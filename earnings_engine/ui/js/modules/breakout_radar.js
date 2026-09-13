@@ -2359,29 +2359,49 @@
             if (tvPopout) tvPopout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
 
             container.innerHTML = `
-                <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, #06070a 70%); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 1.5rem 1.2rem; text-align: center; box-sizing: border-box; font-family: var(--font-sans);">
-                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.8rem; box-shadow: 0 0 20px rgba(245,158,11,0.2);">
+                <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, #06070a 70%); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 1.5rem 1.2rem; text-align: center; box-sizing: border-box; font-family: var(--font-sans); overflow-y: auto;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.6rem; box-shadow: 0 0 20px rgba(245,158,11,0.2);">
                         📊
                     </div>
                     <div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc; font-family: var(--font-heading, sans-serif); letter-spacing: -0.01em;">
                         GoCharting Order Flow &amp; Footprint Terminal
                     </div>
-                    <div style="font-size: 0.76rem; color: #94a3b8; max-width: 460px; margin-top: 0.35rem; line-height: 1.45;">
-                        Direct access to real-time Footprint charts, Volume Profile (POC/VAH/VAL), Cluster Delta, and Order Book Walls for <strong style="color: #fbbf24; font-family: var(--font-mono);">${gcSymbol}</strong>.
+                    <div style="font-size: 0.74rem; color: #94a3b8; max-width: 480px; margin-top: 0.25rem; line-height: 1.45;">
+                        Real-time Footprint clusters, Volume Profile (POC/VAH/VAL), CVD Imbalance, and BSE Order Book Walls for <strong style="color: #fbbf24; font-family: var(--font-mono);">${gcSymbol}</strong>.
+                    </div>
+
+                    <!-- Live Calculated Order Flow Strip -->
+                    <div id="gcOrderFlowMetricsStrip" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; width: 100%; max-width: 520px; margin-top: 0.9rem; text-align: center; font-family: var(--font-mono); font-size: 0.68rem;">
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
+                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Point of Control</div>
+                            <div id="gcPocVal" style="font-weight: 800; color: #fbbf24; margin-top: 2px;">--</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
+                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Value Area High</div>
+                            <div id="gcVahVal" style="font-weight: 800; color: #38bdf8; margin-top: 2px;">--</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
+                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Value Area Low</div>
+                            <div id="gcValVal" style="font-weight: 800; color: #34d399; margin-top: 2px;">--</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
+                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">CVD Flow Bias</div>
+                            <div id="gcDeltaBiasVal" style="font-weight: 800; color: #a78bfa; margin-top: 2px;">CALCULATING...</div>
+                        </div>
                     </div>
 
                     <!-- Direct Launch CTA -->
-                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; justify-content: center;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center;">
                         <a href="${gcUrl}" target="_blank" rel="noopener noreferrer" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000000; font-weight: 800; font-size: 0.82rem; padding: 0.55rem 1.25rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(245,158,11,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
                             <span>🚀 Launch GoCharting Terminal (${gcSymbol}) ↗</span>
                         </a>
                         <button type="button" onclick="app.switchBreakoutChartMode('tv')" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-weight: 700; font-size: 0.78rem; padding: 0.55rem 0.95rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <span>⚡ Switch to TV Embed</span>
+                            <span>⚡ Switch to TV Embed (BSE)</span>
                         </button>
                     </div>
 
                     <!-- Features Matrix Grid -->
-                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; width: 100%; max-width: 480px; margin-top: 1.2rem; text-align: left; font-size: 0.70rem; font-family: var(--font-mono);">
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; width: 100%; max-width: 520px; margin-top: 1rem; text-align: left; font-size: 0.70rem; font-family: var(--font-mono);">
                         <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
                             <div style="color: #fbbf24; font-weight: 700;">🔥 Footprint &amp; Imbalance</div>
                             <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Bid/Ask execution clusters &amp; delta absorption</div>
@@ -2401,6 +2421,27 @@
                     </div>
                 </div>
             `;
+
+            // Asynchronously populate live order flow analytics from backend API
+            fetch(`${API_BASE}/api/v1/breakout-radar/orderflow/${encodeURIComponent(ticker)}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data || !data.success) return;
+                    const pocEl = document.getElementById('gcPocVal');
+                    const vahEl = document.getElementById('gcVahVal');
+                    const valEl = document.getElementById('gcValVal');
+                    const biasEl = document.getElementById('gcDeltaBiasVal');
+
+                    if (pocEl && data.volume_profile) pocEl.textContent = `₹${data.volume_profile.poc.toLocaleString('en-IN')}`;
+                    if (vahEl && data.volume_profile) vahEl.textContent = `₹${data.volume_profile.vah.toLocaleString('en-IN')}`;
+                    if (valEl && data.volume_profile) valEl.textContent = `₹${data.volume_profile.val.toLocaleString('en-IN')}`;
+                    if (biasEl && data.order_flow) {
+                        const regime = data.order_flow.delta_regime;
+                        biasEl.textContent = regime;
+                        biasEl.style.color = regime === 'ACCUMULATION' ? '#34d399' : (regime === 'DISTRIBUTION' ? '#fb7185' : '#fbbf24');
+                    }
+                })
+                .catch(() => {});
         };
 
         app.initBreakoutTradingViewWidget = function(ticker) {

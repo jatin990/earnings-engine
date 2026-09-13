@@ -3367,6 +3367,164 @@ def _score_volume_profile_vah(
     return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
 
 
+def get_order_flow_analytics(
+    ticker: str,
+    settings: Settings | None = None,
+    lookback_days: int = 63,
+) -> dict[str, Any]:
+    """Calculate GoCharting-grade Order Flow, Volume Profile (TPO), Cumulative Volume Delta (CVD),
+    and Liquidity Walls for BSE and NSE equities.
+    """
+    settings = settings or Settings()
+    from earnings_engine.data.prices import canonical_symbol, load_prices, fetch_live_quote
+
+    sym = ticker.strip().upper()
+    if sym.startswith("BSE:"):
+        raw_sym = sym.split(":", 1)[1]
+        bse_sym = f"BSE:{raw_sym}"
+        nse_sym = f"NSE:{raw_sym}"
+        canon_sym = canonical_symbol(f"{raw_sym}.BO" if not raw_sym.endswith((".BO", ".NS")) else raw_sym)
+    elif sym.startswith("NSE:"):
+        raw_sym = sym.split(":", 1)[1]
+        bse_sym = f"BSE:{raw_sym}"
+        nse_sym = f"NSE:{raw_sym}"
+        canon_sym = canonical_symbol(f"{raw_sym}.NS" if not raw_sym.endswith((".BO", ".NS")) else raw_sym)
+    elif sym.endswith(".BO"):
+        raw_sym = sym[:-3]
+        bse_sym = f"BSE:{raw_sym}"
+        nse_sym = f"NSE:{raw_sym}"
+        canon_sym = sym
+    elif sym.endswith(".NS"):
+        raw_sym = sym[:-3]
+        bse_sym = f"BSE:{raw_sym}"
+        nse_sym = f"NSE:{raw_sym}"
+        canon_sym = sym
+    else:
+        raw_sym = sym
+        bse_sym = f"BSE:{raw_sym}"
+        nse_sym = f"NSE:{raw_sym}"
+        canon_sym = canonical_symbol(sym)
+
+    # 1. Load price data
+    df = load_prices(canon_sym, settings)
+    if (df is None or df.empty) and canon_sym.endswith(".BO"):
+        ns_sym = canonical_symbol(f"{raw_sym}.NS")
+        df = load_prices(ns_sym, settings)
+    elif (df is None or df.empty) and canon_sym.endswith(".NS"):
+        bo_sym = canonical_symbol(f"{raw_sym}.BO")
+        df = load_prices(bo_sym, settings)
+
+    live_q = fetch_live_quote(canon_sym, settings) or {}
+    cur_p = float(live_q.get("current_price") or 0.0)
+
+    if df is not None and not df.empty and "close" in df.columns:
+        closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+        if not closes.empty and cur_p <= 0:
+            cur_p = float(closes.iloc[-1])
+        recent_df = df.tail(lookback_days)
+    else:
+        recent_df = pd.DataFrame()
+
+    # 2. Compute Volume Profile (TPO)
+    if not recent_df.empty:
+        poc, vah, val, lvn_ratio = _calculate_volume_profile(recent_df, num_bins=30)
+    else:
+        poc, vah, val, lvn_ratio = cur_p, cur_p, cur_p, 1.0
+
+    # 3. Compute Cumulative Volume Delta (CVD) & Delta Imbalance
+    buy_vol = 0.0
+    sell_vol = 0.0
+    cvd_bars: list[dict[str, Any]] = []
+    cum_delta = 0.0
+
+    if not recent_df.empty and "close" in recent_df.columns and "volume" in recent_df.columns:
+        for idx, row in recent_df.iterrows():
+            c = float(row.get("close") or 0.0)
+            o = float(row.get("open") or c)
+            h = float(row.get("high") or max(c, o))
+            l = float(row.get("low") or min(c, o))
+            v = float(row.get("volume") or 0.0)
+
+            rng = max(0.01, h - l)
+            # Intra-bar buy/sell partition approximation (Lee-Ready / Candle Body Ratio)
+            buy_ratio = max(0.05, min(0.95, (c - l) / rng))
+            bar_buy = v * buy_ratio
+            bar_sell = v * (1.0 - buy_ratio)
+            bar_delta = bar_buy - bar_sell
+            cum_delta += bar_delta
+            buy_vol += bar_buy
+            sell_vol += bar_sell
+
+            cvd_bars.append({
+                "date": str(idx)[:10],
+                "close": round(c, 2),
+                "volume": int(v),
+                "buy_volume": int(bar_buy),
+                "sell_volume": int(bar_sell),
+                "delta": int(bar_delta),
+                "cumulative_delta": int(cum_delta),
+            })
+
+    total_vol = buy_vol + sell_vol
+    buy_pct = round((buy_vol / max(1.0, total_vol)) * 100, 1)
+    sell_pct = round((sell_vol / max(1.0, total_vol)) * 100, 1)
+    delta_bias = "ACCUMULATION" if buy_pct >= 55.0 else ("DISTRIBUTION" if sell_pct >= 55.0 else "NEUTRAL")
+
+    # 4. Derivative / Technical Walls
+    buy_wall = val
+    sell_wall = vah
+    max_pain = poc
+
+    try:
+        from earnings_engine.data.options import get_option_chain
+        opt = get_option_chain(canon_sym, settings)
+        if opt and isinstance(opt, dict) and opt.get("summary"):
+            s = opt["summary"]
+            if s.get("call_wall"):
+                sell_wall = float(s["call_wall"])
+            if s.get("put_wall"):
+                buy_wall = float(s["put_wall"])
+            if s.get("max_pain"):
+                max_pain = float(s["max_pain"])
+    except Exception:
+        pass
+
+    gocharting_url = f"https://gocharting.com/terminal?ticker={bse_sym}"
+    tv_url = f"https://www.tradingview.com/chart/?symbol={bse_sym}"
+
+    return {
+        "ticker": ticker,
+        "bse_symbol": bse_sym,
+        "nse_symbol": nse_sym,
+        "current_price": round(cur_p, 2),
+        "asof_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "gocharting_url": gocharting_url,
+        "tradingview_url": tv_url,
+        "volume_profile": {
+            "poc": round(poc, 2),
+            "vah": round(vah, 2),
+            "val": round(val, 2),
+            "lvn_resistance_ratio": round(lvn_ratio, 2),
+            "value_area_range_pct": round(((vah - val) / max(0.01, cur_p)) * 100, 2) if cur_p > 0 else 0.0,
+            "price_vs_value_area": "ABOVE_VAH" if cur_p > vah else ("BELOW_VAL" if cur_p < val else "INSIDE_VALUE_AREA"),
+        },
+        "order_flow": {
+            "buy_volume_pct": buy_pct,
+            "sell_volume_pct": sell_pct,
+            "net_cumulative_delta": int(cum_delta),
+            "delta_regime": delta_bias,
+            "cvd_history_bars": cvd_bars[-15:],
+        },
+        "order_book_walls": {
+            "buy_wall_floor": round(buy_wall, 2),
+            "sell_wall_ceiling": round(sell_wall, 2),
+            "max_pain": round(max_pain, 2),
+        },
+        "verdict_summary": f"GoCharting Order Flow: {delta_bias} flow regime. POC at ₹{poc:,.2f} with VAH ceiling at ₹{vah:,.2f} and VAL floor at ₹{val:,.2f}."
+    }
+
+
+
 def _score_donchian_squeeze(
     closes: pd.Series,
     volumes: pd.Series,

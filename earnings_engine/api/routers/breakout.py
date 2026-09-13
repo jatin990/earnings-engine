@@ -571,6 +571,28 @@ async def evaluate_single_breakout(
         raise HTTPException(status_code=500, detail=f"Error evaluating breakout: {str(e)}")
 
 
+@router.get("/api/v1/breakout-radar/orderflow/{ticker}")
+@router.get("/api/v1/orderflow/{ticker}")
+async def get_order_flow_endpoint(
+    ticker: str,
+    lookback_days: int = Query(63, ge=10, le=252, description="Lookback sessions for Volume Profile & CVD"),
+):
+    """Retrieve GoCharting-grade Order Flow, Volume Profile (POC/VAH/VAL), CVD Delta Imbalance,
+    and Order Book Walls for BSE/NSE tickers.
+    """
+    try:
+        data = await asyncio.to_thread(
+            breakout_scanner_mod.get_order_flow_analytics,
+            ticker=ticker,
+            settings=_settings,
+            lookback_days=lookback_days,
+        )
+        return {"success": True, **data}
+    except Exception as e:
+        logger.exception("Error in get_order_flow_endpoint: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error computing order flow analytics: {str(e)}")
+
+
 @router.post("/api/v1/breakout-radar/set-tier/{ticker}")
 async def set_breakout_tier(
     ticker: str,

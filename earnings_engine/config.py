@@ -225,11 +225,16 @@ def market_of(ticker: str) -> str:
     sym = ticker.strip().upper()
     if sym.endswith(".NS") or sym.endswith(".BO"):
         return "IN"
-    # Known NSE indices
+    if sym.startswith("BSE:") or sym.startswith("NSE:"):
+        return "IN"
+    # Known NSE & BSE Indian indices
     index_names = {
         "NIFTY", "NIFTY50", "NIFTY 50", "BANKNIFTY", "NIFTY BANK",
         "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYIT", "NIFTY IT",
         "^NSEI", "^NSEBANK", "^CNXIT", "^CNXFIN",
+        "SENSEX", "BSESENSEX", "^BSESN", "BSE:SENSEX", "BSE100", "BSE200", "BSE500",
+        "BSEBANK", "BSEAUTO", "BSEIT", "BSEFMCG", "BSEPOWER", "BSEMETAL", "BSEHEALTHCARE",
+        "BSECAP", "BSEMIDCAP", "BSESMALLCAP",
     }
     if sym in index_names:
         return "IN"
