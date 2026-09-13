@@ -2358,21 +2358,48 @@
             const tvPopout = document.getElementById('bkInspTvPopoutLink');
             if (tvPopout) tvPopout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
 
-            const existingIframe = container.querySelector('iframe');
-            if (existingIframe && existingIframe.getAttribute('data-ticker') === gcSymbol) {
-                return;
-            }
-
             container.innerHTML = `
-                <iframe
-                    id="bkInspGoChartingIframe"
-                    data-ticker="${gcSymbol}"
-                    src="${gcUrl}"
-                    style="width: 100%; height: 100%; border: none; background: #050508; border-radius: 4px;"
-                    allow="fullscreen; clipboard-read; clipboard-write;"
-                    loading="lazy"
-                    title="GoCharting Terminal - ${gcSymbol}">
-                </iframe>
+                <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, #06070a 70%); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 1.5rem 1.2rem; text-align: center; box-sizing: border-box; font-family: var(--font-sans);">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.8rem; box-shadow: 0 0 20px rgba(245,158,11,0.2);">
+                        📊
+                    </div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc; font-family: var(--font-heading, sans-serif); letter-spacing: -0.01em;">
+                        GoCharting Order Flow &amp; Footprint Terminal
+                    </div>
+                    <div style="font-size: 0.76rem; color: #94a3b8; max-width: 460px; margin-top: 0.35rem; line-height: 1.45;">
+                        Direct access to real-time Footprint charts, Volume Profile (POC/VAH/VAL), Cluster Delta, and Order Book Walls for <strong style="color: #fbbf24; font-family: var(--font-mono);">${gcSymbol}</strong>.
+                    </div>
+
+                    <!-- Direct Launch CTA -->
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1.2rem; flex-wrap: wrap; justify-content: center;">
+                        <a href="${gcUrl}" target="_blank" rel="noopener noreferrer" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000000; font-weight: 800; font-size: 0.82rem; padding: 0.55rem 1.25rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(245,158,11,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                            <span>🚀 Launch GoCharting Terminal (${gcSymbol}) ↗</span>
+                        </a>
+                        <button type="button" onclick="app.switchBreakoutChartMode('tv')" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-weight: 700; font-size: 0.78rem; padding: 0.55rem 0.95rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <span>⚡ Switch to TV Embed</span>
+                        </button>
+                    </div>
+
+                    <!-- Features Matrix Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; width: 100%; max-width: 480px; margin-top: 1.2rem; text-align: left; font-size: 0.70rem; font-family: var(--font-mono);">
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
+                            <div style="color: #fbbf24; font-weight: 700;">🔥 Footprint &amp; Imbalance</div>
+                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Bid/Ask execution clusters &amp; delta absorption</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
+                            <div style="color: #34d399; font-weight: 700;">🧱 Order Book Heatmap</div>
+                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Resting liquidity &amp; dynamic support/resistance walls</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
+                            <div style="color: #38bdf8; font-weight: 700;">📈 Market Profile TPO</div>
+                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Point of Control (POC), VAH, VAL value areas</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
+                            <div style="color: #a78bfa; font-weight: 700;">⚡ Real-Time Tick Feed</div>
+                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Ultra low-latency BSE tick stream</div>
+                        </div>
+                    </div>
+                </div>
             `;
         };
 

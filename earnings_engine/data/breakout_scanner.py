@@ -1610,96 +1610,166 @@ def get_tracked_breakouts(
                     if not df.empty and "close" in df.columns:
                         closes = pd.to_numeric(df["close"], errors="coerce").dropna()
                         if not closes.empty:
-                            cur_p = round(float(closes.iloc[-1]), 2)
-                            if lq and lq.get("current_price"):
+                            latest_hist_close = round(float(closes.iloc[-1]), 2)
+                            latest_hist_date = str(df.index[-1])[:10]
+
+                            cur_p = latest_hist_close
+                            if lq and lq.get("current_price") and float(lq.get("current_price") or 0) > 0:
                                 cur_p = float(lq["current_price"])
-                            item_d["current_price"] = cur_p
-                            item_d["current_date"] = str(df.index[-1])[:10]
 
-                            post_df = df.loc[df.index >= sig_date] if sig_date and sig_date in df.index else df.tail(15)
-                            days_elapsed = max(1, len(post_df))
-                            item_d["days_elapsed"] = days_elapsed
+                            # Slicing strictly Point-in-Time starting at signal date
+                            post_df = pd.DataFrame()
+                            if sig_date:
+                                try:
+                                    sig_dt = pd.to_datetime(str(sig_date)[:10]).tz_localize(None)
+                                    df_norm_idx = pd.to_datetime(df.index).tz_localize(None)
+                                    post_mask = df_norm_idx >= sig_dt
+                                    post_df = df.loc[post_mask]
+                                except Exception:
+                                    post_df = pd.DataFrame()
 
-                            if days_elapsed >= 14:
-                                # 14-day post-signal settled trajectory
-                                w14_df = post_df.head(14)
-                                w14_subsequent = w14_df.iloc[1:] if len(w14_df) > 1 else pd.DataFrame()
-                                w14_high = float(pd.to_numeric(w14_df["high"], errors="coerce").dropna().max()) if "high" in w14_df and not w14_df.empty else cur_p
-                                w14_sub_low = float(pd.to_numeric(w14_subsequent["low"], errors="coerce").dropna().min()) if not w14_subsequent.empty and "low" in w14_subsequent else None
-                                w14_close = float(pd.to_numeric(w14_df["close"], errors="coerce").dropna().iloc[-1]) if "close" in w14_df and not w14_df.empty else cur_p
+                            if post_df.empty:
+                                # When signal is newer than price history or created today/weekend:
+                                days_elapsed = 1
+                                item_d["days_elapsed"] = days_elapsed
 
-                                item_d["post_high"] = w14_high
-                                item_d["peak_price"] = w14_high
-                                if sig_p and sig_p > 0:
-                                    item_d["realized_return_pct"] = round(((w14_close - sig_p) / sig_p) * 100, 2)
-                                    item_d["max_gain_pct"] = round(((w14_high - sig_p) / sig_p) * 100, 2)
+                                # Validate if live quote is fresh and on/after signal date
+                                valid_lq_price = False
+                                if lq and lq.get("current_price") and float(lq.get("current_price") or 0) > 0:
+                                    lq_ts = str(lq.get("quote_timestamp") or lq.get("last_updated") or "")[:10]
+                                    sig_d_str = str(sig_date)[:10] if sig_date else ""
+                                    if not sig_d_str or not lq_ts or lq_ts >= sig_d_str:
+                                        cur_p = float(lq["current_price"])
+                                        valid_lq_price = True
 
-                                item_d["is_live_recent"] = False
-                                item_d["settled_14d"] = True
+                                if not valid_lq_price and sig_p:
+                                    cur_p = sig_p
 
-                                if target_p and w14_high >= target_p:
-                                    item_d["outcome"] = "TARGET_HIT"
-                                    item_d["outcome_label"] = "Target Hit 🎯 (14D)"
-                                    item_d["outcome_badge"] = "TARGET_HIT"
-                                    item_d["breakout_happened"] = True
-                                    item_d["what_happened_summary"] = f"🎯 Reached upside target ₹{target_p:,.2f} within 14-day horizon (+{item_d.get('max_gain_pct',0):.1f}% peak)."
-                                elif stop_p and ((w14_sub_low is not None and w14_sub_low <= stop_p) or w14_close <= stop_p):
-                                    item_d["outcome"] = "STOP_HIT"
-                                    item_d["outcome_label"] = "Stop Hit 🛑 (14D)"
-                                    item_d["outcome_badge"] = "STOP_HIT"
-                                    item_d["breakout_happened"] = False
-                                    item_d["what_happened_summary"] = f"🛑 Breached protective stop at ₹{stop_p:,.2f} within 14-day window."
-                                elif sig_p and w14_close >= sig_p:
-                                    item_d["outcome"] = "TRIGGERED"
-                                    item_d["outcome_label"] = f"Breakout Succeeded 🚀 (+{item_d.get('realized_return_pct',0):.1f}% 14D)"
-                                    item_d["outcome_badge"] = "TRIGGERED"
-                                    item_d["breakout_happened"] = True
-                                    item_d["what_happened_summary"] = f"🚀 Settled +{item_d.get('realized_return_pct',0):.1f}% in profit over 14-day post-breakout period."
-                                else:
-                                    item_d["outcome"] = "BREAKOUT_RETRACED"
-                                    item_d["outcome_label"] = "Breakout Retraced ⚠️ (14D)"
-                                    item_d["outcome_badge"] = "BREAKOUT_RETRACED"
-                                    item_d["breakout_happened"] = False
-                                    item_d["what_happened_summary"] = f"⚠️ Breakout pulled back to ₹{w14_close:,.2f} by day 14."
-                            else:
-                                # Recently broken out (< 14 days) -> LIVE tracking!
-                                post_subsequent = post_df.iloc[1:] if len(post_df) > 1 else pd.DataFrame()
-                                post_high = float(pd.to_numeric(post_df["high"], errors="coerce").dropna().max()) if "high" in post_df and not post_df.empty else cur_p
-                                post_sub_low = float(pd.to_numeric(post_subsequent["low"], errors="coerce").dropna().min()) if not post_subsequent.empty and "low" in post_subsequent else None
-
-                                item_d["post_high"] = post_high
-                                item_d["peak_price"] = post_high
+                                item_d["current_price"] = cur_p
+                                item_d["current_date"] = str(sig_date)[:10] if sig_date else latest_hist_date
+                                item_d["post_high"] = max(cur_p, sig_p or cur_p)
+                                item_d["peak_price"] = item_d["post_high"]
                                 if sig_p and sig_p > 0:
                                     item_d["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
-                                    item_d["max_gain_pct"] = round(((post_high - sig_p) / sig_p) * 100, 2)
+                                    item_d["max_gain_pct"] = round(((item_d["post_high"] - sig_p) / sig_p) * 100, 2)
+                                else:
+                                    item_d["realized_return_pct"] = 0.0
+                                    item_d["max_gain_pct"] = 0.0
 
                                 item_d["is_live_recent"] = True
                                 item_d["settled_14d"] = False
 
-                                if target_p and (cur_p >= target_p or post_high >= target_p):
+                                if target_p and (cur_p >= target_p or item_d["post_high"] >= target_p):
                                     item_d["outcome"] = "TARGET_HIT"
-                                    item_d["outcome_label"] = f"Target Hit 🎯 (Live D{days_elapsed})"
+                                    item_d["outcome_label"] = "Target Hit 🎯 (Live D1)"
                                     item_d["outcome_badge"] = "TARGET_HIT"
                                     item_d["breakout_happened"] = True
-                                    item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day {days_elapsed}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
-                                elif stop_p and (cur_p <= stop_p or (post_sub_low is not None and post_sub_low <= stop_p)):
+                                    item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day 1 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
+                                elif stop_p and cur_p <= stop_p:
                                     item_d["outcome"] = "STOP_HIT"
-                                    item_d["outcome_label"] = f"Stop Hit 🛑 (Live D{days_elapsed})"
+                                    item_d["outcome_label"] = "Stop Hit 🛑 (Live D1)"
                                     item_d["outcome_badge"] = "STOP_HIT"
                                     item_d["breakout_happened"] = False
-                                    item_d["what_happened_summary"] = f"🛑 Hit stop loss ₹{stop_p:,.2f} on Day {days_elapsed}/14."
+                                    item_d["what_happened_summary"] = f"🛑 Hit stop loss ₹{stop_p:,.2f} on Day 1."
                                 elif sig_p and cur_p >= sig_p:
                                     item_d["outcome"] = "TRIGGERED"
-                                    item_d["outcome_label"] = f"Live Active 🟢 (+{item_d.get('realized_return_pct',0):.1f}% D{days_elapsed})"
+                                    item_d["outcome_label"] = f"Live Active 🟢 (+{item_d.get('realized_return_pct',0):.1f}% D1)"
                                     item_d["outcome_badge"] = "TRIGGERED"
                                     item_d["breakout_happened"] = True
-                                    item_d["what_happened_summary"] = f"🟢 Holding breakout gains at ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return on Day {days_elapsed}/14)."
+                                    item_d["what_happened_summary"] = f"🟢 Holding breakout gains at ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return on Day 1/14)."
                                 else:
                                     item_d["outcome"] = "BREAKOUT_RETRACED"
-                                    item_d["outcome_label"] = f"Breakout Retraced ⚠️ ({item_d.get('realized_return_pct',0):+.1f}% Live D{days_elapsed})"
+                                    item_d["outcome_label"] = f"Breakout Retraced ⚠️ ({item_d.get('realized_return_pct',0):+.1f}% Live D1)"
                                     item_d["outcome_badge"] = "BREAKOUT_RETRACED"
                                     item_d["breakout_happened"] = False
-                                    item_d["what_happened_summary"] = f"⚠️ Breached trigger to peak ₹{post_high:,.2f} (+{item_d.get('max_gain_pct',0):.1f}%) but retraced to ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return)."
+                                    item_d["what_happened_summary"] = f"⚠️ Pulled back to ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return on Day 1)."
+                            else:
+                                days_elapsed = max(1, len(post_df))
+                                item_d["days_elapsed"] = days_elapsed
+                                item_d["current_price"] = cur_p
+                                item_d["current_date"] = latest_hist_date
+
+                                if days_elapsed >= 14:
+                                    # 14-day post-signal settled trajectory
+                                    w14_df = post_df.head(14)
+                                    w14_subsequent = w14_df.iloc[1:] if len(w14_df) > 1 else pd.DataFrame()
+                                    w14_high = float(pd.to_numeric(w14_df["high"], errors="coerce").dropna().max()) if "high" in w14_df and not w14_df.empty else cur_p
+                                    w14_sub_low = float(pd.to_numeric(w14_subsequent["low"], errors="coerce").dropna().min()) if not w14_subsequent.empty and "low" in w14_subsequent else None
+                                    w14_close = float(pd.to_numeric(w14_df["close"], errors="coerce").dropna().iloc[-1]) if "close" in w14_df and not w14_df.empty else cur_p
+
+                                    item_d["post_high"] = w14_high
+                                    item_d["peak_price"] = w14_high
+                                    if sig_p and sig_p > 0:
+                                        item_d["realized_return_pct"] = round(((w14_close - sig_p) / sig_p) * 100, 2)
+                                        item_d["max_gain_pct"] = round(((w14_high - sig_p) / sig_p) * 100, 2)
+
+                                    item_d["is_live_recent"] = False
+                                    item_d["settled_14d"] = True
+
+                                    if target_p and w14_high >= target_p:
+                                        item_d["outcome"] = "TARGET_HIT"
+                                        item_d["outcome_label"] = "Target Hit 🎯 (14D)"
+                                        item_d["outcome_badge"] = "TARGET_HIT"
+                                        item_d["breakout_happened"] = True
+                                        item_d["what_happened_summary"] = f"🎯 Reached upside target ₹{target_p:,.2f} within 14-day horizon (+{item_d.get('max_gain_pct',0):.1f}% peak)."
+                                    elif stop_p and ((w14_sub_low is not None and w14_sub_low <= stop_p) or w14_close <= stop_p):
+                                        item_d["outcome"] = "STOP_HIT"
+                                        item_d["outcome_label"] = "Stop Hit 🛑 (14D)"
+                                        item_d["outcome_badge"] = "STOP_HIT"
+                                        item_d["breakout_happened"] = False
+                                        item_d["what_happened_summary"] = f"🛑 Breached protective stop at ₹{stop_p:,.2f} within 14-day window."
+                                    elif sig_p and w14_close >= sig_p:
+                                        item_d["outcome"] = "TRIGGERED"
+                                        item_d["outcome_label"] = f"Breakout Succeeded 🚀 (+{item_d.get('realized_return_pct',0):.1f}% 14D)"
+                                        item_d["outcome_badge"] = "TRIGGERED"
+                                        item_d["breakout_happened"] = True
+                                        item_d["what_happened_summary"] = f"🚀 Settled +{item_d.get('realized_return_pct',0):.1f}% in profit over 14-day post-breakout period."
+                                    else:
+                                        item_d["outcome"] = "BREAKOUT_RETRACED"
+                                        item_d["outcome_label"] = "Breakout Retraced ⚠️ (14D)"
+                                        item_d["outcome_badge"] = "BREAKOUT_RETRACED"
+                                        item_d["breakout_happened"] = False
+                                        item_d["what_happened_summary"] = f"⚠️ Breakout pulled back to ₹{w14_close:,.2f} by day 14."
+                                else:
+                                    # Recently broken out (< 14 days) -> LIVE tracking!
+                                    post_subsequent = post_df.iloc[1:] if len(post_df) > 1 else pd.DataFrame()
+                                    post_high = float(pd.to_numeric(post_df["high"], errors="coerce").dropna().max()) if "high" in post_df and not post_df.empty else cur_p
+                                    post_sub_low = float(pd.to_numeric(post_subsequent["low"], errors="coerce").dropna().min()) if not post_subsequent.empty and "low" in post_subsequent else None
+                                    post_high = max(post_high, cur_p)
+
+                                    item_d["post_high"] = post_high
+                                    item_d["peak_price"] = post_high
+                                    if sig_p and sig_p > 0:
+                                        item_d["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
+                                        item_d["max_gain_pct"] = round(((post_high - sig_p) / sig_p) * 100, 2)
+
+                                    item_d["is_live_recent"] = True
+                                    item_d["settled_14d"] = False
+
+                                    if target_p and (cur_p >= target_p or post_high >= target_p):
+                                        item_d["outcome"] = "TARGET_HIT"
+                                        item_d["outcome_label"] = f"Target Hit 🎯 (Live D{days_elapsed})"
+                                        item_d["outcome_badge"] = "TARGET_HIT"
+                                        item_d["breakout_happened"] = True
+                                        item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day {days_elapsed}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
+                                    elif stop_p and (cur_p <= stop_p or (post_sub_low is not None and post_sub_low <= stop_p)):
+                                        item_d["outcome"] = "STOP_HIT"
+                                        item_d["outcome_label"] = f"Stop Hit 🛑 (Live D{days_elapsed})"
+                                        item_d["outcome_badge"] = "STOP_HIT"
+                                        item_d["breakout_happened"] = False
+                                        item_d["what_happened_summary"] = f"🛑 Hit stop loss ₹{stop_p:,.2f} on Day {days_elapsed}/14."
+                                    elif sig_p and cur_p >= sig_p:
+                                        item_d["outcome"] = "TRIGGERED"
+                                        item_d["outcome_label"] = f"Live Active 🟢 (+{item_d.get('realized_return_pct',0):.1f}% D{days_elapsed})"
+                                        item_d["outcome_badge"] = "TRIGGERED"
+                                        item_d["breakout_happened"] = True
+                                        item_d["what_happened_summary"] = f"🟢 Holding breakout gains at ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return on Day {days_elapsed}/14)."
+                                    else:
+                                        item_d["outcome"] = "BREAKOUT_RETRACED"
+                                        item_d["outcome_label"] = f"Breakout Retraced ⚠️ ({item_d.get('realized_return_pct',0):+.1f}% Live D{days_elapsed})"
+                                        item_d["outcome_badge"] = "BREAKOUT_RETRACED"
+                                        item_d["breakout_happened"] = False
+                                        item_d["what_happened_summary"] = f"⚠️ Breached trigger to peak ₹{post_high:,.2f} (+{item_d.get('max_gain_pct',0):.1f}%) but retraced to ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return)."
                 except Exception as ex:
                     logger.debug("Failed processing tracked breakout for %s: %s", t, ex)
 

@@ -219,19 +219,20 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
 
     Reuses the cache when the last fetch is under ``ttl_minutes`` old, when the
     market has already closed for the day or it is a weekend (prices are settled),
-    or when there is no recorded fetch stamp (legacy/seeded rows).
+    provided the cached rows are reasonably fresh.
     """
     sym = canonical_symbol(ticker)
-    fetched = _fetch_log_time(sym, settings)
-    if fetched is None:
-        return True
+    last_cached = _last_cached_date(sym, settings)
+    if last_cached is None:
+        return False
 
+    fetched = _fetch_log_time(sym, settings)
     now = datetime.now()
+
     # On weekends (Saturday & Sunday), markets are closed and Friday prices are fully settled
     if now.weekday() >= 5:
         session = _get_market_session_status(sym)
         last_trading_date = session.get("last_trading_date")
-        last_cached = _last_cached_date(sym, settings)
         if last_cached is not None and last_trading_date:
             try:
                 if last_cached.strftime("%Y-%m-%d") >= last_trading_date:
@@ -249,6 +250,10 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
             except Exception:
                 pass
         return False
+
+    if fetched is None:
+        # Check if last_cached is within 5 business days
+        return (now - last_cached).total_seconds() <= 5 * 86400
 
     if (now - fetched).total_seconds() <= ttl_minutes * 60:
         return True
@@ -988,6 +993,15 @@ def _is_cached_quote_fresh(
         # 1. Price history bar is already settled on or after Friday's date
         if cur_date and friday_date and cur_date >= friday_date:
             return True
+        # If cur_date is older than Friday by more than 4 days, SQLite price_history is stale
+        if cur_date and friday_date:
+            try:
+                c_dt = datetime.strptime(cur_date, "%Y-%m-%d").date()
+                f_dt = datetime.strptime(friday_date, "%Y-%m-%d").date()
+                if (f_dt - c_dt).days > 4:
+                    return False
+            except Exception:
+                pass
         # 2. Or quote was fetched after Friday market close
         if fetched_at_dt:
             if friday_close_dt:

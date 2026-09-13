@@ -123,6 +123,7 @@ def test_build_quote_from_cached_record_structure_and_metrics():
         "day_open", "day_high", "day_low", "week_52_high", "week_52_low",
         "volume", "avg_volume", "market_cap", "currency", "is_live",
         "last_updated", "pct_from_52w_high", "pct_from_52w_low",
+        "quote_timestamp", "price_delay_status", "is_price_stale",
     }
     assert set(quote.keys()) == expected_keys
     assert quote["ticker"] == "TEST.NS"
