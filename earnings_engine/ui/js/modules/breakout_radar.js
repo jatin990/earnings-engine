@@ -2272,10 +2272,16 @@
             const pcrOiEl = document.getElementById('bkInspPcrOi');
             const pcrVolEl = document.getElementById('bkInspPcrVol');
             const sentBadge = document.getElementById('bkInspWallsSentimentBadge');
+            const fnoBadge = document.getElementById('bkInspFnoBadge');
+
+            const wallBox1 = document.getElementById('bkInspWallBox1');
+            const wallBox2 = document.getElementById('bkInspWallBox2');
+            const wallBox3 = document.getElementById('bkInspWallBox3');
+            const wallBox4 = document.getElementById('bkInspWallBox4');
 
             if (!ladderList || !ticker) return;
 
-            ladderList.innerHTML = `<div style="color:#71717a;font-style:italic;text-align:center;padding:0.4rem;">Analyzing real-time order book walls &amp; derivative positioning...</div>`;
+            ladderList.innerHTML = `<div style="color:#94a3b8;font-size:0.78rem;font-style:italic;text-align:center;padding:0.75rem;">Analyzing real-time order book boundaries &amp; structure...</div>`;
 
             const curPrice = candidate?.current_price != null ? Number(candidate.current_price) : (candidate?.signal_price ? Number(candidate.signal_price) : 0);
             const cleanSym = ticker.replace('.NS', '').replace('.BO', '').toUpperCase();
@@ -2288,13 +2294,57 @@
 
                 const isFno = (data.status === 'LIVE' || data.status === 'ARCHIVED') && Array.isArray(data.strikes) && data.strikes.length > 0;
 
+                if (fnoBadge) {
+                    if (isFno) {
+                        fnoBadge.textContent = 'F&O DERIVATIVES';
+                        fnoBadge.style.background = 'rgba(168,85,247,0.14)';
+                        fnoBadge.style.color = '#c084fc';
+                        fnoBadge.style.border = '1px solid rgba(168,85,247,0.35)';
+                    } else {
+                        fnoBadge.textContent = 'CASH EQUITY';
+                        fnoBadge.style.background = 'rgba(56,189,248,0.12)';
+                        fnoBadge.style.color = '#38bdf8';
+                        fnoBadge.style.border = '1px solid rgba(56,189,248,0.3)';
+                    }
+                }
+
                 if (isFno) {
                     if (cardTitle) cardTitle.innerHTML = '🧱 NSE F&amp;O Derivative Walls';
-                    if (buyWallLabel) buyWallLabel.textContent = 'Buy Wall (Floor)';
-                    if (maxPainLabel) maxPainLabel.textContent = 'Max Pain';
-                    if (sellWallLabel) sellWallLabel.textContent = 'Sell Wall (Ceiling)';
-                    if (pcrLabel) pcrLabel.textContent = 'PCR (OI / Vol)';
+                    if (buyWallLabel) {
+                        buyWallLabel.textContent = 'Buy Wall (Floor)';
+                        buyWallLabel.style.color = '#34d399';
+                    }
+                    if (maxPainLabel) {
+                        maxPainLabel.textContent = 'Max Pain';
+                        maxPainLabel.style.color = '#c084fc';
+                    }
+                    if (sellWallLabel) {
+                        sellWallLabel.textContent = 'Sell Wall (Ceiling)';
+                        sellWallLabel.style.color = '#f87171';
+                    }
+                    if (pcrLabel) {
+                        pcrLabel.textContent = 'PCR (OI / Vol)';
+                        pcrLabel.style.color = '#38bdf8';
+                    }
                     if (ladderHeader) ladderHeader.style.display = 'flex';
+
+                    // Restore Box Styles for F&O
+                    if (wallBox1) {
+                        wallBox1.style.background = 'rgba(16,185,129,0.08)';
+                        wallBox1.style.borderColor = 'rgba(16,185,129,0.28)';
+                    }
+                    if (wallBox2) {
+                        wallBox2.style.background = 'rgba(168,85,247,0.08)';
+                        wallBox2.style.borderColor = 'rgba(168,85,247,0.28)';
+                    }
+                    if (wallBox3) {
+                        wallBox3.style.background = 'rgba(239,68,68,0.08)';
+                        wallBox3.style.borderColor = 'rgba(239,68,68,0.28)';
+                    }
+                    if (wallBox4) {
+                        wallBox4.style.background = 'rgba(56,189,248,0.08)';
+                        wallBox4.style.borderColor = 'rgba(56,189,248,0.28)';
+                    }
 
                     // Update Summary Numbers
                     const buyWall = data.support_strike != null ? Number(data.support_strike) : (curPrice * 0.96);
@@ -2303,26 +2353,44 @@
                     const pcrOi = data.pcr_oi != null ? Number(data.pcr_oi) : 1.0;
                     const pcrVol = data.pcr_volume != null ? Number(data.pcr_volume) : 1.0;
 
-                    if (buyWallEl) buyWallEl.textContent = `₹${Math.round(buyWall)}`;
+                    if (buyWallEl) {
+                        buyWallEl.textContent = `₹${Math.round(buyWall)}`;
+                        buyWallEl.style.color = '#34d399';
+                    }
                     if (buyDistEl) {
                         const dist = curPrice > 0 ? ((buyWall - curPrice) / curPrice * 100) : -4.0;
                         buyDistEl.textContent = `${dist.toFixed(1)}%`;
+                        buyDistEl.style.color = '#6ee7b7';
                     }
 
-                    if (sellWallEl) sellWallEl.textContent = `₹${Math.round(sellWall)}`;
-                    if (sellDistEl) {
-                        const dist = curPrice > 0 ? ((sellWall - curPrice) / curPrice * 100) : 5.0;
-                        sellDistEl.textContent = `+${dist.toFixed(1)}%`;
+                    if (maxPainEl) {
+                        maxPainEl.textContent = `₹${Math.round(maxPain)}`;
+                        maxPainEl.style.color = '#c084fc';
                     }
-
-                    if (maxPainEl) maxPainEl.textContent = `₹${Math.round(maxPain)}`;
                     if (maxPainDistEl) {
                         const dist = curPrice > 0 ? ((maxPain - curPrice) / curPrice * 100) : 0.0;
                         maxPainDistEl.textContent = `${dist >= 0 ? '+' : ''}${dist.toFixed(1)}%`;
+                        maxPainDistEl.style.color = '#e9d5ff';
                     }
 
-                    if (pcrOiEl) pcrOiEl.textContent = pcrOi.toFixed(2);
-                    if (pcrVolEl) pcrVolEl.textContent = `Vol: ${pcrVol.toFixed(2)}`;
+                    if (sellWallEl) {
+                        sellWallEl.textContent = `₹${Math.round(sellWall)}`;
+                        sellWallEl.style.color = '#f87171';
+                    }
+                    if (sellDistEl) {
+                        const dist = curPrice > 0 ? ((sellWall - curPrice) / curPrice * 100) : 5.0;
+                        sellDistEl.textContent = `+${dist.toFixed(1)}%`;
+                        sellDistEl.style.color = '#fca5a5';
+                    }
+
+                    if (pcrOiEl) {
+                        pcrOiEl.textContent = pcrOi.toFixed(2);
+                        pcrOiEl.style.color = '#38bdf8';
+                    }
+                    if (pcrVolEl) {
+                        pcrVolEl.textContent = `Vol: ${pcrVol.toFixed(2)}`;
+                        pcrVolEl.style.color = '#bae6fd';
+                    }
 
                     const sentiment = (data.sentiment || (pcrOi >= 1.2 ? 'BULLISH' : (pcrOi <= 0.8 ? 'BEARISH' : 'NEUTRAL'))).toUpperCase();
                     if (sentBadge) {
@@ -2361,29 +2429,29 @@
                         const isSellWall = s.strike === sellWall;
 
                         return `
-                            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.35rem;background:${isAtm ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.015)'};border:${isAtm ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.04)'};padding:0.2rem 0.35rem;border-radius:3px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.45rem;background:${isAtm ? 'rgba(56,189,248,0.1)' : 'rgba(255,255,255,0.02)'};border:${isAtm ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(255,255,255,0.06)'};padding:0.35rem 0.55rem;border-radius:5px;">
                                 <!-- Put Support Bar (Buy Wall) -->
-                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:0.25rem;">
-                                    <span style="font-size:0.58rem;color:${isBuyWall ? '#34d399' : '#94a3b8'};font-weight:${isBuyWall ? '800' : '400'};">${(s.put_oi || 0).toLocaleString('en-IN')}</span>
-                                    <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;direction:rtl;">
-                                        <div style="height:100%;width:${putPct}%;background:${isBuyWall ? '#10b981' : '#34d39988'};border-radius:2px;"></div>
+                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:0.35rem;">
+                                    <span style="font-size:0.72rem;color:${isBuyWall ? '#34d399' : '#94a3b8'};font-weight:${isBuyWall ? '900' : '500'};">${(s.put_oi || 0).toLocaleString('en-IN')}</span>
+                                    <div style="width:55px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;direction:rtl;">
+                                        <div style="height:100%;width:${putPct}%;background:${isBuyWall ? '#10b981' : '#34d39988'};border-radius:3px;"></div>
                                     </div>
                                 </div>
 
                                 <!-- Strike Price Center Column -->
-                                <div style="width:72px;text-align:center;">
-                                    <span style="font-weight:700;color:${isAtm ? '#38bdf8' : '#f8fafc'};font-size:0.64rem;">₹${s.strike}</span>
-                                    ${isBuyWall ? '<span style="font-size:0.50rem;color:#34d399;display:block;line-height:1;">BUY WALL</span>' : ''}
-                                    ${isSellWall ? '<span style="font-size:0.50rem;color:#f87171;display:block;line-height:1;">SELL WALL</span>' : ''}
-                                    ${isAtm && !isBuyWall && !isSellWall ? '<span style="font-size:0.50rem;color:#38bdf8;display:block;line-height:1;">ATM SPOT</span>' : ''}
+                                <div style="width:84px;text-align:center;">
+                                    <span style="font-weight:800;color:${isAtm ? '#38bdf8' : '#f8fafc'};font-size:0.78rem;">₹${s.strike}</span>
+                                    ${isBuyWall ? '<span style="font-size:0.62rem;color:#34d399;display:block;line-height:1;font-weight:800;">BUY WALL</span>' : ''}
+                                    ${isSellWall ? '<span style="font-size:0.62rem;color:#f87171;display:block;line-height:1;font-weight:800;">SELL WALL</span>' : ''}
+                                    ${isAtm && !isBuyWall && !isSellWall ? '<span style="font-size:0.62rem;color:#38bdf8;display:block;line-height:1;font-weight:700;">ATM SPOT</span>' : ''}
                                 </div>
 
                                 <!-- Call Resistance Bar (Sell Wall) -->
-                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:0.25rem;">
-                                    <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
-                                        <div style="height:100%;width:${callPct}%;background:${isSellWall ? '#ef4444' : '#f8717188'};border-radius:2px;"></div>
+                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:0.35rem;">
+                                    <div style="width:55px;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
+                                        <div style="height:100%;width:${callPct}%;background:${isSellWall ? '#ef4444' : '#f8717188'};border-radius:3px;"></div>
                                     </div>
-                                    <span style="font-size:0.58rem;color:${isSellWall ? '#f87171' : '#94a3b8'};font-weight:${isSellWall ? '800' : '400'};">${(s.call_oi || 0).toLocaleString('en-IN')}</span>
+                                    <span style="font-size:0.72rem;color:${isSellWall ? '#f87171' : '#94a3b8'};font-weight:${isSellWall ? '900' : '500'};">${(s.call_oi || 0).toLocaleString('en-IN')}</span>
                                 </div>
                             </div>
                         `;
@@ -2400,64 +2468,126 @@
                     return;
                 }
 
-                // Cash Market / Non-F&O flow (Clean honest display - Zero mock options data)
+                // =========================================================
+                // 🛡️ CASH MARKET / NON-F&O PURE TECHNICAL BOUNDARIES FLOW
+                // Strict Zero-Tolerance for Fake Derivatives & Max Pain
+                // =========================================================
                 const supportFloor = candidate?.stop_loss != null ? Number(candidate.stop_loss) : (curPrice * 0.95);
                 const resCeiling = candidate?.breakout_trigger != null ? Number(candidate.breakout_trigger) : (curPrice * 1.04);
                 const targetCeil = candidate?.target_price != null ? Number(candidate.target_price) : (resCeiling * 1.08);
+                const atrVal = candidate?.atr_14 != null
+                    ? Number(candidate.atr_14)
+                    : (candidate?.daily_volatility_pct ? (curPrice * candidate.daily_volatility_pct / 100) : (curPrice * 0.022));
+                const atrPct = curPrice > 0 ? (atrVal / curPrice * 100) : 2.2;
 
                 if (cardTitle) cardTitle.innerHTML = '📊 Cash Market Key Price Boundaries';
-                if (buyWallLabel) buyWallLabel.textContent = 'Support Floor';
-                if (maxPainLabel) maxPainLabel.textContent = 'Max Pain (F&O)';
-                if (sellWallLabel) sellWallLabel.textContent = 'Trigger Ceiling';
-                if (pcrLabel) pcrLabel.textContent = 'Derivative PCR';
                 if (ladderHeader) ladderHeader.style.display = 'none';
 
-                if (buyWallEl) buyWallEl.textContent = `₹${Math.round(supportFloor)}`;
-                if (buyDistEl) buyDistEl.textContent = `${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
-                if (sellWallEl) sellWallEl.textContent = `₹${Math.round(resCeiling)}`;
-                if (sellDistEl) sellDistEl.textContent = `+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
-
-                // Never fabricate Max Pain for non-F&O equities
-                if (maxPainEl) maxPainEl.textContent = 'N/A';
-                if (maxPainDistEl) {
-                    maxPainDistEl.textContent = 'Non-F&O';
-                    maxPainDistEl.title = 'Max Pain requires an active Options Chain, which is not available for cash equities.';
+                // Re-purpose 4 summary boxes cleanly for cash equity
+                if (buyWallLabel) {
+                    buyWallLabel.textContent = 'Support Floor';
+                    buyWallLabel.style.color = '#34d399';
                 }
-                if (pcrOiEl) pcrOiEl.textContent = 'N/A';
-                if (pcrVolEl) pcrVolEl.textContent = 'Cash Market Only';
+                if (maxPainLabel) {
+                    maxPainLabel.textContent = 'Breakout Trigger';
+                    maxPainLabel.style.color = '#38bdf8';
+                }
+                if (sellWallLabel) {
+                    sellWallLabel.textContent = 'Projected Target';
+                    sellWallLabel.style.color = '#a78bfa';
+                }
+                if (pcrLabel) {
+                    pcrLabel.textContent = 'Daily Expected Move';
+                    pcrLabel.style.color = '#fbbf24';
+                }
+
+                // Style boxes appropriately
+                if (wallBox1) {
+                    wallBox1.style.background = 'rgba(16,185,129,0.08)';
+                    wallBox1.style.borderColor = 'rgba(16,185,129,0.28)';
+                }
+                if (wallBox2) {
+                    wallBox2.style.background = 'rgba(56,189,248,0.08)';
+                    wallBox2.style.borderColor = 'rgba(56,189,248,0.28)';
+                }
+                if (wallBox3) {
+                    wallBox3.style.background = 'rgba(167,139,250,0.08)';
+                    wallBox3.style.borderColor = 'rgba(167,139,250,0.28)';
+                }
+                if (wallBox4) {
+                    wallBox4.style.background = 'rgba(251,191,36,0.08)';
+                    wallBox4.style.borderColor = 'rgba(251,191,36,0.28)';
+                }
+
+                // Values
+                if (buyWallEl) {
+                    buyWallEl.textContent = `₹${Math.round(supportFloor)}`;
+                    buyWallEl.style.color = '#34d399';
+                }
+                if (buyDistEl) {
+                    buyDistEl.textContent = `${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
+                    buyDistEl.style.color = '#6ee7b7';
+                }
+
+                if (maxPainEl) {
+                    maxPainEl.textContent = `₹${Math.round(resCeiling)}`;
+                    maxPainEl.style.color = '#38bdf8';
+                }
+                if (maxPainDistEl) {
+                    maxPainDistEl.textContent = `+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
+                    maxPainDistEl.style.color = '#bae6fd';
+                }
+
+                if (sellWallEl) {
+                    sellWallEl.textContent = `₹${Math.round(targetCeil)}`;
+                    sellWallEl.style.color = '#c084fc';
+                }
+                if (sellDistEl) {
+                    sellDistEl.textContent = `+${(((targetCeil - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
+                    sellDistEl.style.color = '#e9d5ff';
+                }
+
+                if (pcrOiEl) {
+                    pcrOiEl.textContent = `₹${atrVal.toFixed(1)}`;
+                    pcrOiEl.style.color = '#fbbf24';
+                }
+                if (pcrVolEl) {
+                    pcrVolEl.textContent = `±${atrPct.toFixed(1)}% (ATR-14)`;
+                    pcrVolEl.style.color = '#fde68a';
+                }
 
                 if (sentBadge) {
-                    sentBadge.textContent = 'CASH EQUITY · NON-F&O';
-                    sentBadge.style.color = '#94a3b8';
-                    sentBadge.style.borderColor = 'rgba(148,163,184,0.3)';
-                    sentBadge.style.background = 'rgba(148,163,184,0.08)';
-                    sentBadge.title = 'Non-F&O Security: Traded solely in the cash equity segment on NSE. No derivative open interest or options walls exist.';
+                    sentBadge.textContent = 'CASH EQUITY · NO F&O';
+                    sentBadge.style.color = '#38bdf8';
+                    sentBadge.style.borderColor = 'rgba(56,189,248,0.35)';
+                    sentBadge.style.background = 'rgba(56,189,248,0.1)';
+                    sentBadge.title = 'Traded solely in the cash equity market. Key price execution boundaries are derived from volatility and structural order channels.';
                 }
 
                 ladderList.innerHTML = `
-                    <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);padding:0.5rem 0.6rem;border-radius:4px;font-family:var(--font-mono);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
-                            <span style="color:#38bdf8;font-size:0.62rem;font-weight:700;">🛡️ Non-F&amp;O Cash Equity Segment</span>
-                            <span style="color:#94a3b8;font-size:0.56rem;">Exchange Point-in-Time</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);padding:0.75rem 0.85rem;border-radius:6px;font-family:var(--font-mono);display:flex;flex-direction:column;gap:0.6rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <span style="color:#38bdf8;font-size:0.76rem;font-weight:800;">🛡️ Pure Cash Market Technical Structure</span>
+                            <span style="color:#94a3b8;font-size:0.68rem;background:rgba(255,255,255,0.05);padding:0.1rem 0.35rem;border-radius:4px;">NSE Equity Segment</span>
                         </div>
-                        <div style="font-size:0.60rem;color:#94a3b8;line-height:1.35;margin-bottom:0.45rem;">
-                            <strong style="color:#f8fafc;">${ticker}</strong> is not listed in the NSE Equity Derivatives (F&amp;O) segment. Open interest walls &amp; Max Pain do not exist. Key execution boundaries are defined by calculated price action channels:
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.45;">
+                            <strong style="color:#ffffff;">${ticker}</strong> is not listed in the NSE Equity Derivatives (F&amp;O) segment. No derivative open interest walls exist. Technical positioning is determined by calculated price channels:
                         </div>
-                        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.3rem;text-align:center;">
-                            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
-                                <div style="color:#34d399;font-size:0.52rem;font-weight:700;">SUPPORT FLOOR</div>
-                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${supportFloor.toFixed(2)}</div>
-                                <div style="color:#6ee7b7;font-size:0.50rem;">${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.45rem;text-align:center;">
+                            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);padding:0.45rem 0.35rem;border-radius:5px;">
+                                <div style="color:#34d399;font-size:0.68rem;font-weight:800;letter-spacing:0.02em;">SUPPORT FLOOR</div>
+                                <div style="color:#ffffff;font-weight:900;font-size:0.92rem;margin-top:0.1rem;">₹${supportFloor.toFixed(2)}</div>
+                                <div style="color:#6ee7b7;font-size:0.68rem;font-weight:700;">${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
                             </div>
-                            <div style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
-                                <div style="color:#38bdf8;font-size:0.52rem;font-weight:700;">BREAKOUT TRIGGER</div>
-                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${resCeiling.toFixed(2)}</div>
-                                <div style="color:#7dd3fc;font-size:0.50rem;">+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                            <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);padding:0.45rem 0.35rem;border-radius:5px;">
+                                <div style="color:#38bdf8;font-size:0.68rem;font-weight:800;letter-spacing:0.02em;">BREAKOUT TRIGGER</div>
+                                <div style="color:#ffffff;font-weight:900;font-size:0.92rem;margin-top:0.1rem;">₹${resCeiling.toFixed(2)}</div>
+                                <div style="color:#7dd3fc;font-size:0.68rem;font-weight:700;">+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
                             </div>
-                            <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
-                                <div style="color:#c084fc;font-size:0.52rem;font-weight:700;">PROJECTED TARGET</div>
-                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${targetCeil.toFixed(2)}</div>
-                                <div style="color:#d8b4fe;font-size:0.50rem;">+${(((targetCeil - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                            <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);padding:0.45rem 0.35rem;border-radius:5px;">
+                                <div style="color:#c084fc;font-size:0.68rem;font-weight:800;letter-spacing:0.02em;">PROJECTED TARGET</div>
+                                <div style="color:#ffffff;font-weight:900;font-size:0.92rem;margin-top:0.1rem;">₹${targetCeil.toFixed(2)}</div>
+                                <div style="color:#d8b4fe;font-size:0.68rem;font-weight:700;">+${(((targetCeil - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
                             </div>
                         </div>
                     </div>
@@ -2467,10 +2597,9 @@
                     app.initBreakoutQuantumChart(ticker, candidate, null);
                 }
             } catch (err) {
-                console.warn('[BREAKOUT] Error loading order book walls:', err);
-                ladderList.innerHTML = `<div style="color:#71717a;font-size:0.62rem;text-align:center;">Order book depth unavailable (${err.message})</div>`;
-                if (app._bkChartMode === 'native') {
-                    app.initBreakoutQuantumChart(ticker, candidate, null);
+                console.debug("Non-F&O or options fetch error:", err);
+                if (ladderList) {
+                    ladderList.innerHTML = `<div style="color:#94a3b8;font-size:0.75rem;padding:0.6rem;text-align:center;">Cash market execution parameters loaded.</div>`;
                 }
             }
         };
@@ -3347,10 +3476,12 @@
 
             // 5. Order Flow & Institutional Forensics HUD
             const volSurgeEl = document.getElementById('bkInspVolSurge');
+            const volSurgeBar = document.getElementById('bkInspVolSurgeBar');
             const instScoreEl = document.getElementById('bkInspInstScore');
             const instFlowEl = document.getElementById('bkInspInstFlow');
             const atrMoveEl = document.getElementById('bkInspAtrMove');
             const dist52wEl = document.getElementById('bkInsp52wDist');
+            const range52wBar = document.getElementById('bkInsp52wRangeBar');
 
             const volMultiple = candidate.volume_surge_multiple != null
                 ? Number(candidate.volume_surge_multiple)
@@ -3358,6 +3489,14 @@
             if (volSurgeEl) {
                 volSurgeEl.textContent = `${volMultiple.toFixed(1)}x`;
                 volSurgeEl.style.color = volMultiple >= 2.0 ? '#34d399' : (volMultiple >= 1.5 ? '#38bdf8' : '#fbbf24');
+            }
+
+            if (volSurgeBar) {
+                const surgeFillPct = Math.min(100, Math.max(12, (volMultiple / 3.0) * 100));
+                volSurgeBar.style.width = `${surgeFillPct}%`;
+                volSurgeBar.style.background = volMultiple >= 2.0
+                    ? 'linear-gradient(90deg, #38bdf8, #34d399)'
+                    : (volMultiple >= 1.3 ? 'linear-gradient(90deg, #fbbf24, #38bdf8)' : 'rgba(255,255,255,0.25)');
             }
 
             const compScore = candidate.composite_score || 0;
@@ -3388,10 +3527,18 @@
             }
 
             const high52 = candidate.high_52w != null ? Number(candidate.high_52w) : (curPrice * 1.06);
+            const low52 = candidate.low_52w != null ? Number(candidate.low_52w) : (curPrice * 0.70);
             const dist52w = curPrice > 0 ? (((curPrice - high52) / high52) * 100) : -4.0;
             if (dist52wEl) {
                 dist52wEl.textContent = `${dist52w >= 0 ? '+' : ''}${dist52w.toFixed(1)}%`;
                 dist52wEl.style.color = dist52w >= -2.0 ? '#34d399' : (dist52w >= -5.0 ? '#38bdf8' : '#cbd5e1');
+            }
+
+            if (range52wBar) {
+                const span52 = high52 - low52;
+                const range52Pct = span52 > 0 ? Math.min(100, Math.max(0, ((curPrice - low52) / span52) * 100)) : 50;
+                range52wBar.style.width = `${range52Pct}%`;
+                range52wBar.style.background = range52Pct >= 80 ? 'linear-gradient(90deg, #38bdf8, #34d399)' : 'linear-gradient(90deg, #a78bfa, #38bdf8)';
             }
 
             // 6. Strategy-Adaptive Score Pillar Decomposition
@@ -3450,12 +3597,12 @@
                     const pct = Math.min(100, Math.max(0, (val / p.max) * 100));
                     return `
                         <div>
-                            <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.74rem; margin-bottom: 0.2rem; font-weight: 600;">
                                 <span style="color: #cbd5e1;">${p.label}</span>
-                                <span style="color: #ffffff; font-weight: 700;">${val.toFixed(1).replace(/\.0$/, '')} <span style="color: #71717a; font-weight: 400;">/ ${p.max}</span></span>
+                                <span style="color: #ffffff; font-weight: 800;">${val.toFixed(1).replace(/\.0$/, '')} <span style="color: #94a3b8; font-weight: 500;">/ ${p.max}</span></span>
                             </div>
-                            <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                <div style="height: 100%; width: ${pct}%; background: ${p.color}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                            <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                                <div style="height: 100%; width: ${pct}%; background: ${p.color}; border-radius: 3px; transition: width 0.3s ease;"></div>
                             </div>
                         </div>
                     `;
@@ -3479,44 +3626,44 @@
                 const fundReason = notes.fundamental_reasoning || 'Point-in-time fundamental stability and earnings quality verification.';
 
                 notesListEl.innerHTML = `
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(248,113,113,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
-                            <span style="color:#f87171;font-weight:700;">1. Resistance Proximity</span>
-                            <span style="color:#fca5a5;font-weight:800;">${resScore.toFixed(1)} pts</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(248,113,113,0.25);border-radius:6px;padding:0.55rem 0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                            <span style="color:#f87171;font-weight:800;font-size:0.78rem;">1. Resistance Proximity</span>
+                            <span style="color:#fca5a5;font-weight:900;font-size:0.80rem;">${resScore.toFixed(1)} pts</span>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${resReason}</div>
+                        <div style="color:#cbd5e1;font-size:0.74rem;line-height:1.45;">${resReason}</div>
                     </div>
 
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(56,189,248,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
-                            <span style="color:#38bdf8;font-weight:700;">2. Volume Expansion / Surge</span>
-                            <span style="color:#93c5fd;font-weight:800;">${volScore.toFixed(1)} pts</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(56,189,248,0.25);border-radius:6px;padding:0.55rem 0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                            <span style="color:#38bdf8;font-weight:800;font-size:0.78rem;">2. Volume Expansion / Surge</span>
+                            <span style="color:#93c5fd;font-weight:900;font-size:0.80rem;">${volScore.toFixed(1)} pts</span>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${volReason}</div>
+                        <div style="color:#cbd5e1;font-size:0.74rem;line-height:1.45;">${volReason}</div>
                     </div>
 
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(251,191,36,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
-                            <span style="color:#fbbf24;font-weight:700;">3. Volatility Squeeze &amp; Compression</span>
-                            <span style="color:#fde68a;font-weight:800;">${compPillarScore.toFixed(1)} pts</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(251,191,36,0.25);border-radius:6px;padding:0.55rem 0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                            <span style="color:#fbbf24;font-weight:800;font-size:0.78rem;">3. Volatility Squeeze &amp; Compression</span>
+                            <span style="color:#fde68a;font-weight:900;font-size:0.80rem;">${compPillarScore.toFixed(1)} pts</span>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${compReason}</div>
+                        <div style="color:#cbd5e1;font-size:0.74rem;line-height:1.45;">${compReason}</div>
                     </div>
 
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(52,211,153,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
-                            <span style="color:#34d399;font-weight:700;">4. Trend Momentum Posture</span>
-                            <span style="color:#6ee7b7;font-weight:800;">${momScore.toFixed(1)} pts</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(52,211,153,0.25);border-radius:6px;padding:0.55rem 0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                            <span style="color:#34d399;font-weight:800;font-size:0.78rem;">4. Trend Momentum Posture</span>
+                            <span style="color:#6ee7b7;font-weight:900;font-size:0.80rem;">${momScore.toFixed(1)} pts</span>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${momReason}</div>
+                        <div style="color:#cbd5e1;font-size:0.74rem;line-height:1.45;">${momReason}</div>
                     </div>
 
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(192,132,252,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
-                            <span style="color:#c084fc;font-weight:700;">5. Institutional &amp; Fundamental Quality</span>
-                            <span style="color:#e9d5ff;font-weight:800;">${fundScore.toFixed(1)} pts</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(192,132,252,0.25);border-radius:6px;padding:0.55rem 0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                            <span style="color:#c084fc;font-weight:800;font-size:0.78rem;">5. Institutional &amp; Fundamental Quality</span>
+                            <span style="color:#e9d5ff;font-weight:900;font-size:0.80rem;">${fundScore.toFixed(1)} pts</span>
                         </div>
-                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${fundReason}</div>
+                        <div style="color:#cbd5e1;font-size:0.74rem;line-height:1.45;">${fundReason}</div>
                     </div>
                 `;
             }

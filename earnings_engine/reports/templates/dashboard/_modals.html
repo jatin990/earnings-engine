@@ -849,45 +849,45 @@
     <!-- ======================================================== -->
     <div id="globalWatchlistBackdrop" onclick="app.closeWatchlistDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:99980;transition:opacity 0.2s ease;"></div>
 
-    <aside id="globalWatchlistDrawer" class="watchlist-drawer" style="position:fixed;top:0;right:-460px;width:440px;max-width:92vw;height:100vh;background:#09090b;border-left:1px solid rgba(255,255,255,0.12);z-index:99985;box-shadow:-20px 0 60px rgba(0,0,0,0.9);display:flex;flex-direction:column;transition:right 0.25s cubic-bezier(0.16, 1, 0.3, 1);overflow:hidden;">
+    <aside id="globalWatchlistDrawer" class="watchlist-drawer" style="position:fixed;top:0;right:-480px;width:460px;max-width:92vw;height:100vh;background:#09090b;border-left:1px solid rgba(255,255,255,0.12);z-index:99985;box-shadow:-20px 0 60px rgba(0,0,0,0.9);display:flex;flex-direction:column;transition:right 0.25s cubic-bezier(0.16, 1, 0.3, 1);overflow:hidden;">
         <!-- Drawer Header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid rgba(255,255,255,0.08);background:#0d0d12;flex-shrink:0;">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="font-size:1.3rem;">⭐</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.08);background:#0d0d12;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span style="font-size:1.4rem;">⭐</span>
                 <div>
-                    <div style="font-weight:800;font-size:1.05rem;color:#ffffff;">Global Watchlist</div>
-                    <div style="font-size:0.7rem;color:#94a3b8;">Real-time quotes &middot; 52W range &middot; Quick charts</div>
+                    <div style="font-weight:800;font-size:1.1rem;color:#ffffff;letter-spacing:-0.01em;">Global Watchlist</div>
+                    <div style="font-size:0.75rem;color:#94a3b8;">Real-time quotes &middot; 52W range &middot; Quick charts</div>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:0.4rem;">
-                <span class="kbd-badge" style="font-size:0.68rem;padding:0.15rem 0.4rem;">Shift + W</span>
-                <button type="button" onclick="app.closeWatchlistDrawer()" class="btn-icon" style="background:transparent;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;" title="Close Drawer (Esc)">✕</button>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span class="kbd-badge" style="font-size:0.72rem;padding:0.2rem 0.5rem;font-weight:700;">Shift + W</span>
+                <button type="button" onclick="app.closeWatchlistDrawer()" class="btn-icon" style="background:transparent;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;" title="Close Drawer (Esc)">✕</button>
             </div>
         </div>
 
         <!-- Watchlist Selector & Add Bar -->
-        <div style="padding:0.75rem 1.15rem;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.01);display:flex;flex-direction:column;gap:0.5rem;flex-shrink:0;">
-            <div style="display:flex;gap:0.4rem;align-items:center;">
-                <select id="drawerWatchlistSelect" onchange="app.onDrawerWatchlistSelect(this.value)" style="flex:1;height:30px;background:#000000;border:1px solid rgba(255,255,255,0.14);border-radius:5px;color:#ffffff;font-size:0.76rem;padding:0 0.5rem;font-weight:600;outline:none;">
+        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.01);display:flex;flex-direction:column;gap:0.6rem;flex-shrink:0;">
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+                <select id="drawerWatchlistSelect" onchange="app.onDrawerWatchlistSelect(this.value)" style="flex:1;height:34px;background:#000000;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#ffffff;font-size:0.82rem;padding:0 0.6rem;font-weight:600;outline:none;">
                     <option value="">Default Watchlist</option>
                 </select>
-                <button type="button" onclick="app.refreshDrawerQuotes()" class="btn btn-secondary btn-sm" style="height:30px;font-size:0.72rem;padding:0 0.5rem;" title="Refresh live quotes">↻ Live</button>
+                <button type="button" onclick="app.refreshDrawerQuotes()" class="btn btn-secondary btn-sm" style="height:34px;font-size:0.76rem;font-weight:600;padding:0 0.65rem;" title="Refresh live quotes">↻ Live</button>
             </div>
-            <div style="display:flex;gap:0.4rem;align-items:center;">
-                <input type="text" id="drawerAddTickerInput" placeholder="Add symbol (e.g. INFY.NS)..." style="flex:1;height:28px;background:#000000;border:1px solid rgba(255,255,255,0.12);border-radius:5px;color:#ffffff;font-size:0.74rem;font-family:var(--font-mono);padding:0 0.5rem;outline:none;" onkeydown="if(event.key==='Enter') app.addTickerFromDrawer();">
-                <button type="button" onclick="app.addTickerFromDrawer()" class="btn btn-primary btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.6rem;background:#0284c7;border-color:#0369a1;">＋ Add</button>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+                <input type="text" id="drawerAddTickerInput" placeholder="Add symbol (e.g. INFY.NS or NVDA)..." style="flex:1;height:32px;background:#000000;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#ffffff;font-size:0.80rem;font-family:var(--font-mono);padding:0 0.65rem;outline:none;" onkeydown="if(event.key==='Enter') app.addTickerFromDrawer();">
+                <button type="button" onclick="app.addTickerFromDrawer()" class="btn btn-primary btn-sm" style="height:32px;font-size:0.78rem;font-weight:700;padding:0 0.75rem;background:#0284c7;border-color:#0369a1;">＋ Add</button>
             </div>
         </div>
 
         <!-- Scrollable Watchlist Item Rows -->
-        <div id="drawerWatchlistItems" style="flex:1;overflow-y:auto;padding:0.5rem;display:flex;flex-direction:column;gap:0.35rem;">
-            <div style="text-align:center;padding:2rem;color:#64748b;font-size:0.78rem;">Loading watchlist...</div>
+        <div id="drawerWatchlistItems" style="flex:1;overflow-y:auto;padding:0.75rem;display:flex;flex-direction:column;gap:0.5rem;">
+            <div style="text-align:center;padding:2.5rem;color:#64748b;font-size:0.82rem;">Loading watchlist...</div>
         </div>
 
         <!-- Drawer Footer -->
-        <div style="padding:0.6rem 1.15rem;border-top:1px solid rgba(255,255,255,0.08);background:#0d0d12;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;color:#94a3b8;flex-shrink:0;">
-            <span><strong id="drawerTotalCount" style="color:#38bdf8;">0</strong> tracked symbols</span>
-            <span>Point-in-Time Verified</span>
+        <div style="padding:0.75rem 1.25rem;border-top:1px solid rgba(255,255,255,0.08);background:#0d0d12;display:flex;justify-content:space-between;align-items:center;font-size:0.76rem;color:#94a3b8;flex-shrink:0;">
+            <span><strong id="drawerTotalCount" style="color:#38bdf8;font-size:0.85rem;">0</strong> tracked symbols</span>
+            <span style="color:#64748b;">Point-in-Time Verified</span>
         </div>
     </aside>
 

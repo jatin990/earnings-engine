@@ -119,37 +119,40 @@
                 const isPos = chg >= 0;
 
                 return `
-                    <div class="drawer-quote-row" style="background:#0d0d12;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;display:flex;flex-direction:column;gap:0.4rem;transition:border-color 0.15s ease;">
+                    <div class="drawer-quote-row" style="background:#0d0d12;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.75rem 0.9rem;display:flex;flex-direction:column;gap:0.45rem;transition:border-color 0.15s ease;">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                             <div>
-                                <div style="display:flex;align-items:center;gap:0.45rem;">
-                                    <strong style="color:#ffffff;font-size:0.88rem;font-family:var(--font-mono);">${ticker}</strong>
-                                    ${volumeSurge >= 1.8 ? `<span class="signal-badge" style="font-size:0.62rem;background:rgba(234,179,8,0.15);color:#facc15;">🔥 ${volumeSurge.toFixed(1)}x Vol</span>` : ''}
+                                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                                    <strong style="color:#ffffff;font-size:1.02rem;font-weight:800;font-family:var(--font-mono);cursor:pointer;" onclick="app.inspectBreakoutStock ? app.inspectBreakoutStock('${ticker}') : app.openStockModal('${ticker}')">${ticker}</strong>
+                                    ${volumeSurge >= 1.8 ? `<span class="signal-badge" style="font-size:0.70rem;font-weight:700;background:rgba(234,179,8,0.15);color:#facc15;border:1px solid rgba(234,179,8,0.3);padding:0.12rem 0.45rem;border-radius:4px;">🔥 ${volumeSurge.toFixed(1)}x Vol</span>` : ''}
                                 </div>
-                                <div style="font-size:0.7rem;color:#94a3b8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
+                                <div style="font-size:0.78rem;color:#94a3b8;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:0.15rem;">${name}</div>
                             </div>
                             <div style="text-align:right;">
-                                <div style="font-size:0.9rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">${sym}${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                                <div style="font-size:0.72rem;font-weight:700;color:${isPos ? '#34d399' : '#f87171'};font-family:var(--font-mono);">${isPos ? '+' : ''}${chg.toFixed(2)}%</div>
+                                <div style="font-size:1.05rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">${sym}${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div style="font-size:0.80rem;font-weight:700;color:${isPos ? '#34d399' : '#f87171'};font-family:var(--font-mono);margin-top:0.1rem;">${isPos ? '+' : ''}${chg.toFixed(2)}%</div>
                             </div>
                         </div>
 
-                        <!-- 52W Range Mini Bar -->
-                        <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;color:#64748b;">
-                            <span>52L: ${sym}${low52.toFixed(0)}</span>
-                            <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;position:relative;overflow:hidden;">
-                                <div style="position:absolute;left:0;top:0;bottom:0;width:${rangePct}%;background:${isPos ? '#34d399' : '#38bdf8'};border-radius:2px;"></div>
+                        <!-- 52W Range Visual Gauge Bar -->
+                        <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:5px;padding:0.35rem 0.55rem;margin-top:0.1rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.70rem;color:#94a3b8;margin-bottom:0.25rem;">
+                                <span>52L: <strong style="color:#cbd5e1;font-family:var(--font-mono);">${sym}${low52.toFixed(0)}</strong></span>
+                                <span style="font-weight:700;color:${rangePct >= 80 ? '#34d399' : '#38bdf8'};">${rangePct.toFixed(0)}% Range</span>
+                                <span>52H: <strong style="color:#cbd5e1;font-family:var(--font-mono);">${sym}${high52.toFixed(0)}</strong></span>
                             </div>
-                            <span>52H: ${sym}${high52.toFixed(0)}</span>
+                            <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;position:relative;overflow:hidden;">
+                                <div style="position:absolute;left:0;top:0;bottom:0;width:${rangePct}% ;background:${rangePct >= 80 ? 'linear-gradient(90deg, #38bdf8, #34d399)' : 'linear-gradient(90deg, #a78bfa, #38bdf8)'};border-radius:3px;"></div>
+                            </div>
                         </div>
 
                         <!-- Action Buttons -->
-                        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.04);padding-top:0.35rem;margin-top:0.15rem;">
-                            <div style="display:flex;gap:0.35rem;">
-                                <button type="button" onclick="app.openMultiChartModal('${ticker}')" class="btn-micro" style="font-size:0.68rem;padding:0.15rem 0.45rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);border-radius:4px;cursor:pointer;">📈 Chart</button>
-                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" class="btn-micro" style="font-size:0.68rem;padding:0.15rem 0.45rem;background:rgba(255,255,255,0.05);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);border-radius:4px;text-decoration:none;">🔍 Detail</a>
+                        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.06);padding-top:0.45rem;margin-top:0.15rem;">
+                            <div style="display:flex;gap:0.4rem;">
+                                <button type="button" onclick="app.openMultiChartModal('${ticker}')" class="btn-micro" style="font-size:0.72rem;font-weight:700;padding:0.2rem 0.55rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:4px;cursor:pointer;">📈 Chart</button>
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" class="btn-micro" style="font-size:0.72rem;font-weight:600;padding:0.2rem 0.55rem;background:rgba(255,255,255,0.05);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:4px;text-decoration:none;">🔍 Detail</a>
                             </div>
-                            <button type="button" onclick="app.removeTickerFromDrawer('${ticker}')" class="btn-micro" style="font-size:0.68rem;padding:0.15rem 0.35rem;background:transparent;color:#94a3b8;border:none;cursor:pointer;" title="Remove from watchlist">✕ Remove</button>
+                            <button type="button" onclick="app.removeTickerFromDrawer('${ticker}')" class="btn-micro" style="font-size:0.72rem;padding:0.2rem 0.45rem;background:transparent;color:#94a3b8;border:none;cursor:pointer;" title="Remove from watchlist">✕ Remove</button>
                         </div>
                     </div>
                 `;

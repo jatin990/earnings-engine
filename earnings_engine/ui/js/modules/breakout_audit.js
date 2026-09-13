@@ -198,11 +198,11 @@
             // Render filter pills
             const filter = app._currentDrawerFilter;
             pillsContainer.innerHTML = `
-                <button type="button" onclick="app.setBreakoutDrawerFilter('ALL')" class="btn-micro" style="padding:0.2rem 0.5rem;font-size:0.65rem;font-weight:700;border-radius:4px;background:${filter === 'ALL' ? '#2563eb' : '#18181b'};color:${filter === 'ALL' ? '#fff' : '#94a3b8'};border:1px solid rgba(255,255,255,0.1);cursor:pointer;">All (${batch.total_moved})</button>
-                <button type="button" onclick="app.setBreakoutDrawerFilter('HOT')" class="btn-micro" style="padding:0.2rem 0.5rem;font-size:0.65rem;font-weight:700;border-radius:4px;background:${filter === 'HOT' ? 'rgba(239,68,68,0.25)' : '#18181b'};color:#f87171;border:1px solid rgba(239,68,68,0.3);cursor:pointer;">🔥 Hot (${batch.promoted_hot})</button>
-                <button type="button" onclick="app.setBreakoutDrawerFilter('WARM')" class="btn-micro" style="padding:0.2rem 0.5rem;font-size:0.65rem;font-weight:700;border-radius:4px;background:${filter === 'WARM' ? 'rgba(245,158,11,0.25)' : '#18181b'};color:#fbbf24;border:1px solid rgba(245,158,11,0.3);cursor:pointer;">⚡ Warm (${batch.added_warm})</button>
-                ${batch.target_hit > 0 ? `<button type="button" onclick="app.setBreakoutDrawerFilter('TARGET')" class="btn-micro" style="padding:0.2rem 0.5rem;font-size:0.65rem;font-weight:700;border-radius:4px;background:${filter === 'TARGET' ? 'rgba(16,185,129,0.25)' : '#18181b'};color:#34d399;border:1px solid rgba(16,185,129,0.3);cursor:pointer;">🎯 Targets (${batch.target_hit})</button>` : ''}
-                ${(batch.demoted_warm + batch.removed_cold) > 0 ? `<button type="button" onclick="app.setBreakoutDrawerFilter('EXITS')" class="btn-micro" style="padding:0.2rem 0.5rem;font-size:0.65rem;font-weight:700;border-radius:4px;background:${filter === 'EXITS' ? 'rgba(239,68,68,0.2)' : '#18181b'};color:#fca5a5;border:1px solid rgba(239,68,68,0.2);cursor:pointer;">Exits (${batch.demoted_warm + batch.removed_cold})</button>` : ''}
+                <button type="button" onclick="app.setBreakoutDrawerFilter('ALL')" class="btn-micro" style="padding:0.35rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:5px;background:${filter === 'ALL' ? '#2563eb' : '#18181b'};color:${filter === 'ALL' ? '#fff' : '#94a3b8'};border:1px solid rgba(255,255,255,0.15);cursor:pointer;">All (${batch.total_moved})</button>
+                <button type="button" onclick="app.setBreakoutDrawerFilter('HOT')" class="btn-micro" style="padding:0.35rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:5px;background:${filter === 'HOT' ? 'rgba(239,68,68,0.25)' : '#18181b'};color:#f87171;border:1px solid rgba(239,68,68,0.3);cursor:pointer;">🔥 Hot (${batch.promoted_hot})</button>
+                <button type="button" onclick="app.setBreakoutDrawerFilter('WARM')" class="btn-micro" style="padding:0.35rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:5px;background:${filter === 'WARM' ? 'rgba(245,158,11,0.25)' : '#18181b'};color:#fbbf24;border:1px solid rgba(245,158,11,0.3);cursor:pointer;">⚡ Warm (${batch.added_warm})</button>
+                ${batch.target_hit > 0 ? `<button type="button" onclick="app.setBreakoutDrawerFilter('TARGET')" class="btn-micro" style="padding:0.35rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:5px;background:${filter === 'TARGET' ? 'rgba(16,185,129,0.25)' : '#18181b'};color:#34d399;border:1px solid rgba(16,185,129,0.3);cursor:pointer;">🎯 Targets (${batch.target_hit})</button>` : ''}
+                ${(batch.demoted_warm + batch.removed_cold) > 0 ? `<button type="button" onclick="app.setBreakoutDrawerFilter('EXITS')" class="btn-micro" style="padding:0.35rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:5px;background:${filter === 'EXITS' ? 'rgba(239,68,68,0.2)' : '#18181b'};color:#fca5a5;border:1px solid rgba(239,68,68,0.2);cursor:pointer;">Exits (${batch.demoted_warm + batch.removed_cold})</button>` : ''}
             `;
 
             // Filter entries
@@ -218,7 +218,7 @@
             }
 
             if (!entries.length) {
-                listContainer.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.75rem;padding:1.5rem;">No setups matching selected tier filter in this scan.</div>';
+                listContainer.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.82rem;padding:2rem;">No setups matching selected tier filter in this scan.</div>';
                 return;
             }
 
@@ -240,37 +240,37 @@
                 const stopStr = l.stop_loss ? `₹${Number(l.stop_loss).toFixed(2)}` : null;
                 const scoreBefore = l.score_before != null ? l.score_before : '—';
                 const scoreAfter = l.score_after != null ? l.score_after : '—';
-                const counterBadge = (l.counter && l.counter > 1) ? `<span style="font-size:0.60rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.05rem 0.3rem;border-radius:3px;border:1px solid rgba(56,189,248,0.3);">🔁 ${l.counter}x</span>` : '';
+                const counterBadge = (l.counter && l.counter > 1) ? `<span style="font-size:0.68rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.1rem 0.4rem;border-radius:4px;border:1px solid rgba(56,189,248,0.3);">🔁 ${l.counter}x</span>` : '';
 
                 return `
-                    <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:0.6rem 0.75rem;display:flex;flex-direction:column;gap:0.35rem;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;">
-                            <div style="display:flex;align-items:center;gap:0.4rem;">
-                                <span style="font-size:0.62rem;font-weight:800;color:${color};background:#000;padding:0.1rem 0.35rem;border-radius:3px;border:1px solid ${border};">${badgeLabel}</span>
-                                <strong style="font-size:0.85rem;color:#f8fafc;font-family:var(--font-mono);cursor:pointer;" onclick="app.inspectBreakoutStock('${l.ticker}')" title="Click to view setup details in HUD">${l.ticker}</strong>
-                                <span style="font-size:0.68rem;color:#94a3b8;">${l.company_name || ''}</span>
+                    <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:0.75rem 0.9rem;display:flex;flex-direction:column;gap:0.45rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;">
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span style="font-size:0.70rem;font-weight:800;color:${color};background:#000;padding:0.15rem 0.45rem;border-radius:4px;border:1px solid ${border};">${badgeLabel}</span>
+                                <strong style="font-size:1.02rem;color:#f8fafc;font-family:var(--font-mono);font-weight:800;cursor:pointer;" onclick="app.inspectBreakoutStock('${l.ticker}')" title="Click to view setup details in HUD">${l.ticker}</strong>
+                                <span style="font-size:0.76rem;color:#94a3b8;">${l.company_name || ''}</span>
                                 ${counterBadge}
                             </div>
-                            <div style="display:flex;align-items:center;gap:0.3rem;">
-                                <button type="button" onclick="app.inspectBreakoutStock('${l.ticker}'); event.stopPropagation();" class="btn btn-xs" style="background:#18181b;color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.62rem;padding:0.1rem 0.35rem;cursor:pointer;">⚡ HUD</button>
-                                <button type="button" onclick="app.openStockModal('${l.ticker}'); event.stopPropagation();" class="btn btn-xs" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.1rem 0.35rem;cursor:pointer;">📈 Chart</button>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <button type="button" onclick="app.inspectBreakoutStock('${l.ticker}'); event.stopPropagation();" class="btn btn-xs" style="background:#18181b;color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:0.72rem;font-weight:700;padding:0.2rem 0.5rem;border-radius:4px;cursor:pointer;">⚡ HUD</button>
+                                <button type="button" onclick="app.openStockModal('${l.ticker}'); event.stopPropagation();" class="btn btn-xs" style="background:#18181b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.2);font-size:0.72rem;font-weight:600;padding:0.2rem 0.5rem;border-radius:4px;cursor:pointer;">📈 Chart</button>
                             </div>
                         </div>
 
                         <!-- Transition Metric Strip -->
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(85px, 1fr));gap:0.3rem;background:#030305;border:1px solid rgba(255,255,255,0.06);border-radius:4px;padding:0.35rem 0.5rem;font-size:0.65rem;font-family:var(--font-mono);">
-                            <div><span style="color:#71717a;">Price:</span> <strong style="color:#f8fafc;">${priceStr}</strong></div>
-                            <div><span style="color:#71717a;">Score:</span> <strong style="color:#60a5fa;">${scoreBefore} ➔ ${scoreAfter}</strong></div>
-                            ${triggerStr ? `<div><span style="color:#71717a;">Trigger:</span> <strong style="color:#fbbf24;">${triggerStr}</strong></div>` : ''}
-                            ${targetStr ? `<div><span style="color:#71717a;">Target:</span> <strong style="color:#34d399;">${targetStr}</strong></div>` : ''}
-                            ${stopStr ? `<div><span style="color:#71717a;">Stop:</span> <strong style="color:#f87171;">${stopStr}</strong></div>` : ''}
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(95px, 1fr));gap:0.4rem;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:0.45rem 0.65rem;font-size:0.74rem;font-family:var(--font-mono);">
+                            <div><span style="color:#94a3b8;">Price:</span> <strong style="color:#f8fafc;font-size:0.80rem;">${priceStr}</strong></div>
+                            <div><span style="color:#94a3b8;">Score:</span> <strong style="color:#60a5fa;font-size:0.80rem;">${scoreBefore} ➔ ${scoreAfter}</strong></div>
+                            ${triggerStr ? `<div><span style="color:#94a3b8;">Trigger:</span> <strong style="color:#fbbf24;font-size:0.80rem;">${triggerStr}</strong></div>` : ''}
+                            ${targetStr ? `<div><span style="color:#94a3b8;">Target:</span> <strong style="color:#34d399;font-size:0.80rem;">${targetStr}</strong></div>` : ''}
+                            ${stopStr ? `<div><span style="color:#94a3b8;">Stop:</span> <strong style="color:#f87171;font-size:0.80rem;">${stopStr}</strong></div>` : ''}
                         </div>
 
                         <!-- Reason / Explanation -->
-                        <div style="font-size:0.70rem;color:#e2e8f0;line-height:1.35;margin-top:0.05rem;">
-                            <strong>Why:</strong> ${l.reason || 'Multi-speed tier evaluation'}
+                        <div style="font-size:0.78rem;color:#e2e8f0;line-height:1.45;margin-top:0.05rem;">
+                            <strong style="color:#ffffff;">Why:</strong> ${l.reason || 'Multi-speed tier evaluation'}
                         </div>
-                        ${l.catalyst_impact ? `<div style="font-size:0.66rem;color:#38bdf8;">📰 <em>Catalyst:</em> ${l.catalyst_impact}</div>` : ''}
+                        ${l.catalyst_impact ? `<div style="font-size:0.74rem;color:#38bdf8;line-height:1.4;">📰 <strong style="color:#93c5fd;">Catalyst:</strong> ${l.catalyst_impact}</div>` : ''}
                     </div>
                 `;
             }).join('');

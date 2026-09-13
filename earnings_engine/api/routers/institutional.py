@@ -348,6 +348,28 @@ async def get_institutional_recent_accumulation(
         raise HTTPException(status_code=500, detail=f"Error fetching recent accumulation: {str(e)}")
 
 
+@router.get("/api/v1/institutional/signals", summary="Smart Money Radar Tracked Signals")
+async def get_smart_money_signals(
+    strategy: str = Query("ALL_STRATEGIES", description="Strategy key: ALL_STRATEGIES, WHALE_CONVICTION, BLOCK_DEAL_MOMENTUM, DUAL_ACCELERATION, DOMESTIC_ABSORPTION"),
+    status: str = Query("active", description="Signal lifecycle status: active, target_hit, distribution_exit, cooling_off, all"),
+    sort_by: str = Query("score", description="Sort key: score, return, gain, capital, date, days"),
+    limit: int = Query(60, ge=1, le=200, description="Max signals to return"),
+):
+    """Retrieve tracked smart money signals filtered by strategy, lifecycle status, and sort key."""
+    try:
+        data = await asyncio.to_thread(
+            inst_mod.get_tracked_smart_money_signals,
+            strategy=strategy,
+            status=status,
+            sort_by=sort_by,
+            limit=limit,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_smart_money_signals: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching smart money signals: {str(e)}")
+
 
 @router.get("/api/v1/institutional/funds")
 async def get_top_institutional_funds(
@@ -408,6 +430,25 @@ async def get_stock_buyers(
     except Exception as e:
         logger.exception("Error in get_stock_buyers for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=f"Error fetching stock buyers: {str(e)}")
+
+
+@router.get("/api/v1/institutional/stock/{ticker}/forensics", summary="Stock Forensic Dossier")
+async def get_stock_forensics(ticker: str):
+    """Retrieve complete stock forensic dossier (metadata, signal timeline, institutional buyers, quarterly income trajectory, block deals, macro profile)."""
+    try:
+        data = await asyncio.to_thread(
+            inst_mod.get_stock_forensic_dossier,
+            ticker=ticker,
+            settings=_settings,
+        )
+        if not data or not data.get("ticker"):
+            raise HTTPException(status_code=404, detail=f"No forensic dossier found for {ticker}")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in get_stock_forensics for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock forensic dossier: {str(e)}")
 
 
 @router.get("/api/v1/institutional/stock/{ticker}")
