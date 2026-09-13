@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
             --bg-void: #000000;
@@ -4774,21 +4773,43 @@
 
         function formatTradingViewSymbol(sym) {
             if (!sym) return 'NSE:NIFTY';
-            const clean = sym.trim().toUpperCase();
-            if (clean.endsWith('.NS')) return 'NSE:' + clean.replace('.NS', '');
-            if (clean.endsWith('.BO')) return 'BSE:' + clean.replace('.BO', '');
+            const clean = String(sym).trim().toUpperCase();
+            if (clean === '^NSEI' || clean === 'NIFTY' || clean === 'NIFTY50' || clean === 'NIFTY 50') return 'NSE:NIFTY';
+            if (clean === '^NSEBANK' || clean === 'BANKNIFTY' || clean === 'NIFTYBANK') return 'NSE:BANKNIFTY';
+            if (clean === '^CNX500' || clean === 'NIFTY500') return 'NSE:NIFTY500';
+            if (clean === '^GSPC' || clean === 'SPX' || clean === 'S&P 500' || clean === 'S&P500') return 'SP:SPX';
+            if (clean === '^NDX' || clean === 'NDX') return 'NASDAQ:NDX';
+            if (clean === '^DJI' || clean === 'DJI') return 'DJ:DJI';
+            if (clean.includes(':')) return clean;
+            if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
+            if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
             return clean;
         }
 
         function initTradingViewOnlineWidget() {
             const container = document.getElementById('tradingview_widget_container');
-            if (!container || !window.TradingView) return;
+            if (!container) return;
             container.innerHTML = '';
 
             const tvSymbol = formatTradingViewSymbol(ACTIVE_SYM);
 
             try {
-                new window.TradingView.widget({
+                const widgetWrap = document.createElement('div');
+                widgetWrap.className = 'tradingview-widget-container';
+                widgetWrap.style.width = '100%';
+                widgetWrap.style.height = '100%';
+
+                const widgetInner = document.createElement('div');
+                widgetInner.className = 'tradingview-widget-container__widget';
+                widgetInner.style.width = '100%';
+                widgetInner.style.height = '100%';
+                widgetWrap.appendChild(widgetInner);
+
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+                script.async = true;
+                script.innerHTML = JSON.stringify({
                     "autosize": true,
                     "symbol": tvSymbol,
                     "interval": "D",
@@ -4796,20 +4817,21 @@
                     "theme": "dark",
                     "style": "1",
                     "locale": "en",
-                    "toolbar_bg": "#090a10",
                     "enable_publishing": false,
                     "allow_symbol_change": true,
-                    "container_id": "tradingview_widget_container",
                     "hide_side_toolbar": false,
-                    "studies": [
-                        "MASimple@tv-basicstudies",
-                        "RSI@tv-basicstudies",
-                        "Volume@tv-basicstudies"
-                    ]
+                    "hide_top_toolbar": false,
+                    "save_image": true,
+                    "calendar": false,
+                    "hide_volume": false,
+                    "support_host": "https://www.tradingview.com"
                 });
+
+                widgetWrap.appendChild(script);
+                container.appendChild(widgetWrap);
             } catch (err) {
                 console.warn('Error creating TradingView widget:', err);
-                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:var(--font-mono);font-size:0.85rem;">TradingView online stream ready for ${tvSymbol}</div>`;
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:var(--font-mono);font-size:0.85rem;">TradingView stream ready for ${tvSymbol}</div>`;
             }
         }
 
