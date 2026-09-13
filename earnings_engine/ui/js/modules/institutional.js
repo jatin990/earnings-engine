@@ -1866,6 +1866,227 @@
 
 
 
+        // =========================================================================
+        // 🏛️ NEXUS PERSISTENT DRAWER — INSTITUTIONAL HALF RENDERER
+        // Merged into the breakout inspector drawer as the persistent institutional
+        // bottom half. Mirrors renderStockInstitutionalDetails against nexusInst* IDs.
+        // =========================================================================
+
+        _nexusInstLoading: false,
+
+        async loadNexusInstitutional(ticker) {
+            if (!ticker || this._nexusInstLoading) return;
+            const clean = String(ticker).trim().toUpperCase();
+            const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : clean + '.NS';
+            this._nexusInstLoading = true;
+            const emptyEl = document.getElementById('nexusInstEmpty');
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.renderNexusInstitutionalPanel(data);
+                } else if (emptyEl) {
+                    emptyEl.style.display = 'block';
+                }
+            } catch (e) {
+                console.error('[INSTITUTIONAL] Failed loading nexus panel data:', e);
+                if (emptyEl) emptyEl.style.display = 'block';
+            } finally {
+                this._nexusInstLoading = false;
+            }
+        },
+
+        // Unified entry point: opens the persistent drawer (breakout + institutional
+        // halves) for a ticker. Works standalone (institutional tab) or via breakout.
+        async openStockIntelligencePanel(ticker) {
+            if (!ticker) return;
+            const clean = String(ticker).trim().toUpperCase();
+            const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : clean + '.NS';
+            this._selectedTicker = cleanTicker;
+
+            // Open the drawer shell (reparent to body + slide in)
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            const backdrop = document.getElementById('breakoutInspectorBackdrop');
+            if (drawer && drawer.parentElement !== document.body) document.body.appendChild(drawer);
+            if (backdrop && backdrop.parentElement !== document.body) document.body.appendChild(backdrop);
+            if (drawer) {
+                try {
+                    drawer.style.width = localStorage.getItem('breakout_inspector_drawer_width') || '720px';
+                } catch (e) {}
+                drawer.style.right = '0px';
+            }
+            if (backdrop) {
+                backdrop.style.display = 'block';
+                setTimeout(() => { backdrop.style.opacity = '1'; }, 10);
+            }
+
+            // Load tech side if breakout module is available
+            if (app.selectBreakoutCandidate) {
+                app.selectBreakoutCandidate(cleanTicker, false, false);
+            } else {
+                // Show the drawer content, ensure institutional empty state visible
+                const emptyState = document.getElementById('breakoutInspectorEmptyState');
+                const content = document.getElementById('breakoutInspectorContent');
+                if (emptyState) emptyState.style.display = 'none';
+                if (content) content.style.display = 'block';
+            }
+
+            // Load institutional half
+            await this.loadNexusInstitutional(cleanTicker);
+        },
+
+        renderNexusInstitutionalPanel(data) {
+            if (!data) return;
+            const emptyEl = document.getElementById('nexusInstEmpty');
+            const headerEl = document.getElementById('nexusInstHeader');
+            const stripEl = document.getElementById('nexusInstReturnsStrip');
+            const tickerEl = document.getElementById('nexusInstTicker');
+            const companyEl = document.getElementById('nexusInstCompany');
+            const verdictEl = document.getElementById('nexusInstVerdict');
+            const priceEl = document.getElementById('nexusInstPrice');
+            const ret7dEl = document.getElementById('nexusInst7dVal');
+            const ret30dEl = document.getElementById('nexusInst30dVal');
+            const ret1yEl = document.getElementById('nexusInst1yVal');
+            const mcapEl = document.getElementById('nexusInstMcapVal');
+            const scoreLineEl = document.getElementById('nexusInstScoreLine');
+            const shContainer = document.getElementById('nexusInstShareholdingContainer');
+            const shWrap = document.getElementById('nexusInstShareholdingWrap');
+            const bdContainer = document.getElementById('nexusInstBlockDealsContainer');
+            const bdWrap = document.getElementById('nexusInstBlockDealsWrap');
+            const holdingsBody = document.getElementById('nexusInstHoldingsTableBody');
+            const holdingsWrap = document.getElementById('nexusInstHoldingsWrap');
+            const fundCountEl = document.getElementById('nexusInstFundCount');
+
+            // Show populated state, hide empty
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (headerEl) headerEl.style.display = 'block';
+            if (stripEl) stripEl.style.display = 'grid';
+
+            // Identity
+            const cleanVerdict = (data.verdict || 'Accumulating').replace(/^[^\w\s]+\s*/, '');
+            if (tickerEl) tickerEl.textContent = data.ticker;
+            if (companyEl) companyEl.textContent = data.company_name || '';
+            if (verdictEl) { verdictEl.textContent = cleanVerdict; verdictEl.style.background = '#18181b'; verdictEl.style.color = '#f4f4f5'; }
+
+            // Price
+            const curP = (data.shareholding_patterns && data.shareholding_patterns.length > 0)
+                ? (data.shareholding_patterns[0].current_price != null ? data.shareholding_patterns[0].current_price : data.shareholding_patterns[0].stock_price) : null;
+            const priceStr = curP != null ? `₹${Number(curP).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+            if (priceEl) priceEl.textContent = priceStr;
+
+            // Returns
+            const ret7d = data.return_7d_pct, ret30d = data.return_30d_pct, ret1y = data.return_1y_pct;
+            const fmt = (v) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '—';
+            const col = (v) => v != null ? (v >= 0 ? '#34d399' : '#f87171') : '#a1a1aa';
+            if (ret7dEl) { ret7dEl.textContent = fmt(ret7d); ret7dEl.style.color = col(ret7d); }
+            if (ret30dEl) { ret30dEl.textContent = fmt(ret30d); ret30dEl.style.color = col(ret30d); }
+            if (ret1yEl) { ret1yEl.textContent = fmt(ret1y); ret1yEl.style.color = col(ret1y); }
+            if (mcapEl) mcapEl.textContent = data.market_cap_cr ? `₹${Number(Math.round(data.market_cap_cr)).toLocaleString()} Cr` : '—';
+
+            // Score line
+            const incAmtStr = data.increase_amount_cr != null
+                ? `+₹${Number(data.increase_amount_cr).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Cr`
+                : `+₹${data.net_flow_cr || 0} Cr`;
+            if (scoreLineEl) scoreLineEl.innerHTML = `Score: <strong style="color:#fff;">${data.accumulation_score || 50}/100</strong> · Inflow: <strong style="color:#34d399;">${incAmtStr}</strong> · Inst Stake: <strong style="color:#fff;">${data.total_institutional_stake_pct || '—'}%</strong>`;
+
+            // ── Shareholding Pattern Table ──
+            const pats = data.shareholding_patterns || [];
+            if (shContainer) {
+                if (!pats.length) {
+                    shContainer.innerHTML = '<div style="color:#52525b;font-size:0.68rem;text-align:center;padding:0.5rem;">No filing data.</div>';
+                    if (shWrap) shWrap.style.display = 'block';
+                } else {
+                    shContainer.innerHTML = `
+                        <table style="width:100%;font-size:0.68rem;text-align:left;border-collapse:collapse;">
+                            <thead>
+                                <tr style="color:#71717a;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);">
+                                    <th style="padding:0.25rem 0.35rem;">QTR</th>
+                                    <th style="padding:0.25rem 0.35rem;text-align:right;">PRICE</th>
+                                    <th style="padding:0.25rem 0.35rem;text-align:right;">PROM</th>
+                                    <th style="padding:0.25rem 0.35rem;text-align:right;">FII</th>
+                                    <th style="padding:0.25rem 0.35rem;text-align:right;">DII/MF</th>
+                                    <th style="padding:0.25rem 0.35rem;text-align:right;">RETAIL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pats.slice(0, 6).map((p, idx) => {
+                                    const fiiDelta = p.fii_delta_pct != null ? p.fii_delta_pct : (idx < pats.length - 1 ? (p.fii_pct - pats[idx + 1].fii_pct) : 0);
+                                    const diiDelta = p.dii_delta_pct != null ? p.dii_delta_pct : (idx < pats.length - 1 ? (p.dii_mf_pct - pats[idx + 1].dii_mf_pct) : 0);
+                                    const fiiD = fiiDelta !== 0 ? `<span style="color:${fiiDelta > 0 ? '#34d399' : '#f87171'};font-size:0.58rem;">(${fiiDelta > 0 ? '+' : ''}${fiiDelta.toFixed(2)}%)</span>` : '';
+                                    const diiD = diiDelta !== 0 ? `<span style="color:${diiDelta > 0 ? '#34d399' : '#f87171'};font-size:0.58rem;">(${diiDelta > 0 ? '+' : ''}${diiDelta.toFixed(2)}%)</span>` : '';
+                                    const price = p.current_price != null ? p.current_price : p.stock_price;
+                                    const priceStr2 = price != null ? `₹${Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+                                    return `
+                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                            <td style="padding:0.25rem 0.35rem;font-weight:700;color:#fff;font-family:var(--font-mono);">${p.quarter}</td>
+                                            <td style="padding:0.25rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;">${priceStr2}</td>
+                                            <td style="padding:0.25rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;">${p.promoter_pct}%</td>
+                                            <td style="padding:0.25rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;font-weight:700;">${p.fii_pct}% ${fiiD}</td>
+                                            <td style="padding:0.25rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;font-weight:700;">${p.dii_mf_pct}% ${diiD}</td>
+                                            <td style="padding:0.25rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#71717a;">${p.public_retail_pct}%</td>
+                                        </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>`;
+                    if (shWrap) shWrap.style.display = 'block';
+                }
+            }
+
+            // ── Block Deals ──
+            const deals = data.block_deals || [];
+            if (bdContainer) {
+                if (!deals.length) {
+                    bdContainer.innerHTML = '<div style="color:#52525b;font-size:0.68rem;">No block deals on record.</div>';
+                    if (bdWrap) bdWrap.style.display = 'block';
+                } else {
+                    bdContainer.innerHTML = deals.map(d => {
+                        const isBuy = d.deal_type === 'BUY';
+                        const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                        const col = isBuy ? '#34d399' : '#f87171';
+                        return `
+                            <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:4px;padding:0.3rem 0.45rem;margin-bottom:0.25rem;font-size:0.66rem;font-family:var(--font-mono);">
+                                <span style="color:${col};font-weight:700;">[${d.deal_type}]</span>
+                                <strong style="color:#fff;">${d.client_name}</strong>
+                                <span style="color:#71717a;"> · ${d.quantity.toLocaleString()} @ ₹${d.price} (₹${d.value_cr} Cr) · ${d.deal_date}</span>
+                            </div>`;
+                    }).join('');
+                    if (bdWrap) bdWrap.style.display = 'block';
+                }
+            }
+
+            // ── Fund Holdings ──
+            const holdings = data.holdings || [];
+            if (fundCountEl) fundCountEl.textContent = `${holdings.length} Funds`;
+            if (holdingsBody) {
+                if (!holdings.length) {
+                    holdingsBody.innerHTML = '<tr><td colspan="6" style="padding:1rem;text-align:center;color:#52525b;font-size:0.68rem;">No fund positions recorded.</td></tr>';
+                    if (holdingsWrap) holdingsWrap.style.display = 'block';
+                } else {
+                    holdingsBody.innerHTML = holdings.slice(0, 15).map(h => {
+                        const act = h.action;
+                        const isBuy = act === 'NEW BUY', isAcc = act === 'ACCUMULATED', isTrim = act === 'TRIMMED';
+                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
+                        const chgPct = h.change_pct != null ? h.change_pct : 0;
+                        const incCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
+                        const incCol = incCr >= 0 ? '#34d399' : '#f87171';
+                        const totCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                <td style="padding:0.28rem 0.4rem;font-family:var(--font-mono);font-weight:700;color:#fff;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.fund_name}</td>
+                                <td style="padding:0.28rem 0.35rem;"><span style="font-size:0.58rem;background:#18181b;color:${actCol};border:1px solid rgba(255,255,255,0.1);padding:0.05rem 0.25rem;border-radius:3px;">${h.action}</span></td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;font-weight:700;">${h.stake_pct}%</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${chgPct >= 0 ? '#34d399' : '#f87171'};">${chgPct > 0 ? '+' : ''}${chgPct}%</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${incCol};">${incCr >= 0 ? '+' : ''}₹${Number(incCr).toFixed(1)} Cr</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;font-size:0.62rem;">₹${Number(totCr).toFixed(1)} Cr</td>
+                            </tr>`;
+                    }).join('');
+                    if (holdingsWrap) holdingsWrap.style.display = 'block';
+                }
+            }
+        },
+
+
+
         async inspectFundPortfolio(fundName) {
 
             if (!fundName) return;

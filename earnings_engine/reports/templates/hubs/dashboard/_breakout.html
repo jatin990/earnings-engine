@@ -895,8 +895,8 @@
                         <div id="bkInspLightweightChartWrap" style="display: none; height: 70vh; min-height: 360px; width: 100%; border-radius: 6px; overflow: hidden; background: #050508; position: relative;">
                             <div id="bkInspLightweightChartContainer" style="width: 100%; height: 100%;"></div>
 
-                            <!-- 🧱 Order Book Depth Overlay Panel -->
-                            <div id="bkInspOrderBookDepthOverlay" style="position: absolute; top: 8px; right: 65px; width: 220px; max-height: calc(100% - 35px); pointer-events: none; z-index: 4; display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: opacity 0.2s ease;">
+                            <!-- 🧱 Order Book Depth Overlay Panel (Expandable) -->
+                            <div id="bkInspOrderBookDepthOverlay" style="position: absolute; top: 8px; right: 65px; width: 240px; max-height: calc(100% - 35px); pointer-events: none; z-index: 4; display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width 0.25s ease, max-height 0.25s ease, opacity 0.2s ease; scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.35) transparent;">
                             </div>
 
                             <div id="bkInspChartLoadingOverlay" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,5,8,0.85); color: #cbd5e1; font-family: var(--font-mono); font-size: 0.82rem; z-index: 5; font-weight: 600;">
@@ -1135,6 +1135,103 @@
                         <button type="button" id="bkInspScrollNotesBtn" onclick="app.scrollToBreakoutNotes()" class="btn btn-sm btn-tactile" style="background: #18181b; color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); font-size: 0.78rem; font-weight: 700; padding: 0.38rem 0.65rem; border-radius: 5px; cursor: pointer;" title="Scroll to inline mathematical notes">
                             📐 Notes
                         </button>
+                    </div>
+
+                    <!-- ─────────────────────────────────────────────────────────────────── -->
+                    <!-- 🏛️ DEEP INSTITUTIONAL DETAIL (Persistent Drawer Half)             -->
+                    <!-- ─────────────────────────────────────────────────────────────────── -->
+                    <div id="nexusInstitutionalSection" style="margin-top:0.85rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:0.85rem;">
+                        <!-- Section Header -->
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.65rem;">
+                            <div style="display:flex;align-items:center;gap:0.45rem;">
+                                <span style="font-size:1.05rem;">🏛️</span>
+                                <span style="font-size:0.78rem;font-weight:800;color:#e2e8f0;text-transform:uppercase;letter-spacing:0.04em;font-family:var(--font-mono);">Institutional Forensics</span>
+                            </div>
+                            <span id="nexusInstStockTicker" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);display:none;"></span>
+                        </div>
+
+                        <!-- Stock Identity Header -->
+                        <div id="nexusInstHeader" style="display:none; background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:7px;padding:0.65rem 0.8rem;margin-bottom:0.5rem;">
+                            <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;">
+                                <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+                                    <span id="nexusInstTicker" style="font-size:1.05rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
+                                    <span id="nexusInstCompany" style="font-size:0.72rem;color:#94a3b8;">--</span>
+                                    <span id="nexusInstVerdict" class="badge" style="font-size:0.60rem;background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.2);padding:0.1rem 0.35rem;">--</span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;font-family:var(--font-mono);font-size:0.68rem;">
+                                    <span style="color:#71717a;">7D:</span><span id="nexusInst7D" style="font-weight:700;">--</span>
+                                    <span style="color:#71717a;">30D:</span><span id="nexusInst30D" style="font-weight:700;">--</span>
+                                    <span style="color:#71717a;">1Y:</span><span id="nexusInst1Y" style="font-weight:700;">--</span>
+                                    <span style="color:#71717a;">Mcap:</span><span id="nexusInstMcap">--</span>
+                                </div>
+                            </div>
+                            <div id="nexusInstScoreLine" style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);margin-top:0.3rem;"></div>
+                        </div>
+
+                        <!-- Returns / Mcap Strip (compact inline) -->
+                        <div id="nexusInstReturnsStrip" style="display:none;display:grid;grid-template-columns:repeat(auto-fit, minmax(72px, 1fr));gap:0.35rem;margin-bottom:0.5rem;font-family:var(--font-mono);font-size:0.68rem;">
+                            <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.45rem;border-radius:5px;text-align:center;">
+                                <div style="color:#71717a;font-size:0.58rem;">PRICE</div>
+                                <div id="nexusInstPrice" style="font-weight:800;color:#ffffff;font-size:0.82rem;">--</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.45rem;border-radius:5px;text-align:center;">
+                                <div style="color:#71717a;font-size:0.58rem;">7D</div>
+                                <div id="nexusInst7dVal" style="font-weight:700;">--</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.45rem;border-radius:5px;text-align:center;">
+                                <div style="color:#71717a;font-size:0.58rem;">30D</div>
+                                <div id="nexusInst30dVal" style="font-weight:700;">--</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.45rem;border-radius:5px;text-align:center;">
+                                <div style="color:#71717a;font-size:0.58rem;">1Y</div>
+                                <div id="nexusInst1yVal" style="font-weight:700;">--</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.45rem;border-radius:5px;text-align:center;">
+                                <div style="color:#71717a;font-size:0.58rem;">MCAP</div>
+                                <div id="nexusInstMcapVal" style="font-weight:700;color:#ffffff;">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="nexusInstEmpty" style="background:#000000;border:1px solid rgba(255,255,255,0.06);border-radius:7px;padding:1.5rem 1rem;text-align:center;">
+                            <div style="font-size:1.1rem;margin-bottom:0.35rem;">🏛️</div>
+                            <div style="font-size:0.78rem;color:#52525b;font-family:var(--font-mono);">Click a setup row to load institutional forensics<br>for this ticker.</div>
+                        </div>
+
+                        <!-- Shareholding Pattern -->
+                        <div id="nexusInstShareholdingWrap" style="display:none;margin-bottom:0.45rem;">
+                            <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;font-family:var(--font-mono);text-transform:uppercase;">Trailing Shareholding &amp; QoQ Deltas</div>
+                            <div id="nexusInstShareholdingContainer" style="background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:6px;overflow-x:auto;padding:0.4rem;"></div>
+                        </div>
+
+                        <!-- Block Deals -->
+                        <div id="nexusInstBlockDealsWrap" style="display:none;margin-bottom:0.45rem;">
+                            <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;margin-bottom:0.3rem;font-family:var(--font-mono);text-transform:uppercase;">Recent Block &amp; Bulk Deals</div>
+                            <div id="nexusInstBlockDealsContainer" style="background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem;max-height:140px;overflow-y:auto;"></div>
+                        </div>
+
+                        <!-- Fund Holdings -->
+                        <div id="nexusInstHoldingsWrap" style="display:none;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;">
+                                <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;font-family:var(--font-mono);text-transform:uppercase;">Fund-by-Fund Holdings</div>
+                                <span id="nexusInstFundCount" style="font-size:0.62rem;color:#38bdf8;font-family:var(--font-mono);">0 Funds</span>
+                            </div>
+                            <div style="background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:6px;overflow-x:auto;max-height:220px;overflow-y:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.66rem;text-align:left;">
+                                    <thead>
+                                        <tr style="color:#71717a;border-bottom:1px solid rgba(255,255,255,0.06);font-family:var(--font-mono);">
+                                            <th style="padding:0.3rem 0.45rem;font-weight:700;">FUND</th>
+                                            <th style="padding:0.3rem 0.35rem;">ACTION</th>
+                                            <th style="padding:0.3rem 0.35rem;text-align:right;">STAKE</th>
+                                            <th style="padding:0.3rem 0.35rem;text-align:right;">CHG%</th>
+                                            <th style="padding:0.3rem 0.35rem;text-align:right;">INCREASE</th>
+                                            <th style="padding:0.3rem 0.35rem;text-align:right;">VALUE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="nexusInstHoldingsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
