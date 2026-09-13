@@ -247,6 +247,28 @@ def market_of(ticker: str) -> str:
     return "US"
 
 
+# -------------------------------------------------------------------
+# Breakout Radar Filter Thresholds
+# -------------------------------------------------------------------
+# Market cap class boundaries in Crores (INR):
+#   large_cap >= 20,000 Cr  (₹200B, ~$2.4B)
+#   mid_cap   >= 500 Cr  and < 20,000 Cr
+#   small_cap  < 500 Cr
+BREAKOUT_MCAP_LARGE_MIN_CR = 20_000.0
+BREAKOUT_MCAP_MID_MIN_CR = 500.0
+
+# Volume ratio threshold for "elevated volume" filter
+BREAKOUT_ELEVATED_VOLUME_RATIO = 1.5  # 1.5x vs 20-day average
+
+# Conviction thresholds on composite_score (0–100)
+BREAKOUT_CONVICTION_HIGH = 70
+BREAKOUT_CONVICTION_MEDIUM = 50
+
+# -------------------------------------------------------------------
+# PyTorch / CUDA helpers
+# -------------------------------------------------------------------
+
+
 def get_default_device(preferred: str | None = None) -> str:
     """Return the resolved PyTorch device for Kronos inference.
 

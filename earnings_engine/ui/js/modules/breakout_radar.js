@@ -723,12 +723,31 @@
             }
 
             try {
-                const params = new URLSearchParams({ universe: universe, strategy: strategy, sort_by: sortBy, min_score: minScore, limit: 100, tier: 'HOT' });
+                const tierSelect = document.getElementById('breakoutTierSelect');
+                const tier = tierSelect?.value || app._breakoutPoolFilter || 'ALL';
+                const params = new URLSearchParams({ universe: universe, strategy: strategy, sort_by: sortBy, min_score: minScore, limit: 100, tier: tier });
                 if (asofDate) {
                     params.set('asof_date', asofDate);
                 }
                 if (forceLive || app.breakoutLiveTracking) {
                     params.set('live', 'true');
+                }
+                // --- Breakout Radar Filter: Market Cap ---
+                const mcapVal = document.getElementById('breakoutMcapSelect')?.value || 'all';
+                if (mcapVal === 'gt1000') {
+                    params.set('mcap_min', '1000');
+                } else if (mcapVal && mcapVal !== 'all') {
+                    params.set('mcap_class', mcapVal);
+                }
+                // --- Breakout Radar Filter: Volume Ratio ---
+                const volVal = document.getElementById('breakoutVolumeSelect')?.value || 'all';
+                if (volVal && volVal !== 'all') {
+                    params.set('min_volume_ratio', volVal);
+                }
+                // --- Breakout Radar Filter: Conviction ---
+                const convVal = document.getElementById('breakoutConvictionSelect')?.value || 'all';
+                if (convVal && convVal !== 'all') {
+                    params.set('min_conviction', convVal);
                 }
                 const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
                 if (!res.ok) throw new Error('HTTP ' + res.status);

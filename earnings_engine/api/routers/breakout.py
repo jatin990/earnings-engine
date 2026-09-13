@@ -8,6 +8,13 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 
 from earnings_engine.api.dependencies import _settings
+from earnings_engine.config import (
+    BREAKOUT_CONVICTION_HIGH,
+    BREAKOUT_CONVICTION_MEDIUM,
+    BREAKOUT_ELEVATED_VOLUME_RATIO,
+    BREAKOUT_MCAP_LARGE_MIN_CR,
+    BREAKOUT_MCAP_MID_MIN_CR,
+)
 from earnings_engine.data import breakout_scanner as breakout_scanner_mod
 from earnings_engine.logging_utils import get_logger
 
@@ -34,6 +41,11 @@ async def get_breakout_radar_endpoint(
     live: bool = Query(False, description="Force live real-time price fetching for candidates"),
     real_tracked_only: bool = Query(False, description="Filter to show ONLY real-time tracked entries persisted in database archive"),
     tier: str | None = Query("ALL", description="Filter pool tier (HOT, WARM, ALL)"),
+    mcap_min: float | None = Query(None, description="Minimum market cap in Crores (INR) — e.g. 1000 for >1000 Cr. Applied to NSE (.NS) tickers only"),
+    mcap_max: float | None = Query(None, description="Maximum market cap in Crores (INR) — e.g. 5000 for <5000 Cr. Applied to NSE (.NS) tickers only"),
+    mcap_class: str | None = Query(None, description="Market cap class band: large_cap, mid_cap, small_cap (large>=20,000 Cr, mid 500-20,000 Cr, small<500 Cr)"),
+    min_volume_ratio: float | None = Query(None, description="Minimum volume ratio vs 20-day average (e.g. 1.5 for elevated volume)"),
+    min_conviction: str | None = Query(None, description="Minimum conviction band: high (score>=70), medium (score>=50)"),
 ):
     """Return breakout candidates from the background scanner or point-in-time historical backtest."""
     import pandas as pd
@@ -64,6 +76,84 @@ async def get_breakout_radar_endpoint(
         if tier and tier.upper() != "ALL":
             target_tier = tier.upper().strip()
             candidates = [c for c in candidates if (c.get("tier") or "HOT").upper() == target_tier]
+
+        # --- Market Cap Enrichment (only if a mcap filter is requested) ---
+        _has_mcap_filter = any([mcap_min is not None, mcap_max is not None, mcap_class is not None])
+        if _has_mcap_filter:
+            _bulk_caps: dict[str, float] = {}
+            try:
+                from earnings_engine.data.universe import load_all_market_caps
+                _bulk_caps = await asyncio.to_thread(load_all_market_caps, _settings) or {}
+            except Exception as _mcap_err:
+                logger.debug("Bulk market cap load skipped: %s", _mcap_err)
+            for c in candidates:
+                if c.get("market_cap_cr") is None:
+                    t = c.get("ticker", "")
+                    # load_all_market_caps returns raw units (rupees); convert to Cr if present
+                    raw_cap = _bulk_caps.get(t) or _bulk_caps.get(t.replace(".NS", ""))
+                    if raw_cap is not None:
+                        try:
+                            c["market_cap_cr"] = round(float(raw_cap) / 1e7, 2)  # INR → Cr
+                        except (TypeError, ValueError):
+                            pass
+
+        # Apply market cap minimum threshold (Crores, NSE tickers only)
+        if mcap_min is not None:
+            candidates = [
+                c for c in candidates
+                if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
+                or ".NS" in str(c.get("ticker", "")).upper()
+                and float(c.get("market_cap_cr")) >= mcap_min
+            ]
+
+        # Apply market cap maximum threshold (Crores, NSE tickers only)
+        if mcap_max is not None:
+            candidates = [
+                c for c in candidates
+                if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
+                or ".NS" in str(c.get("ticker", "")).upper()
+                and float(c.get("market_cap_cr")) <= mcap_max
+            ]
+
+        # Apply named market cap class band
+        if mcap_class and mcap_class.lower() != "all":
+            _class_lower = mcap_class.lower().strip()
+            if _class_lower == "large_cap":
+                candidates = [
+                    c for c in candidates
+                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
+                    or ".NS" in str(c.get("ticker", "")).upper()
+                    and float(c.get("market_cap_cr")) >= BREAKOUT_MCAP_LARGE_MIN_CR
+                ]
+            elif _class_lower == "mid_cap":
+                candidates = [
+                    c for c in candidates
+                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
+                    or ".NS" in str(c.get("ticker", "")).upper()
+                    and BREAKOUT_MCAP_MID_MIN_CR <= float(c.get("market_cap_cr")) < BREAKOUT_MCAP_LARGE_MIN_CR
+                ]
+            elif _class_lower == "small_cap":
+                candidates = [
+                    c for c in candidates
+                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
+                    or ".NS" in str(c.get("ticker", "")).upper()
+                    and float(c.get("market_cap_cr")) < BREAKOUT_MCAP_MID_MIN_CR
+                ]
+
+        # Apply elevated volume ratio filter
+        if min_volume_ratio is not None:
+            candidates = [
+                c for c in candidates
+                if (c.get("volume_ratio") or 0) >= min_volume_ratio
+            ]
+
+        # Apply conviction band filter
+        if min_conviction and min_conviction.lower() != "all":
+            _conv_lower = min_conviction.lower().strip()
+            if _conv_lower == "high":
+                candidates = [c for c in candidates if (c.get("composite_score") or 0) >= BREAKOUT_CONVICTION_HIGH]
+            elif _conv_lower == "medium":
+                candidates = [c for c in candidates if (c.get("composite_score") or 0) >= BREAKOUT_CONVICTION_MEDIUM]
 
         # Synchronize candidate prices: auto-fetch live quotes for hot pool & candidate setups
         if candidates and not asof_date:

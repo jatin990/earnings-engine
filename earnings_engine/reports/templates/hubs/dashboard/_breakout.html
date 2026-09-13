@@ -117,6 +117,39 @@
                     <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width: 36px; background: transparent; border: none; color: #f4f4f5; font-size: 0.70rem; font-family: var(--font-mono); text-align: center; outline: none;">
                 </div>
 
+                <!-- Market Cap Filter -->
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Mcap:</span>
+                    <select id="breakoutMcapSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter by market cap class or threshold">
+                        <option value="all">All Sizes</option>
+                        <option value="large_cap">Large Cap (≥20,000 Cr)</option>
+                        <option value="mid_cap">Mid Cap (500–20,000 Cr)</option>
+                        <option value="small_cap">Small Cap (&lt;500 Cr)</option>
+                        <option value="gt1000">Large+ Mid (≥1,000 Cr)</option>
+                    </select>
+                </div>
+
+                <!-- Volume Filter -->
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Vol:</span>
+                    <select id="breakoutVolumeSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter by volume surge vs 20D average">
+                        <option value="all">All Volume</option>
+                        <option value="1.5">↑ 1.5x+ Elevated</option>
+                        <option value="2.0">↑ 2.0x+ Explosive</option>
+                        <option value="3.0">↑ 3.0x+ Extreme</option>
+                    </select>
+                </div>
+
+                <!-- Conviction Filter -->
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Conv:</span>
+                    <select id="breakoutConvictionSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter by conviction band">
+                        <option value="all">All Conviction</option>
+                        <option value="high">🔥 High (≥70 pts)</option>
+                        <option value="medium">⚡ Medium (≥50 pts)</option>
+                    </select>
+                </div>
+
                 <!-- Limit Selector -->
                 <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
                     <span style="font-size: 0.68rem; color: #71717a;">Limit:</span>
