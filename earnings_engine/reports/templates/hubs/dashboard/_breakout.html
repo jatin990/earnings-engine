@@ -429,32 +429,40 @@
                         <div id="bkInspTradingViewCard" style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.55rem; margin-bottom: 0.65rem;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; padding: 0 0.15rem; flex-wrap: wrap; gap: 0.3rem;">
                                 <div style="display: flex; align-items: center; gap: 0.35rem; font-family: var(--font-mono);">
-                                    <span style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em;">📈 Chart &amp; Walls</span>
+                                    <span style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em;">📈 Quantum Chart</span>
                                     <span id="bkInspChartSymbolBadge" style="color: #38bdf8; font-size: 0.60rem; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.25); padding: 0.04rem 0.3rem; border-radius: 3px;">TCS.NS</span>
+                                    <!-- Candlestick History Range Filter Pills -->
+                                    <div class="timeframe-pill-group" style="display: inline-flex; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 1px; font-size: 0.58rem; margin-left: 0.2rem;">
+                                        <button type="button" id="bkRange3MBtn" onclick="app.setBreakoutChartRange('3M')" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.08rem 0.28rem; cursor: pointer;">3M</button>
+                                        <button type="button" id="bkRange6MBtn" onclick="app.setBreakoutChartRange('6M')" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.08rem 0.28rem; cursor: pointer;">6M</button>
+                                        <button type="button" id="bkRange1YBtn" onclick="app.setBreakoutChartRange('1Y')" class="btn btn-sm" style="background: rgba(56,189,248,0.18); border: none; color: #38bdf8; padding: 0.08rem 0.28rem; cursor: pointer; font-weight: 700;">1Y</button>
+                                        <button type="button" id="bkRangeAllBtn" onclick="app.setBreakoutChartRange('ALL')" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.08rem 0.28rem; cursor: pointer;">ALL</button>
+                                    </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                                    <!-- Chart Height Quick Selectors -->
-                                    <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.58rem;">
-                                        <button type="button" id="bkChartH380Btn" onclick="app.setBreakoutChartHeight(380)" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="Compact height (380px)">380h</button>
-                                        <button type="button" id="bkChartH480Btn" onclick="app.setBreakoutChartHeight(480)" class="btn btn-sm" style="background: rgba(56,189,248,0.18); border: none; color: #38bdf8; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Standard height (480px)">480h</button>
-                                        <button type="button" id="bkChartH620Btn" onclick="app.setBreakoutChartHeight(620)" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="Tall height (620px)">620h</button>
-                                        <button type="button" id="bkInspChartMaxBtn" onclick="app.toggleBreakoutChartMaximize()" class="btn btn-sm" style="background: transparent; border: none; color: #a78bfa; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Toggle Full Viewport Chart Height">⤢ Max</button>
+                                    <!-- Viewport Height Allocation (% of Drawer) -->
+                                    <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.58rem;" title="Chart viewport height allocation percentage">
+                                        <span style="font-size: 0.54rem; color: #71717a; padding: 0 0.2rem; font-weight: 700;">SPLIT:</span>
+                                        <button type="button" id="bkChartH50Btn" onclick="app.setBreakoutChartHeight('50vh')" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="50% Drawer Height">50%</button>
+                                        <button type="button" id="bkChartH70Btn" onclick="app.setBreakoutChartHeight('70vh')" class="btn btn-sm" style="background: rgba(56,189,248,0.18); border: none; color: #38bdf8; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="70% Drawer Height (Default)">70%</button>
+                                        <button type="button" id="bkChartH85Btn" onclick="app.setBreakoutChartHeight('85vh')" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="85% High Focus Height">85%</button>
+                                        <button type="button" id="bkInspChartMaxBtn" onclick="app.toggleBreakoutChartMaximize()" class="btn btn-sm" style="background: transparent; border: none; color: #a78bfa; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Toggle Full Screen Maximize">⤢ Max</button>
                                     </div>
 
-                                    <!-- Chart Mode Switcher -->
+                                    <!-- Chart Mode Switcher (Native Live vs TradingView Popout) -->
                                     <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.60rem;">
-                                        <button type="button" id="bkChartModeNativeBtn" onclick="app.switchBreakoutChartMode('native')" style="background: rgba(56,189,248,0.18); color: #38bdf8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; font-weight: 700; cursor: pointer;">Native + Walls</button>
-                                        <button type="button" id="bkChartModeTvBtn" onclick="app.switchBreakoutChartMode('tv')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;">TradingView</button>
+                                        <button type="button" id="bkChartModeNativeBtn" onclick="app.switchBreakoutChartMode('native')" style="background: rgba(56,189,248,0.18); color: #38bdf8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; font-weight: 700; cursor: pointer;" title="Native Real-Time Market Chart + Order Book Walls">🟢 Live Native</button>
+                                        <button type="button" id="bkChartModeTvBtn" onclick="app.switchBreakoutChartMode('tv')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;" title="TradingView Embed Widget">TV Embed</button>
                                     </div>
                                     <button type="button" onclick="app.fitBreakoutChartScale()" class="btn btn-sm" style="background: #18181b; border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; font-size: 0.60rem; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer; font-family: var(--font-mono);" title="Fit Candles to Viewport">⟲ Fit</button>
-                                    <a id="bkInspTvPopoutLink" href="#" target="_blank" style="color: #38bdf8; font-size: 0.62rem; text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.2rem;">
+                                    <a id="bkInspTvPopoutLink" href="#" target="_blank" class="btn btn-sm" style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); color: #38bdf8; font-size: 0.60rem; text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.2rem; padding: 0.12rem 0.35rem; border-radius: 3px;" title="Open full chart directly on TradingView.com">
                                         <span>TV ↗</span>
                                     </a>
                                 </div>
                             </div>
 
-                            <!-- Native Quantum Lightweight Chart Container -->
-                            <div id="bkInspLightweightChartWrap" style="height: 480px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
+                            <!-- Native Quantum Lightweight Chart Container (70% Drawer Viewport Default) -->
+                            <div id="bkInspLightweightChartWrap" style="height: 70vh; min-height: 360px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
                                 <div id="bkInspLightweightChartContainer" style="width: 100%; height: 100%;"></div>
                                 <div id="bkInspChartLoadingOverlay" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,5,8,0.85); color: #94a3b8; font-family: var(--font-mono); font-size: 0.72rem; z-index: 5;">
                                     <span>⏳ Loading chart &amp; wall levels...</span>
@@ -462,7 +470,10 @@
                             </div>
 
                             <!-- TradingView Embed Widget Container (Toggled via TV mode) -->
-                            <div id="bkInspTradingViewContainer" style="display: none; height: 480px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508;">
+                            <div id="bkInspTradingViewContainer" style="display: none; height: 70vh; min-height: 360px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
+                                <div id="bkInspTvNotice" style="display: none; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(18,20,28,0.92); border: 1px solid rgba(255,255,255,0.12); padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 0.62rem; color: #cbd5e1; font-family: var(--font-mono); z-index: 10; display: flex; align-items: center; justify-content: space-between;">
+                                    <span>⚠️ TradingView restricts NSE iframe embedding. Use <strong>Live Native</strong> mode or click <a id="bkInspTvNoticePopout" href="#" target="_blank" style="color: #38bdf8; text-decoration: underline;">TV ↗ Popout</a> for full view.</span>
+                                </div>
                             </div>
 
                             <!-- ↕️ Interactive Vertical Chart Resizer Bar -->

@@ -1454,6 +1454,9 @@
             const wrap = document.getElementById('bkInspLightweightChartWrap');
             const tvWrap = document.getElementById('bkInspTradingViewContainer');
             const maxBtn = document.getElementById('bkInspChartMaxBtn');
+            const h50Btn = document.getElementById('bkChartH50Btn');
+            const h70Btn = document.getElementById('bkChartH70Btn');
+            const h85Btn = document.getElementById('bkChartH85Btn');
             const h380Btn = document.getElementById('bkChartH380Btn');
             const h480Btn = document.getElementById('bkChartH480Btn');
             const h620Btn = document.getElementById('bkChartH620Btn');
@@ -1462,28 +1465,45 @@
             if (wrap) wrap.style.height = hStr;
             if (tvWrap) tvWrap.style.height = hStr;
 
-            // Update button styles
-            const hNum = typeof height === 'number' ? height : parseInt(height, 10);
-            [h380Btn, h480Btn, h620Btn].forEach(b => {
+            // Reset all split percentage & pixel height buttons
+            [h50Btn, h70Btn, h85Btn, h380Btn, h480Btn, h620Btn].forEach(b => {
                 if (b) {
                     b.style.background = 'transparent';
                     b.style.color = '#94a3b8';
                     b.style.fontWeight = '400';
                 }
             });
-            if (hNum === 380 && h380Btn) {
-                h380Btn.style.background = 'rgba(56,189,248,0.18)';
-                h380Btn.style.color = '#38bdf8';
-                h380Btn.style.fontWeight = '700';
-            } else if (hNum === 480 && h480Btn) {
-                h480Btn.style.background = 'rgba(56,189,248,0.18)';
-                h480Btn.style.color = '#38bdf8';
-                h480Btn.style.fontWeight = '700';
-            } else if (hNum === 620 && h620Btn) {
-                h620Btn.style.background = 'rgba(56,189,248,0.18)';
-                h620Btn.style.color = '#38bdf8';
-                h620Btn.style.fontWeight = '700';
+
+            // Highlight active split button
+            if ((hStr.includes('50vh') || hStr === '50%') && h50Btn) {
+                h50Btn.style.background = 'rgba(56,189,248,0.18)';
+                h50Btn.style.color = '#38bdf8';
+                h50Btn.style.fontWeight = '700';
+            } else if ((hStr.includes('70vh') || hStr === '70%') && h70Btn) {
+                h70Btn.style.background = 'rgba(56,189,248,0.18)';
+                h70Btn.style.color = '#38bdf8';
+                h70Btn.style.fontWeight = '700';
+            } else if ((hStr.includes('85vh') || hStr === '85%') && h85Btn) {
+                h85Btn.style.background = 'rgba(56,189,248,0.18)';
+                h85Btn.style.color = '#38bdf8';
+                h85Btn.style.fontWeight = '700';
+            } else {
+                const hNum = typeof height === 'number' ? height : parseInt(height, 10);
+                if (hNum === 380 && h380Btn) {
+                    h380Btn.style.background = 'rgba(56,189,248,0.18)';
+                    h380Btn.style.color = '#38bdf8';
+                    h380Btn.style.fontWeight = '700';
+                } else if (hNum === 480 && h480Btn) {
+                    h480Btn.style.background = 'rgba(56,189,248,0.18)';
+                    h480Btn.style.color = '#38bdf8';
+                    h480Btn.style.fontWeight = '700';
+                } else if (hNum === 620 && h620Btn) {
+                    h620Btn.style.background = 'rgba(56,189,248,0.18)';
+                    h620Btn.style.color = '#38bdf8';
+                    h620Btn.style.fontWeight = '700';
+                }
             }
+
             if (maxBtn) {
                 maxBtn.textContent = '⤢ Max';
                 maxBtn.style.color = '#a78bfa';
@@ -1506,10 +1526,10 @@
             const isMax = wrap.getAttribute('data-maximized') === 'true';
             if (isMax) {
                 wrap.removeAttribute('data-maximized');
-                let prevHeight = 480;
+                let prevHeight = '70vh';
                 try {
                     const stored = localStorage.getItem('breakout_chart_height');
-                    if (stored && !stored.includes('vh')) prevHeight = stored;
+                    if (stored) prevHeight = stored;
                 } catch (e) {}
                 app.setBreakoutChartHeight(prevHeight);
                 if (maxBtn) {
@@ -1524,6 +1544,35 @@
                     maxBtn.textContent = '⤓ Restore';
                     maxBtn.style.color = '#34d399';
                 }
+            }
+        };
+
+        // Candlestick History Range Filter (3M, 6M, 1Y, ALL)
+        app._bkChartRange = app._bkChartRange || '1Y';
+        app.setBreakoutChartRange = function(range) {
+            app._bkChartRange = range || '1Y';
+            const r3M = document.getElementById('bkRange3MBtn');
+            const r6M = document.getElementById('bkRange6MBtn');
+            const r1Y = document.getElementById('bkRange1YBtn');
+            const rAll = document.getElementById('bkRangeAllBtn');
+
+            [r3M, r6M, r1Y, rAll].forEach(btn => {
+                if (btn) {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#94a3b8';
+                    btn.style.fontWeight = '400';
+                }
+            });
+
+            const activeBtn = range === '3M' ? r3M : (range === '6M' ? r6M : (range === 'ALL' ? rAll : r1Y));
+            if (activeBtn) {
+                activeBtn.style.background = 'rgba(56,189,248,0.18)';
+                activeBtn.style.color = '#38bdf8';
+                activeBtn.style.fontWeight = '700';
+            }
+
+            if (app._bkRawBars && app._bkRawBars.length > 0 && app._bkCandleSeries && app._bkVolumeSeries) {
+                app._renderBreakoutChartBars(app._bkRawBars, app._bkChartRange);
             }
         };
 
@@ -1806,6 +1855,46 @@
             return result;
         }
 
+        app._renderBreakoutChartBars = function(rawBars, range) {
+            if (!rawBars || rawBars.length === 0 || !app._bkCandleSeries || !app._bkVolumeSeries) return;
+
+            let filteredBars = rawBars;
+            if (range === '3M') {
+                filteredBars = rawBars.slice(-65);
+            } else if (range === '6M') {
+                filteredBars = rawBars.slice(-130);
+            } else if (range === '1Y') {
+                filteredBars = rawBars.slice(-252);
+            }
+
+            const candles = [];
+            const volumes = [];
+            filteredBars.forEach(r => {
+                const itemTime = r.date || r.time;
+                candles.push({
+                    time: itemTime,
+                    open: Number(r.open),
+                    high: Number(r.high),
+                    low: Number(r.low),
+                    close: Number(r.close),
+                });
+                volumes.push({
+                    time: itemTime,
+                    value: Number(r.volume || 0),
+                    color: Number(r.close) >= Number(r.open) ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                });
+            });
+
+            app._bkCandleSeries.setData(candles);
+            app._bkVolumeSeries.setData(volumes);
+            if (app._bkSma20Series) app._bkSma20Series.setData(calculateSMA(candles, 20));
+            if (app._bkSma50Series) app._bkSma50Series.setData(calculateSMA(candles, 50));
+
+            if (app._bkLightweightChart) {
+                app._bkLightweightChart.timeScale().fitContent();
+            }
+        };
+
         app.initBreakoutQuantumChart = async function(ticker, candidate, wallsData) {
             const container = document.getElementById('bkInspLightweightChartContainer');
             const wrap = document.getElementById('bkInspLightweightChartWrap');
@@ -1898,6 +1987,8 @@
                     lineWidth: 1,
                     title: 'SMA 50',
                 });
+                app._bkSma20Series = sma20Series;
+                app._bkSma50Series = sma50Series;
 
                 // Fetch historical bars
                 const res = await fetch(`/api/v1/price-history/${encodeURIComponent(ticker)}`);
@@ -1909,31 +2000,14 @@
                     return;
                 }
 
-                const candles = [];
-                const volumes = [];
-                rawBars.forEach(r => {
-                    const itemTime = r.date || r.time;
-                    candles.push({
-                        time: itemTime,
-                        open: Number(r.open),
-                        high: Number(r.high),
-                        low: Number(r.low),
-                        close: Number(r.close),
-                    });
-                    volumes.push({
-                        time: itemTime,
-                        value: Number(r.volume || 0),
-                        color: Number(r.close) >= Number(r.open) ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
-                    });
-                });
+                app._bkRawBars = rawBars;
+                app._bkCurrentCandidate = candidate;
+                app._bkCurrentWallsData = wallsData;
 
-                candleSeries.setData(candles);
-                volumeSeries.setData(volumes);
-                sma20Series.setData(calculateSMA(candles, 20));
-                sma50Series.setData(calculateSMA(candles, 50));
+                app._renderBreakoutChartBars(rawBars, app._bkChartRange || '1Y');
 
                 // Overlay Key Execution Lines & Order Book Walls
-                const curPrice = candidate?.current_price || (candles.length > 0 ? candles[candles.length - 1].close : 0);
+                const curPrice = candidate?.current_price || (rawBars.length > 0 ? Number(rawBars[rawBars.length - 1].close) : 0);
                 const trigger = candidate?.breakout_trigger != null ? Number(candidate.breakout_trigger) : null;
                 const target = candidate?.target_price != null ? Number(candidate.target_price) : (trigger ? trigger * 1.08 : null);
                 const stopLoss = candidate?.stop_loss != null ? Number(candidate.stop_loss) : (curPrice ? curPrice * 0.95 : null);
@@ -2223,19 +2297,29 @@
             const badge = document.getElementById('bkInspChartSymbolBadge');
             if (badge) badge.textContent = tvSymbol;
             const popout = document.getElementById('bkInspTvPopoutLink');
-            if (popout) popout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
+            const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
+            if (popout) popout.href = tvUrl;
+
+            // Notice element for exchange restrictions
+            const isIndianSymbol = tvSymbol.startsWith('NSE:') || tvSymbol.startsWith('BSE:');
+            const noticeEl = document.createElement('div');
+            noticeEl.id = 'bkInspTvNotice';
+            noticeEl.style.cssText = `display: ${isIndianSymbol ? 'flex' : 'none'}; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(18,20,28,0.92); border: 1px solid rgba(255,255,255,0.12); padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 0.62rem; color: #cbd5e1; font-family: var(--font-mono); z-index: 10; align-items: center; justify-content: space-between;`;
+            noticeEl.innerHTML = `<span>⚠️ TradingView restricts NSE/BSE iframe embedding. Use <strong style="color:#38bdf8;">Live Native</strong> mode or click <a href="${tvUrl}" target="_blank" style="color: #38bdf8; text-decoration: underline;">TV ↗ Popout</a> for full view.</span>`;
 
             try {
                 const widgetWrap = document.createElement('div');
                 widgetWrap.className = 'tradingview-widget-container';
                 widgetWrap.style.width = '100%';
                 widgetWrap.style.height = '100%';
+                widgetWrap.style.position = 'relative';
 
                 const widgetInner = document.createElement('div');
                 widgetInner.className = 'tradingview-widget-container__widget';
                 widgetInner.style.width = '100%';
                 widgetInner.style.height = '100%';
                 widgetWrap.appendChild(widgetInner);
+                widgetWrap.appendChild(noticeEl);
 
                 const script = document.createElement('script');
                 script.type = 'text/javascript';
