@@ -305,11 +305,18 @@
             // Update KPI Cards
             const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
             setEl('bkTrackedKpiTotal', summary.total_tracked != null ? summary.total_tracked : '—');
+            setEl('bkTrackedKpiActiveCount', `${summary.active_count || 0} active · ${(summary.total_tracked || 0) - (summary.active_count || 0)} settled`);
             setEl('bkTrackedKpiWinRate', summary.win_rate_pct != null ? `${summary.win_rate_pct}%` : '—');
+            setEl('bkTrackedKpiWinLoss', `${summary.win_count || 0}W · ${summary.loss_count || 0}L`);
+            setEl('bkTrackedKpiTargetCount', summary.target_hit_count != null ? `${summary.target_hit_count} Hits` : '—');
+            setEl('bkTrackedKpiTargetRate', summary.target_hit_rate_pct != null ? `(${summary.target_hit_rate_pct}%)` : '(—)');
+            setEl('bkTrackedKpiAvgDays', summary.avg_days_to_target != null ? `${summary.avg_days_to_target} Days` : '—');
             setEl('bkTrackedKpiAvgReturn', summary.avg_return_pct != null ? `${summary.avg_return_pct >= 0 ? '+' : ''}${summary.avg_return_pct}%` : '—');
-            setEl('bkTrackedKpiMaxReturn', summary.max_return_pct != null ? `${summary.max_return_pct >= 0 ? '+' : ''}${summary.max_return_pct}%` : '—');
             setEl('bkTrackedKpiTopTicker', summary.max_return_ticker || '—');
-            setEl('bkTrackedKpiActiveCount', `${summary.active_count || 0} active / ${summary.triggered_count || 0} fired`);
+            setEl('bkTrackedKpiMaxReturn', summary.max_return_pct != null ? `(${summary.max_return_pct >= 0 ? '+' : ''}${summary.max_return_pct}%)` : '');
+
+            // Render Per-Strategy Matrix Breakdown
+            renderPerStrategyBreakdown(summary.per_strategy_stats || {});
 
             app.recalculatePortfolioSimulation();
         } catch (e) {
@@ -324,6 +331,96 @@
             }
         }
     };
+
+    // Render Per-Strategy Quantitative Breakdown Matrix
+    function renderPerStrategyBreakdown(stats) {
+        const tbody = document.getElementById('breakoutTrackedStrategyTableBody');
+        if (!tbody) return;
+
+        const stratKeys = Object.keys(stats || {});
+        if (stratKeys.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="padding:1.5rem; text-align:center; color:#64748b; font-size:0.75rem;">No strategy performance records available for current timeframe filter.</td></tr>`;
+            return;
+        }
+
+        const rowsHtml = stratKeys.map(k => {
+            const s = stats[k] || {};
+            const total = s.total_tracked || 0;
+            const icon = s.icon || '⚡';
+            const name = s.strategy_name || k;
+            const badge = s.badge || k;
+
+            const winRate = s.win_rate_pct != null ? s.win_rate_pct : 0.0;
+            const winCount = s.win_count || 0;
+            const lossCount = s.loss_count || 0;
+            const winColor = winRate >= 65 ? '#34d399' : (winRate >= 50 ? '#fbbf24' : (total > 0 ? '#f87171' : '#94a3b8'));
+            const winBg = winRate >= 65 ? 'rgba(16,185,129,0.15)' : (winRate >= 50 ? 'rgba(245,158,11,0.12)' : (total > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)'));
+
+            const targetHits = s.target_hit_count || 0;
+            const targetRate = s.target_hit_rate_pct != null ? s.target_hit_rate_pct : 0.0;
+
+            const avgDays = s.avg_days_to_target != null ? `${s.avg_days_to_target}d` : '—';
+            const avgDaysBadge = s.avg_days_to_target != null
+                ? `<span style="font-size:0.68rem; font-weight:700; color:#fbbf24; background:rgba(234,179,8,0.15); border:1px solid rgba(234,179,8,0.3); padding:0.08rem 0.4rem; border-radius:3px;">⏱️ ${avgDays}</span>`
+                : `<span style="color:#64748b;">—</span>`;
+
+            const stopHits = s.stop_hit_count || 0;
+            const stopRate = s.stop_hit_rate_pct != null ? s.stop_hit_rate_pct : 0.0;
+
+            const avgRet = s.avg_return_pct != null ? s.avg_return_pct : 0.0;
+            const avgRetColor = avgRet > 0 ? '#34d399' : (avgRet < 0 ? '#f87171' : '#94a3b8');
+
+            const avgPeak = s.avg_peak_gain_pct != null ? s.avg_peak_gain_pct : 0.0;
+
+            const bestSym = s.best_ticker && s.best_ticker !== '—' ? s.best_ticker : '—';
+            const bestRet = s.best_return_pct != null ? s.best_return_pct : 0.0;
+            const bestWinnerHtml = bestSym !== '—'
+                ? `<div style="display:flex; align-items:baseline; gap:0.3rem;"><strong style="color:#f8fafc; cursor:pointer;" onclick="app.inspectBreakoutStock('${bestSym}')">${bestSym}</strong> <span style="color:#34d399; font-size:0.65rem; font-weight:700;">+${bestRet.toFixed(1)}%</span></div>`
+                : `<span style="color:#64748b;">—</span>`;
+
+            return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.04); background:rgba(2,6,23,0.4); transition:background 0.15s;" onmouseenter="this.style.background='rgba(30,41,59,0.4)'" onmouseleave="this.style.background='rgba(2,6,23,0.4)'">
+                    <td style="padding:0.5rem 0.6rem; text-align:left;">
+                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <span style="font-size:0.9rem;">${icon}</span>
+                            <div>
+                                <div style="font-weight:700; color:#f8fafc; font-size:0.74rem;">${name}</div>
+                                <div style="font-size:0.58rem; color:#94a3b8;">${badge}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:center; font-weight:700; color:#cbd5e1;">
+                        <div>${total}</div>
+                        <div style="font-size:0.56rem; color:#64748b;">${s.active_count || 0} act / ${s.triggered_count || 0} fired</div>
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:center;">
+                        <span style="font-weight:800; color:${winColor}; background:${winBg}; padding:0.1rem 0.4rem; border-radius:3px; font-size:0.72rem;">${total > 0 ? `${winRate}%` : '—'}</span>
+                        <div style="font-size:0.56rem; color:#64748b; margin-top:2px;">${winCount}W / ${lossCount}L</div>
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:center;">
+                        <div style="font-weight:700; color:#38bdf8;">${targetHits} <span style="font-size:0.62rem; color:#94a3b8;">(${total > 0 ? targetRate : 0}%)</span></div>
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:center;">
+                        ${avgDaysBadge}
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:center;">
+                        <span style="color:${stopHits > 0 ? '#f87171' : '#94a3b8'}; font-weight:600;">${stopHits} <span style="font-size:0.62rem; color:#64748b;">(${total > 0 ? stopRate : 0}%)</span></span>
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:right; font-weight:700; color:${avgRetColor};">
+                        ${total > 0 ? `${avgRet >= 0 ? '+' : ''}${avgRet.toFixed(2)}%` : '—'}
+                    </td>
+                    <td style="padding:0.5rem 0.55rem; text-align:right; font-weight:700; color:#34d399;">
+                        ${total > 0 ? `+${avgPeak.toFixed(2)}%` : '—'}
+                    </td>
+                    <td style="padding:0.5rem 0.6rem; text-align:left;">
+                        ${bestWinnerHtml}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.innerHTML = rowsHtml;
+    }
 
     // Strategy badge formatter
     function formatStrategyBadge(strat, archetype) {
@@ -596,11 +693,14 @@
             let outcomeBg = 'rgba(148,163,184,0.12)';
             let outcomeBorder = 'rgba(148,163,184,0.25)';
 
+            const gTargetHitDays = g.setups.filter(s => s.days_to_target != null && s.outcome === 'TARGET_HIT').map(s => s.days_to_target);
+            const gMinDays = gTargetHitDays.length > 0 ? Math.min(...gTargetHitDays) : null;
+
             if (g.has_target_hit) {
                 outcomeColor = '#34d399';
                 outcomeBg = 'rgba(16,185,129,0.18)';
                 outcomeBorder = 'rgba(16,185,129,0.45)';
-                outcomeLabel = 'Target Hit 🎯';
+                outcomeLabel = `Target Hit 🎯${gMinDays != null ? ` (${gMinDays}d)` : ''}`;
             } else if (g.has_triggered) {
                 outcomeColor = isLiveRecent ? '#34d399' : '#38bdf8';
                 outcomeBg = isLiveRecent ? 'rgba(16,185,129,0.18)' : 'rgba(56,189,248,0.18)';
@@ -686,7 +786,10 @@
                 const sGainStr = sGain != null ? `+${Number(sGain).toFixed(2)}%` : '—';
 
                 const sScore = s.composite_score || 0;
-                const sOutLabel = s.outcome_label || s.outcome || 'ACTIVE';
+                let sOutLabel = s.outcome_label || s.outcome || 'ACTIVE';
+                if (s.outcome === 'TARGET_HIT' && s.days_to_target != null) {
+                    sOutLabel = `Target Hit 🎯 (${s.days_to_target}d)`;
+                }
 
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(2,6,23,0.6);transition:background 0.15s;cursor:pointer;" onmouseenter="this.style.background='rgba(30,41,59,0.5)'" onmouseleave="this.style.background='rgba(2,6,23,0.6)'" onclick="app.inspectBreakoutStock('${sym}')" title="Click to inspect setup forensics in Slide-Over Drawer">

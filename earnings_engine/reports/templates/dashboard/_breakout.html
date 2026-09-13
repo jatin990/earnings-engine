@@ -564,6 +564,110 @@
             </div>
         </div>
 
+        <!-- High-Density Audited Performance & Win-Rate KPI Summary Cards -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:0.45rem; margin-bottom:0.75rem;">
+            <!-- Total Tracked -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Tracked Setups</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiTotal">—</span></div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;"><span id="bkTrackedKpiActiveCount">—</span></div>
+            </div>
+
+            <!-- Win Rate -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(16,185,129,0.25); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#34d399; text-transform:uppercase; font-weight:800; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
+                    <span>Overall Win Rate</span>
+                    <span>🎯</span>
+                </div>
+                <div style="font-size:1.15rem; font-weight:800; color:#34d399; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiWinRate">—</span></div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;"><span id="bkTrackedKpiWinLoss">—</span></div>
+            </div>
+
+            <!-- Target Hits -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(56,189,248,0.2); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#38bdf8; text-transform:uppercase; font-weight:800; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
+                    <span>Target Hits</span>
+                    <span>🏁</span>
+                </div>
+                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.35rem; margin-top:0.15rem;">
+                    <span id="bkTrackedKpiTargetCount">—</span>
+                    <span id="bkTrackedKpiTargetRate" style="font-size:0.68rem; font-weight:700; color:#38bdf8;">(—)</span>
+                </div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">Hit &ge; Target Price</div>
+            </div>
+
+            <!-- Avg Days to Target -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(234,179,8,0.2); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#fbbf24; text-transform:uppercase; font-weight:800; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
+                    <span>Avg Days to Target</span>
+                    <span>⏱️</span>
+                </div>
+                <div style="font-size:1.15rem; font-weight:800; color:#fbbf24; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiAvgDays">—</span></div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">Trading days from trigger</div>
+            </div>
+
+            <!-- Avg Realized Return -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Avg Return</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiAvgReturn">—</span></div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">Per setup average</div>
+            </div>
+
+            <!-- Best Winner Stock -->
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Best Winner</div>
+                <div style="font-size:1.10rem; font-weight:800; color:#34d399; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.3rem; margin-top:0.15rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <span id="bkTrackedKpiTopTicker">—</span>
+                    <span id="bkTrackedKpiMaxReturn" style="font-size:0.68rem; color:#a1a1aa; font-family:var(--font-mono);"></span>
+                </div>
+                <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">Peak single-setup return</div>
+            </div>
+        </div>
+
+        <!-- ⚡ Per-Strategy Quantitative Performance & Forensics Breakdown Card -->
+        <div id="breakoutTrackedStrategyMatrixCard" style="background:#09090b; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:0.75rem 0.95rem; margin-bottom:0.75rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.6rem; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.45rem;">
+                    <span style="font-size:1.05rem;">🔬</span>
+                    <div>
+                        <div style="font-size:0.80rem; font-weight:800; color:#f8fafc; letter-spacing:-0.01em; display:flex; align-items:center; gap:0.4rem;">
+                            <span>Per-Strategy Quantitative Performance Breakdown</span>
+                            <span style="font-size:0.58rem; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:0.02rem 0.35rem; border-radius:3px; font-weight:700;">5 Models</span>
+                        </div>
+                        <div style="font-size:0.64rem; color:#94a3b8; font-family:var(--font-mono); margin-top:1px;">
+                            Audited hit rate, duration to target, and risk-adjusted efficiency decomposed by detection algorithm
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategy Grid / Table -->
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.72rem; font-family:var(--font-mono);">
+                    <thead>
+                        <tr style="background:rgba(255,255,255,0.02); border-bottom:1px solid rgba(255,255,255,0.08); font-size:0.64rem; color:#94a3b8; text-transform:uppercase;">
+                            <th style="padding:0.4rem 0.55rem; text-align:left;">Strategy Archetype</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:center;">Tracked</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:center;">Win Rate</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:center;">Target Hits</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:center;">Avg Days to Target</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:center;">Stop Hit Rate</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:right;">Avg Return</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:right;">Avg Peak Gain</th>
+                            <th style="padding:0.4rem 0.55rem; text-align:left;">Top Winner</th>
+                        </tr>
+                    </thead>
+                    <tbody id="breakoutTrackedStrategyTableBody">
+                        <tr>
+                            <td colspan="9" style="padding:1.5rem; text-align:center; color:#64748b; font-size:0.75rem;">
+                                Decomposing strategy performance statistics...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- 💼 Realized Portfolio Capital Simulator (10L Default / Custom) -->
         <div id="breakoutPortfolioSimulatorBox" style="background:linear-gradient(180deg, #09090b 0%, #030712 100%); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:0.75rem 0.95rem; margin-bottom:0.75rem; box-shadow:0 4px 20px -5px rgba(0,0,0,0.5);">
             <!-- Simulator Header & Capital Switcher -->

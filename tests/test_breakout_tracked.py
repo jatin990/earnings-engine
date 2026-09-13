@@ -366,3 +366,110 @@ def test_portfolio_capital_simulation_api(app_client):
     sim = data["summary"]["portfolio_simulation"]
     assert sim["initial_capital"] == 500000.0
 
+
+def test_per_strategy_breakdown_and_days_to_target():
+    """Verify detailed per-strategy performance breakdown, win rates, target hits, and days-to-target evaluation."""
+    settings = Settings()
+    apply_migrations(settings)
+
+    res = get_tracked_breakouts(days=30, settings=settings)
+    assert res["success"] is True
+    summary = res["summary"]
+
+    # Verify summary fields
+    assert "win_rate_pct" in summary
+    assert "target_hit_count" in summary
+    assert "target_hit_rate_pct" in summary
+    assert "avg_days_to_target" in summary
+    assert "per_strategy_stats" in summary
+
+    per_strat = summary["per_strategy_stats"]
+    assert isinstance(per_strat, dict)
+
+    # Verify all 5 core breakout strategies are present in breakdown
+    expected_strats = [
+        "CLASSIC_TECHNICAL",
+        "NSE_DELIVERY_ABSORPTION",
+        "NSE_FO_CALL_WALL",
+        "VOLUME_PROFILE_VAH",
+        "DONCHIAN_TTM_SQUEEZE",
+    ]
+    for s_key in expected_strats:
+        assert s_key in per_strat
+        st = per_strat[s_key]
+        assert "strategy_id" in st
+        assert "strategy_name" in st
+        assert "total_tracked" in st
+        assert "win_rate_pct" in st
+        assert "target_hit_count" in st
+        assert "target_hit_rate_pct" in st
+        assert "stop_hit_count" in st
+        assert "stop_hit_rate_pct" in st
+        assert "avg_days_to_target" in st
+        assert "avg_return_pct" in st
+        assert "avg_peak_gain_pct" in st
+        assert "best_ticker" in st
+        assert "best_return_pct" in st
+
+    # Verify items have days_to_target populated when outcome is TARGET_HIT
+    for item in res["items"]:
+        if item.get("outcome") == "TARGET_HIT" and item.get("days_to_target") is not None:
+            assert isinstance(item["days_to_target"], int)
+            assert item["days_to_target"] >= 0
+
+
+def test_deterministic_days_to_target_with_mocked_prices(monkeypatch):
+    """Verify that a stock breaking out and hitting target on day 2 gets days_to_target = 2."""
+    import pandas as pd
+    settings = Settings()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = get_db_connection(settings)
+
+    # Insert test signal from 5 days ago (use non-filtered symbol prefix)
+    ticker_sym = "SPEEDRUN_TARGET_VALID.NS"
+    cur = conn.execute(
+        """
+        INSERT INTO breakout_tracked_signals (
+            ticker, company_name, industry, tier, signal_date,
+            signal_price, current_price, breakout_trigger, target_price, stop_loss,
+            composite_score, setup_archetype, outcome, breakout_happened, scanned_at, created_at, updated_at
+        ) VALUES (
+            ?, 'Speed Runner Corp', 'Equities', 'HOT', '2026-09-01',
+            100.0, 115.0, 102.0, 110.0, 95.0, 85.0, 'Classic Technical Breakout', 'ACTIVE', 1,
+            ?, ?, ?
+        )
+        """,
+        (ticker_sym, today_str, today_str, today_str),
+    )
+    test_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    try:
+        # Mock price trajectory: Day 1 touches 105 (below target 110), Day 2 touches 112 (reaches target 110)
+        dates = pd.to_datetime(["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04"])
+        mock_df = pd.DataFrame(
+            [
+                {"open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 10000},  # Day 1: 2026-09-01
+                {"open": 101.0, "high": 112.0, "low": 100.0, "close": 110.0, "volume": 25000},  # Day 2: 2026-09-02 reaches target 110!
+                {"open": 110.0, "high": 114.0, "low": 108.0, "close": 111.0, "volume": 20000},  # Day 3: 2026-09-03
+                {"open": 111.0, "high": 115.0, "low": 110.0, "close": 115.0, "volume": 30000},  # Day 4: 2026-09-04
+            ],
+            index=dates,
+        )
+        from earnings_engine.data import prices
+        monkeypatch.setattr(prices, "fetch_prices", lambda sym, settings, force=False: mock_df)
+
+        res = get_tracked_breakouts(days=30, settings=settings)
+        item = next((it for it in res["items"] if it["id"] == test_id), None)
+        assert item is not None
+        assert item["outcome"] == "TARGET_HIT"
+        assert item["days_to_target"] == 2
+    finally:
+        clean_conn = get_db_connection(settings)
+        clean_conn.execute("DELETE FROM breakout_tracked_signals WHERE id = ?", (test_id,))
+        clean_conn.commit()
+        clean_conn.close()
+
+
+
