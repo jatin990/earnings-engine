@@ -476,3 +476,122 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
         "total_pulled": total_pulled,
         "tables": stats,
     }
+
+
+def override_remote_tables_from_local(
+    tables: list[str],
+    settings: Settings | None = None,
+    batch_size: int = 100,
+) -> dict[str, Any]:
+    """Force override specified remote Turso tables with local SQLite table contents.
+
+    Permanently purges remote rows for the specified tables and re-populates them with
+    the clean, authentic local records to eliminate any remote synthetic artifacts.
+    """
+    s = settings or Settings()
+    url = os.getenv("TURSO_DATABASE_URL", "").strip()
+    token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+
+    if not (url and token):
+        logger.info("[TURSO-OVERRIDE] Upstream Turso credentials not configured. Skipping remote override.")
+        return {"status": "skipped", "reason": "No Turso credentials configured"}
+
+    start_t = time.perf_counter()
+    logger.info("[TURSO-OVERRIDE] Starting remote override for tables: %s", tables)
+
+    db_path = str(_cache_path(s))
+    s.ensure_dirs()
+
+    try:
+        local_conn = sqlite3.connect(db_path, timeout=30.0)
+        local_conn.execute("PRAGMA journal_mode=WAL")
+        remote_conn = TursoConnection(url, token)
+
+        local_tables = {r[0] for r in local_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() if r}
+        remote_tables = {r[0] for r in remote_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall() if r}
+    except Exception as e:
+        logger.error("[TURSO-OVERRIDE] Failed to establish database connection for override: %s", e)
+        return {"status": "error", "error": str(e)}
+
+    stats: dict[str, dict[str, Any]] = {}
+    total_pushed = 0
+
+    try:
+        for table in tables:
+            if table not in local_tables:
+                continue
+
+            # Ensure table exists on remote Turso
+            if table not in remote_tables:
+                try:
+                    cur = local_conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        remote_conn.execute(row[0])
+                        remote_tables.add(table)
+                except Exception as e:
+                    logger.warning("[TURSO-OVERRIDE] Could not create remote table %s: %s", table, e)
+
+            # Match columns
+            local_col_info = _get_table_columns_info(local_conn, table)
+            remote_col_info = _get_table_columns_info(remote_conn, table) if table in remote_tables else {}
+
+            for col_name, col_type in local_col_info.items():
+                if col_name not in remote_col_info:
+                    try:
+                        remote_conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col_name}" {col_type}')
+                        remote_col_info[col_name] = col_type
+                    except Exception as e:
+                        logger.debug("[TURSO-OVERRIDE] Remote ALTER TABLE ADD COLUMN %s on %s: %s", col_name, table, e)
+
+            shared_cols = [c for c in local_col_info if c in remote_col_info]
+            if not shared_cols:
+                continue
+
+            col_str = ", ".join(f'"{c}"' for c in shared_cols)
+            ph = ", ".join("?" for _ in shared_cols)
+            insert_sql = f'INSERT OR REPLACE INTO "{table}" ({col_str}) VALUES ({ph})'
+
+            # 1. Fetch all local records
+            local_rows = local_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
+
+            # 2. Wipe remote table
+            try:
+                remote_conn.execute(f'DELETE FROM "{table}"')
+            except Exception as e:
+                logger.warning("[TURSO-OVERRIDE] Remote DELETE error on table %s: %s", table, e)
+
+            # 3. Push local records in chunks
+            pushed = 0
+            if local_rows:
+                for i in range(0, len(local_rows), batch_size):
+                    chunk = local_rows[i : i + batch_size]
+                    try:
+                        remote_conn.executemany(insert_sql, chunk)
+                        pushed += len(chunk)
+                    except Exception as e:
+                        logger.error("[TURSO-OVERRIDE] Push error on table %s chunk %d: %s", table, i, e)
+
+            stats[table] = {"rows_pushed": pushed, "status": "overridden"}
+            total_pushed += pushed
+
+    finally:
+        try:
+            local_conn.close()
+        except Exception:
+            pass
+
+    elapsed = time.perf_counter() - start_t
+    logger.info("[TURSO-OVERRIDE] Completed in %.2fs (pushed %d records across %d tables)", elapsed, total_pushed, len(stats))
+    return {
+        "status": "success",
+        "action": "override_remote_from_local",
+        "elapsed_seconds": round(elapsed, 2),
+        "total_pushed": total_pushed,
+        "tables": stats,
+    }
+
+
+# Backwards compatibility alias
+sync_all_to_turso = sync_local_to_upstream
+

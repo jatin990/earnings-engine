@@ -274,3 +274,95 @@ def test_signal_day_intraday_low_does_not_trigger_false_stop_hit(monkeypatch):
         clean_conn.execute("DELETE FROM breakout_tracked_signals WHERE id = ?", (test_id,))
         clean_conn.commit()
         clean_conn.close()
+
+
+def test_portfolio_capital_simulation():
+    """Verify 10L portfolio capital simulation: 70/30 target booking, stop loss enforcement, and net P&L."""
+    settings = Settings()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = get_db_connection(settings)
+
+    # Insert two test signals: 1 Target Hit and 1 Stop Loss Hit
+    cur1 = conn.execute(
+        """
+        INSERT INTO breakout_tracked_signals (
+            ticker, company_name, industry, tier, signal_date,
+            signal_price, current_price, breakout_trigger, target_price, stop_loss,
+            composite_score, setup_archetype, outcome, max_gain_pct, scanned_at, created_at, updated_at
+        ) VALUES (
+            'TEST_PORT_WIN.NS', 'Test Win Corp', 'Tech', 'HOT', ?,
+            100.0, 125.0, 100.0, 110.0, 95.0,
+            85.0, 'Classic Technical', 'TARGET_HIT', 20.0,
+            ?, ?, ?
+        )
+        """,
+        (today_str, today_str, today_str, today_str),
+    )
+    id1 = cur1.lastrowid
+
+    cur2 = conn.execute(
+        """
+        INSERT INTO breakout_tracked_signals (
+            ticker, company_name, industry, tier, signal_date,
+            signal_price, current_price, breakout_trigger, target_price, stop_loss,
+            composite_score, setup_archetype, outcome, max_gain_pct, scanned_at, created_at, updated_at
+        ) VALUES (
+            'TEST_PORT_LOSS.NS', 'Test Loss Corp', 'Tech', 'HOT', ?,
+            100.0, 92.0, 100.0, 110.0, 95.0,
+            75.0, 'Classic Technical', 'STOP_HIT', 0.0,
+            ?, ?, ?
+        )
+        """,
+        (today_str, today_str, today_str, today_str),
+    )
+    id2 = cur2.lastrowid
+    conn.commit()
+    conn.close()
+
+    try:
+        # Run simulation with 10L capital
+        res = get_tracked_breakouts(days=1, capital=1000000.0, settings=settings)
+        assert res["success"] is True
+
+        items_map = {it["id"]: it for it in res["items"] if it["id"] in (id1, id2)}
+        assert id1 in items_map
+        assert id2 in items_map
+
+        win_item = items_map[id1]
+        loss_item = items_map[id2]
+
+        # Target Return = (110 - 100) / 100 * 100 = +10.0%
+        # Peak Gain = 20.0%
+        # Simulated Return = 0.70 * 10.0 + 0.30 * 20.0 = 7.0 + 6.0 = 13.0%
+        assert win_item["simulated_return_pct"] == 13.0
+        assert "70% @ Target" in win_item["simulated_booking_note"]
+
+        # Stop Return = (95 - 100) / 100 * 100 = -5.0%
+        assert loss_item["simulated_return_pct"] == -5.0
+        assert "100% Stop Loss Hit" in loss_item["simulated_booking_note"]
+
+        # Check summary portfolio simulation
+        sim_summary = res["summary"]["portfolio_simulation"]
+        assert sim_summary["initial_capital"] == 1000000.0
+        assert sim_summary["allocation_per_trade"] > 0
+        assert sim_summary["final_capital"] is not None
+        assert sim_summary["net_pnl"] is not None
+        assert sim_summary["total_profit"] >= win_item["simulated_pnl"]
+        assert sim_summary["total_loss"] >= abs(loss_item["simulated_pnl"])
+    finally:
+        clean_conn = get_db_connection(settings)
+        clean_conn.execute("DELETE FROM breakout_tracked_signals WHERE id IN (?, ?)", (id1, id2))
+        clean_conn.commit()
+        clean_conn.close()
+
+
+def test_portfolio_capital_simulation_api(app_client):
+    """Verify that /api/v1/breakout/tracked endpoint accepts capital query parameter and returns simulation."""
+    resp = app_client.get("/api/v1/breakout/tracked?days=7&capital=500000")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "portfolio_simulation" in data["summary"]
+    sim = data["summary"]["portfolio_simulation"]
+    assert sim["initial_capital"] == 500000.0
+

@@ -370,15 +370,28 @@ def ingest_nse_universe_data(
 
 
 def sync_to_turso_cloud(settings: Settings) -> bool:
-    """Sync cleaned institutional tables to Turso cloud database."""
+    """Sync and override cleaned institutional tables in Turso cloud database."""
     print("\n" + "=" * 78)
-    print(" [*] REPLICATING CLEANED DATA TO TURSO CLOUD")
+    print(" [*] REPLICATING & OVERRIDING CLEANED DATA TO TURSO CLOUD")
     print("=" * 78)
 
     try:
-        from earnings_engine.data.turso_sync import sync_all_to_turso
-        res = sync_all_to_turso(settings)
-        print("  * Turso replication completed successfully.")
+        from earnings_engine.data.turso_sync import override_remote_tables_from_local, sync_local_to_upstream
+        institutional_tables = [
+            "shareholding_patterns",
+            "institutional_holdings",
+            "institutional_block_deals",
+            "institutional_accumulation_cache",
+            "institutional_radar_signals",
+            "institutional_quarantine",
+        ]
+        print(f"  * Overriding remote tables: {', '.join(institutional_tables)}...")
+        override_res = override_remote_tables_from_local(institutional_tables, settings=settings)
+        print(f"  * Override complete: {override_res.get('total_pushed', 0)} total records pushed to remote.")
+
+        print("  * Running general incremental delta sync for remaining state tables...")
+        sync_res = sync_local_to_upstream(settings=settings)
+        print(f"  * General sync complete (status: {sync_res.get('status', 'ok')}).")
         return True
     except Exception as e:
         print(f"  ! Turso sync notice (local DB intact): {e}")
