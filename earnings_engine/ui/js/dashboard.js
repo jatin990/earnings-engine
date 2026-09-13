@@ -2431,19 +2431,9 @@ const API_BASE = window.location.origin;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-            },
+            }
+        });
 
-        // [] → extracted to modules/recalculate.js
-        // [month_filter] -> extracted to modules/month_filter.js
-        // [consensus] -> extracted to modules/consensus.js
-        // [customizer] -> extracted to modules/customizer.js
-        // [stock_rating] -> extracted to modules/stock_rating.js
-        // [watchlist_modal] -> extracted to modules/watchlist_modal.js
-        // [catalyst_consensus] -> extracted to modules/catalyst_consensus.js
-        // [breakout_radar] -> extracted to modules/breakout_radar.js
-        // [tracked_breakouts] -> extracted to modules/tracked_breakouts.js
-        // [schedules] -> extracted to modules/schedules.js
-        // [breakout_audit] -> extracted to modules/breakout_audit.js
         // Universal Breakout Inspector Drawer Dispatcher
         if (!app.openBreakoutInspectorDrawer) {
             app.openBreakoutInspectorDrawer = async function(tickerOrCandidate) {
@@ -2458,7 +2448,6 @@ const API_BASE = window.location.origin;
             };
             window.openBreakoutInspectorDrawer = app.openBreakoutInspectorDrawer;
         }
-        });
 
         // Safe boot sequence: ensures all modular script tags have loaded & attached to window.app
         function bootApp() {
