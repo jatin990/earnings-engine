@@ -37,6 +37,8 @@ def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: S
         from earnings_engine.data.prices import load_prices
         settings = settings or Settings()
         pdf = load_prices(clean_symbol, settings)
+        if (pdf is None or pdf.empty) and not clean_symbol.endswith(".NS"):
+            pdf = load_prices(f"{clean_symbol}.NS", settings)
         if pdf is not None and not pdf.empty and "close" in pdf.columns:
             last_close = float(pdf["close"].dropna().iloc[-1])
             if last_close > 0:
@@ -51,6 +53,11 @@ def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: S
         p = float(q.get("price") or 0)
         if p > 0:
             return p
+        if not clean_symbol.endswith(".NS"):
+            q_ns = mgr.fetch_quote(f"{clean_symbol}.NS")
+            p_ns = float(q_ns.get("price") or 0)
+            if p_ns > 0:
+                return p_ns
     except Exception:
         pass
 

@@ -41,11 +41,20 @@ class YFinanceProvider(DataProvider):
             "NIFTY 50": "^NSEI",
             "BANKNIFTY": "^NSEBANK",
             "NIFTY BANK": "^NSEBANK",
+            "FINNIFTY": "^CNXFIN",
             "NIFTYIT": "^CNXIT",
             "NIFTY IT": "^CNXIT",
         }
         if sym in index_map:
             return index_map[sym]
+        if sym.startswith("^") or sym.endswith(".NS") or sym.endswith(".BO"):
+            return sym
+        try:
+            from earnings_engine.config import market_of
+            if market_of(sym) == "IN":
+                return f"{sym}.NS"
+        except Exception:
+            pass
         return sym
 
     def fetch_ohlcv(
@@ -113,11 +122,17 @@ class YFinanceProvider(DataProvider):
             t = yf.Ticker(sym)
             price = None
             if hasattr(t, "fast_info"):
-                price = getattr(t.fast_info, "last_price", None) or getattr(t.fast_info, "previous_close", None)
+                try:
+                    price = getattr(t.fast_info, "last_price", None) or getattr(t.fast_info, "previous_close", None)
+                except Exception:
+                    price = None
             if price is None:
-                hist = t.history(period="5d")
-                if not hist.empty and "Close" in hist.columns:
-                    price = float(hist["Close"].iloc[-1])
+                try:
+                    hist = t.history(period="5d")
+                    if not hist.empty and "Close" in hist.columns:
+                        price = float(hist["Close"].iloc[-1])
+                except Exception:
+                    price = None
 
             elapsed_ms = (time.perf_counter() - t0) * 1000
             p_val = float(price) if price is not None else None

@@ -219,8 +219,27 @@ def load_email_settings() -> EmailSettings:
 
 
 def market_of(ticker: str) -> str:
-    """Infer market code from a yfinance ticker symbol."""
-    return "IN" if ticker.endswith(".NS") else "US"
+    """Infer market code from a ticker symbol or index."""
+    if not ticker:
+        return "US"
+    sym = ticker.strip().upper()
+    if sym.endswith(".NS") or sym.endswith(".BO"):
+        return "IN"
+    # Known NSE indices
+    index_names = {
+        "NIFTY", "NIFTY50", "NIFTY 50", "BANKNIFTY", "NIFTY BANK",
+        "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYIT", "NIFTY IT",
+        "^NSEI", "^NSEBANK", "^CNXIT", "^CNXFIN",
+    }
+    if sym in index_names:
+        return "IN"
+    try:
+        from earnings_engine.data.universe import is_fno_eligible
+        if is_fno_eligible(sym):
+            return "IN"
+    except Exception:
+        pass
+    return "US"
 
 
 def get_default_device(preferred: str | None = None) -> str:

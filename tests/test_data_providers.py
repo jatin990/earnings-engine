@@ -86,3 +86,24 @@ class TestOptionChainAnalytics:
         assert "pcr_oi" in res
         assert "max_pain_strike" in res
         assert res["status"] in ("LIVE", "ESTIMATED")
+
+    def test_market_of_and_symbol_normalization(self) -> None:
+        from earnings_engine.config import market_of
+        from earnings_engine.data.providers.yfinance_provider import YFinanceProvider
+
+        # market_of checks
+        assert market_of("RELIANCE.NS") == "IN"
+        assert market_of("LICHSGFIN.NS") == "IN"
+        assert market_of("LICHSGFIN") == "IN"  # Bare NSE F&O underlying
+        assert market_of("NIFTY") == "IN"
+        assert market_of("BANKNIFTY") == "IN"
+        assert market_of("AAPL") == "US"
+        assert market_of("MSFT") == "US"
+
+        # yfinance normalization checks
+        assert YFinanceProvider._normalize_symbol("LICHSGFIN") == "LICHSGFIN.NS"
+        assert YFinanceProvider._normalize_symbol("RELIANCE.NS") == "RELIANCE.NS"
+        assert YFinanceProvider._normalize_symbol("NIFTY") == "^NSEI"
+        assert YFinanceProvider._normalize_symbol("BANKNIFTY") == "^NSEBANK"
+        assert YFinanceProvider._normalize_symbol("AAPL") == "AAPL"
+
