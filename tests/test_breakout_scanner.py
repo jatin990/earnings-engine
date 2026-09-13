@@ -250,6 +250,17 @@ class TestCacheAccessors:
         assert "candidates_found" in status
         assert "scan_intervals" in status or "scan_interval_min" in status
 
+    def test_get_breakout_pool_stats_strategy_breakdown(self):
+        from earnings_engine.data.breakout_scanner import get_breakout_pool_stats, BREAKOUT_STRATEGIES
+        stats = get_breakout_pool_stats()
+        assert isinstance(stats, dict)
+        assert "strategies" in stats
+        for s_key in BREAKOUT_STRATEGIES:
+            assert s_key in stats["strategies"]
+            assert "hot" in stats["strategies"][s_key]
+            assert "warm" in stats["strategies"][s_key]
+            assert "total" in stats["strategies"][s_key]
+
 
 # ---------------------------------------------------------------------------
 # API Endpoint tests

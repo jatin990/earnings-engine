@@ -1097,7 +1097,10 @@ def get_breakout_pool_stats(settings: Settings | None = None) -> dict[str, Any]:
         "total_count": 0,
         "late_count": 0,
         "avg_late_delay_pct": 0.0,
-        "strategies": {},
+        "strategies": {
+            strat_key: {"hot": 0, "warm": 0, "total": 0}
+            for strat_key in BREAKOUT_STRATEGIES
+        },
     }
     try:
         from earnings_engine.data.migrations import apply_migrations
@@ -1400,6 +1403,33 @@ def get_stock_breakout_timeline(
     }
 
 
+def _extract_strategy_id_from_setup(item: dict[str, Any]) -> str:
+    """Classify a setup into one of the 5 registered breakout strategy keys."""
+    strat = str(item.get("strategy_id") or item.get("strategy") or "").upper().strip()
+    if "DELIVERY" in strat or "ABSORPTION" in strat:
+        return "NSE_DELIVERY_ABSORPTION"
+    if "CALL" in strat or "FO_" in strat or "WALL" in strat or "OPTION" in strat:
+        return "NSE_FO_CALL_WALL"
+    if "VOLUME_PROFILE" in strat or "VAH" in strat:
+        return "VOLUME_PROFILE_VAH"
+    if "DONCHIAN" in strat or "SQUEEZE" in strat or "TTM" in strat:
+        return "DONCHIAN_TTM_SQUEEZE"
+    if "CLASSIC" in strat or "TECHNICAL" in strat:
+        return "CLASSIC_TECHNICAL"
+
+    arch = str(item.get("setup_archetype") or "").upper()
+    if "DELIVERY" in arch or "ABSORPTION" in arch:
+        return "NSE_DELIVERY_ABSORPTION"
+    if "CALL" in arch or "F&O" in arch or "WALL" in arch or "OPTION" in arch:
+        return "NSE_FO_CALL_WALL"
+    if "VOLUME PROFILE" in arch or "VAH" in arch:
+        return "VOLUME_PROFILE_VAH"
+    if "DONCHIAN" in arch or "SQUEEZE" in arch or "TTM" in arch:
+        return "DONCHIAN_TTM_SQUEEZE"
+
+    return "CLASSIC_TECHNICAL"
+
+
 def get_tracked_breakouts(
     days: int | None = None,
     start_date: str | None = None,
@@ -1659,11 +1689,15 @@ def get_tracked_breakouts(
                                 item_d["is_live_recent"] = True
                                 item_d["settled_14d"] = False
 
+                                item_d["days_to_target"] = None
+                                item_d["strategy_id"] = _extract_strategy_id_from_setup(item_d)
+
                                 if target_p and (cur_p >= target_p or item_d["post_high"] >= target_p):
                                     item_d["outcome"] = "TARGET_HIT"
                                     item_d["outcome_label"] = "Target Hit 🎯 (Live D1)"
                                     item_d["outcome_badge"] = "TARGET_HIT"
                                     item_d["breakout_happened"] = True
+                                    item_d["days_to_target"] = 1
                                     item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day 1 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
                                 elif stop_p and cur_p <= stop_p:
                                     item_d["outcome"] = "STOP_HIT"
@@ -1688,6 +1722,7 @@ def get_tracked_breakouts(
                                 item_d["days_elapsed"] = days_elapsed
                                 item_d["current_price"] = cur_p
                                 item_d["current_date"] = latest_hist_date
+                                item_d["strategy_id"] = _extract_strategy_id_from_setup(item_d)
 
                                 if days_elapsed >= 14:
                                     # 14-day post-signal settled trajectory
@@ -1705,13 +1740,22 @@ def get_tracked_breakouts(
 
                                     item_d["is_live_recent"] = False
                                     item_d["settled_14d"] = True
+                                    item_d["days_to_target"] = None
 
                                     if target_p and w14_high >= target_p:
+                                        target_day = 14
+                                        if "high" in w14_df:
+                                            highs = pd.to_numeric(w14_df["high"], errors="coerce").fillna(0).tolist()
+                                            for idx, h_val in enumerate(highs, start=1):
+                                                if h_val >= target_p:
+                                                    target_day = idx
+                                                    break
+                                        item_d["days_to_target"] = target_day
                                         item_d["outcome"] = "TARGET_HIT"
-                                        item_d["outcome_label"] = "Target Hit 🎯 (14D)"
+                                        item_d["outcome_label"] = f"Target Hit 🎯 (Day {target_day})"
                                         item_d["outcome_badge"] = "TARGET_HIT"
                                         item_d["breakout_happened"] = True
-                                        item_d["what_happened_summary"] = f"🎯 Reached upside target ₹{target_p:,.2f} within 14-day horizon (+{item_d.get('max_gain_pct',0):.1f}% peak)."
+                                        item_d["what_happened_summary"] = f"🎯 Reached upside target ₹{target_p:,.2f} on Day {target_day}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
                                     elif stop_p and ((w14_sub_low is not None and w14_sub_low <= stop_p) or w14_close <= stop_p):
                                         item_d["outcome"] = "STOP_HIT"
                                         item_d["outcome_label"] = "Stop Hit 🛑 (14D)"
@@ -1745,13 +1789,22 @@ def get_tracked_breakouts(
 
                                     item_d["is_live_recent"] = True
                                     item_d["settled_14d"] = False
+                                    item_d["days_to_target"] = None
 
                                     if target_p and (cur_p >= target_p or post_high >= target_p):
+                                        target_day = days_elapsed
+                                        if not post_df.empty and "high" in post_df:
+                                            highs = pd.to_numeric(post_df["high"], errors="coerce").fillna(0).tolist()
+                                            for idx, h_val in enumerate(highs, start=1):
+                                                if h_val >= target_p:
+                                                    target_day = idx
+                                                    break
+                                        item_d["days_to_target"] = target_day
                                         item_d["outcome"] = "TARGET_HIT"
-                                        item_d["outcome_label"] = f"Target Hit 🎯 (Live D{days_elapsed})"
+                                        item_d["outcome_label"] = f"Target Hit 🎯 (Live D{target_day})"
                                         item_d["outcome_badge"] = "TARGET_HIT"
                                         item_d["breakout_happened"] = True
-                                        item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day {days_elapsed}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
+                                        item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day {target_day}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
                                     elif stop_p and (cur_p <= stop_p or (post_sub_low is not None and post_sub_low <= stop_p)):
                                         item_d["outcome"] = "STOP_HIT"
                                         item_d["outcome_label"] = f"Stop Hit 🛑 (Live D{days_elapsed})"
@@ -1877,20 +1930,92 @@ def get_tracked_breakouts(
             it["simulated_booking_note"] = book_note
 
         positive_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED"))
+        loss_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) < 0 or it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT", "SETUP_FAILED", "BREAKOUT_FAILED"))
         win_rate_pct = round((positive_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
 
         all_rets = [it.get("realized_return_pct") or 0.0 for it in items]
         avg_return_pct = round(sum(all_rets) / len(all_rets), 2) if all_rets else 0.0
+
+        all_peaks = [it.get("max_gain_pct") or 0.0 for it in items]
+        avg_peak_gain_pct = round(sum(all_peaks) / len(all_peaks), 2) if all_peaks else 0.0
 
         best_item = max(items, key=lambda x: x.get("realized_return_pct") or -999) if items else None
         max_return_pct = best_item.get("realized_return_pct", 0.0) if best_item else 0.0
         max_return_ticker = best_item.get("ticker", "—") if best_item else "—"
 
         target_hit_count = sum(1 for it in items if it.get("outcome") == "TARGET_HIT")
+        target_hit_rate_pct = round((target_hit_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
         triggered_count = sum(1 for it in items if it.get("outcome") in ("TRIGGERED", "BREAKOUT_SUCCEEDED", "TARGET_HIT", "BREAKOUT_RETRACED"))
         stop_hit_count = sum(1 for it in items if it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT"))
+        stop_hit_rate_pct = round((stop_hit_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
         setup_failed_count = sum(1 for it in items if it.get("outcome") in ("SETUP_FAILED", "BREAKOUT_FAILED"))
         active_count = sum(1 for it in items if not it.get("settled_14d", False) and (it.get("days_elapsed") or 0) < 14)
+
+        all_days_to_target = [it["days_to_target"] for it in items if it.get("days_to_target") is not None and it.get("outcome") == "TARGET_HIT"]
+        avg_days_to_target = round(sum(all_days_to_target) / len(all_days_to_target), 1) if all_days_to_target else None
+
+        # Per-Strategy breakdown matrix
+        per_strategy_stats: dict[str, dict[str, Any]] = {}
+        for s_key, s_meta in BREAKOUT_STRATEGIES.items():
+            s_items = [it for it in items if _extract_strategy_id_from_setup(it) == s_key]
+            s_total = len(s_items)
+            if s_total == 0:
+                per_strategy_stats[s_key] = {
+                    "strategy_id": s_key,
+                    "strategy_name": s_meta.get("name", s_key),
+                    "short_name": s_meta.get("short_name", s_key),
+                    "icon": s_meta.get("icon", "⚡"),
+                    "badge": s_meta.get("badge", s_key),
+                    "total_tracked": 0,
+                    "win_count": 0,
+                    "loss_count": 0,
+                    "win_rate_pct": 0.0,
+                    "target_hit_count": 0,
+                    "target_hit_rate_pct": 0.0,
+                    "stop_hit_count": 0,
+                    "stop_hit_rate_pct": 0.0,
+                    "avg_days_to_target": None,
+                    "avg_return_pct": 0.0,
+                    "avg_peak_gain_pct": 0.0,
+                    "active_count": 0,
+                    "triggered_count": 0,
+                    "best_ticker": "—",
+                    "best_return_pct": 0.0,
+                }
+            else:
+                s_wins = sum(1 for it in s_items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED"))
+                s_losses = sum(1 for it in s_items if (it.get("realized_return_pct") or 0) < 0 or it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT", "SETUP_FAILED", "BREAKOUT_FAILED"))
+                s_targets = sum(1 for it in s_items if it.get("outcome") == "TARGET_HIT")
+                s_stops = sum(1 for it in s_items if it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT"))
+                s_active = sum(1 for it in s_items if not it.get("settled_14d", False) and (it.get("days_elapsed") or 0) < 14)
+                s_triggered = sum(1 for it in s_items if it.get("outcome") in ("TRIGGERED", "BREAKOUT_SUCCEEDED", "TARGET_HIT", "BREAKOUT_RETRACED"))
+                s_rets = [it.get("realized_return_pct") or 0.0 for it in s_items]
+                s_peaks = [it.get("max_gain_pct") or 0.0 for it in s_items]
+                s_target_days = [it["days_to_target"] for it in s_items if it.get("days_to_target") is not None and it.get("outcome") == "TARGET_HIT"]
+                s_best = max(s_items, key=lambda x: x.get("realized_return_pct") or -999) if s_items else None
+
+                per_strategy_stats[s_key] = {
+                    "strategy_id": s_key,
+                    "strategy_name": s_meta.get("name", s_key),
+                    "short_name": s_meta.get("short_name", s_key),
+                    "icon": s_meta.get("icon", "⚡"),
+                    "badge": s_meta.get("badge", s_key),
+                    "total_tracked": s_total,
+                    "win_count": s_wins,
+                    "loss_count": s_losses,
+                    "win_rate_pct": round((s_wins / s_total) * 100, 1),
+                    "target_hit_count": s_targets,
+                    "target_hit_rate_pct": round((s_targets / s_total) * 100, 1),
+                    "stop_hit_count": s_stops,
+                    "stop_hit_rate_pct": round((s_stops / s_total) * 100, 1),
+                    "avg_days_to_target": round(sum(s_target_days) / len(s_target_days), 1) if s_target_days else None,
+                    "avg_return_pct": round(sum(s_rets) / len(s_rets), 2) if s_rets else 0.0,
+                    "avg_peak_gain_pct": round(sum(s_peaks) / len(s_peaks), 2) if s_peaks else 0.0,
+                    "active_count": s_active,
+                    "triggered_count": s_triggered,
+                    "best_ticker": s_best.get("ticker", "—") if s_best else "—",
+                    "best_return_pct": s_best.get("realized_return_pct", 0.0) if s_best else 0.0,
+                }
 
         # Portfolio simulation aggregation
         total_sim_profit = round(sum(it.get("simulated_pnl", 0.0) for it in items if (it.get("simulated_pnl") or 0.0) > 0), 2)
@@ -1926,14 +2051,21 @@ def get_tracked_breakouts(
             "summary": {
                 "total_tracked": total_tracked,
                 "win_rate_pct": win_rate_pct,
+                "win_count": positive_count,
+                "loss_count": loss_count,
+                "target_hit_count": target_hit_count,
+                "target_hit_rate_pct": target_hit_rate_pct,
+                "stop_hit_count": stop_hit_count,
+                "stop_hit_rate_pct": stop_hit_rate_pct,
+                "avg_days_to_target": avg_days_to_target,
                 "avg_return_pct": avg_return_pct,
+                "avg_peak_gain_pct": avg_peak_gain_pct,
                 "max_return_pct": max_return_pct,
                 "max_return_ticker": max_return_ticker,
                 "active_count": active_count,
                 "triggered_count": triggered_count,
-                "target_hit_count": target_hit_count,
-                "stop_hit_count": stop_hit_count,
                 "setup_failed_count": setup_failed_count,
+                "per_strategy_stats": per_strategy_stats,
                 "portfolio_simulation": portfolio_sim,
             },
             "items": items,

@@ -246,6 +246,69 @@
             const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
             const limitNum = limitVal === 'all' ? list.length : parseInt(limitVal, 10);
             app.renderBreakoutTable(list.slice(0, limitNum), app._breakoutAsofDate);
+
+            // Dynamically refresh strategy dropdown counts matching active filters/pool
+            app.updateBreakoutStrategyDropdown();
+        };
+
+        app.updateBreakoutStrategyDropdown = function(poolStats) {
+            const stratSelect = document.getElementById('breakoutStrategySelect');
+            if (!stratSelect) return;
+
+            const stats = poolStats || app._lastBreakoutPoolStats || {};
+            const stratStats = stats.strategies || {};
+            const tier = (app._breakoutPoolFilter || document.getElementById('breakoutTierSelect')?.value || 'ALL').toUpperCase();
+            const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;
+
+            let counts = {};
+            let allCount = 0;
+
+            if (asofDate && app._breakoutData && app._breakoutData.length > 0) {
+                app._breakoutData.forEach(c => {
+                    const s = (c.strategy || 'CLASSIC_TECHNICAL').toUpperCase();
+                    const cTier = (c.tier || 'HOT').toUpperCase();
+                    if (tier === 'ALL' || cTier === tier) {
+                        counts[s] = (counts[s] || 0) + 1;
+                        allCount++;
+                    }
+                });
+            } else if (stratStats && Object.keys(stratStats).length > 0) {
+                for (const [sKey, sObj] of Object.entries(stratStats)) {
+                    const key = sKey.toUpperCase();
+                    let c = 0;
+                    if (tier === 'HOT') c = sObj.hot || 0;
+                    else if (tier === 'WARM') c = sObj.warm || 0;
+                    else c = sObj.total != null ? sObj.total : ((sObj.hot || 0) + (sObj.warm || 0));
+                    counts[key] = c;
+                    allCount += c;
+                }
+            } else if (app._breakoutData && app._breakoutData.length > 0) {
+                app._breakoutData.forEach(c => {
+                    const s = (c.strategy || 'CLASSIC_TECHNICAL').toUpperCase();
+                    const cTier = (c.tier || 'HOT').toUpperCase();
+                    if (tier === 'ALL' || cTier === tier) {
+                        counts[s] = (counts[s] || 0) + 1;
+                        allCount++;
+                    }
+                });
+            }
+
+            const STRATEGY_BASE_LABELS = {
+                'ALL': 'All Strategies (Aggregated)',
+                'CLASSIC_TECHNICAL': 'Classic Coiling (52W+ATR)',
+                'NSE_DELIVERY_ABSORPTION': 'NSE Delivery Absorption',
+                'NSE_FO_CALL_WALL': 'NSE F&O Call OI Wall',
+                'VOLUME_PROFILE_VAH': 'Volume Profile VAH',
+                'DONCHIAN_TTM_SQUEEZE': 'Donchian TTM Squeeze',
+            };
+
+            Array.from(stratSelect.options).forEach(opt => {
+                const val = opt.value.toUpperCase();
+                const baseName = STRATEGY_BASE_LABELS[val] || opt.getAttribute('data-base-label') || opt.textContent.replace(/\s*\(\d[\d,]*\)$/, '').trim();
+                opt.setAttribute('data-base-label', baseName);
+                const count = val === 'ALL' ? allCount : (counts[val] || 0);
+                opt.textContent = `${baseName} (${count.toLocaleString()})`;
+            });
         };
 
         app.toggleBreakoutExplainer = function() {
@@ -675,6 +738,8 @@
                 const status = data.scan_status || {};
                 const summary = data.backtest_summary || {};
                 const poolStats = data.pool_stats || {};
+                app._lastBreakoutPoolStats = poolStats;
+                app.updateBreakoutStrategyDropdown(poolStats);
                 const total = app._breakoutData.length;
                 const topCandidate = total > 0 ? app._breakoutData[0] : null;
                 const avgScore = total > 0
