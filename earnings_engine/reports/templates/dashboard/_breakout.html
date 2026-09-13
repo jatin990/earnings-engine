@@ -765,16 +765,16 @@
                                     <button type="button" id="bkInspChartMaxBtn" onclick="app.toggleBreakoutChartMaximize()" class="btn btn-sm" style="background: transparent; border: none; color: #a78bfa; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Toggle Full Screen Maximize">⤢ Max</button>
                                 </div>
 
-                                <!-- Chart Mode Switcher (TV Embed vs GoCharting vs Live Native) -->
+                                <!-- Chart Mode Switcher (TV Embed vs Order Flow vs Live Native) -->
                                 <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.60rem;">
                                     <button type="button" id="bkChartModeTvBtn" onclick="app.switchBreakoutChartMode('tv')" style="background: rgba(56,189,248,0.18); color: #38bdf8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; font-weight: 700; cursor: pointer;" title="TradingView Embed Widget (BSE lookup)">⚡ TV Embed</button>
-                                    <button type="button" id="bkChartModeGoChartingBtn" onclick="app.switchBreakoutChartMode('gocharting')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;" title="GoCharting Terminal &amp; Order Flow">📊 GoCharting</button>
-                                    <button type="button" id="bkChartModeNativeBtn" onclick="app.switchBreakoutChartMode('native')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;" title="Native Real-Time Market Chart + Order Book Walls">🟢 Live Native</button>
+                                    <button type="button" id="bkChartModeGoChartingBtn" onclick="app.switchBreakoutChartMode('gocharting')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;" title="Embedded Order Flow, Footprint &amp; Volume Profile Terminal">📊 Order Flow</button>
+                                    <button type="button" id="bkChartModeNativeBtn" onclick="app.switchBreakoutChartMode('native')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;" title="Native Real-Time Market Chart + Horizontal Order Book Spread">🟢 Live Native</button>
                                 </div>
                                 <button type="button" onclick="app.fitBreakoutChartScale()" class="btn btn-sm" style="background: #18181b; border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; font-size: 0.60rem; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer; font-family: var(--font-mono);" title="Fit Candles to Viewport">⟲ Fit</button>
-                                <a id="bkInspGoChartingPopoutLink" href="#" target="_blank" class="btn btn-sm" style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); color: #fbbf24; font-size: 0.60rem; text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.2rem; padding: 0.12rem 0.35rem; border-radius: 3px;" title="Open full chart directly on GoCharting Terminal">
-                                    <span>GC ↗</span>
-                                </a>
+                                <button type="button" id="bkToggleDepthSpreadBtn" onclick="app.toggleBreakoutDepthSpread()" class="btn btn-sm" style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); color: #34d399; font-size: 0.60rem; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer; font-family: var(--font-mono); display: none;" title="Toggle Horizontal Order Book Depth Spread Overlay">
+                                    <span>🧱 Depth Spread</span>
+                                </button>
                                 <a id="bkInspTvPopoutLink" href="#" target="_blank" class="btn btn-sm" style="background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); color: #38bdf8; font-size: 0.60rem; text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.2rem; padding: 0.12rem 0.35rem; border-radius: 3px;" title="Open full chart directly on TradingView.com">
                                     <span>TV ↗</span>
                                 </a>
@@ -785,14 +785,20 @@
                         <div id="bkInspTradingViewContainer" style="display: block; height: 70vh; min-height: 360px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
                         </div>
 
-                        <!-- GoCharting Terminal Launcher Container -->
+                        <!-- Embedded In-Project GoCharting Order Flow Terminal Container -->
                         <div id="bkInspGoChartingContainer" style="display: none; height: 70vh; min-height: 360px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
-                            <!-- Populated with GoCharting Terminal Hub -->
+                            <!-- Populated with Self-Hosted In-Project Order Flow Terminal Canvas -->
                         </div>
 
-                        <!-- Native Quantum Lightweight Chart Container -->
+                        <!-- Native Quantum Lightweight Chart Container with Horizontal Order Book Spread -->
                         <div id="bkInspLightweightChartWrap" style="display: none; height: 70vh; min-height: 360px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
                             <div id="bkInspLightweightChartContainer" style="width: 100%; height: 100%;"></div>
+
+                            <!-- 🧱 Horizontal Order Book Spread Overlay Panel -->
+                            <div id="bkInspOrderBookDepthOverlay" style="position: absolute; top: 8px; right: 65px; width: 220px; max-height: calc(100% - 35px); pointer-events: none; z-index: 4; display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: opacity 0.2s ease;">
+                                <!-- Dynamically populated with horizontal bid/ask liquidity depth bars -->
+                            </div>
+
                             <div id="bkInspChartLoadingOverlay" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,5,8,0.85); color: #94a3b8; font-family: var(--font-mono); font-size: 0.72rem; z-index: 5;">
                                 <span>⏳ Loading chart &amp; wall levels...</span>
                             </div>
@@ -808,37 +814,37 @@
                     <div id="bkInspWallsCard" style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem; font-family: var(--font-mono);">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
                             <div style="font-size: 0.66rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
-                                <span>🧱 Order Book &amp; Derivative Walls</span>
+                                <span id="bkInspWallsCardTitle">🧱 Order Book &amp; Derivative Walls</span>
                             </div>
                             <span id="bkInspWallsSentimentBadge" style="font-size: 0.58rem; color: #34d399; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); padding: 0.04rem 0.3rem; border-radius: 3px; font-weight: 700;">BULLISH</span>
                         </div>
 
                         <!-- Primary Walls Summary Strip (Floor, Max Pain, Ceiling, PCR) -->
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; text-align: center; margin-bottom: 0.5rem;">
+                        <div id="bkInspWallsSummaryGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; text-align: center; margin-bottom: 0.5rem;">
                             <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.22); padding: 0.3rem 0.2rem; border-radius: 4px;">
-                                <div style="font-size: 0.56rem; color: #34d399; text-transform: uppercase; font-weight: 700;">Buy Wall (Floor)</div>
+                                <div id="bkInspBuyWallLabel" style="font-size: 0.56rem; color: #34d399; text-transform: uppercase; font-weight: 700;">Buy Wall (Floor)</div>
                                 <div id="bkInspBuyWallStrike" style="font-size: 0.76rem; font-weight: 800; color: #34d399; margin-top: 0.05rem;">₹0</div>
                                 <div id="bkInspBuyWallDist" style="font-size: 0.56rem; color: #6ee7b7;">-0.0%</div>
                             </div>
                             <div style="background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.22); padding: 0.3rem 0.2rem; border-radius: 4px;">
-                                <div style="font-size: 0.56rem; color: #c084fc; text-transform: uppercase; font-weight: 700;">Max Pain</div>
+                                <div id="bkInspMaxPainLabel" style="font-size: 0.56rem; color: #c084fc; text-transform: uppercase; font-weight: 700;">Max Pain</div>
                                 <div id="bkInspMaxPainStrike" style="font-size: 0.76rem; font-weight: 800; color: #c084fc; margin-top: 0.05rem;">₹0</div>
                                 <div id="bkInspMaxPainDist" style="font-size: 0.56rem; color: #e9d5ff;">0.0%</div>
                             </div>
                             <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.22); padding: 0.3rem 0.2rem; border-radius: 4px;">
-                                <div style="font-size: 0.56rem; color: #f87171; text-transform: uppercase; font-weight: 700;">Sell Wall (Ceiling)</div>
+                                <div id="bkInspSellWallLabel" style="font-size: 0.56rem; color: #f87171; text-transform: uppercase; font-weight: 700;">Sell Wall (Ceiling)</div>
                                 <div id="bkInspSellWallStrike" style="font-size: 0.76rem; font-weight: 800; color: #f87171; margin-top: 0.05rem;">₹0</div>
                                 <div id="bkInspSellWallDist" style="font-size: 0.56rem; color: #fca5a5;">+0.0%</div>
                             </div>
                             <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.22); padding: 0.3rem 0.2rem; border-radius: 4px;">
-                                <div style="font-size: 0.56rem; color: #38bdf8; text-transform: uppercase; font-weight: 700;">PCR (OI / Vol)</div>
+                                <div id="bkInspPcrLabel" style="font-size: 0.56rem; color: #38bdf8; text-transform: uppercase; font-weight: 700;">PCR (OI / Vol)</div>
                                 <div id="bkInspPcrOi" style="font-size: 0.76rem; font-weight: 800; color: #38bdf8; margin-top: 0.05rem;">1.00</div>
                                 <div id="bkInspPcrVol" style="font-size: 0.56rem; color: #bae6fd;">Vol: 1.00</div>
                             </div>
                         </div>
 
                         <!-- Visual Strike Ladder / Order Flow Depth Distribution -->
-                        <div style="font-size: 0.58rem; color: #71717a; text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem; display: flex; justify-content: space-between;">
+                        <div id="bkInspStrikeLadderHeader" style="font-size: 0.58rem; color: #71717a; text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem; display: flex; justify-content: space-between;">
                             <span>Put OI Support (Buy)</span>
                             <span>Strike Price</span>
                             <span>Call OI Resistance (Sell)</span>

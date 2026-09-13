@@ -1370,22 +1370,22 @@
                 <!-- Metric Summary Chips -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem;">
                     <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div style="font-size: 0.65rem; color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟢 Major Buy Wall (Put OI)</div>
+                        <div id="valBuyWallTitle" style="font-size: 0.65rem; color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟢 Major Buy Wall (Put OI)</div>
                         <div id="valBuyWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
                         <div id="valBuyWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
                     </div>
                     <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div style="font-size: 0.65rem; color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🔴 Major Sell Wall (Call OI)</div>
+                        <div id="valSellWallTitle" style="font-size: 0.65rem; color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🔴 Major Sell Wall (Call OI)</div>
                         <div id="valSellWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #f87171; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
                         <div id="valSellWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
                     </div>
                     <div style="background: rgba(251, 191, 36, 0.06); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div style="font-size: 0.65rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟡 Max Pain Equilibrium</div>
+                        <div id="valMaxPainTitle" style="font-size: 0.65rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟡 Max Pain Equilibrium</div>
                         <div id="valMaxPainStrike" style="font-size: 1.05rem; font-weight: 800; color: #fde047; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
                         <div id="valMaxPainDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">Zero-payout strike</div>
                     </div>
                     <div style="background: rgba(129, 140, 248, 0.06); border: 1px solid rgba(129, 140, 248, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div style="font-size: 0.65rem; color: #818cf8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">⚖️ Put-Call Ratio (PCR)</div>
+                        <div id="valPcrTitle" style="font-size: 0.65rem; color: #818cf8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">⚖️ Put-Call Ratio (PCR)</div>
                         <div id="valPcrRatio" style="font-size: 1.05rem; font-weight: 800; color: #a5b4fc; font-family: var(--font-mono); margin-top: 0.15rem;">—</div>
                         <div id="valPcrSentiment" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— sentiment</div>
                     </div>
@@ -5141,6 +5141,7 @@
             const cleanSym = ACTIVE_SYM.replace('.NS', '').replace('.BO', '');
             const el = (id) => document.getElementById(id);
 
+            let isFno = false;
             let supportStrike = null;
             let resistanceStrike = null;
             let maxPainStrike = null;
@@ -5153,7 +5154,8 @@
                 const optResp = await fetch(`/api/v1/options/chain?symbol=${encodeURIComponent(cleanSym)}`);
                 if (optResp.ok) {
                     const optData = await optResp.json();
-                    if (optData.success && optData.data && (optData.data.strikes || []).length > 0) {
+                    if (optData.success && optData.data && (optData.data.status === 'LIVE' || optData.data.status === 'ARCHIVED') && Array.isArray(optData.data.strikes) && optData.data.strikes.length > 0) {
+                        isFno = true;
                         const d = optData.data;
                         stockLiquidityData = d;
                         supportStrike = d.support_strike;
@@ -5163,13 +5165,16 @@
                         sentiment = d.sentiment || 'NEUTRAL';
                         spotPrice = d.spot_price;
                         strikesList = d.strikes || [];
+                        if (el('liquiditySourceBadge')) {
+                            el('liquiditySourceBadge').textContent = 'NSE F&O Open Interest Walls';
+                        }
                     }
                 }
             } catch (e) {
                 console.debug('Option chain lookup fallback:', e);
             }
 
-            if (!supportStrike || !resistanceStrike) {
+            if (!isFno) {
                 try {
                     const techResp = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`);
                     if (techResp.ok) {
@@ -5178,12 +5183,12 @@
                         if (!supportStrike && t.support_level) supportStrike = t.support_level;
                         if (!resistanceStrike && t.resistance_level) resistanceStrike = t.resistance_level;
                         if (!spotPrice && t.close) spotPrice = t.close;
-                        if (el('liquiditySourceBadge')) {
-                            el('liquiditySourceBadge').textContent = 'Swing Channels & Multi-Timeframe Liquidity';
-                        }
                     }
                 } catch (te) {
                     console.debug('Technicals fallback failed:', te);
+                }
+                if (el('liquiditySourceBadge')) {
+                    el('liquiditySourceBadge').textContent = '🛡️ Cash Equity · Technical Swing Channels (Non-F&O)';
                 }
             }
 
@@ -5198,21 +5203,52 @@
             }
 
             if (el('wallSpotPrice')) el('wallSpotPrice').textContent = spotPrice ? `₹${Number(spotPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
-            if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN')}` : '—';
-            if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN')}` : '—';
-            if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = maxPainStrike ? `₹${Number(maxPainStrike).toLocaleString('en-IN')}` : '—';
-            if (el('valPcrRatio')) el('valPcrRatio').textContent = pcrVal != null ? Number(pcrVal).toFixed(2) : '—';
-            if (el('valPcrSentiment')) {
-                const sColor = sentiment.includes('BULL') ? '#34d399' : (sentiment.includes('BEAR') ? '#f87171' : '#94a3b8');
-                el('valPcrSentiment').innerHTML = `<span style="color:${sColor};font-weight:700;">${sentiment}</span>`;
+
+            if (isFno) {
+                if (el('valBuyWallTitle')) el('valBuyWallTitle').textContent = '🟢 Major Buy Wall (Put OI)';
+                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN')}` : '—';
+                if (el('valBuyWallDetail')) el('valBuyWallDetail').textContent = 'Peak Put OI Demand Floor';
+
+                if (el('valSellWallTitle')) el('valSellWallTitle').textContent = '🔴 Major Sell Wall (Call OI)';
+                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN')}` : '—';
+                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = 'Peak Call OI Resistance';
+
+                if (el('valMaxPainTitle')) el('valMaxPainTitle').textContent = '🟡 Max Pain Equilibrium';
+                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = maxPainStrike ? `₹${Number(maxPainStrike).toLocaleString('en-IN')}` : '—';
+                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Zero-payout strike';
+
+                if (el('valPcrTitle')) el('valPcrTitle').textContent = '⚖️ Put-Call Ratio (PCR)';
+                if (el('valPcrRatio')) el('valPcrRatio').textContent = pcrVal != null ? Number(pcrVal).toFixed(2) : '—';
+                if (el('valPcrSentiment')) {
+                    const sColor = sentiment.includes('BULL') ? '#34d399' : (sentiment.includes('BEAR') ? '#f87171' : '#94a3b8');
+                    el('valPcrSentiment').innerHTML = `<span style="color:${sColor};font-weight:700;">${sentiment}</span>`;
+                }
+            } else {
+                if (el('valBuyWallTitle')) el('valBuyWallTitle').textContent = '🟢 Technical Support Floor';
+                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+                if (el('valBuyWallDetail')) el('valBuyWallDetail').textContent = 'Point-in-Time Swing Floor';
+
+                if (el('valSellWallTitle')) el('valSellWallTitle').textContent = '🔴 Technical Resistance Ceiling';
+                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = 'Breakout Pivot Ceiling';
+
+                if (el('valMaxPainTitle')) el('valMaxPainTitle').textContent = '🟡 Max Pain (F&O Only)';
+                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = 'N/A';
+                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Non-F&O Equity';
+
+                if (el('valPcrTitle')) el('valPcrTitle').textContent = '⚖️ Derivative PCR';
+                if (el('valPcrRatio')) el('valPcrRatio').textContent = 'N/A';
+                if (el('valPcrSentiment')) {
+                    el('valPcrSentiment').innerHTML = `<span style="color:#94a3b8;font-weight:600;">Cash Market Only</span>`;
+                }
             }
 
-            renderLiquidityDepthMountain(strikesList, spotPrice, supportStrike, resistanceStrike);
-            renderLiquidityLadder(strikesList, supportStrike, resistanceStrike, maxPainStrike);
-            applyLiquidityWallPriceLines(supportStrike, resistanceStrike, maxPainStrike);
+            renderLiquidityDepthMountain(strikesList, spotPrice, supportStrike, resistanceStrike, isFno);
+            renderLiquidityLadder(strikesList, supportStrike, resistanceStrike, maxPainStrike, isFno);
+            applyLiquidityWallPriceLines(supportStrike, resistanceStrike, isFno ? maxPainStrike : null, isFno);
         }
 
-        function applyLiquidityWallPriceLines(support, resistance, maxPain) {
+        function applyLiquidityWallPriceLines(support, resistance, maxPain, isFno) {
             if (!stockCandleSeries || !window.LightweightCharts) return;
 
             if (buyWallPriceLine) {
@@ -5233,9 +5269,9 @@
                     price: parseFloat(support),
                     color: '#10b981',
                     lineWidth: 2,
-                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    lineStyle: isFno ? window.LightweightCharts.LineStyle.Dashed : window.LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: '🟢 BUY WALL',
+                    title: isFno ? '🟢 BUY WALL' : `SUPPORT: ₹${Number(support).toFixed(1)}`,
                 });
             }
             if (resistance) {
@@ -5243,12 +5279,12 @@
                     price: parseFloat(resistance),
                     color: '#ef4444',
                     lineWidth: 2,
-                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    lineStyle: isFno ? window.LightweightCharts.LineStyle.Dashed : window.LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: '🔴 SELL WALL',
+                    title: isFno ? '🔴 SELL WALL' : `RESISTANCE: ₹${Number(resistance).toFixed(1)}`,
                 });
             }
-            if (maxPain) {
+            if (maxPain && isFno) {
                 maxPainPriceLine = stockCandleSeries.createPriceLine({
                     price: parseFloat(maxPain),
                     color: '#fbbf24',
@@ -5260,7 +5296,7 @@
             }
         }
 
-        function renderLiquidityDepthMountain(strikes, spotPrice, supportStrike, resistanceStrike) {
+        function renderLiquidityDepthMountain(strikes, spotPrice, supportStrike, resistanceStrike, isFno) {
             const svg = document.getElementById('liquidityDepthSvg');
             if (!svg) return;
 
@@ -5278,17 +5314,19 @@
                 return;
             }
 
-            let filteredStrikes = (strikes || []).filter(s => s.strike && s.strike > spotPrice * 0.75 && s.strike < spotPrice * 1.25);
-            if (filteredStrikes.length < 2) {
+            let filteredStrikes = isFno ? (strikes || []).filter(s => s.strike && s.strike > spotPrice * 0.75 && s.strike < spotPrice * 1.25) : [];
+            if (!isFno || filteredStrikes.length < 2) {
                 const el = (id) => document.getElementById(id);
-                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
-                if (el('depthMinStrike')) el('depthMinStrike').textContent = supportStrike ? `₹${Math.round(supportStrike).toLocaleString('en-IN')}` : '—';
-                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = resistanceStrike ? `₹${Math.round(resistanceStrike).toLocaleString('en-IN')}` : '—';
-                const supText = supportStrike ? `Support ₹${Number(supportStrike).toLocaleString('en-IN')}` : 'Support —';
-                const resText = resistanceStrike ? `Resistance ₹${Number(resistanceStrike).toLocaleString('en-IN')}` : 'Resistance —';
+                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(2)}`;
+                if (el('depthMinStrike')) el('depthMinStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+                const supText = supportStrike ? `Support Floor: ₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Support: —';
+                const resText = resistanceStrike ? `Resistance Ceiling: ₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Resistance: —';
                 svg.innerHTML = `
-                    <text x="300" y="65" text-anchor="middle" fill="#94a3b8" font-size="12" font-family="monospace" font-weight="bold">Non-F&O Equity · Spot: ₹${Number(spotPrice).toFixed(2)}</text>
-                    <text x="300" y="90" text-anchor="middle" fill="#64748b" font-size="11" font-family="monospace">Swing Liquidity Levels: ${supText} | ${resText}</text>
+                    <rect width="600" height="160" fill="rgba(15, 23, 42, 0.4)" rx="6" />
+                    <text x="300" y="60" text-anchor="middle" fill="#38bdf8" font-size="13" font-family="monospace" font-weight="bold">🛡️ Non-F&O Cash Equity Segment · Spot: ₹${Number(spotPrice).toFixed(2)}</text>
+                    <text x="300" y="88" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="monospace">${supText}  ·  ${resText}</text>
+                    <text x="300" y="112" text-anchor="middle" fill="#64748b" font-size="10" font-family="monospace">Options open interest profile not applicable to cash-only securities.</text>
                 `;
                 return;
             }
@@ -5359,39 +5397,70 @@
             `;
         }
 
-        function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike) {
+        function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike, isFno) {
             const list = document.getElementById('liquidityLevelsList');
             if (!list) return;
 
             const items = [];
-            if (resistanceStrike) {
+            if (isFno) {
+                if (resistanceStrike) {
+                    items.push({
+                        type: 'SELL_WALL',
+                        label: '🔴 Call OI Sell Wall',
+                        strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`,
+                        val: 'Strong Resistance',
+                        color: '#f87171',
+                        bg: 'rgba(239,68,68,0.1)',
+                    });
+                }
+                if (maxPainStrike) {
+                    items.push({
+                        type: 'MAX_PAIN',
+                        label: '🟡 Max Pain Strike',
+                        strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`,
+                        val: 'Neutral Pivot',
+                        color: '#fbbf24',
+                        bg: 'rgba(251,191,36,0.1)',
+                    });
+                }
+                if (supportStrike) {
+                    items.push({
+                        type: 'BUY_WALL',
+                        label: '🟢 Put OI Buy Wall',
+                        strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`,
+                        val: 'Major Demand Floor',
+                        color: '#34d399',
+                        bg: 'rgba(16,185,129,0.1)',
+                    });
+                }
+            } else {
+                if (resistanceStrike) {
+                    items.push({
+                        type: 'TECH_RES',
+                        label: '🔴 Technical Resistance Ceiling',
+                        strike: `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+                        val: 'Breakout Pivot',
+                        color: '#f87171',
+                        bg: 'rgba(239,68,68,0.08)',
+                    });
+                }
+                if (supportStrike) {
+                    items.push({
+                        type: 'TECH_SUP',
+                        label: '🟢 Technical Support Floor',
+                        strike: `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+                        val: 'Demand Baseline',
+                        color: '#34d399',
+                        bg: 'rgba(16,185,129,0.08)',
+                    });
+                }
                 items.push({
-                    type: 'SELL_WALL',
-                    label: '🔴 Call OI Sell Wall',
-                    strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`,
-                    val: 'Strong Resistance',
-                    color: '#f87171',
-                    bg: 'rgba(239,68,68,0.1)',
-                });
-            }
-            if (maxPainStrike) {
-                items.push({
-                    type: 'MAX_PAIN',
-                    label: '🟡 Max Pain Strike',
-                    strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`,
-                    val: 'Neutral Pivot',
-                    color: '#fbbf24',
-                    bg: 'rgba(251,191,36,0.1)',
-                });
-            }
-            if (supportStrike) {
-                items.push({
-                    type: 'BUY_WALL',
-                    label: '🟢 Put OI Buy Wall',
-                    strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`,
-                    val: 'Major Demand Floor',
-                    color: '#34d399',
-                    bg: 'rgba(16,185,129,0.1)',
+                    type: 'FNO_STATUS',
+                    label: '🛡️ Equity Derivatives Status',
+                    strike: 'Not in F&O',
+                    val: 'Cash Market Only',
+                    color: '#94a3b8',
+                    bg: 'rgba(148,163,184,0.06)',
                 });
             }
 

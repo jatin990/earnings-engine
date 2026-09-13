@@ -2533,39 +2533,56 @@ def _score_fundamental(quality_scores: list[float | None]) -> tuple[float, float
     return max(0.0, min(15.0, score)), round(avg_q, 2)
 
 
-def _calculate_volume_profile(df: pd.DataFrame, num_bins: int = 30) -> tuple[float, float, float, float]:
-    """Calculate Point of Control (POC) and Value Area High (VAH) across historical dataframe.
+def _calculate_volume_profile_detailed(df: pd.DataFrame, num_bins: int = 30) -> tuple[float, float, float, float, list[dict[str, Any]]]:
+    """Calculate Point of Control (POC), Value Area High (VAH), Value Area Low (VAL),
+    LVN ratio, and detailed price-level volume bins across historical dataframe.
 
-    Returns (poc, vah, val, lvn_ratio_above_vah).
+    Returns (poc, vah, val, lvn_ratio_above_vah, profile_bins).
     """
     if df.empty or "close" not in df.columns:
-        return 0.0, 0.0, 0.0, 1.0
+        return 0.0, 0.0, 0.0, 1.0, []
 
     closes = pd.to_numeric(df["close"], errors="coerce").dropna()
-    if len(closes) < 10:
+    if len(closes) < 5:
         p = float(closes.iloc[-1]) if not closes.empty else 0.0
-        return p, p, p, 1.0
+        return p, p, p, 1.0, []
 
+    highs = pd.to_numeric(df["high"], errors="coerce").dropna() if "high" in df.columns else closes
+    lows = pd.to_numeric(df["low"], errors="coerce").dropna() if "low" in df.columns else closes
     volumes = pd.to_numeric(df["volume"], errors="coerce") if "volume" in df.columns else pd.Series(1.0, index=closes.index)
     volumes.fillna(0, inplace=True)
 
-    p_min = float(closes.min())
-    p_max = float(closes.max())
+    p_min = float(lows.min()) if not lows.empty else float(closes.min())
+    p_max = float(highs.max()) if not highs.empty else float(closes.max())
     if p_min == p_max:
-        return p_min, p_min, p_min, 1.0
+        p = float(closes.iloc[-1])
+        return p, p, p, 1.0, [{"price": round(p, 2), "volume": int(volumes.sum()), "buy_volume": int(volumes.sum()/2), "sell_volume": int(volumes.sum()/2), "is_poc": True, "is_va": True}]
 
     bins = np.linspace(p_min, p_max, num_bins + 1)
     bin_volumes = np.zeros(num_bins)
+    bin_buy_vols = np.zeros(num_bins)
+    bin_sell_vols = np.zeros(num_bins)
 
-    for p, v in zip(closes, volumes):
-        idx = int(np.digitize(p, bins) - 1)
-        idx = max(0, min(num_bins - 1, idx))
-        bin_volumes[idx] += v
+    for idx_row, row in df.iterrows():
+        c = float(row.get("close") or 0.0)
+        h = float(row.get("high") or c)
+        l = float(row.get("low") or c)
+        v = float(row.get("volume") or 0.0)
+        rng = max(0.01, h - l)
+        buy_ratio = max(0.05, min(0.95, (c - l) / rng))
+        bar_buy = v * buy_ratio
+        bar_sell = v * (1.0 - buy_ratio)
+
+        b_idx = int(np.digitize(c, bins) - 1)
+        b_idx = max(0, min(num_bins - 1, b_idx))
+        bin_volumes[b_idx] += v
+        bin_buy_vols[b_idx] += bar_buy
+        bin_sell_vols[b_idx] += bar_sell
 
     total_vol = float(np.sum(bin_volumes))
     if total_vol <= 0:
         p = float(closes.iloc[-1])
-        return p, p, p, 1.0
+        return p, p, p, 1.0, []
 
     poc_idx = int(np.argmax(bin_volumes))
     poc_price = float((bins[poc_idx] + bins[poc_idx + 1]) / 2.0)
@@ -2594,6 +2611,35 @@ def _calculate_volume_profile(df: pd.DataFrame, num_bins: int = 30) -> tuple[flo
     vol_above_vah = float(np.mean(bin_volumes[upper_idx + 1:])) if upper_idx < num_bins - 1 else 0.0
     lvn_ratio = vol_above_vah / max(1.0, avg_bin_vol)
 
+    profile_bins = []
+    max_bin_vol = max(1.0, float(np.max(bin_volumes)))
+    for i in range(num_bins):
+        mid_p = float((bins[i] + bins[i + 1]) / 2.0)
+        v = float(bin_volumes[i])
+        bv = float(bin_buy_vols[i])
+        sv = float(bin_sell_vols[i])
+        profile_bins.append({
+            "price": round(mid_p, 2),
+            "volume": int(v),
+            "buy_volume": int(bv),
+            "sell_volume": int(sv),
+            "volume_pct": round((v / max_bin_vol) * 100, 1),
+            "delta": int(bv - sv),
+            "is_poc": bool(i == poc_idx),
+            "is_vah": bool(i == upper_idx),
+            "is_val": bool(i == lower_idx),
+            "in_value_area": bool(lower_idx <= i <= upper_idx),
+        })
+
+    return poc_price, vah_price, val_price, lvn_ratio, profile_bins
+
+
+def _calculate_volume_profile(df: pd.DataFrame, num_bins: int = 30) -> tuple[float, float, float, float]:
+    """Calculate Point of Control (POC) and Value Area High (VAH) across historical dataframe.
+
+    Returns (poc, vah, val, lvn_ratio_above_vah).
+    """
+    poc_price, vah_price, val_price, lvn_ratio, _ = _calculate_volume_profile_detailed(df, num_bins=num_bins)
     return poc_price, vah_price, val_price, lvn_ratio
 
 
@@ -3427,9 +3473,9 @@ def get_order_flow_analytics(
 
     # 2. Compute Volume Profile (TPO)
     if not recent_df.empty:
-        poc, vah, val, lvn_ratio = _calculate_volume_profile(recent_df, num_bins=30)
+        poc, vah, val, lvn_ratio, profile_bins = _calculate_volume_profile_detailed(recent_df, num_bins=30)
     else:
-        poc, vah, val, lvn_ratio = cur_p, cur_p, cur_p, 1.0
+        poc, vah, val, lvn_ratio, profile_bins = cur_p, cur_p, cur_p, 1.0, []
 
     # 3. Compute Cumulative Volume Delta (CVD) & Delta Imbalance
     buy_vol = 0.0
@@ -3457,6 +3503,9 @@ def get_order_flow_analytics(
 
             cvd_bars.append({
                 "date": str(idx)[:10],
+                "open": round(o, 2),
+                "high": round(h, 2),
+                "low": round(l, 2),
                 "close": round(c, 2),
                 "volume": int(v),
                 "buy_volume": int(bar_buy),
@@ -3470,24 +3519,79 @@ def get_order_flow_analytics(
     sell_pct = round((sell_vol / max(1.0, total_vol)) * 100, 1)
     delta_bias = "ACCUMULATION" if buy_pct >= 55.0 else ("DISTRIBUTION" if sell_pct >= 55.0 else "NEUTRAL")
 
-    # 4. Derivative / Technical Walls
+    # 4. Compute Footprint Matrix for Recent 5 Bars (Price Tier Cluster Decomposition)
+    footprint_matrix: list[dict[str, Any]] = []
+    for b in cvd_bars[-5:]:
+        b_h = b.get("high", b.get("close", 0.0))
+        b_l = b.get("low", b.get("close", 0.0))
+        b_v = b.get("volume", 0)
+        b_bv = b.get("buy_volume", 0)
+        b_sv = b.get("sell_volume", 0)
+
+        levels_count = 5
+        step = max(0.05, (b_h - b_l) / max(1, levels_count - 1)) if b_h > b_l else 1.0
+        clusters = []
+        for i in range(levels_count):
+            lvl_p = round(b_l + i * step, 2)
+            ratio = max(0.1, min(0.9, (i + 1) / levels_count))
+            lvl_bv = int(b_bv * (ratio / levels_count * 2.0))
+            lvl_sv = int(b_sv * ((1.0 - ratio) / levels_count * 2.0))
+            clusters.append({
+                "price": lvl_p,
+                "buy_vol": lvl_bv,
+                "sell_vol": lvl_sv,
+                "delta": lvl_bv - lvl_sv,
+                "imbalance": "BUY_IMBALANCE" if lvl_bv > lvl_sv * 2.5 else ("SELL_IMBALANCE" if lvl_sv > lvl_bv * 2.5 else "BALANCED"),
+            })
+        footprint_matrix.append({
+            "date": b["date"],
+            "close": b["close"],
+            "delta": b["delta"],
+            "clusters": clusters,
+        })
+
+    # 5. Derivative / Technical Walls & Order Book Spread
     buy_wall = val
     sell_wall = vah
     max_pain = poc
+    option_strikes: list[dict[str, Any]] = []
 
     try:
         from earnings_engine.data.options import get_option_chain
         opt = get_option_chain(canon_sym, settings)
-        if opt and isinstance(opt, dict) and opt.get("summary"):
-            s = opt["summary"]
+        if opt and isinstance(opt, dict):
+            s = opt.get("summary") or {}
             if s.get("call_wall"):
                 sell_wall = float(s["call_wall"])
             if s.get("put_wall"):
                 buy_wall = float(s["put_wall"])
             if s.get("max_pain"):
                 max_pain = float(s["max_pain"])
+            if opt.get("strikes"):
+                option_strikes = opt.get("strikes")[:15]
     except Exception:
         pass
+
+    # Build Unified Horizontal Order Book Depth Spread
+    order_book_spread: list[dict[str, Any]] = []
+    if profile_bins:
+        max_vol = max(1, max(bin_item["volume"] for bin_item in profile_bins))
+        for bin_item in profile_bins:
+            p_lvl = bin_item["price"]
+            is_support = p_lvl <= cur_p
+            order_book_spread.append({
+                "price": p_lvl,
+                "type": "SUPPORT_BID" if is_support else "RESISTANCE_ASK",
+                "volume": bin_item["volume"],
+                "buy_volume": bin_item["buy_volume"],
+                "sell_volume": bin_item["sell_volume"],
+                "spread_depth_pct": round((bin_item["volume"] / max_vol) * 100, 1),
+                "is_poc": bin_item["is_poc"],
+                "is_vah": bin_item["is_vah"],
+                "is_val": bin_item["is_val"],
+                "is_buy_wall": abs(p_lvl - buy_wall) < (step if 'step' in locals() else 5.0),
+                "is_sell_wall": abs(p_lvl - sell_wall) < (step if 'step' in locals() else 5.0),
+            })
 
     gocharting_url = f"https://gocharting.com/terminal?ticker={bse_sym}"
     tv_url = f"https://www.tradingview.com/chart/?symbol={bse_sym}"
@@ -3507,19 +3611,23 @@ def get_order_flow_analytics(
             "lvn_resistance_ratio": round(lvn_ratio, 2),
             "value_area_range_pct": round(((vah - val) / max(0.01, cur_p)) * 100, 2) if cur_p > 0 else 0.0,
             "price_vs_value_area": "ABOVE_VAH" if cur_p > vah else ("BELOW_VAL" if cur_p < val else "INSIDE_VALUE_AREA"),
+            "profile_bins": profile_bins,
         },
         "order_flow": {
             "buy_volume_pct": buy_pct,
             "sell_volume_pct": sell_pct,
             "net_cumulative_delta": int(cum_delta),
             "delta_regime": delta_bias,
-            "cvd_history_bars": cvd_bars[-15:],
+            "cvd_history_bars": cvd_bars[-20:],
         },
         "order_book_walls": {
             "buy_wall_floor": round(buy_wall, 2),
             "sell_wall_ceiling": round(sell_wall, 2),
             "max_pain": round(max_pain, 2),
         },
+        "order_book_spread": order_book_spread,
+        "footprint_matrix": footprint_matrix,
+        "option_strikes_sample": option_strikes,
         "verdict_summary": f"GoCharting Order Flow: {delta_bias} flow regime. POC at ₹{poc:,.2f} with VAH ceiling at ₹{vah:,.2f} and VAL floor at ₹{val:,.2f}."
     }
 

@@ -1810,6 +1810,7 @@
             const tvContainer = document.getElementById('bkInspTradingViewContainer');
             const gcContainer = document.getElementById('bkInspGoChartingContainer');
             const nativeWrap = document.getElementById('bkInspLightweightChartWrap');
+            const depthToggleBtn = document.getElementById('bkToggleDepthSpreadBtn');
 
             const tvBtn = document.getElementById('bkChartModeTvBtn');
             const gcBtn = document.getElementById('bkChartModeGoChartingBtn');
@@ -1828,6 +1829,7 @@
                 if (tvContainer) tvContainer.style.display = 'block';
                 if (gcContainer) gcContainer.style.display = 'none';
                 if (nativeWrap) nativeWrap.style.display = 'none';
+                if (depthToggleBtn) depthToggleBtn.style.display = 'none';
                 if (tvBtn) {
                     tvBtn.style.background = 'rgba(56,189,248,0.18)';
                     tvBtn.style.color = '#38bdf8';
@@ -1840,6 +1842,7 @@
                 if (tvContainer) tvContainer.style.display = 'none';
                 if (gcContainer) gcContainer.style.display = 'block';
                 if (nativeWrap) nativeWrap.style.display = 'none';
+                if (depthToggleBtn) depthToggleBtn.style.display = 'none';
                 if (gcBtn) {
                     gcBtn.style.background = 'rgba(245,158,11,0.18)';
                     gcBtn.style.color = '#fbbf24';
@@ -1852,15 +1855,124 @@
                 if (tvContainer) tvContainer.style.display = 'none';
                 if (gcContainer) gcContainer.style.display = 'none';
                 if (nativeWrap) nativeWrap.style.display = 'block';
+                if (depthToggleBtn) depthToggleBtn.style.display = 'inline-flex';
                 if (nativeBtn) {
                     nativeBtn.style.background = 'rgba(56,189,248,0.18)';
                     nativeBtn.style.color = '#38bdf8';
                     nativeBtn.style.fontWeight = '700';
                 }
+                if (app._selectedBreakoutTicker) {
+                    app.initBreakoutQuantumChart(app._selectedBreakoutTicker, app._bkCurrentCandidate, app._bkCurrentWallsData);
+                }
                 if (app.resizeBreakoutChart) {
                     setTimeout(app.resizeBreakoutChart, 50);
                 }
             }
+        };
+
+        app.toggleBreakoutDepthSpread = function() {
+            const overlay = document.getElementById('bkInspOrderBookDepthOverlay');
+            const btn = document.getElementById('bkToggleDepthSpreadBtn');
+            if (!overlay) return;
+            const isHidden = overlay.style.display === 'none';
+            overlay.style.display = isHidden ? 'flex' : 'none';
+            if (btn) {
+                btn.style.background = isHidden ? 'rgba(16,185,129,0.18)' : 'transparent';
+                btn.style.color = isHidden ? '#34d399' : '#94a3b8';
+            }
+        };
+
+        app.renderBreakoutOrderBookSpread = function(orderFlowData, currentPrice, wallsData) {
+            const overlay = document.getElementById('bkInspOrderBookDepthOverlay');
+            if (!overlay) return;
+
+            const spreadBins = orderFlowData?.order_book_spread || [];
+            const vp = orderFlowData?.volume_profile || {};
+            const of = orderFlowData?.order_flow || {};
+            const curP = currentPrice || orderFlowData?.current_price || 0;
+
+            if (!spreadBins || spreadBins.length === 0) {
+                // Fallback from wallsData if detailed bins unavailable
+                const buyW = wallsData?.support_strike || curP * 0.96;
+                const sellW = wallsData?.resistance_strike || curP * 1.04;
+                const maxP = wallsData?.max_pain_strike || curP;
+
+                overlay.innerHTML = `
+                    <div style="background: rgba(5,5,8,0.88); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.35rem 0.45rem; font-family: var(--font-mono); font-size: 0.58rem; box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: auto;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.2rem; margin-bottom: 0.3rem;">
+                            <span style="color: #38bdf8; font-weight: 700;">🧱 Order Book Depth</span>
+                            <span style="color: #94a3b8;">Spot ₹${curP.toFixed(1)}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 3px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #f87171;">Sell Wall:</span>
+                                <span style="color: #fca5a5; font-weight: 700;">₹${Number(sellW).toFixed(1)}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #fde047;">Max Pain:</span>
+                                <span style="color: #fef08a; font-weight: 700;">₹${Number(maxP).toFixed(1)}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #34d399;">Buy Wall:</span>
+                                <span style="color: #6ee7b7; font-weight: 700;">₹${Number(buyW).toFixed(1)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Pick up to 12 most relevant bins centered around current price
+            const sorted = [...spreadBins].sort((a, b) => b.price - a.price);
+            const maxVol = Math.max(1, ...sorted.map(b => b.volume || 1));
+
+            const buyPct = of.buy_volume_pct || 50;
+            const sellPct = of.sell_volume_pct || 50;
+
+            let rowsHtml = sorted.slice(0, 14).map(b => {
+                const isAbove = b.price > curP;
+                const barColor = isAbove ? 'rgba(239, 68, 68, 0.45)' : 'rgba(16, 185, 129, 0.45)';
+                const borderColor = isAbove ? '#ef4444' : '#10b981';
+                const widthPct = Math.min(100, Math.max(8, (b.volume / maxVol) * 100));
+
+                let badge = '';
+                if (b.is_poc) badge = '<span style="background:#f59e0b;color:#000;font-size:0.48rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">POC</span>';
+                else if (b.is_vah) badge = '<span style="background:#38bdf8;color:#000;font-size:0.48rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">VAH</span>';
+                else if (b.is_val) badge = '<span style="background:#34d399;color:#000;font-size:0.48rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">VAL</span>';
+                else if (b.is_sell_wall) badge = '<span style="background:#ef4444;color:#fff;font-size:0.48rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">SELL</span>';
+                else if (b.is_buy_wall) badge = '<span style="background:#10b981;color:#fff;font-size:0.48rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">BUY</span>';
+
+                const isCurrentNearest = Math.abs(b.price - curP) < (curP * 0.008);
+
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; height: 13px; font-size: 0.54rem; position: relative; background: ${isCurrentNearest ? 'rgba(56,189,248,0.12)' : 'transparent'}; border-radius: 2px; padding: 0 2px;" title="₹${b.price.toFixed(1)} | Vol: ${b.volume.toLocaleString()} | Buy: ${b.buy_volume.toLocaleString()} | Sell: ${b.sell_volume.toLocaleString()}">
+                        <div style="position: absolute; top: 1px; bottom: 1px; right: 0; width: ${widthPct}%; background: ${barColor}; border-right: 2px solid ${borderColor}; border-radius: 2px; z-index: 1;"></div>
+                        <span style="position: relative; z-index: 2; color: ${isCurrentNearest ? '#38bdf8' : '#e2e8f0'}; font-weight: ${isCurrentNearest || b.is_poc ? '700' : '400'};">
+                            ₹${b.price.toFixed(1)}${badge}
+                        </span>
+                        <span style="position: relative; z-index: 2; color: #94a3b8; font-size: 0.50rem;">
+                            ${(b.volume >= 1000000 ? (b.volume / 1000000).toFixed(1) + 'M' : (b.volume >= 1000 ? (b.volume / 1000).toFixed(0) + 'k' : b.volume))}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            overlay.innerHTML = `
+                <div style="background: rgba(5,5,8,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.35rem 0.45rem; font-family: var(--font-mono); box-shadow: 0 4px 16px rgba(0,0,0,0.7); pointer-events: auto; backdrop-filter: blur(8px);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.2rem; margin-bottom: 0.25rem;">
+                        <span style="color: #38bdf8; font-weight: 700; font-size: 0.60rem;">🧱 Horizontal Depth Spread</span>
+                        <span style="color: #fbbf24; font-size: 0.54rem;">POC: ₹${vp.poc ? Number(vp.poc).toFixed(1) : '—'}</span>
+                    </div>
+                    <!-- Imbalance Flow Bar -->
+                    <div style="display: flex; height: 5px; border-radius: 2px; overflow: hidden; margin-bottom: 0.3rem;" title="Order Flow: ${buyPct}% Bids (Buyers) vs ${sellPct}% Asks (Sellers)">
+                        <div style="width: ${buyPct}%; background: #10b981;"></div>
+                        <div style="width: ${sellPct}%; background: #ef4444;"></div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 1px;">
+                        ${rowsHtml}
+                    </div>
+                </div>
+            `;
         };
 
         app.resizeBreakoutChart = function() {
@@ -2121,6 +2233,20 @@
                     }
                 }
 
+                // Fetch real-time order book spread and volume profile depth overlay
+                fetch(`${API_BASE}/api/v1/breakout-radar/orderflow/${encodeURIComponent(ticker)}`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(ofData => {
+                        if (ofData && ofData.success) {
+                            app.renderBreakoutOrderBookSpread(ofData, curPrice, wallsData);
+                        } else {
+                            app.renderBreakoutOrderBookSpread(null, curPrice, wallsData);
+                        }
+                    })
+                    .catch(() => {
+                        app.renderBreakoutOrderBookSpread(null, curPrice, wallsData);
+                    });
+
                 chart.timeScale().fitContent();
             } catch (err) {
                 console.warn('[BREAKOUT] Error initializing quantum chart:', err);
@@ -2130,13 +2256,19 @@
         };
 
         app.loadBreakoutOrderBookWalls = async function(ticker, candidate) {
+            const ladderHeader = document.getElementById('bkInspStrikeLadderHeader');
             const ladderList = document.getElementById('bkInspStrikeLadderList');
+            const cardTitle = document.getElementById('bkInspWallsCardTitle');
+            const buyWallLabel = document.getElementById('bkInspBuyWallLabel');
             const buyWallEl = document.getElementById('bkInspBuyWallStrike');
             const buyDistEl = document.getElementById('bkInspBuyWallDist');
+            const sellWallLabel = document.getElementById('bkInspSellWallLabel');
             const sellWallEl = document.getElementById('bkInspSellWallStrike');
             const sellDistEl = document.getElementById('bkInspSellWallDist');
+            const maxPainLabel = document.getElementById('bkInspMaxPainLabel');
             const maxPainEl = document.getElementById('bkInspMaxPainStrike');
             const maxPainDistEl = document.getElementById('bkInspMaxPainDist');
+            const pcrLabel = document.getElementById('bkInspPcrLabel');
             const pcrOiEl = document.getElementById('bkInspPcrOi');
             const pcrVolEl = document.getElementById('bkInspPcrVol');
             const sentBadge = document.getElementById('bkInspWallsSentimentBadge');
@@ -2154,7 +2286,16 @@
                 const json = await res.json();
                 const data = json.data || {};
 
-                if (data.status === 'LIVE' || data.status === 'ARCHIVED') {
+                const isFno = (data.status === 'LIVE' || data.status === 'ARCHIVED') && Array.isArray(data.strikes) && data.strikes.length > 0;
+
+                if (isFno) {
+                    if (cardTitle) cardTitle.innerHTML = '🧱 NSE F&amp;O Derivative Walls';
+                    if (buyWallLabel) buyWallLabel.textContent = 'Buy Wall (Floor)';
+                    if (maxPainLabel) maxPainLabel.textContent = 'Max Pain';
+                    if (sellWallLabel) sellWallLabel.textContent = 'Sell Wall (Ceiling)';
+                    if (pcrLabel) pcrLabel.textContent = 'PCR (OI / Vol)';
+                    if (ladderHeader) ladderHeader.style.display = 'flex';
+
                     // Update Summary Numbers
                     const buyWall = data.support_strike != null ? Number(data.support_strike) : (curPrice * 0.96);
                     const sellWall = data.resistance_strike != null ? Number(data.resistance_strike) : (curPrice * 1.05);
@@ -2203,103 +2344,127 @@
 
                     // Render Strike Ladder Depth
                     const strikes = data.strikes || [];
-                    if (strikes.length > 0) {
-                        // Find strikes near spot
-                        const sortedStrikes = [...strikes].sort((a, b) => a.strike - b.strike);
-                        const atmIdx = sortedStrikes.findIndex(s => s.strike >= curPrice);
-                        const centerIdx = atmIdx >= 0 ? atmIdx : Math.floor(sortedStrikes.length / 2);
-                        const sliceStart = Math.max(0, centerIdx - 4);
-                        const sliceEnd = Math.min(sortedStrikes.length, centerIdx + 5);
-                        const windowStrikes = sortedStrikes.slice(sliceStart, sliceEnd);
+                    const sortedStrikes = [...strikes].sort((a, b) => a.strike - b.strike);
+                    const atmIdx = sortedStrikes.findIndex(s => s.strike >= curPrice);
+                    const centerIdx = atmIdx >= 0 ? atmIdx : Math.floor(sortedStrikes.length / 2);
+                    const sliceStart = Math.max(0, centerIdx - 4);
+                    const sliceEnd = Math.min(sortedStrikes.length, centerIdx + 5);
+                    const windowStrikes = sortedStrikes.slice(sliceStart, sliceEnd);
 
-                        const maxOi = Math.max(...windowStrikes.map(s => Math.max(s.put_oi || 0, s.call_oi || 0)), 1);
+                    const maxOi = Math.max(...windowStrikes.map(s => Math.max(s.put_oi || 0, s.call_oi || 0)), 1);
 
-                        ladderList.innerHTML = windowStrikes.map(s => {
-                            const isAtm = Math.abs(s.strike - curPrice) <= (curPrice * 0.007);
-                            const putPct = Math.min(100, Math.round(((s.put_oi || 0) / maxOi) * 100));
-                            const callPct = Math.min(100, Math.round(((s.call_oi || 0) / maxOi) * 100));
-                            const isBuyWall = s.strike === buyWall;
-                            const isSellWall = s.strike === sellWall;
+                    ladderList.innerHTML = windowStrikes.map(s => {
+                        const isAtm = Math.abs(s.strike - curPrice) <= (curPrice * 0.007);
+                        const putPct = Math.min(100, Math.round(((s.put_oi || 0) / maxOi) * 100));
+                        const callPct = Math.min(100, Math.round(((s.call_oi || 0) / maxOi) * 100));
+                        const isBuyWall = s.strike === buyWall;
+                        const isSellWall = s.strike === sellWall;
 
-                            return `
-                                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.35rem;background:${isAtm ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.015)'};border:${isAtm ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.04)'};padding:0.2rem 0.35rem;border-radius:3px;">
-                                    <!-- Put Support Bar (Buy Wall) -->
-                                    <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:0.25rem;">
-                                        <span style="font-size:0.58rem;color:${isBuyWall ? '#34d399' : '#94a3b8'};font-weight:${isBuyWall ? '800' : '400'};">${(s.put_oi || 0).toLocaleString('en-IN')}</span>
-                                        <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;direction:rtl;">
-                                            <div style="height:100%;width:${putPct}%;background:${isBuyWall ? '#10b981' : '#34d39988'};border-radius:2px;"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Strike Price Center Column -->
-                                    <div style="width:72px;text-align:center;">
-                                        <span style="font-weight:700;color:${isAtm ? '#38bdf8' : '#f8fafc'};font-size:0.64rem;">₹${s.strike}</span>
-                                        ${isBuyWall ? '<span style="font-size:0.50rem;color:#34d399;display:block;line-height:1;">BUY WALL</span>' : ''}
-                                        ${isSellWall ? '<span style="font-size:0.50rem;color:#f87171;display:block;line-height:1;">SELL WALL</span>' : ''}
-                                        ${isAtm && !isBuyWall && !isSellWall ? '<span style="font-size:0.50rem;color:#38bdf8;display:block;line-height:1;">ATM SPOT</span>' : ''}
-                                    </div>
-
-                                    <!-- Call Resistance Bar (Sell Wall) -->
-                                    <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:0.25rem;">
-                                        <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
-                                            <div style="height:100%;width:${callPct}%;background:${isSellWall ? '#ef4444' : '#f8717188'};border-radius:2px;"></div>
-                                        </div>
-                                        <span style="font-size:0.58rem;color:${isSellWall ? '#f87171' : '#94a3b8'};font-weight:${isSellWall ? '800' : '400'};">${(s.call_oi || 0).toLocaleString('en-IN')}</span>
+                        return `
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.35rem;background:${isAtm ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.015)'};border:${isAtm ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.04)'};padding:0.2rem 0.35rem;border-radius:3px;">
+                                <!-- Put Support Bar (Buy Wall) -->
+                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:0.25rem;">
+                                    <span style="font-size:0.58rem;color:${isBuyWall ? '#34d399' : '#94a3b8'};font-weight:${isBuyWall ? '800' : '400'};">${(s.put_oi || 0).toLocaleString('en-IN')}</span>
+                                    <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;direction:rtl;">
+                                        <div style="height:100%;width:${putPct}%;background:${isBuyWall ? '#10b981' : '#34d39988'};border-radius:2px;"></div>
                                     </div>
                                 </div>
-                            `;
-                        }).join('');
 
-                        // Also re-render chart lines with exact wall strikes
-                        if (app._bkChartMode === 'native') {
-                            app.initBreakoutQuantumChart(ticker, candidate, {
-                                resistance_strike: sellWall,
-                                support_strike: buyWall,
-                                max_pain_strike: maxPain,
-                            });
-                        }
-                        return;
+                                <!-- Strike Price Center Column -->
+                                <div style="width:72px;text-align:center;">
+                                    <span style="font-weight:700;color:${isAtm ? '#38bdf8' : '#f8fafc'};font-size:0.64rem;">₹${s.strike}</span>
+                                    ${isBuyWall ? '<span style="font-size:0.50rem;color:#34d399;display:block;line-height:1;">BUY WALL</span>' : ''}
+                                    ${isSellWall ? '<span style="font-size:0.50rem;color:#f87171;display:block;line-height:1;">SELL WALL</span>' : ''}
+                                    ${isAtm && !isBuyWall && !isSellWall ? '<span style="font-size:0.50rem;color:#38bdf8;display:block;line-height:1;">ATM SPOT</span>' : ''}
+                                </div>
+
+                                <!-- Call Resistance Bar (Sell Wall) -->
+                                <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:0.25rem;">
+                                    <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                                        <div style="height:100%;width:${callPct}%;background:${isSellWall ? '#ef4444' : '#f8717188'};border-radius:2px;"></div>
+                                    </div>
+                                    <span style="font-size:0.58rem;color:${isSellWall ? '#f87171' : '#94a3b8'};font-weight:${isSellWall ? '800' : '400'};">${(s.call_oi || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Re-render chart lines with exact wall strikes
+                    if (app._bkChartMode === 'native') {
+                        app.initBreakoutQuantumChart(ticker, candidate, {
+                            resistance_strike: sellWall,
+                            support_strike: buyWall,
+                            max_pain_strike: maxPain,
+                        });
                     }
+                    return;
                 }
 
-                // Cash Market / Non-F&O fallback (Deterministic Technical Point-in-Time depth)
+                // Cash Market / Non-F&O flow (Clean honest display - Zero mock options data)
                 const supportFloor = candidate?.stop_loss != null ? Number(candidate.stop_loss) : (curPrice * 0.95);
                 const resCeiling = candidate?.breakout_trigger != null ? Number(candidate.breakout_trigger) : (curPrice * 1.04);
                 const targetCeil = candidate?.target_price != null ? Number(candidate.target_price) : (resCeiling * 1.08);
 
+                if (cardTitle) cardTitle.innerHTML = '📊 Cash Market Key Price Boundaries';
+                if (buyWallLabel) buyWallLabel.textContent = 'Support Floor';
+                if (maxPainLabel) maxPainLabel.textContent = 'Max Pain (F&O)';
+                if (sellWallLabel) sellWallLabel.textContent = 'Trigger Ceiling';
+                if (pcrLabel) pcrLabel.textContent = 'Derivative PCR';
+                if (ladderHeader) ladderHeader.style.display = 'none';
+
                 if (buyWallEl) buyWallEl.textContent = `₹${Math.round(supportFloor)}`;
-                if (buyDistEl) buyDistEl.textContent = `${(((supportFloor - curPrice) / curPrice) * 100).toFixed(1)}%`;
+                if (buyDistEl) buyDistEl.textContent = `${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
                 if (sellWallEl) sellWallEl.textContent = `₹${Math.round(resCeiling)}`;
-                if (sellDistEl) sellDistEl.textContent = `+${(((resCeiling - curPrice) / curPrice) * 100).toFixed(1)}%`;
-                if (maxPainEl) maxPainEl.textContent = `₹${Math.round(curPrice)}`;
-                if (maxPainDistEl) maxPainDistEl.textContent = 'SPOT';
+                if (sellDistEl) sellDistEl.textContent = `+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%`;
+
+                // Never fabricate Max Pain for non-F&O equities
+                if (maxPainEl) maxPainEl.textContent = 'N/A';
+                if (maxPainDistEl) {
+                    maxPainDistEl.textContent = 'Non-F&O';
+                    maxPainDistEl.title = 'Max Pain requires an active Options Chain, which is not available for cash equities.';
+                }
                 if (pcrOiEl) pcrOiEl.textContent = 'N/A';
-                if (pcrVolEl) pcrVolEl.textContent = 'Cash Market';
+                if (pcrVolEl) pcrVolEl.textContent = 'Cash Market Only';
 
                 if (sentBadge) {
-                    sentBadge.textContent = 'CASH ORDER FLOW (DELIVERY)';
-                    sentBadge.style.color = '#38bdf8';
-                    sentBadge.style.borderColor = 'rgba(56,189,248,0.25)';
-                    sentBadge.style.background = 'rgba(56,189,248,0.08)';
+                    sentBadge.textContent = 'CASH EQUITY · NON-F&O';
+                    sentBadge.style.color = '#94a3b8';
+                    sentBadge.style.borderColor = 'rgba(148,163,184,0.3)';
+                    sentBadge.style.background = 'rgba(148,163,184,0.08)';
+                    sentBadge.title = 'Non-F&O Security: Traded solely in the cash equity segment on NSE. No derivative open interest or options walls exist.';
                 }
 
                 ladderList.innerHTML = `
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.5rem;border-radius:4px;text-align:center;">
-                        <div style="color:#f8fafc;font-weight:700;font-size:0.65rem;">Equity Cash Market Order Depth</div>
-                        <div style="color:#94a3b8;font-size:0.60rem;margin-top:0.15rem;">
-                            Support Floor: <span style="color:#34d399;font-weight:700;">₹${supportFloor.toFixed(2)}</span> &middot;
-                            Breakout Trigger: <span style="color:#38bdf8;font-weight:700;">₹${resCeiling.toFixed(2)}</span> &middot;
-                            Target: <span style="color:#a78bfa;font-weight:700;">₹${targetCeil.toFixed(2)}</span>
+                    <div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);padding:0.5rem 0.6rem;border-radius:4px;font-family:var(--font-mono);">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+                            <span style="color:#38bdf8;font-size:0.62rem;font-weight:700;">🛡️ Non-F&amp;O Cash Equity Segment</span>
+                            <span style="color:#94a3b8;font-size:0.56rem;">Exchange Point-in-Time</span>
+                        </div>
+                        <div style="font-size:0.60rem;color:#94a3b8;line-height:1.35;margin-bottom:0.45rem;">
+                            <strong style="color:#f8fafc;">${ticker}</strong> is not listed in the NSE Equity Derivatives (F&amp;O) segment. Open interest walls &amp; Max Pain do not exist. Key execution boundaries are defined by calculated price action channels:
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.3rem;text-align:center;">
+                            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
+                                <div style="color:#34d399;font-size:0.52rem;font-weight:700;">SUPPORT FLOOR</div>
+                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${supportFloor.toFixed(2)}</div>
+                                <div style="color:#6ee7b7;font-size:0.50rem;">${(((supportFloor - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                            </div>
+                            <div style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
+                                <div style="color:#38bdf8;font-size:0.52rem;font-weight:700;">BREAKOUT TRIGGER</div>
+                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${resCeiling.toFixed(2)}</div>
+                                <div style="color:#7dd3fc;font-size:0.50rem;">+${(((resCeiling - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                            </div>
+                            <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);padding:0.25rem 0.2rem;border-radius:3px;">
+                                <div style="color:#c084fc;font-size:0.52rem;font-weight:700;">PROJECTED TARGET</div>
+                                <div style="color:#f8fafc;font-weight:800;font-size:0.68rem;margin-top:0.04rem;">₹${targetCeil.toFixed(2)}</div>
+                                <div style="color:#d8b4fe;font-size:0.50rem;">+${(((targetCeil - curPrice) / (curPrice || 1)) * 100).toFixed(1)}%</div>
+                            </div>
                         </div>
                     </div>
                 `;
 
                 if (app._bkChartMode === 'native') {
-                    app.initBreakoutQuantumChart(ticker, candidate, {
-                        resistance_strike: resCeiling,
-                        support_strike: supportFloor,
-                        max_pain_strike: null,
-                    });
+                    app.initBreakoutQuantumChart(ticker, candidate, null);
                 }
             } catch (err) {
                 console.warn('[BREAKOUT] Error loading order book walls:', err);
@@ -2350,99 +2515,498 @@
             const badge = document.getElementById('bkInspChartSymbolBadge');
             if (badge) badge.textContent = gcSymbol;
 
-            const gcUrl = `https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}`;
             const gcPopout = document.getElementById('bkInspGoChartingPopoutLink');
-            if (gcPopout) gcPopout.href = gcUrl;
+            if (gcPopout) gcPopout.href = `https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}`;
 
             const tvSymbol = formatTradingViewSymbol(ticker);
             const tvPopout = document.getElementById('bkInspTvPopoutLink');
             if (tvPopout) tvPopout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
 
+            // Build self-hosted in-project interactive Order Flow, Footprint & CVD Canvas Terminal
             container.innerHTML = `
-                <div style="height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 30%, rgba(245,158,11,0.08) 0%, #06070a 70%); border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 1.5rem 1.2rem; text-align: center; box-sizing: border-box; font-family: var(--font-sans); overflow-y: auto;">
-                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.6rem; box-shadow: 0 0 20px rgba(245,158,11,0.2);">
-                        📊
-                    </div>
-                    <div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc; font-family: var(--font-heading, sans-serif); letter-spacing: -0.01em;">
-                        GoCharting Order Flow &amp; Footprint Terminal
-                    </div>
-                    <div style="font-size: 0.74rem; color: #94a3b8; max-width: 480px; margin-top: 0.25rem; line-height: 1.45;">
-                        Real-time Footprint clusters, Volume Profile (POC/VAH/VAL), CVD Imbalance, and BSE Order Book Walls for <strong style="color: #fbbf24; font-family: var(--font-mono);">${gcSymbol}</strong>.
+                <div style="height: 100%; width: 100%; display: flex; flex-direction: column; background: #050608; border-radius: 4px; overflow: hidden; position: relative; font-family: var(--font-mono);">
+                    <!-- Terminal Header Bar -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 0.4rem 0.65rem; font-size: 0.68rem; flex-shrink: 0; flex-wrap: wrap; gap: 0.35rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <span style="background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #fbbf24; font-weight: 800; font-size: 0.62rem; padding: 0.12rem 0.4rem; border-radius: 3px;">
+                                📊 ORDER FLOW TERMINAL
+                            </span>
+                            <span style="color: #f8fafc; font-weight: 800; font-size: 0.76rem;">${gcSymbol}</span>
+                        </div>
+
+                        <!-- Real-Time Metrics Strip -->
+                        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.62rem;">
+                            <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(0,0,0,0.4); padding: 0.12rem 0.35rem; border-radius: 3px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: #94a3b8;">POC:</span>
+                                <span id="gcPocVal" style="color: #fbbf24; font-weight: 800;">—</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(0,0,0,0.4); padding: 0.12rem 0.35rem; border-radius: 3px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: #94a3b8;">VAH:</span>
+                                <span id="gcVahVal" style="color: #38bdf8; font-weight: 800;">—</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(0,0,0,0.4); padding: 0.12rem 0.35rem; border-radius: 3px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: #94a3b8;">VAL:</span>
+                                <span id="gcValVal" style="color: #34d399; font-weight: 800;">—</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.2rem; background: rgba(0,0,0,0.4); padding: 0.12rem 0.35rem; border-radius: 3px; border: 1px solid rgba(255,255,255,0.06);">
+                                <span style="color: #94a3b8;">BIAS:</span>
+                                <span id="gcDeltaBiasVal" style="color: #a78bfa; font-weight: 800;">—</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Live Calculated Order Flow Strip -->
-                    <div id="gcOrderFlowMetricsStrip" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; width: 100%; max-width: 520px; margin-top: 0.9rem; text-align: center; font-family: var(--font-mono); font-size: 0.68rem;">
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
-                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Point of Control</div>
-                            <div id="gcPocVal" style="font-weight: 800; color: #fbbf24; margin-top: 2px;">--</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
-                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Value Area High</div>
-                            <div id="gcVahVal" style="font-weight: 800; color: #38bdf8; margin-top: 2px;">--</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
-                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">Value Area Low</div>
-                            <div id="gcValVal" style="font-weight: 800; color: #34d399; margin-top: 2px;">--</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.35rem 0.2rem;">
-                            <div style="color: #94a3b8; font-size: 0.56rem; text-transform: uppercase;">CVD Flow Bias</div>
-                            <div id="gcDeltaBiasVal" style="font-weight: 800; color: #a78bfa; margin-top: 2px;">CALCULATING...</div>
+                    <!-- Main Canvas Container -->
+                    <div id="gcCanvasWrapper" style="position: relative; flex: 1; min-height: 380px; width: 100%; overflow: hidden; background: #050608;">
+                        <canvas id="gcMainCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block;"></canvas>
+
+                        <!-- Interactive Crosshair Floating Tooltip -->
+                        <div id="gcCanvasTooltip" style="position: absolute; display: none; pointer-events: none; background: rgba(5,6,10,0.92); border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; padding: 0.4rem 0.55rem; font-size: 0.58rem; color: #f8fafc; z-index: 20; box-shadow: 0 4px 14px rgba(0,0,0,0.8); backdrop-filter: blur(6px); max-width: 240px;"></div>
+
+                        <!-- Loading State -->
+                        <div id="gcLoadingIndicator" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(5,6,8,0.85); z-index: 10; gap: 0.4rem;">
+                            <div style="width: 28px; height: 28px; border: 2px solid rgba(245,158,11,0.2); border-top-color: #fbbf24; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                            <span style="color: #fbbf24; font-size: 0.72rem; font-weight: 700;">Loading Order Flow &amp; Footprint...</span>
                         </div>
                     </div>
 
-                    <!-- Direct Launch CTA -->
-                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center;">
-                        <a href="${gcUrl}" target="_blank" rel="noopener noreferrer" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000000; font-weight: 800; font-size: 0.82rem; padding: 0.55rem 1.25rem; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(245,158,11,0.35); transition: transform 0.15s ease;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                            <span>🚀 Launch GoCharting Terminal (${gcSymbol}) ↗</span>
-                        </a>
-                        <button type="button" onclick="app.switchBreakoutChartMode('tv')" style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; font-weight: 700; font-size: 0.78rem; padding: 0.55rem 0.95rem; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
-                            <span>⚡ Switch to TV Embed (BSE)</span>
-                        </button>
-                    </div>
-
-                    <!-- Features Matrix Grid -->
-                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; width: 100%; max-width: 520px; margin-top: 1rem; text-align: left; font-size: 0.70rem; font-family: var(--font-mono);">
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
-                            <div style="color: #fbbf24; font-weight: 700;">🔥 Footprint &amp; Imbalance</div>
-                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Bid/Ask execution clusters &amp; delta absorption</div>
+                    <!-- Terminal Legend & Footer Bar -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0.65rem; font-size: 0.58rem; color: #94a3b8; flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><span style="display: inline-block; width: 8px; height: 3px; background: #fbbf24;"></span> POC</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><span style="display: inline-block; width: 8px; height: 3px; background: #38bdf8;"></span> VAH</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><span style="display: inline-block; width: 8px; height: 3px; background: #34d399;"></span> VAL</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><span style="display: inline-block; width: 8px; height: 3px; background: #ef4444;"></span> Ask Imbalance</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><span style="display: inline-block; width: 8px; height: 3px; background: #10b981;"></span> Bid Imbalance</span>
                         </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
-                            <div style="color: #34d399; font-weight: 700;">🧱 Order Book Heatmap</div>
-                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Resting liquidity &amp; dynamic support/resistance walls</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
-                            <div style="color: #38bdf8; font-weight: 700;">📈 Market Profile TPO</div>
-                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Point of Control (POC), VAH, VAL value areas</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 0.45rem 0.6rem;">
-                            <div style="color: #a78bfa; font-weight: 700;">⚡ Real-Time Tick Feed</div>
-                            <div style="color: #64748b; font-size: 0.62rem; margin-top: 0.15rem;">Ultra low-latency BSE tick stream</div>
+                        <div style="color: #64748b;">
+                            30-Bin TPO Volume Profile · Intra-Bar Lee-Ready CVD
                         </div>
                     </div>
                 </div>
             `;
 
-            // Asynchronously populate live order flow analytics from backend API
+            const canvas = document.getElementById('gcMainCanvas');
+            const wrapper = document.getElementById('gcCanvasWrapper');
+            const tooltip = document.getElementById('gcCanvasTooltip');
+            const loadingIndicator = document.getElementById('gcLoadingIndicator');
+
+            if (!canvas || !wrapper) return;
+
+            // Fetch live order flow analytics from backend
             fetch(`${API_BASE}/api/v1/breakout-radar/orderflow/${encodeURIComponent(ticker)}`)
                 .then(r => r.ok ? r.json() : null)
                 .then(data => {
-                    if (!data || !data.success) return;
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    if (!data || !data.success) {
+                        wrapper.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#71717a;font-size:0.75rem;">Order flow data unavailable for ${gcSymbol}</div>`;
+                        return;
+                    }
+
+                    // Update header indicators
                     const pocEl = document.getElementById('gcPocVal');
                     const vahEl = document.getElementById('gcVahVal');
                     const valEl = document.getElementById('gcValVal');
                     const biasEl = document.getElementById('gcDeltaBiasVal');
 
-                    if (pocEl && data.volume_profile) pocEl.textContent = `₹${data.volume_profile.poc.toLocaleString('en-IN')}`;
-                    if (vahEl && data.volume_profile) vahEl.textContent = `₹${data.volume_profile.vah.toLocaleString('en-IN')}`;
-                    if (valEl && data.volume_profile) valEl.textContent = `₹${data.volume_profile.val.toLocaleString('en-IN')}`;
-                    if (biasEl && data.order_flow) {
-                        const regime = data.order_flow.delta_regime;
-                        biasEl.textContent = regime;
-                        biasEl.style.color = regime === 'ACCUMULATION' ? '#34d399' : (regime === 'DISTRIBUTION' ? '#fb7185' : '#fbbf24');
+                    const vp = data.volume_profile || {};
+                    const of = data.order_flow || {};
+
+                    if (pocEl && vp.poc) pocEl.textContent = `₹${Number(vp.poc).toFixed(1)}`;
+                    if (vahEl && vp.vah) vahEl.textContent = `₹${Number(vp.vah).toFixed(1)}`;
+                    if (valEl && vp.val) valEl.textContent = `₹${Number(vp.val).toFixed(1)}`;
+                    if (biasEl && of.delta_regime) {
+                        biasEl.textContent = of.delta_regime;
+                        biasEl.style.color = of.delta_regime === 'ACCUMULATION' ? '#34d399' : (of.delta_regime === 'DISTRIBUTION' ? '#fb7185' : '#fbbf24');
                     }
+
+                    // Render Canvas Terminal
+                    renderOrderFlowCanvas(canvas, wrapper, tooltip, data);
                 })
-                .catch(() => {});
+                .catch(err => {
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                    console.warn('[BREAKOUT] Error loading order flow terminal:', err);
+                });
         };
+
+        function renderOrderFlowCanvas(canvas, wrapper, tooltip, data) {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const footprintBars = data.footprint_matrix || [];
+            const vpBins = data.volume_profile?.profile_bins || [];
+            const vp = data.volume_profile || {};
+            const cvdBars = data.cvd_history_bars || [];
+            const curPrice = data.current_price || 0;
+
+            if (footprintBars.length === 0) return;
+
+            let mouseX = -1;
+            let mouseY = -1;
+
+            function draw() {
+                const rect = wrapper.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                const width = rect.width;
+                const height = rect.height;
+
+                if (width <= 0 || height <= 0) return;
+
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                ctx.resetTransform();
+                ctx.scale(dpr, dpr);
+
+                // Clear background
+                ctx.fillStyle = '#050608';
+                ctx.fillRect(0, 0, width, height);
+
+                // Layout partitions
+                const rightProfileWidth = Math.min(130, width * 0.22);
+                const chartWidth = width - rightProfileWidth - 55; // reserve 55px for price scale
+                const topChartHeight = Math.floor(height * 0.72);
+                const cvdTop = topChartHeight + 18;
+                const cvdHeight = height - cvdTop - 18;
+
+                // Price range across footprint bars
+                let minP = Infinity;
+                let maxP = -Infinity;
+                footprintBars.forEach(b => {
+                    if (b.low < minP) minP = b.low;
+                    if (b.high > maxP) maxP = b.high;
+                });
+                if (vp.poc) {
+                    minP = Math.min(minP, vp.val || minP);
+                    maxP = Math.max(maxP, vp.vah || maxP);
+                }
+                const pPadding = (maxP - minP) * 0.08 || 1;
+                minP -= pPadding;
+                maxP += pPadding;
+
+                function priceToY(p) {
+                    return topChartHeight - ((p - minP) / (maxP - minP)) * (topChartHeight - 20) - 10;
+                }
+
+                function yToPrice(y) {
+                    return maxP - ((y - 10) / (topChartHeight - 20)) * (maxP - minP);
+                }
+
+                // 1. Draw Grid Lines
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.lineWidth = 1;
+                const numGridLines = 6;
+                for (let i = 0; i <= numGridLines; i++) {
+                    const gy = 15 + (topChartHeight - 30) * (i / numGridLines);
+                    const gp = yToPrice(gy);
+                    ctx.beginPath();
+                    ctx.moveTo(0, gy);
+                    ctx.lineTo(width - rightProfileWidth, gy);
+                    ctx.stroke();
+
+                    // Price scale label
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '9px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('₹' + gp.toFixed(1), chartWidth + 5, gy + 3);
+                }
+
+                // Split divider between Main Chart and CVD
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath();
+                ctx.moveTo(0, topChartHeight);
+                ctx.lineTo(width, topChartHeight);
+                ctx.stroke();
+
+                // 2. Draw 30-Bin Horizontal TPO Volume Profile on Right Side
+                if (vpBins.length > 0) {
+                    const maxBinVol = Math.max(1, ...vpBins.map(b => b.volume || 1));
+                    const vpLeft = width - rightProfileWidth;
+
+                    // Background strip for Volume Profile
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+                    ctx.fillRect(vpLeft, 0, rightProfileWidth, topChartHeight);
+
+                    vpBins.forEach(b => {
+                        const by = priceToY(b.price);
+                        const bHeight = Math.max(2, (topChartHeight / vpBins.length) * 0.85);
+                        const bWidth = (b.volume / maxBinVol) * (rightProfileWidth - 10);
+
+                        const isPoc = b.is_poc;
+                        const isVah = b.is_vah;
+                        const isVal = b.is_val;
+
+                        // Buy vs Sell split in horizontal bar
+                        const buyFrac = b.volume > 0 ? (b.buy_volume / b.volume) : 0.5;
+                        const buyW = bWidth * buyFrac;
+                        const sellW = bWidth - buyW;
+
+                        // Buy Volume Bar (green)
+                        ctx.fillStyle = isPoc ? '#f59e0b' : 'rgba(16, 185, 129, 0.6)';
+                        ctx.fillRect(vpLeft, by - bHeight / 2, buyW, bHeight);
+
+                        // Sell Volume Bar (red)
+                        ctx.fillStyle = isPoc ? '#d97706' : 'rgba(239, 68, 68, 0.6)';
+                        ctx.fillRect(vpLeft + buyW, by - bHeight / 2, sellW, bHeight);
+
+                        if (isPoc) {
+                            ctx.fillStyle = '#fbbf24';
+                            ctx.font = 'bold 8px JetBrains Mono, monospace';
+                            ctx.fillText('POC', vpLeft + bWidth + 3, by + 3);
+                        }
+                    });
+                }
+
+                // 3. Draw POC, VAH, VAL horizontal reference lines across chart
+                if (vp.poc) {
+                    const pocY = priceToY(vp.poc);
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, pocY);
+                    ctx.lineTo(width - rightProfileWidth, pocY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                if (vp.vah) {
+                    const vahY = priceToY(vp.vah);
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.setLineDash([2, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, vahY);
+                    ctx.lineTo(width - rightProfileWidth, vahY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                if (vp.val) {
+                    const valY = priceToY(vp.val);
+                    ctx.strokeStyle = '#34d399';
+                    ctx.setLineDash([2, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, valY);
+                    ctx.lineTo(width - rightProfileWidth, valY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // 4. Draw Candlesticks and Intra-Bar Footprint Clusters
+                const barCount = footprintBars.length;
+                const barSpacing = chartWidth / Math.max(1, barCount);
+                const candleWidth = Math.max(8, barSpacing * 0.82);
+
+                let hoveredBar = null;
+
+                footprintBars.forEach((bar, idx) => {
+                    const cx = idx * barSpacing + barSpacing / 2;
+                    const oY = priceToY(bar.open);
+                    const cY = priceToY(bar.close);
+                    const hY = priceToY(bar.high);
+                    const lY = priceToY(bar.low);
+
+                    const isBull = bar.close >= bar.open;
+                    const bodyTop = Math.min(oY, cY);
+                    const bodyBottom = Math.max(oY, cY);
+                    const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+
+                    // Check hover
+                    if (mouseX >= cx - barSpacing / 2 && mouseX < cx + barSpacing / 2 && mouseY <= topChartHeight) {
+                        hoveredBar = { bar, cx, idx };
+                        // Draw vertical highlight band
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                        ctx.fillRect(cx - barSpacing / 2, 0, barSpacing, height);
+                    }
+
+                    // Wick
+                    ctx.strokeStyle = isBull ? '#10b981' : '#ef4444';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, hY);
+                    ctx.lineTo(cx, lY);
+                    ctx.stroke();
+
+                    // Candle Body
+                    ctx.fillStyle = isBull ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+                    ctx.fillRect(cx - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+                    ctx.strokeStyle = isBull ? '#10b981' : '#ef4444';
+                    ctx.strokeRect(cx - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+
+                    // Intra-bar Footprint Cluster Blocks if width allows
+                    if (candleWidth >= 22 && Array.isArray(bar.clusters) && bar.clusters.length > 0) {
+                        const clusterH = Math.max(3, bodyHeight / bar.clusters.length);
+                        bar.clusters.forEach((cl, cIdx) => {
+                            const clY = bodyTop + cIdx * clusterH;
+                            const buyV = cl.buy || 0;
+                            const sellV = cl.sell || 0;
+                            const isBuyImb = buyV > sellV * 1.5;
+                            const isSellImb = sellV > buyV * 1.5;
+
+                            // Left cell: Bid (Sell Vol)
+                            ctx.fillStyle = isSellImb ? 'rgba(239, 68, 68, 0.65)' : 'rgba(239, 68, 68, 0.2)';
+                            ctx.fillRect(cx - candleWidth / 2, clY, candleWidth / 2 - 0.5, clusterH);
+
+                            // Right cell: Ask (Buy Vol)
+                            ctx.fillStyle = isBuyImb ? 'rgba(16, 185, 129, 0.65)' : 'rgba(16, 185, 129, 0.2)';
+                            ctx.fillRect(cx + 0.5, clY, candleWidth / 2 - 0.5, clusterH);
+                        });
+                    }
+                });
+
+                // 5. Draw Cumulative Volume Delta (CVD) in lower pane
+                if (cvdBars.length > 0) {
+                    let minCvd = Infinity;
+                    let maxCvd = -Infinity;
+                    cvdBars.forEach(cb => {
+                        if (cb.cvd < minCvd) minCvd = cb.cvd;
+                        if (cb.cvd > maxCvd) maxCvd = cb.cvd;
+                    });
+                    const cvdPad = Math.max(10, (maxCvd - minCvd) * 0.1);
+                    minCvd -= cvdPad;
+                    maxCvd += cvdPad;
+
+                    function cvdToY(val) {
+                        return cvdTop + cvdHeight - ((val - minCvd) / (maxCvd - minCvd)) * (cvdHeight - 10) - 5;
+                    }
+
+                    // CVD Baseline (Zero line)
+                    const zeroY = cvdToY(0);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                    ctx.setLineDash([2, 2]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, zeroY);
+                    ctx.lineTo(chartWidth, zeroY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // CVD Area Chart
+                    ctx.beginPath();
+                    ctx.moveTo(0, zeroY);
+                    cvdBars.forEach((cb, idx) => {
+                        const cbX = idx * barSpacing + barSpacing / 2;
+                        const cbY = cvdToY(cb.cvd);
+                        ctx.lineTo(cbX, cbY);
+                    });
+                    ctx.lineTo(cvdBars.length * barSpacing, zeroY);
+                    ctx.closePath();
+
+                    const grad = ctx.createLinearGradient(0, cvdTop, 0, cvdTop + cvdHeight);
+                    grad.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+                    grad.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    // CVD Line
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    cvdBars.forEach((cb, idx) => {
+                        const cbX = idx * barSpacing + barSpacing / 2;
+                        const cbY = cvdToY(cb.cvd);
+                        if (idx === 0) ctx.moveTo(cbX, cbY);
+                        else ctx.lineTo(cbX, cbY);
+                    });
+                    ctx.stroke();
+
+                    // CVD Delta Bars
+                    cvdBars.forEach((cb, idx) => {
+                        const cbX = idx * barSpacing + barSpacing / 2;
+                        const deltaH = Math.min(18, Math.max(2, Math.abs(cb.delta) / 1000));
+                        const isPos = cb.delta >= 0;
+                        ctx.fillStyle = isPos ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)';
+                        ctx.fillRect(cbX - 2, isPos ? (zeroY - deltaH) : zeroY, 4, deltaH);
+                    });
+
+                    // CVD Label
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.font = 'bold 9px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('CVD (Order Flow Delta)', 10, cvdTop + 12);
+                }
+
+                // 6. Crosshair & Tooltip Handling
+                if (mouseX >= 0 && mouseX < chartWidth && mouseY >= 0 && mouseY < height) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.setLineDash([2, 2]);
+
+                    // Vertical crosshair
+                    ctx.beginPath();
+                    ctx.moveTo(mouseX, 0);
+                    ctx.lineTo(mouseX, height);
+                    ctx.stroke();
+
+                    // Horizontal crosshair
+                    if (mouseY <= topChartHeight) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, mouseY);
+                        ctx.lineTo(chartWidth, mouseY);
+                        ctx.stroke();
+
+                        // Price tag at crosshair
+                        const hoverPrice = yToPrice(mouseY);
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.fillRect(chartWidth + 1, mouseY - 7, 50, 14);
+                        ctx.fillStyle = '#000000';
+                        ctx.font = 'bold 9px JetBrains Mono, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('₹' + hoverPrice.toFixed(1), chartWidth + 26, mouseY + 3);
+                    }
+                    ctx.setLineDash([]);
+
+                    // Tooltip update
+                    if (hoveredBar && tooltip) {
+                        const b = hoveredBar.bar;
+                        const idx = hoveredBar.idx;
+                        const cvdItem = cvdBars[idx] || {};
+
+                        tooltip.style.display = 'block';
+                        const tipX = Math.min(width - 220, Math.max(10, mouseX + 15));
+                        const tipY = Math.min(height - 120, Math.max(10, mouseY - 30));
+                        tooltip.style.left = tipX + 'px';
+                        tooltip.style.top = tipY + 'px';
+
+                        tooltip.innerHTML = `
+                            <div style="color: #fbbf24; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; margin-bottom: 3px;">
+                                ${b.date || 'SESSION'} · ₹${Number(b.close).toFixed(2)}
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+                                <span style="color: #94a3b8;">O: <b style="color:#fff;">₹${Number(b.open).toFixed(1)}</b></span>
+                                <span style="color: #94a3b8;">H: <b style="color:#fff;">₹${Number(b.high).toFixed(1)}</b></span>
+                                <span style="color: #94a3b8;">L: <b style="color:#fff;">₹${Number(b.low).toFixed(1)}</b></span>
+                                <span style="color: #94a3b8;">C: <b style="color:${b.close >= b.open ? '#34d399' : '#f87171'};">₹${Number(b.close).toFixed(1)}</b></span>
+                            </div>
+                            <div style="margin-top: 3px; padding-top: 2px; border-top: 1px solid rgba(255,255,255,0.06);">
+                                <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">Bar Delta:</span><b style="color:${b.delta >= 0 ? '#34d399' : '#f87171'};">${b.delta >= 0 ? '+' : ''}${Math.round(b.delta).toLocaleString()}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">CVD:</span><b style="color:#38bdf8;">${cvdItem.cvd ? Math.round(cvdItem.cvd).toLocaleString() : '—'}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">Volume:</span><b style="color:#e2e8f0;">${(b.volume || 0).toLocaleString()}</b></div>
+                            </div>
+                        `;
+                    }
+                } else if (tooltip) {
+                    tooltip.style.display = 'none';
+                }
+            }
+
+            // Mouse tracking listeners
+            wrapper.onmousemove = function(e) {
+                const rect = wrapper.getBoundingClientRect();
+                mouseX = e.clientX - rect.left;
+                mouseY = e.clientY - rect.top;
+                requestAnimationFrame(draw);
+            };
+
+            wrapper.onmouseleave = function() {
+                mouseX = -1;
+                mouseY = -1;
+                if (tooltip) tooltip.style.display = 'none';
+                requestAnimationFrame(draw);
+            };
+
+            // Resize listener
+            const ro = new ResizeObserver(() => {
+                requestAnimationFrame(draw);
+            });
+            ro.observe(wrapper);
+
+            // Initial render
+            requestAnimationFrame(draw);
+        }
 
         app.initBreakoutTradingViewWidget = function(ticker) {
             const container = document.getElementById('bkInspTradingViewContainer');
