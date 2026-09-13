@@ -11,7 +11,7 @@
     // 📜 TRACKED BREAKOUTS HISTORY CONTROLLER
     // =========================================================================
     app._trackedBreakoutsData = [];
-    app._trackedBreakoutPresetDays = 7;
+    app._trackedBreakoutPresetDays = 3;
     app._trackedBreakoutCapital = 1000000; // 10 Lakhs default
     app._activeBreakoutSubtab = 'scanner';
 
@@ -111,7 +111,7 @@
         const endInput = document.getElementById('breakoutTrackedEndDate');
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        app.setTrackedBreakoutPreset(7);
+        app.setTrackedBreakoutPreset(3);
     };
 
     // =========================================================================

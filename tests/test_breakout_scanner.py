@@ -711,5 +711,41 @@ class TestTechnicalIndicatorsAndVCP:
         assert res["volume_dry_up"] is True
 
 
+class TestTrackedBreakoutsSummaryAndStrategyMetrics:
+    def test_get_tracked_breakouts_3_days_preset_structure(self):
+        from earnings_engine.data.breakout_scanner import get_tracked_breakouts, BREAKOUT_STRATEGIES
+
+        res = get_tracked_breakouts(days=3)
+        assert res["success"] is True
+        assert "summary" in res
+        assert "timeframe" in res
+        assert res["timeframe"]["preset_days"] == 3
+
+        summary = res["summary"]
+        assert "win_rate_pct" in summary
+        assert "win_count" in summary
+        assert "loss_count" in summary
+        assert "target_hit_count" in summary
+        assert "target_hit_rate_pct" in summary
+        assert "avg_days_to_target" in summary
+        assert "avg_return_pct" in summary
+        assert "per_strategy_stats" in summary
+
+        for strat_key in BREAKOUT_STRATEGIES:
+            assert strat_key in summary["per_strategy_stats"]
+            s_stat = summary["per_strategy_stats"][strat_key]
+            assert "total_tracked" in s_stat
+            assert "win_count" in s_stat
+            assert "loss_count" in s_stat
+            assert "win_rate_pct" in s_stat
+            assert "target_hit_count" in s_stat
+            assert "target_hit_rate_pct" in s_stat
+            assert "avg_days_to_target" in s_stat
+            assert "avg_return_pct" in s_stat
+            assert "active_count" in s_stat
+            assert "triggered_count" in s_stat
+
+
+
 
 
