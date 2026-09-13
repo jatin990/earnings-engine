@@ -1875,6 +1875,56 @@ def _migration_040_purge_invalid_price_history_nan_records(conn: Any) -> None:
         logger.debug("[MIGRATION-040] Price history purge notice: %s", e)
 
 
+def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
+    """Add strategy columns & lifecycle tracking fields to institutional_radar_signals and create quarterly_financials table."""
+    # 1. Upgrade institutional_radar_signals with strategy, risk/reward, and lifecycle fields
+    _add_column_if_missing(conn, "institutional_radar_signals", "strategy", "TEXT NOT NULL DEFAULT 'WHALE_CONVICTION'")
+    _add_column_if_missing(conn, "institutional_radar_signals", "ideal_entry_price", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "target_price", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "stop_loss", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "risk_reward_ratio", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "outcome_return_pct", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_status", "TEXT NOT NULL DEFAULT 'ACTIVE'")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_date", "TEXT")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_price", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_reason", "TEXT")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_notes", "TEXT")
+    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_reviewed_at", "TEXT")
+    _add_column_if_missing(conn, "institutional_radar_signals", "entry_delay_pct", "REAL DEFAULT 0.0")
+    _add_column_if_missing(conn, "institutional_radar_signals", "is_late", "INTEGER DEFAULT 0")
+
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_strat_status ON institutional_radar_signals(strategy, lifecycle_status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_lifecycle ON institutional_radar_signals(lifecycle_status, ticker)")
+    except Exception as e:
+        logger.debug("[MIGRATION-041] Index notice for institutional_radar_signals: %s", e)
+
+    # 2. Create quarterly_financials table for fundamental growth metrics & historical quarters
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quarterly_financials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            quarter TEXT NOT NULL,
+            period_end_date TEXT,
+            revenue_cr REAL,
+            net_profit_cr REAL,
+            operating_margin_pct REAL,
+            eps REAL,
+            sales_growth_yoy_pct REAL,
+            profit_growth_yoy_pct REAL,
+            raw_payload_json TEXT,
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+            updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+            UNIQUE(ticker, quarter)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_qfin_ticker_quarter ON quarterly_financials(ticker, quarter)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_qfin_period_end ON quarterly_financials(period_end_date DESC)")
+    except Exception as e:
+        logger.debug("[MIGRATION-041] Index notice for quarterly_financials: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1917,6 +1967,7 @@ MIGRATIONS: list[Migration] = [
     Migration(38, "038_alert_rules_engine", _migration_038_alert_rules_engine),
     Migration(39, "039_strategy_tier_audit_and_swing_radar", _migration_039_strategy_tier_audit_and_swing_radar),
     Migration(40, "040_purge_invalid_price_history_nan_records", _migration_040_purge_invalid_price_history_nan_records),
+    Migration(41, "041_smart_money_strategies_and_financials", _migration_041_smart_money_strategies_and_financials),
 ]
 
 
