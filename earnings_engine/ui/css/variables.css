@@ -1,0 +1,186 @@
+/**
+ * Nexus Intelligence Platform — Ergonomic 2K / 32-Inch Design System Tokens
+ * Calibrated in OKLCH & sRGB for 2560x1440 High-Resolution Displays (~92 PPI)
+ * High Legibility, Anti-Glare Warm Obsidian & Platinum Pearl Financial Terminal
+ */
+
+:root {
+    /* ─── Surface & Canvas Hierarchy (Warm Obsidian & Titanium Slate) ─── */
+    --bg-canvas: #0b0d13;              /* oklch(0.14 0.012 260) - Eliminates halation & glare */
+    --bg-sidebar: #0f121a;             /* oklch(0.16 0.014 260) - Sidebar navigation background */
+    --bg-topbar: rgba(11, 13, 19, 0.92); /* Frosted topbar backdrop */
+    --bg-surface: #141722;             /* oklch(0.19 0.016 260) - Standard card & container */
+    --bg-surface-elevated: #1a1e2c;    /* oklch(0.23 0.018 260) - Hovered/elevated cards, dropdowns */
+    --bg-surface-active: #212637;      /* oklch(0.27 0.020 260) - Active / focused surfaces */
+    --bg-surface-popover: #252b3e;     /* oklch(0.30 0.022 260) - Modals, context menus */
+    --bg-well: #0e1017;                /* oklch(0.15 0.012 260) - Recessed table & chart areas */
+    --bg-overlay: rgba(11, 13, 19, 0.85); /* Modal overlay scrim */
+
+    /* Legacy mapping for backward compatibility */
+    --bg: #0b0d13;
+    --card: #141722;
+    --card-elevated: #1a1e2c;
+    --card-surface: #141722;
+
+    /* ─── Hairline Luxury Borders ───────────────────────────────────────── */
+    --border-subtle: rgba(255, 255, 255, 0.07);
+    --border-card: rgba(255, 255, 255, 0.095);
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-hover: rgba(255, 255, 255, 0.20);
+    --border-focus: rgba(96, 165, 250, 0.50);
+    --border-accent: rgba(56, 189, 248, 0.35);
+    --card-border: var(--border-card);
+    --card-border-hover: var(--border-hover);
+
+    /* ─── Platinum Pearl Typography Hierarchy (Anti-Glare, AAA/AA) ─────── */
+    --text-primary: #f1f3f8;           /* Warm Alabaster Platinum (16.5:1 contrast on canvas) */
+    --text-secondary: #c5cbd6;         /* Soft Silver / Titanium (11.0:1 contrast) */
+    --text-muted: #8e97a8;             /* Muted Steel (6.2:1 contrast, AAA Micro) */
+    --text-tertiary: #6b7485;          /* Secondary Metadata (4.8:1 contrast, AA compliant) */
+    --text-faint: #525a6b;             /* Inactive tags, disabled markers */
+    --light: #f1f3f7;
+    --muted: #8e97a8;
+
+    /* ─── Muted Jewel-Tone Financial Semantics ──────────────────────────── */
+    /* Bullish / Positive Return (Jade Emerald) */
+    --color-bullish: #34d399;
+    --color-bullish-muted: #10b981;
+    --color-bullish-bg: rgba(52, 211, 153, 0.10);
+    --color-bullish-border: rgba(52, 211, 153, 0.24);
+    --green: #34d399;
+
+    /* Bearish / Negative Return (Velvet Rose Crimson) */
+    --color-bearish: #fb7185;
+    --color-bearish-muted: #f43f5e;
+    --color-bearish-bg: rgba(251, 113, 133, 0.10);
+    --color-bearish-border: rgba(251, 113, 133, 0.24);
+    --red: #fb7185;
+
+    /* Neutral / Warning (Champagne Amber) */
+    --color-warning: #fbbf24;
+    --color-warning-muted: #d97706;
+    --color-warning-bg: rgba(251, 191, 36, 0.10);
+    --color-warning-border: rgba(251, 191, 36, 0.24);
+    --amber: #fbbf24;
+
+    /* Executive Sapphire & Sky Accent */
+    --color-primary: #38bdf8;
+    --color-primary-muted: #0284c7;
+    --color-primary-bg: rgba(56, 189, 248, 0.10);
+    --color-primary-border: rgba(56, 189, 248, 0.28);
+    --accent: #38bdf8;
+    --accent-vivid: #0284c7;
+    --accent-glow: rgba(56, 189, 248, 0.15);
+    --cyan: #38bdf8;
+
+    /* Executive Champagne Gold (Elite Conviction / High Institutional Conviction) */
+    --color-gold: #d4af37;
+    --color-gold-bg: rgba(212, 175, 55, 0.10);
+    --color-gold-border: rgba(212, 175, 55, 0.25);
+    --gold: #d4af37;
+
+    /* Purple / Indigo Accent */
+    --purple: #818cf8;
+    --purple-dark: #0f121a;
+
+    /* ─── 2K Fluid Typography Scale (Calibrated for ~92 PPI / 1440p) ───── */
+    --font-size-2xs: clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);  /* 12.0px - 13.0px (Floor) */
+    --font-size-xs: clamp(0.8125rem, 0.78rem + 0.18vw, 0.875rem);   /* 13.0px - 14.0px */
+    --font-size-sm: clamp(0.875rem, 0.84rem + 0.20vw, 0.9375rem);   /* 14.0px - 15.0px */
+    --font-size-base: clamp(0.9375rem, 0.90rem + 0.25vw, 1.0625rem);/* 15.0px - 17.0px */
+    --font-size-md: clamp(1.0625rem, 1.00rem + 0.35vw, 1.1875rem);  /* 17.0px - 19.0px */
+    --font-size-lg: clamp(1.20rem, 1.12rem + 0.45vw, 1.40rem);     /* 19.2px - 22.4px */
+    --font-size-xl: clamp(1.40rem, 1.25rem + 0.65vw, 1.75rem);     /* 22.4px - 28.0px */
+    --font-size-2xl: clamp(1.75rem, 1.50rem + 1.00vw, 2.25rem);    /* 28.0px - 36.0px */
+
+    /* ─── Font Stacks ──────────────────────────────────────────────────── */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --font-heading: 'Space Grotesk', 'Inter', -apple-system, sans-serif;
+
+    /* ─── Ambient Multi-Layer Shadows (No Glaring Neon Halos) ──────────── */
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.30);
+    --shadow-lg: 0 16px 40px -6px rgba(0, 0, 0, 0.70), 0 4px 12px -2px rgba(0, 0, 0, 0.40);
+    --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --shadow-popover: 0 24px 64px -8px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    --card-glow: var(--shadow-card);
+
+    /* ─── Border Radii ─────────────────────────────────────────────────── */
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* ─── Transitions ──────────────────────────────────────────────────── */
+    --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-slow: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Light Theme Overrides (Warm Crisp Cream & Slate) */
+:root[data-theme="light"],
+body.light-mode {
+    --bg-canvas: #f6f8fb;
+    --bg-sidebar: #eef2f7;
+    --bg-topbar: rgba(246, 248, 251, 0.94);
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f1f4f9;
+    --bg-surface-active: #e5eaf3;
+    --bg-surface-popover: #ffffff;
+    --bg-well: #f0f3f8;
+    --bg-overlay: rgba(15, 23, 42, 0.60);
+
+    --border-subtle: rgba(15, 23, 42, 0.08);
+    --border-card: rgba(15, 23, 42, 0.12);
+    --border-default: rgba(15, 23, 42, 0.18);
+    --border-hover: rgba(15, 23, 42, 0.30);
+    --border-focus: rgba(2, 132, 199, 0.50);
+    --border-accent: rgba(2, 132, 199, 0.35);
+
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --text-tertiary: #94a3b8;
+    --text-faint: #cbd5e1;
+    --light: #0f172a;
+    --muted: #64748b;
+
+    --color-bullish: #059669;
+    --color-bullish-bg: rgba(5, 150, 105, 0.08);
+    --color-bullish-border: rgba(5, 150, 105, 0.22);
+    --green: #059669;
+
+    --color-bearish: #dc2626;
+    --color-bearish-bg: rgba(220, 38, 38, 0.08);
+    --color-bearish-border: rgba(220, 38, 38, 0.22);
+    --red: #dc2626;
+
+    --color-warning: #d97706;
+    --color-warning-bg: rgba(217, 119, 6, 0.08);
+    --color-warning-border: rgba(217, 119, 6, 0.22);
+    --amber: #d97706;
+
+    --color-primary: #0284c7;
+    --color-primary-bg: rgba(2, 132, 199, 0.08);
+    --color-primary-border: rgba(2, 132, 199, 0.25);
+    --accent: #0284c7;
+    --accent-vivid: #0369a1;
+    --cyan: #0284c7;
+
+    --color-gold: #b45309;
+    --color-gold-bg: rgba(180, 83, 9, 0.08);
+    --color-gold-border: rgba(180, 83, 9, 0.22);
+    --gold: #b45309;
+
+    --purple: #6366f1;
+    --purple-dark: #f1f5f9;
+
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.12);
+    --shadow-card: 0 2px 10px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --shadow-popover: 0 16px 36px rgba(15, 23, 42, 0.15);
+}

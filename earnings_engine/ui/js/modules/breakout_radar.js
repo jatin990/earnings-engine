@@ -1582,9 +1582,22 @@
             }
         };
 
-        app.openBreakoutInspectorDrawer = function() {
+        app.openBreakoutInspectorDrawer = function(tickerOrCandidate) {
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
+
+            // Reparent directly to document.body so drawer displays cleanly over ANY active tab
+            if (drawer && drawer.parentElement !== document.body) {
+                document.body.appendChild(drawer);
+            }
+            if (backdrop && backdrop.parentElement !== document.body) {
+                document.body.appendChild(backdrop);
+            }
+
+            if (tickerOrCandidate && app.selectBreakoutCandidate) {
+                app.selectBreakoutCandidate(tickerOrCandidate, false, false);
+            }
+
             if (drawer) {
                 let savedWidth = '720px';
                 try {
@@ -1596,13 +1609,13 @@
                 // Restore saved chart height
                 try {
                     const savedHeight = localStorage.getItem('breakout_chart_height');
-                    if (savedHeight) {
+                    if (savedHeight && app.setBreakoutChartHeight) {
                         app.setBreakoutChartHeight(savedHeight);
                     }
                 } catch (e) {}
 
-                if (app.resizeBreakoutChart) {
-                    setTimeout(app.resizeBreakoutChart, 80);
+                if (app.switchBreakoutChartMode) {
+                    app.switchBreakoutChartMode(app._bkChartMode || 'tv');
                 }
             }
             if (backdrop) {
@@ -1610,6 +1623,8 @@
                 setTimeout(() => { backdrop.style.opacity = '1'; }, 10);
             }
         };
+
+        window.openBreakoutInspectorDrawer = app.openBreakoutInspectorDrawer;
 
         app.closeBreakoutInspectorDrawer = function() {
             const drawer = document.getElementById('breakoutInspectorDrawer');
@@ -1624,12 +1639,12 @@
             }
         };
 
-        app.toggleBreakoutInspectorDrawer = function() {
+        app.toggleBreakoutInspectorDrawer = function(tickerOrCandidate) {
             const drawer = document.getElementById('breakoutInspectorDrawer');
             if (drawer && (drawer.style.right === '0px' || drawer.style.right === '0')) {
                 app.closeBreakoutInspectorDrawer();
             } else {
-                app.openBreakoutInspectorDrawer();
+                app.openBreakoutInspectorDrawer(tickerOrCandidate);
             }
         };
 
@@ -1774,7 +1789,11 @@
         // =========================================================================
         // 📈 INTERACTIVE QUANTUM CHART & ORDER BOOK WALLS CONTROLLER
         // =========================================================================
-        app._bkChartMode = app._bkChartMode || 'native';
+        let savedChartMode = 'tv';
+        try {
+            savedChartMode = localStorage.getItem('breakout_chart_mode') || 'tv';
+        } catch (e) {}
+        app._bkChartMode = savedChartMode;
         app._bkLightweightChart = null;
         app._bkCandleSeries = null;
         app._bkVolumeSeries = null;
@@ -1783,20 +1802,32 @@
         app._bkChartPriceLines = [];
 
         app.switchBreakoutChartMode = function(mode) {
-            app._bkChartMode = mode;
-            const nativeWrap = document.getElementById('bkInspLightweightChartWrap');
-            const tvContainer = document.getElementById('bkInspTradingViewContainer');
-            const nativeBtn = document.getElementById('bkChartModeNativeBtn');
-            const tvBtn = document.getElementById('bkChartModeTvBtn');
+            app._bkChartMode = mode || 'tv';
+            try {
+                localStorage.setItem('breakout_chart_mode', app._bkChartMode);
+            } catch (e) {}
 
-            if (mode === 'tv') {
-                if (nativeWrap) nativeWrap.style.display = 'none';
-                if (tvContainer) tvContainer.style.display = 'block';
-                if (nativeBtn) {
-                    nativeBtn.style.background = 'transparent';
-                    nativeBtn.style.color = '#94a3b8';
-                    nativeBtn.style.fontWeight = '400';
+            const tvContainer = document.getElementById('bkInspTradingViewContainer');
+            const gcContainer = document.getElementById('bkInspGoChartingContainer');
+            const nativeWrap = document.getElementById('bkInspLightweightChartWrap');
+
+            const tvBtn = document.getElementById('bkChartModeTvBtn');
+            const gcBtn = document.getElementById('bkChartModeGoChartingBtn');
+            const nativeBtn = document.getElementById('bkChartModeNativeBtn');
+
+            // Reset all mode button states
+            [tvBtn, gcBtn, nativeBtn].forEach(btn => {
+                if (btn) {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#94a3b8';
+                    btn.style.fontWeight = '400';
                 }
+            });
+
+            if (app._bkChartMode === 'tv') {
+                if (tvContainer) tvContainer.style.display = 'block';
+                if (gcContainer) gcContainer.style.display = 'none';
+                if (nativeWrap) nativeWrap.style.display = 'none';
                 if (tvBtn) {
                     tvBtn.style.background = 'rgba(56,189,248,0.18)';
                     tvBtn.style.color = '#38bdf8';
@@ -1805,18 +1836,26 @@
                 if (app._selectedBreakoutTicker) {
                     app.initBreakoutTradingViewWidget(app._selectedBreakoutTicker);
                 }
-            } else {
-                if (nativeWrap) nativeWrap.style.display = 'block';
+            } else if (app._bkChartMode === 'gocharting') {
                 if (tvContainer) tvContainer.style.display = 'none';
+                if (gcContainer) gcContainer.style.display = 'block';
+                if (nativeWrap) nativeWrap.style.display = 'none';
+                if (gcBtn) {
+                    gcBtn.style.background = 'rgba(245,158,11,0.18)';
+                    gcBtn.style.color = '#fbbf24';
+                    gcBtn.style.fontWeight = '700';
+                }
+                if (app._selectedBreakoutTicker) {
+                    app.initBreakoutGoChartingWidget(app._selectedBreakoutTicker);
+                }
+            } else {
+                if (tvContainer) tvContainer.style.display = 'none';
+                if (gcContainer) gcContainer.style.display = 'none';
+                if (nativeWrap) nativeWrap.style.display = 'block';
                 if (nativeBtn) {
                     nativeBtn.style.background = 'rgba(56,189,248,0.18)';
                     nativeBtn.style.color = '#38bdf8';
                     nativeBtn.style.fontWeight = '700';
-                }
-                if (tvBtn) {
-                    tvBtn.style.background = 'transparent';
-                    tvBtn.style.color = '#94a3b8';
-                    tvBtn.style.fontWeight = '400';
                 }
                 if (app.resizeBreakoutChart) {
                     setTimeout(app.resizeBreakoutChart, 50);
@@ -2272,8 +2311,9 @@
         };
 
         function formatTradingViewSymbol(sym) {
-            if (!sym) return 'NSE:NIFTY';
+            if (!sym) return 'BSE:SENSEX';
             const clean = String(sym).trim().toUpperCase();
+            if (clean === '^BSESN' || clean === 'SENSEX' || clean === 'BSE:SENSEX') return 'BSE:SENSEX';
             if (clean === '^NSEI' || clean === 'NIFTY' || clean === 'NIFTY50' || clean === 'NIFTY 50') return 'NSE:NIFTY';
             if (clean === '^NSEBANK' || clean === 'BANKNIFTY' || clean === 'NIFTYBANK') return 'NSE:BANKNIFTY';
             if (clean === '^CNX500' || clean === 'NIFTY500') return 'NSE:NIFTY500';
@@ -2281,12 +2321,60 @@
             if (clean === '^NDX' || clean === 'NDX') return 'NASDAQ:NDX';
             if (clean === '^DJI' || clean === 'DJI') return 'DJ:DJI';
             if (clean.includes(':')) return clean;
-            if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
             if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
+            if (clean.endsWith('.NS')) return 'BSE:' + clean.slice(0, -3);
             const knownUSTickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'SPY', 'QQQ', 'AMD', 'INTC', 'NFLX', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS'];
             if (knownUSTickers.includes(clean)) return clean;
-            return 'NSE:' + clean;
+            return 'BSE:' + clean;
         }
+
+        function formatGoChartingSymbol(sym) {
+            if (!sym) return 'BSE:SENSEX';
+            const clean = String(sym).trim().toUpperCase();
+            if (clean === '^BSESN' || clean === 'SENSEX') return 'BSE:SENSEX';
+            if (clean === '^NSEI' || clean === 'NIFTY') return 'NSE:NIFTY';
+            if (clean.includes(':')) return clean;
+            if (clean.endsWith('.NS') || clean.endsWith('.BO')) {
+                return 'BSE:' + clean.replace(/\.(NS|BO)$/, '');
+            }
+            const knownUSTickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'SPY', 'QQQ', 'AMD', 'INTC', 'NFLX', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS'];
+            if (knownUSTickers.includes(clean)) return clean;
+            return 'BSE:' + clean;
+        }
+
+        app.initBreakoutGoChartingWidget = function(ticker) {
+            const container = document.getElementById('bkInspGoChartingContainer');
+            if (!container || !ticker) return;
+
+            const gcSymbol = formatGoChartingSymbol(ticker);
+            const badge = document.getElementById('bkInspChartSymbolBadge');
+            if (badge) badge.textContent = gcSymbol;
+
+            const gcUrl = `https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}`;
+            const gcPopout = document.getElementById('bkInspGoChartingPopoutLink');
+            if (gcPopout) gcPopout.href = gcUrl;
+
+            const tvSymbol = formatTradingViewSymbol(ticker);
+            const tvPopout = document.getElementById('bkInspTvPopoutLink');
+            if (tvPopout) tvPopout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
+
+            const existingIframe = container.querySelector('iframe');
+            if (existingIframe && existingIframe.getAttribute('data-ticker') === gcSymbol) {
+                return;
+            }
+
+            container.innerHTML = `
+                <iframe
+                    id="bkInspGoChartingIframe"
+                    data-ticker="${gcSymbol}"
+                    src="${gcUrl}"
+                    style="width: 100%; height: 100%; border: none; background: #050508; border-radius: 4px;"
+                    allow="fullscreen; clipboard-read; clipboard-write;"
+                    loading="lazy"
+                    title="GoCharting Terminal - ${gcSymbol}">
+                </iframe>
+            `;
+        };
 
         app.initBreakoutTradingViewWidget = function(ticker) {
             const container = document.getElementById('bkInspTradingViewContainer');
@@ -2300,12 +2388,15 @@
             const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
             if (popout) popout.href = tvUrl;
 
-            // Notice element for exchange restrictions
-            const isIndianSymbol = tvSymbol.startsWith('NSE:') || tvSymbol.startsWith('BSE:');
+            const gcSymbol = formatGoChartingSymbol(ticker);
+            const gcPopout = document.getElementById('bkInspGoChartingPopoutLink');
+            if (gcPopout) gcPopout.href = `https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}`;
+
+            // Notice element for exchange restrictions (BSE streams seamlessly)
             const noticeEl = document.createElement('div');
             noticeEl.id = 'bkInspTvNotice';
-            noticeEl.style.cssText = `display: ${isIndianSymbol ? 'flex' : 'none'}; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(18,20,28,0.92); border: 1px solid rgba(255,255,255,0.12); padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 0.62rem; color: #cbd5e1; font-family: var(--font-mono); z-index: 10; align-items: center; justify-content: space-between;`;
-            noticeEl.innerHTML = `<span>⚠️ TradingView restricts NSE/BSE iframe embedding. Use <strong style="color:#38bdf8;">Live Native</strong> mode or click <a href="${tvUrl}" target="_blank" style="color: #38bdf8; text-decoration: underline;">TV ↗ Popout</a> for full view.</span>`;
+            noticeEl.style.cssText = `display: flex; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(18,20,28,0.92); border: 1px solid rgba(255,255,255,0.12); padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 0.62rem; color: #cbd5e1; font-family: var(--font-mono); z-index: 10; align-items: center; justify-content: space-between;`;
+            noticeEl.innerHTML = `<span>TradingView stream active for <strong>${tvSymbol}</strong>. Click <a href="${tvUrl}" target="_blank" style="color: #38bdf8; text-decoration: underline;">TV ↗ Popout</a> or <a href="https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}" target="_blank" style="color: #fbbf24; text-decoration: underline;">GoCharting Terminal</a> for order flow workspace.</span>`;
 
             try {
                 const widgetWrap = document.createElement('div');
@@ -2509,10 +2600,10 @@
                 freshEl.style.color = isLive ? '#34d399' : '#94a3b8';
             }
 
-            // 2. Interactive Quantum Chart & Real-Time Order Book Walls Initialization
+            // 2. Interactive Chart & Real-Time Order Book Walls Initialization
             app.loadBreakoutOrderBookWalls(ticker, candidate);
-            if (app._bkChartMode === 'tv') {
-                app.initBreakoutTradingViewWidget(ticker);
+            if (app.switchBreakoutChartMode) {
+                app.switchBreakoutChartMode(app._bkChartMode || 'tv');
             }
 
             // 3. Actionable Setup Verdict Banner

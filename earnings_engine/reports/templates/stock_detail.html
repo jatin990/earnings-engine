@@ -6,40 +6,41 @@
     <title>{{ ticker }} · Stock Intelligence & AI Consensus</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&family=JetBrains+Mono:wght@400..800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
-            --bg-void: #000000;
-            --bg-card: #09090f;
-            --bg-surface: #0b0c12;
-            --bg-surface-elevated: #11131c;
-            --bg-elevated: #161824;
-            --border: rgba(255, 255, 255, 0.08);
-            --border-hover: rgba(255, 255, 255, 0.18);
+            --bg-void: #0b0d13;
+            --bg-card: #141722;
+            --bg-surface: #161a26;
+            --bg-surface-elevated: #1d2232;
+            --bg-elevated: #22283a;
+            --border: rgba(255, 255, 255, 0.095);
+            --border-hover: rgba(255, 255, 255, 0.20);
             --border-focus: rgba(56, 189, 248, 0.5);
 
-            --text-primary: #ffffff;
-            --text-secondary: #94a3b8;
-            --text-tertiary: #64748b;
+            --text-primary: #f1f3f8;
+            --text-secondary: #c5cbd6;
+            --text-tertiary: #8e97a8;
 
-            --emerald: #10b981;
-            --emerald-subtle: rgba(16, 185, 129, 0.12);
-            --emerald-border: rgba(16, 185, 129, 0.25);
+            --emerald: #34d399;
+            --emerald-subtle: rgba(52, 211, 153, 0.10);
+            --emerald-border: rgba(52, 211, 153, 0.24);
 
-            --rose: #f43f5e;
-            --rose-subtle: rgba(244, 63, 94, 0.12);
-            --rose-border: rgba(244, 63, 94, 0.25);
+            --rose: #fb7185;
+            --rose-subtle: rgba(251, 113, 133, 0.10);
+            --rose-border: rgba(251, 113, 133, 0.24);
 
-            --indigo: #6366f1;
-            --indigo-subtle: rgba(99, 102, 241, 0.12);
-            --indigo-border: rgba(99, 102, 241, 0.3);
+            --indigo: #818cf8;
+            --indigo-subtle: rgba(129, 140, 248, 0.10);
+            --indigo-border: rgba(129, 140, 248, 0.25);
 
             --sky: #38bdf8;
-            --amber: #f59e0b;
+            --amber: #fbbf24;
             --gold: #d4af37;
 
-            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-sans: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
             --radius-sm: 8px;
             --radius-md: 12px;
@@ -50,18 +51,20 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            background-color: #000000;
+            background-color: var(--bg-void);
             background-image:
-                radial-gradient(ellipse at 50% -10%, rgba(56, 189, 248, 0.05) 0px, transparent 65%),
-                radial-gradient(ellipse at 100% 40%, rgba(212, 175, 55, 0.03) 0px, transparent 55%),
-                radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.025) 0px, transparent 60%);
+                radial-gradient(ellipse at 50% -10%, rgba(56, 189, 248, 0.04) 0px, transparent 65%),
+                radial-gradient(ellipse at 100% 40%, rgba(212, 175, 55, 0.025) 0px, transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.02) 0px, transparent 60%);
             background-attachment: fixed;
             color: var(--text-primary);
             font-family: var(--font-sans);
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            font-size: 15px;
             line-height: 1.5;
         }
 
@@ -1281,14 +1284,20 @@
                         <span>Interactive Technical Terminal &amp; Liquidity Walls</span>
                     </div>
 
-                    <!-- Dual Chart View Mode Switcher -->
-                    <div style="display: inline-flex; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px;">
-                        <button type="button" id="btnChartModeTv" onclick="setChartMode('tradingview')" style="background: rgba(56,189,248,0.2); border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
-                            <span>⚡</span><span>Live TradingView</span>
-                        </button>
-                        <button type="button" id="btnChartModeNexus" onclick="setChartMode('nexus')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
-                            <span>📊</span><span>Nexus Quant Canvas</span>
-                        </button>
+                    <!-- Dual Chart View Mode Switcher & GoCharting Direct -->
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <div style="display: inline-flex; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px;">
+                            <button type="button" id="btnChartModeTv" onclick="setChartMode('tradingview')" style="background: rgba(56,189,248,0.2); border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                                <span>⚡</span><span>Live TradingView (BSE)</span>
+                            </button>
+                            <button type="button" id="btnChartModeNexus" onclick="setChartMode('nexus')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                                <span>📊</span><span>Nexus Quant Canvas</span>
+                            </button>
+                        </div>
+                        {% set active_sym = ticker if ticker is defined and ticker else (stock.symbol if stock is defined and stock and stock.symbol else '') %}
+                        <a id="btnGoChartingDirect" href="https://gocharting.com/terminal?ticker={{ 'BSE:' ~ (active_sym.replace('.NS', '').replace('.BO', '')) if (active_sym.endswith('.NS') or active_sym.endswith('.BO')) else active_sym }}" target="_blank" style="background: var(--color-gold-bg); border: 1px solid var(--color-gold-border); color: var(--color-gold); font-size: 0.78rem; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-weight: 700;" title="Open live order flow chart &amp; footprint in GoCharting Terminal">
+                            <span>📊 GoCharting ↗</span>
+                        </a>
                     </div>
                 </div>
 
@@ -4778,8 +4787,9 @@
         let stockLiquidityData = null;
 
         function formatTradingViewSymbol(sym) {
-            if (!sym) return 'NSE:NIFTY';
+            if (!sym) return 'BSE:SENSEX';
             const clean = String(sym).trim().toUpperCase();
+            if (clean === '^BSESN' || clean === 'SENSEX' || clean === 'BSE:SENSEX') return 'BSE:SENSEX';
             if (clean === '^NSEI' || clean === 'NIFTY' || clean === 'NIFTY50' || clean === 'NIFTY 50') return 'NSE:NIFTY';
             if (clean === '^NSEBANK' || clean === 'BANKNIFTY' || clean === 'NIFTYBANK') return 'NSE:BANKNIFTY';
             if (clean === '^CNX500' || clean === 'NIFTY500') return 'NSE:NIFTY500';
@@ -4787,11 +4797,11 @@
             if (clean === '^NDX' || clean === 'NDX') return 'NASDAQ:NDX';
             if (clean === '^DJI' || clean === 'DJI') return 'DJ:DJI';
             if (clean.includes(':')) return clean;
-            if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
             if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
+            if (clean.endsWith('.NS')) return 'BSE:' + clean.slice(0, -3);
             const knownUSTickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'SPY', 'QQQ', 'AMD', 'INTC', 'NFLX', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS'];
             if (knownUSTickers.includes(clean)) return clean;
-            return 'NSE:' + clean;
+            return 'BSE:' + clean;
         }
 
         function initTradingViewOnlineWidget() {

@@ -6,22 +6,23 @@
     <title>Nexus Gateway // Personal Access & Scoped Hubs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&family=JetBrains+Mono:wght@400..800&family=Space+Grotesk:wght@500..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --bg-base: #000000;
-            --card-surface: #06060a;
-            --card-elevated: #0a0a10;
-            --border-soft: rgba(255, 255, 255, 0.08);
-            --border-highlight: rgba(255, 255, 255, 0.20);
+            --bg-base: #0b0d13;
+            --card-surface: #141722;
+            --card-elevated: #1a1e2c;
+            --border-soft: rgba(255, 255, 255, 0.095);
+            --border-highlight: rgba(255, 255, 255, 0.22);
             --gold: #d4af37;
-            --gold-glow: rgba(212, 175, 55, 0.25);
-            --emerald: #10b981;
-            --rose: #ef4444;
+            --gold-glow: rgba(212, 175, 55, 0.18);
+            --emerald: #34d399;
+            --rose: #fb7185;
             --sky: #38bdf8;
-            --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --font-mono: 'Geist Mono', monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
             --font-heading: 'Space Grotesk', sans-serif;
         }
 
@@ -31,20 +32,23 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background-color: #000000;
+            background-color: var(--bg-base);
             background-image:
-                radial-gradient(ellipse at 50% -10%, rgba(212, 175, 55, 0.04) 0px, transparent 65%),
-                radial-gradient(ellipse at 100% 40%, rgba(16, 185, 129, 0.03) 0px, transparent 55%),
-                radial-gradient(ellipse at 0% 100%, rgba(56, 189, 248, 0.025) 0px, transparent 60%);
+                radial-gradient(ellipse at 50% -10%, rgba(212, 175, 55, 0.035) 0px, transparent 65%),
+                radial-gradient(ellipse at 100% 40%, rgba(16, 185, 129, 0.02) 0px, transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(56, 189, 248, 0.02) 0px, transparent 60%);
             background-attachment: fixed;
-            color: #ffffff;
+            color: #f1f3f8;
             font-family: var(--font-sans);
+            font-size: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             overflow-x: hidden;
             position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         /* Subtle luxury hairline cyber grid */

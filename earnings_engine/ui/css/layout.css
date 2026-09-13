@@ -1,0 +1,94 @@
+/**
+ * Nexus Intelligence Platform — 2K Curved Viewport & App Shell Layout
+ */
+
+.app-shell {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: 100vh;
+    max-height: 100vh;
+    width: 100vw;
+    max-width: 100vw;
+    background: var(--bg-canvas);
+    overflow: hidden;
+}
+
+.app-sidebar {
+    width: 260px;
+    height: 100vh;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 40;
+    flex-shrink: 0;
+}
+
+.app-main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    background: var(--bg-canvas);
+    min-width: 0;
+}
+
+.app-topbar {
+    height: 52px;
+    min-height: 52px;
+    background: var(--bg-topbar);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(1rem, 0.8rem + 0.5vw, 1.75rem);
+    z-index: 30;
+    flex-shrink: 0;
+}
+
+.app-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: clamp(1rem, 0.75rem + 0.6vw, 1.75rem);
+    max-width: 2560px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Wide Viewport Card Grids */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: clamp(1rem, 0.75rem + 0.5vw, 1.5rem);
+    margin-bottom: 1.5rem;
+}
+
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: clamp(0.75rem, 0.5rem + 0.4vw, 1.25rem);
+    margin-bottom: 1.25rem;
+}
+
+/* 50-50 Split Radars & Inspect Panes */
+.split-view-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1.25rem;
+    height: calc(100vh - 160px);
+    overflow: hidden;
+}
+
+@media (max-width: 1200px) {
+    .split-view-container {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+}

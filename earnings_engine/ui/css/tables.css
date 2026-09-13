@@ -1,0 +1,145 @@
+/**
+ * Nexus Intelligence Platform — High-Density Financial Table Styles
+ * Optimized for 2560x1440 2K High-Density Scanning
+ */
+
+.results-table,
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.results-table thead th,
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg-sidebar);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--border-card);
+    white-space: nowrap;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.40);
+}
+
+.results-table tbody tr,
+.data-table tbody tr {
+    transition: background-color var(--transition-fast);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.results-table tbody tr:nth-child(even),
+.data-table tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.015);
+}
+
+.results-table tbody tr:hover,
+.data-table tbody tr:hover {
+    background-color: var(--bg-surface-elevated) !important;
+}
+
+.results-table tbody tr.selected-row,
+.data-table tbody tr.selected-row {
+    background-color: var(--bg-surface-active) !important;
+    box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.results-table td,
+.data-table td {
+    padding: 0.55rem 0.85rem;
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Numeric & Financial Columns */
+.results-table td.num,
+.results-table th.num,
+.data-table td.num,
+.data-table th.num {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Stock Ticker Presentation */
+.ticker-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ticker-symbol {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: var(--color-primary);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.ticker-symbol:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+.ticker-company {
+    font-size: var(--font-size-2xs);
+    color: var(--text-muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Financial Return Status Badges */
+.return-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-2xs);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.return-pill.bullish,
+.return-pill.positive {
+    background-color: var(--color-bullish-bg);
+    color: var(--color-bullish);
+    border: 1px solid var(--color-bullish-border);
+}
+
+.return-pill.bearish,
+.return-pill.negative {
+    background-color: var(--color-bearish-bg);
+    color: var(--color-bearish);
+    border: 1px solid var(--color-bearish-border);
+}
+
+.return-pill.neutral {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+/* Table Scroll Wrapper */
+.table-scroll-container {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+}

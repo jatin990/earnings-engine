@@ -1,0 +1,178 @@
+/**
+ * Nexus Intelligence Platform — Executive Financial Components
+ */
+
+/* ─── KPI & Metric Cards ────────────────────────────────────────────── */
+.kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    padding: clamp(0.85rem, 0.75rem + 0.4vw, 1.25rem);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+}
+
+.kpi-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.kpi-label {
+    font-size: var(--font-size-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+
+.kpi-value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    line-height: 1.15;
+}
+
+.kpi-subtext {
+    font-size: var(--font-size-2xs);
+    color: var(--text-tertiary);
+    margin-top: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/* ─── Buttons & Actions ─────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.95rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface-elevated);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    line-height: 1.4;
+}
+
+.btn:hover {
+    background: var(--bg-surface-active);
+    border-color: var(--border-hover);
+    color: #ffffff;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary-muted);
+    color: #0b0d13;
+}
+
+.btn-primary:hover {
+    background: #7dd3fc;
+    color: #0b0d13;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.55rem;
+    font-size: var(--font-size-2xs);
+    border-radius: var(--radius-xs);
+}
+
+.btn-micro {
+    padding: 0.18rem 0.45rem;
+    font-size: var(--font-size-2xs);
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+}
+
+/* ─── Navigation Tabs & Filters ─────────────────────────────────────── */
+.tab-button {
+    padding: 0.5rem 1rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tab-button:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface-elevated);
+}
+
+.tab-button.active {
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    border-color: var(--border-card);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ─── Status Badges & Pills ─────────────────────────────────────────── */
+.badge-gold {
+    background: var(--color-gold-bg);
+    color: var(--color-gold);
+    border: 1px solid var(--color-gold-border);
+}
+
+.badge-bullish {
+    background: var(--color-bullish-bg);
+    color: var(--color-bullish);
+    border: 1px solid var(--color-bullish-border);
+}
+
+.badge-bearish {
+    background: var(--color-bearish-bg);
+    color: var(--color-bearish);
+    border: 1px solid var(--color-bearish-border);
+}
+
+/* ─── Form Inputs ───────────────────────────────────────────────────── */
+input[type="text"],
+input[type="search"],
+input[type="number"],
+select {
+    background: var(--bg-well);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    padding: 0.45rem 0.75rem;
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+input:focus,
+select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}

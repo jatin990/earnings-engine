@@ -2444,7 +2444,20 @@ const API_BASE = window.location.origin;
         // [tracked_breakouts] -> extracted to modules/tracked_breakouts.js
         // [schedules] -> extracted to modules/schedules.js
         // [breakout_audit] -> extracted to modules/breakout_audit.js
-        // [institutional] -> extracted to modules/institutional.js
+        // Universal Breakout Inspector Drawer Dispatcher
+        if (!app.openBreakoutInspectorDrawer) {
+            app.openBreakoutInspectorDrawer = async function(tickerOrCandidate) {
+                if (typeof app.selectBreakoutCandidate !== 'function') {
+                    if (app.loadTabModules) {
+                        await app.loadTabModules('breakout');
+                    }
+                }
+                if (typeof app.openBreakoutInspectorDrawer === 'function') {
+                    return app.openBreakoutInspectorDrawer(tickerOrCandidate);
+                }
+            };
+            window.openBreakoutInspectorDrawer = app.openBreakoutInspectorDrawer;
+        }
         });
 
         // Safe boot sequence: ensures all modular script tags have loaded & attached to window.app
