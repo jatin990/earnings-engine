@@ -1467,6 +1467,7 @@ def _migration_032_institutional_radar_signals(conn: Any) -> None:
         CREATE TABLE IF NOT EXISTS institutional_radar_signals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ticker TEXT NOT NULL,
+            strategy TEXT NOT NULL DEFAULT 'WHALE_CONVICTION',
             signal_date TEXT NOT NULL,
             signal_price REAL NOT NULL,
             initial_score REAL,
@@ -1481,7 +1482,7 @@ def _migration_032_institutional_radar_signals(conn: Any) -> None:
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
             updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
-            UNIQUE (ticker, signal_date)
+            UNIQUE (ticker, strategy, signal_date)
         )
     """)
     try:
@@ -1879,11 +1880,17 @@ def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
     """Add strategy columns & lifecycle tracking fields to institutional_radar_signals and create quarterly_financials table."""
     # 1. Upgrade institutional_radar_signals with strategy, risk/reward, and lifecycle fields
     _add_column_if_missing(conn, "institutional_radar_signals", "strategy", "TEXT NOT NULL DEFAULT 'WHALE_CONVICTION'")
+    _add_column_if_missing(conn, "institutional_radar_signals", "company_name", "TEXT")
+    _add_column_if_missing(conn, "institutional_radar_signals", "industry", "TEXT")
     _add_column_if_missing(conn, "institutional_radar_signals", "ideal_entry_price", "REAL")
     _add_column_if_missing(conn, "institutional_radar_signals", "target_price", "REAL")
     _add_column_if_missing(conn, "institutional_radar_signals", "stop_loss", "REAL")
     _add_column_if_missing(conn, "institutional_radar_signals", "risk_reward_ratio", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "current_date", "TEXT")
     _add_column_if_missing(conn, "institutional_radar_signals", "outcome_return_pct", "REAL")
+    _add_column_if_missing(conn, "institutional_radar_signals", "days_elapsed", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "institutional_radar_signals", "whale_count", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "institutional_radar_signals", "trigger_reason", "TEXT")
     _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_status", "TEXT NOT NULL DEFAULT 'ACTIVE'")
     _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_date", "TEXT")
     _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_price", "REAL")
@@ -1896,6 +1903,7 @@ def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_strat_status ON institutional_radar_signals(strategy, lifecycle_status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_lifecycle ON institutional_radar_signals(lifecycle_status, ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_strat_ticker ON institutional_radar_signals(strategy, ticker)")
     except Exception as e:
         logger.debug("[MIGRATION-041] Index notice for institutional_radar_signals: %s", e)
 
