@@ -4,7 +4,7 @@
 <div id="tab-breakout" class="tab-content" style="width: 100%; max-width: 100%;">
 
     <!-- Header: Breakout Intelligence & Setup Radar -->
-    <div style="margin-bottom: 0.75rem;">
+    <div style="margin-bottom: 0.75rem; padding-top: 0.35rem;">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.65rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <div style="font-size: 1.15rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 0.5rem; letter-spacing: -0.02em;">
@@ -478,11 +478,11 @@
                             </div>
                         </div>
 
-                        <!-- ⚡ 5-Pillar Score Meters Card -->
+                        <!-- ⚡ Strategy-Adaptive Score Meters Card -->
                         <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
-                                <div style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
-                                    ⚡ 5-Pillar Score Decomposition
+                                <div id="bkInspPillarsTitle" style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
+                                    ⚡ Score Decomposition
                                 </div>
                                 <div style="display: flex; align-items: baseline; gap: 0.25rem;">
                                     <span id="bkInspCompositeScore" style="font-size: 1.15rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono);">0</span>
@@ -490,61 +490,8 @@
                                 </div>
                             </div>
 
-                            <div style="display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono);">
-                                <!-- Pillar 1: Resistance Proximity -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
-                                        <span style="color: #cbd5e1;">🎯 Resistance Ceiling</span>
-                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreRes">0</span> <span style="color: #52525b;">/ 40</span></span>
-                                    </div>
-                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarRes" style="height: 100%; width: 0%; background: #38bdf8; border-radius: 2px; transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Pillar 2: Volume Expansion -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
-                                        <span style="color: #cbd5e1;">📊 Volume Surge</span>
-                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreVol">0</span> <span style="color: #52525b;">/ 10</span></span>
-                                    </div>
-                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarVol" style="height: 100%; width: 0%; background: #34d399; border-radius: 2px; transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Pillar 3: Price Volatility Compression -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
-                                        <span style="color: #cbd5e1;">🗜️ Price Compression</span>
-                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreComp">0</span> <span style="color: #52525b;">/ 10</span></span>
-                                    </div>
-                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarComp" style="height: 100%; width: 0%; background: #a78bfa; border-radius: 2px; transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Pillar 4: Trend Momentum -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
-                                        <span style="color: #cbd5e1;">🚀 Trend Momentum</span>
-                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreMom">0</span> <span style="color: #52525b;">/ 25</span></span>
-                                    </div>
-                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarMom" style="height: 100%; width: 0%; background: #34d399; border-radius: 2px; transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Pillar 5: Fundamental Quality -->
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
-                                        <span style="color: #cbd5e1;">📈 Fundamental Quality</span>
-                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreFund">0</span> <span style="color: #52525b;">/ 15</span></span>
-                                    </div>
-                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarFund" style="height: 100%; width: 0%; background: #60a5fa; border-radius: 2px; transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
+                            <div id="bkInspPillarsContainer" style="display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono);">
+                                <!-- Dynamically rendered by app.renderBreakoutSetupInspector() -->
                             </div>
                         </div>
 

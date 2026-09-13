@@ -147,20 +147,41 @@ def clean_synthetic_institutional_records(settings: Settings) -> int:
         except Exception as e:
             print(f"  ! Error purging synthetic holdings: {e}")
 
-    # 2. Clean synthetic mock block deals
-    cur_bd = conn.execute(
-        """
-        DELETE FROM institutional_block_deals
-        WHERE client_name IN ('QUANT MUTUAL FUND', 'HDFC MUTUAL FUND', 'GQG PARTNERS EMERGING MARKETS', 'Vanguard Emerging Markets Fund', 'Temasek Holdings')
-           OR ticker = 'ALLCARGO.NS'
-        """
-    )
-    bd_deleted = cur_bd.rowcount if hasattr(cur_bd, "rowcount") else 0
-    if hasattr(conn, "commit"):
-        conn.commit()
-    if bd_deleted > 0:
-        print(f"  * Purged {bd_deleted} synthetic block deal entries.")
-        purged_total += bd_deleted
+    # 2. Clean all synthetic mock block deals
+    cur_bd = conn.execute("SELECT id, ticker, client_name, deal_type, value_cr, created_at FROM institutional_block_deals")
+    bd_rows = cur_bd.fetchall()
+    bd_quarantine = []
+    bd_ids = []
+    for r in bd_rows:
+        bd_id, ticker, cname, dtype, v_cr, c_at = r
+        bd_ids.append(bd_id)
+        bd_quarantine.append((
+            "institutional_block_deals",
+            f"{ticker}:{cname}",
+            "SYNTHETIC_CLEANER",
+            "Purged synthetic batch-seeded block deal record",
+            json.dumps({"id": bd_id, "ticker": ticker, "client_name": cname, "value_cr": v_cr, "created_at": c_at}),
+            now_iso,
+        ))
+
+    if bd_ids:
+        try:
+            conn.executemany(
+                """
+                INSERT INTO institutional_quarantine (
+                    record_type, entity_key, source_name, rejection_reason, raw_payload, quarantined_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                bd_quarantine,
+            )
+            ph_bd = ",".join("?" for _ in bd_ids)
+            conn.execute(f"DELETE FROM institutional_block_deals WHERE id IN ({ph_bd})", bd_ids)
+            if hasattr(conn, "commit"):
+                conn.commit()
+            print(f"  * Purged and quarantined {len(bd_ids)} synthetic block deal entries.")
+            purged_total += len(bd_ids)
+        except Exception as e:
+            print(f"  ! Error purging synthetic block deals: {e}")
 
     # 3. Clean synthetic multi-quarter generated shareholding rows
     cur_shp = conn.execute(
@@ -176,7 +197,16 @@ def clean_synthetic_institutional_records(settings: Settings) -> int:
         print(f"  * Purged {shp_deleted} synthetic quarterly multipliers from shareholding_patterns.")
         purged_total += shp_deleted
 
-    # 4. Recalculate metrics cache cleanly from remaining real data
+    # 4. Clean legacy synthetic institutional radar signals
+    cur_sig = conn.execute("DELETE FROM institutional_radar_signals WHERE signal_date <= '2026-09-10'")
+    sig_deleted = cur_sig.rowcount if hasattr(cur_sig, "rowcount") else 0
+    if hasattr(conn, "commit"):
+        conn.commit()
+    if sig_deleted > 0:
+        print(f"  * Purged {sig_deleted} legacy synthetic radar signals from institutional_radar_signals.")
+        purged_total += sig_deleted
+
+    # 5. Recalculate metrics cache cleanly from remaining authentic data
     print("  * Recalculating institutional metrics cache from authentic data...")
     recalc_res = recalculate_all_institutional_metrics(settings, force=True)
     print(f"  * Precomputed {recalc_res.get('equities_processed', 0)} equities in accumulation cache.")

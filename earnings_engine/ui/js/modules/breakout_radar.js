@@ -800,7 +800,7 @@
             }
         };
 
-        const DEFAULT_BREAKOUT_COLS = ['stock', 'signal_price', 'current_price', 'trigger', 'target_stop', 'return', 'outcome', 'score', 'actions'];
+        const DEFAULT_BREAKOUT_COLS = ['stock', 'score', 'current_price', 'trigger', 'target_stop', 'return', 'outcome', 'signal_price', 'actions'];
 
         const BREAKOUT_COLUMNS = {
             stock: {
@@ -808,7 +808,7 @@
                 label: 'Stock & Quality',
                 sortKey: 'ticker',
                 align: 'left',
-                headerStyle: 'color:#94a3b8;',
+                headerStyle: 'color:#94a3b8;min-width:145px;',
                 render: (c, ctx) => `
                     <td style="padding:0.28rem 0.45rem;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="display:flex;flex-direction:column;gap:0.08rem;">
@@ -817,16 +817,16 @@
                                 <button type="button" class="btn-ticker-refresh btn-tactile" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${ctx.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.70rem;padding:0 0.1rem;opacity:0.8;line-height:1;" title="Refresh live price & technical metrics for ${ctx.ticker}">↻</button>
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#71717a;text-decoration:none;font-size:0.65rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
                                 ${c.confirmation_badge ? `
-                                    <span style="font-size:0.55rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.02rem 0.25rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.15rem;" title="Volume expansion and fakeout protection indicator">
+                                    <span style="font-size:0.54rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.02rem 0.25rem;border-radius:3px;font-weight:800;white-space:nowrap;display:inline-flex;align-items:center;gap:0.15rem;" title="Volume expansion and fakeout protection indicator">
                                         ${c.confirmation_badge}
                                     </span>
                                 ` : (ctx.isBreakingOut ? `
-                                    <span style="font-size:0.55rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.02rem 0.25rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.15rem;" title="Price crossed above resistance trigger">
+                                    <span style="font-size:0.54rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.02rem 0.25rem;border-radius:3px;font-weight:800;white-space:nowrap;display:inline-flex;align-items:center;gap:0.15rem;" title="Price crossed above resistance trigger">
                                         ⚡ Breached
                                     </span>
                                 ` : '')}
                             </div>
-                            <div style="font-size:0.64rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
+                            <div style="font-size:0.64rem;color:#94a3b8;max-width:145px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.05rem;display:flex;gap:0.2rem;flex-wrap:wrap;align-items:center;">
                                 <span style="font-size:0.55rem;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:0.02rem 0.25rem;border-radius:3px;font-weight:800;" title="Tier: Elite Hot Breakout Pool">HOT</span>
                                 <span style="font-size:0.55rem;background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);padding:0.02rem 0.25rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
@@ -843,6 +843,20 @@
                                 `}
                             </div>
                         </div>
+                    </td>
+                `
+            },
+            score: {
+                id: 'score',
+                label: 'Score',
+                sortKey: 'composite_score',
+                align: 'center',
+                headerStyle: 'color:#94a3b8;width:55px;text-align:center;',
+                render: (c, ctx) => `
+                    <td style="padding:0.28rem 0.35rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <span style="display:inline-block;background:${ctx.scoreBg};color:${ctx.scoreColor};border:1px solid ${ctx.scoreBorder};font-size:0.75rem;font-weight:800;font-family:var(--font-mono);padding:0.10rem 0.40rem;border-radius:4px;" title="Quantitative Conviction Score: ${ctx.score}/100">
+                            ${ctx.score}
+                        </span>
                     </td>
                 `
             },
@@ -1008,12 +1022,12 @@
                 render: (c, ctx) => {
                     const expl = c.what_happened_summary || c.explanation_one_liner;
                     return `
-                    <td style="padding:0.28rem 0.45rem;border-right:1px solid rgba(255,255,255,0.03);min-width:180px;">
+                    <td style="padding:0.28rem 0.45rem;border-right:1px solid rgba(255,255,255,0.03);max-width:175px;">
                         <div style="display:flex;align-items:center;gap:0.3rem;">
                             ${ctx.outcomeBadgeHtml(c)}
                         </div>
                         ${expl ? `
-                            <div style="font-size:0.60rem;color:#cbd5e1;line-height:1.2;margin-top:0.18rem;max-width:260px;" title="${expl}">
+                            <div style="font-size:0.60rem;color:#cbd5e1;line-height:1.2;margin-top:0.18rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${expl}">
                                 ${expl}
                             </div>
                         ` : ''}
@@ -1659,35 +1673,74 @@
                 dist52wEl.style.color = dist52w >= -2.0 ? '#34d399' : (dist52w >= -5.0 ? '#38bdf8' : '#cbd5e1');
             }
 
-            // 5. 5-Pillar Scores
+            // 5. Strategy-Adaptive Score Pillar Decomposition
             const compScore = candidate.composite_score || 0;
-            const resScore = candidate.resistance_score || (candidate.calculation_notes && candidate.calculation_notes.resistance_proximity ? candidate.calculation_notes.resistance_proximity.score : 0) || 0;
-            const volScore = candidate.volume_score || (candidate.calculation_notes && candidate.calculation_notes.volume_surge ? candidate.calculation_notes.volume_surge.score : 0) || 0;
-            const squeezeScore = candidate.compression_score || (candidate.calculation_notes && candidate.calculation_notes.price_compression ? candidate.calculation_notes.price_compression.score : 0) || 0;
-            const momScore = candidate.momentum_score || (candidate.calculation_notes && candidate.calculation_notes.trend_momentum ? candidate.calculation_notes.trend_momentum.score : 0) || 0;
-            const fundScore = candidate.fundamental_score || (candidate.calculation_notes && candidate.calculation_notes.fundamental_quality ? candidate.calculation_notes.fundamental_quality.score : 0) || 0;
-
             const scoreEl = document.getElementById('bkInspCompositeScore');
             if (scoreEl) {
                 scoreEl.textContent = compScore;
                 scoreEl.style.color = compScore >= 75 ? '#34d399' : (compScore >= 55 ? '#38bdf8' : '#ffffff');
             }
 
-            const setPillar = (scoreVal, maxVal, textId, barId) => {
-                const tEl = document.getElementById(textId);
-                const bEl = document.getElementById(barId);
-                if (tEl) tEl.textContent = scoreVal;
-                if (bEl) {
-                    const pct = Math.min(100, Math.max(0, (scoreVal / maxVal) * 100));
-                    bEl.style.width = `${pct}%`;
+            const pillarsContainer = document.getElementById('bkInspPillarsContainer');
+            const pillarsTitle = document.getElementById('bkInspPillarsTitle');
+            if (pillarsContainer) {
+                const stratKey = (candidate.strategy || 'CLASSIC_TECHNICAL').toUpperCase().replace(/\s+/g, '_');
+                if (pillarsTitle) {
+                    pillarsTitle.textContent = `⚡ ${(candidate.strategy || 'Classic Technical').replace(/_/g, ' ')} Decomposition`;
                 }
-            };
 
-            setPillar(resScore, 40, 'bkInspScoreRes', 'bkInspBarRes');
-            setPillar(volScore, 10, 'bkInspScoreVol', 'bkInspBarVol');
-            setPillar(squeezeScore, 10, 'bkInspScoreComp', 'bkInspBarComp');
-            setPillar(momScore, 25, 'bkInspScoreMom', 'bkInspBarMom');
-            setPillar(fundScore, 15, 'bkInspScoreFund', 'bkInspBarFund');
+                // Strategy weight configurations aligned with backend BreakoutScanner
+                const strategyPillarConfigs = {
+                    'CLASSIC_TECHNICAL': [
+                        { label: 'Resistance Proximity', max: 30, val: candidate.resistance_score ?? (candidate.calculation_notes?.resistance_proximity?.score ?? 0), color: '#38bdf8' },
+                        { label: 'Volume Expansion', max: 20, val: candidate.volume_score ?? (candidate.calculation_notes?.volume_surge?.score ?? 0), color: '#34d399' },
+                        { label: 'Price Compression', max: 15, val: candidate.compression_score ?? (candidate.calculation_notes?.price_compression?.score ?? 0), color: '#a78bfa' },
+                        { label: 'Trend Momentum', max: 15, val: candidate.momentum_score ?? (candidate.calculation_notes?.trend_momentum?.score ?? 0), color: '#fbbf24' },
+                        { label: 'Fundamental Quality', max: 20, val: candidate.fundamental_score ?? (candidate.calculation_notes?.fundamental_quality?.score ?? 0), color: '#f43f5e' },
+                    ],
+                    'NSE_DELIVERY_ABSORPTION': [
+                        { label: 'Bhavcopy Delivery Surge', max: 35, val: candidate.volume_score ?? (candidate.calculation_notes?.delivery_surge?.score ?? 0), color: '#34d399' },
+                        { label: 'Institutional Inflows (FII/DII)', max: 25, val: candidate.fundamental_score ?? (candidate.calculation_notes?.institutional_inflows?.score ?? 0), color: '#38bdf8' },
+                        { label: 'Resistance Proximity', max: 20, val: candidate.resistance_score ?? (candidate.calculation_notes?.resistance_proximity?.score ?? 0), color: '#a78bfa' },
+                        { label: 'Fundamental Quality', max: 20, val: candidate.compression_score ?? (candidate.calculation_notes?.fundamental_quality?.score ?? 0), color: '#f43f5e' },
+                    ],
+                    'NSE_FO_CALL_WALL': [
+                        { label: 'Call OI Wall Resistance', max: 35, val: candidate.resistance_score ?? (candidate.calculation_notes?.call_oi_wall?.score ?? 0), color: '#f87171' },
+                        { label: 'PCR Trend Multiple', max: 25, val: candidate.volume_score ?? (candidate.calculation_notes?.pcr_trend?.score ?? 0), color: '#38bdf8' },
+                        { label: 'Call Unwinding Velocity', max: 20, val: candidate.compression_score ?? (candidate.calculation_notes?.call_unwinding?.score ?? 0), color: '#fbbf24' },
+                        { label: 'Trend Strength', max: 20, val: candidate.momentum_score ?? (candidate.calculation_notes?.trend_strength?.score ?? 0), color: '#34d399' },
+                    ],
+                    'VOLUME_PROFILE_VAH': [
+                        { label: 'VAH Breakout Ceiling', max: 35, val: candidate.resistance_score ?? (candidate.calculation_notes?.vah_breakout?.score ?? 0), color: '#38bdf8' },
+                        { label: 'LVN Low Volume Vacuum', max: 30, val: candidate.compression_score ?? (candidate.calculation_notes?.lvn_vacuum?.score ?? 0), color: '#a78bfa' },
+                        { label: 'Relative Volume Surge', max: 20, val: candidate.volume_score ?? (candidate.calculation_notes?.relative_volume?.score ?? 0), color: '#34d399' },
+                        { label: 'Consolidation Time', max: 15, val: candidate.momentum_score ?? (candidate.calculation_notes?.consolidation?.score ?? 0), color: '#fbbf24' },
+                    ],
+                    'DONCHIAN_TTM_SQUEEZE': [
+                        { label: 'TTM Squeeze Energy', max: 35, val: candidate.compression_score ?? (candidate.calculation_notes?.ttm_squeeze?.score ?? 0), color: '#a78bfa' },
+                        { label: '55-Day Donchian Breach', max: 30, val: candidate.resistance_score ?? (candidate.calculation_notes?.donchian_breach?.score ?? 0), color: '#38bdf8' },
+                        { label: 'Momentum Oscillator', max: 20, val: candidate.momentum_score ?? (candidate.calculation_notes?.momentum_osc?.score ?? 0), color: '#fbbf24' },
+                        { label: 'Volume Surge Multiple', max: 15, val: candidate.volume_score ?? (candidate.calculation_notes?.volume_surge?.score ?? 0), color: '#34d399' },
+                    ]
+                };
+
+                const pillars = strategyPillarConfigs[stratKey] || strategyPillarConfigs['CLASSIC_TECHNICAL'];
+                pillarsContainer.innerHTML = pillars.map(p => {
+                    const val = Number(p.val) || 0;
+                    const pct = Math.min(100, Math.max(0, (val / p.max) * 100));
+                    return `
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
+                                <span style="color: #cbd5e1;">${p.label}</span>
+                                <span style="color: #ffffff; font-weight: 700;">${val.toFixed(1).replace(/\.0$/, '')} <span style="color: #71717a; font-weight: 400;">/ ${p.max}</span></span>
+                            </div>
+                            <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                <div style="height: 100%; width: ${pct}%; background: ${p.color}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
 
             // 6. Catalyst Notes
             const catalystEl = document.getElementById('bkInspCatalystText');
