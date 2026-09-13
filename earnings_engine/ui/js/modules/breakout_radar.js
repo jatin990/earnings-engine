@@ -1384,42 +1384,6 @@
                     if (!def || typeof def.render !== 'function') return '';
                     return def.render(c, cellCtx);
                 }).join('');
-                    c.is_breaking_out ||
-                    c.outcome === 'TARGET_HIT' ||
-                    c.outcome === 'BREAKOUT_SUCCEEDED' ||
-                    (curVal != null && trigVal != null && curVal >= trigVal * 1.002) ||
-                    (postHighVal != null && trigVal != null && postHighVal >= trigVal * 1.002)
-                );
-
-                const cellCtx = {
-                    ticker,
-                    company,
-                    industry,
-                    archetype,
-                    sigPriceStr,
-                    curPriceStr,
-                    triggerStr,
-                    targetStr,
-                    stopStr,
-                    curPriceColor,
-                    curPriceBadgeBg,
-                    curPriceBadgeBorder,
-                    curPriceBadgeText,
-                    curPriceBadgeLabel,
-                    retStr,
-                    gapPct,
-                    score,
-                    scoreColor,
-                    scoreBg,
-                    outcomeBadgeHtml,
-                    isBreakingOut
-                };
-
-                const cellsHtml = cols.map(colKey => {
-                    const def = BREAKOUT_COLUMNS[colKey];
-                    if (!def || typeof def.render !== 'function') return '';
-                    return def.render(c, cellCtx);
-                }).join('');
 
                 let rowClass = 'bk-table-row';
                 if (c.outcome === 'TARGET_HIT' || c.outcome === 'BREAKOUT_SUCCEEDED') {
@@ -1766,7 +1730,6 @@
             if (ticker && app.openBreakoutNotesModal) {
                 app.openBreakoutNotesModal(ticker);
             }
-        };
         };
 
         app.copyCurrentBreakoutLevels = function() {
