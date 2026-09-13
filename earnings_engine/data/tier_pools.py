@@ -21,6 +21,71 @@ from earnings_engine.logging_utils import get_logger
 logger = get_logger("earnings_engine.data.tier_pools")
 
 
+TERMINAL_END_STATES: set[str] = {
+    "TARGET_HIT",
+    "STOPPED_OUT",
+    "INVALIDATED",
+    "EXPIRED",
+    "REMOVED_COLD",
+}
+
+TIER_WEIGHTS: dict[str, int] = {
+    "COLD": 0,
+    "WARM": 10,
+    "HOT": 20,
+    "BREAKING_OUT": 30,
+}
+
+
+def group_logs_into_scan_batches(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group transition log entries into discrete, chronological scan cycles."""
+    batches: dict[str, dict[str, Any]] = {}
+
+    for l in logs:
+        raw_time = str(l.get("created_at") or "")
+        # Truncate to minute for grouping (e.g. "2026-09-13 03:56")
+        time_key = raw_time[:16].replace("T", " ") if len(raw_time) >= 16 else raw_time
+        if not time_key:
+            time_key = "Recent Scan Cycle"
+
+        if time_key not in batches:
+            batches[time_key] = {
+                "batch_id": time_key,
+                "timestamp": raw_time,
+                "total_moved": 0,
+                "promoted_hot": 0,
+                "added_warm": 0,
+                "demoted_warm": 0,
+                "removed_cold": 0,
+                "target_hit": 0,
+                "stopped_out": 0,
+                "entries": [],
+            }
+
+        b = batches[time_key]
+        b["total_moved"] += 1
+        ev = str(l.get("event_type") or "").upper()
+        to_t = str(l.get("to_tier") or "").upper()
+        from_t = str(l.get("from_tier") or "").upper()
+
+        if ev == "TARGET_HIT":
+            b["target_hit"] += 1
+        elif ev in ("STOPPED_OUT", "STOP_LOSS_HIT", "STOP_HIT"):
+            b["stopped_out"] += 1
+        elif ev == "PROMOTED_HOT" or to_t == "HOT":
+            b["promoted_hot"] += 1
+        elif ev == "ADDED_WARM" or (to_t == "WARM" and from_t == "COLD"):
+            b["added_warm"] += 1
+        elif ev == "DEMOTED_WARM" or (to_t == "WARM" and from_t == "HOT"):
+            b["demoted_warm"] += 1
+        elif ev in ("REMOVED_COLD", "INVALIDATED", "EXPIRED") or to_t == "COLD":
+            b["removed_cold"] += 1
+
+        b["entries"].append(l)
+
+    return list(batches.values())
+
+
 @dataclass(frozen=True)
 class TierPoolConfig:
     """Configuration schema for a domain-specific Tier Pool Manager instance."""
@@ -190,6 +255,7 @@ class TierPoolManager:
             tbl = self.cfg.audit_table_name
 
             # Check for immediate previous duplicate transition to increment counter
+            # Terminal states (TARGET_HIT, STOPPED_OUT, INVALIDATED, EXPIRED) are irreversible and sealed
             last_row = conn.execute(
                 f"""
                 SELECT id, from_tier, to_tier, score_after, event_type, counter
@@ -201,11 +267,16 @@ class TierPoolManager:
             ).fetchone()
 
             is_duplicate = False
-            if last_row:
+            if last_row and (event_type.upper() not in TERMINAL_END_STATES):
                 l_from = str(last_row[1] or "").upper()
                 l_to = str(last_row[2] or "").upper()
                 l_ev = str(last_row[4] or "").upper()
-                if l_from == from_tier.upper() and l_to == to_tier.upper() and l_ev == event_type.upper():
+                if (
+                    l_ev not in TERMINAL_END_STATES
+                    and l_from == from_tier.upper()
+                    and l_to == to_tier.upper()
+                    and l_ev == event_type.upper()
+                ):
                     is_duplicate = True
 
             if is_duplicate and last_row:
@@ -680,6 +751,8 @@ class TierPoolManager:
                     "created_at": r[18],
                     "updated_at": r[19],
                 })
+
+            result["scan_batches"] = group_logs_into_scan_batches(result["logs"])
 
         except Exception as e:
             logger.warning("[%s-AUDIT-QUERY] Audit log fetch error: %s", self.cfg.domain, e)

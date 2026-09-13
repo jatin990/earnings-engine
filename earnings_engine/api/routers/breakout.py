@@ -416,12 +416,15 @@ async def get_breakout_audit_log_endpoint(
             strategy=strategy,
             settings=_settings,
         )
+        from earnings_engine.data.tier_pools import group_logs_into_scan_batches
+        scan_batches = group_logs_into_scan_batches(logs)
         return {
             "success": True,
             "count": len(logs),
             "total_count": total_count,
             "summary_stats": summary_stats,
             "logs": logs,
+            "scan_batches": scan_batches,
         }
     except Exception as e:
         logger.exception("Error in get_breakout_audit_log: %s", e)

@@ -1487,6 +1487,41 @@
             }
         };
 
+        app.selectBreakoutCandidate = function(ticker, autoScroll, openDrawer) {
+            if (!ticker) return;
+            app._selectedBreakoutTicker = ticker;
+
+            const rows = document.querySelectorAll('#breakoutTableBody tr[data-ticker]');
+            rows.forEach((row, idx) => {
+                const rowTicker = row.getAttribute('data-ticker');
+                if (rowTicker === ticker) {
+                    row.classList.add('bk-row-selected');
+                    app._breakoutSelectedIndex = idx;
+                    if (autoScroll) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else {
+                    row.classList.remove('bk-row-selected');
+                }
+            });
+
+            const candidate = (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
+                || (app._breakoutData || []).find(c => c.ticker === ticker)
+                || { ticker: ticker };
+
+            if (app.renderBreakoutSetupInspector) {
+                app.renderBreakoutSetupInspector(candidate);
+            }
+
+            if (openDrawer) {
+                app.openBreakoutInspectorDrawer();
+            }
+        };
+
+        app.inspectBreakoutStock = function(ticker, autoScroll) {
+            app.selectBreakoutCandidate(ticker, autoScroll !== false, true);
+        };
+
         // Drawer Drag-to-Resize Listener Setup
         if (!app._bkDrawerResizeAttached) {
             app._bkDrawerResizeAttached = true;
