@@ -792,6 +792,11 @@
                 }
 
                 app.applyBreakoutFilterAndRender();
+
+                // Eagerly populate breakout movement activity badge & summary chips
+                if (typeof app.loadBreakoutAuditLog === 'function') {
+                    app.loadBreakoutAuditLog();
+                }
             } catch (err) {
                 console.error('[BREAKOUT] Load error:', err);
                 if (tbody && !silent) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
@@ -2681,6 +2686,9 @@
 
                 if (e.key === 'Escape') {
                     app.closeBreakoutInspectorDrawer();
+                    if (typeof app.closeBreakoutScanDetailDrawer === 'function') {
+                        app.closeBreakoutScanDetailDrawer();
+                    }
                     return;
                 }
 
