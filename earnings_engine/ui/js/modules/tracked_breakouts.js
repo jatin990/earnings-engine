@@ -12,6 +12,7 @@
     // =========================================================================
     app._trackedBreakoutsData = [];
     app._trackedBreakoutPresetDays = 7;
+    app._trackedBreakoutCapital = 1000000; // 10 Lakhs default
     app._activeBreakoutSubtab = 'scanner';
 
     app.switchBreakoutSubtab = function(subtab) {
@@ -113,6 +114,137 @@
         app.setTrackedBreakoutPreset(7);
     };
 
+    // =========================================================================
+    // 💰 PORTFOLIO CAPITAL SIMULATOR (10L Default, 70/30 Target Booking Rule)
+    // =========================================================================
+    app.formatInr = function(val, showSign = false) {
+        if (val == null || isNaN(val)) return '—';
+        const num = Number(val);
+        const absVal = Math.abs(num);
+        const sign = num > 0 ? (showSign ? '+' : '') : (num < 0 ? '-' : '');
+        return `${sign}₹${absVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    };
+
+    app.setTrackedBreakoutCapital = function(cap) {
+        app._trackedBreakoutCapital = Number(cap) || 1000000;
+        const input = document.getElementById('breakoutTrackedCapitalInput');
+        if (input) input.value = app._trackedBreakoutCapital;
+
+        document.querySelectorAll('.bk-cap-preset').forEach(btn => {
+            const btnCap = Number(btn.getAttribute('data-capital'));
+            if (btnCap === app._trackedBreakoutCapital) {
+                btn.classList.add('bk-cap-active');
+            } else {
+                btn.classList.remove('bk-cap-active');
+            }
+        });
+
+        app.recalculatePortfolioSimulation();
+    };
+
+    app.onTrackedCapitalInputChange = function(val) {
+        const num = parseFloat(val);
+        if (isNaN(num) || num <= 0) return;
+        app._trackedBreakoutCapital = num;
+        document.querySelectorAll('.bk-cap-preset').forEach(btn => {
+            const btnCap = Number(btn.getAttribute('data-capital'));
+            if (btnCap === app._trackedBreakoutCapital) {
+                btn.classList.add('bk-cap-active');
+            } else {
+                btn.classList.remove('bk-cap-active');
+            }
+        });
+        app.recalculatePortfolioSimulation();
+    };
+
+    app.recalculatePortfolioSimulation = function() {
+        const items = app._trackedBreakoutsData || [];
+        const total = items.length;
+        const cap = Number(app._trackedBreakoutCapital) || 1000000;
+        const alloc = total > 0 ? (cap / total) : 0;
+
+        let totalProfit = 0;
+        let totalLoss = 0;
+        let netPnl = 0;
+        let winCount = 0;
+        let lossCount = 0;
+
+        items.forEach(it => {
+            const outStr = (it.outcome || '').toUpperCase();
+            const sigP = Number(it.signal_price || it.breakout_trigger || 0);
+            const targetP = Number(it.target_price || 0);
+            const stopP = Number(it.stop_loss || 0);
+            const curP = Number(it.current_price || 0);
+            const maxG = Number(it.max_gain_pct || 0);
+
+            let simRet = 0;
+            let bookNote = '';
+
+            if (outStr === 'TARGET_HIT') {
+                const targetRet = (sigP > 0 && targetP > 0) ? ((targetP - sigP) / sigP * 100) : Number(it.realized_return_pct || 0);
+                const peakRet = Math.max(targetRet, maxG);
+                simRet = (0.70 * targetRet) + (0.30 * peakRet);
+                bookNote = `70% @ Target (+${targetRet.toFixed(1)}%), 30% @ Peak (+${peakRet.toFixed(1)}%)`;
+            } else if (outStr === 'STOP_HIT' || outStr === 'STOP_LOSS_HIT') {
+                let stopRet = (sigP > 0 && stopP > 0) ? ((stopP - sigP) / sigP * 100) : Number(it.realized_return_pct || -5);
+                if (stopRet > 0) stopRet = -Math.abs(stopRet);
+                simRet = stopRet;
+                bookNote = `100% Stop Loss Hit (${stopRet.toFixed(1)}%)`;
+            } else if (outStr === 'ACTIVE' || outStr === 'PENDING' || outStr.includes('COILING')) {
+                simRet = Number(it.realized_return_pct || 0);
+                bookNote = `MTM Live (${simRet >= 0 ? '+' : ''}${simRet.toFixed(1)}%)`;
+            } else {
+                simRet = Number(it.realized_return_pct || 0);
+                bookNote = `14D Settled (${simRet >= 0 ? '+' : ''}${simRet.toFixed(1)}%)`;
+            }
+
+            const pnl = alloc * (simRet / 100);
+            it.simulated_return_pct = simRet;
+            it.simulated_allocation = alloc;
+            it.simulated_pnl = pnl;
+            it.simulated_booking_note = bookNote;
+
+            netPnl += pnl;
+            if (pnl > 0) {
+                totalProfit += pnl;
+                winCount++;
+            } else if (pnl < 0) {
+                totalLoss += Math.abs(pnl);
+                lossCount++;
+            }
+        });
+
+        const finalCap = cap + netPnl;
+        const retPct = cap > 0 ? ((netPnl / cap) * 100) : 0;
+        const pf = totalLoss > 0 ? (totalProfit / totalLoss) : (totalProfit > 0 ? 99.0 : 0.0);
+
+        // Update UI tiles
+        const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        setEl('bkPortStatStart', app.formatInr(cap));
+        setEl('bkPortStatValue', app.formatInr(finalCap));
+        setEl('bkPortStatNetPnl', app.formatInr(netPnl, true));
+        setEl('bkPortStatWins', app.formatInr(totalProfit, true));
+        setEl('bkPortStatLosses', totalLoss > 0 ? `-${app.formatInr(totalLoss)}` : '₹0');
+        setEl('bkPortStatWinCount', String(winCount));
+        setEl('bkPortStatLossCount', String(lossCount));
+        setEl('bkPortStatPF', pf >= 99 ? '∞ Max' : `${pf.toFixed(2)}x`);
+        setEl('bkPortStatAlloc', app.formatInr(alloc));
+
+        const netRetEl = document.getElementById('bkPortStatNetRet');
+        if (netRetEl) {
+            netRetEl.textContent = `(${retPct >= 0 ? '+' : ''}${retPct.toFixed(2)}%)`;
+            netRetEl.style.color = retPct >= 0 ? '#34d399' : '#f87171';
+        }
+
+        const netPnlEl = document.getElementById('bkPortStatNetPnl');
+        if (netPnlEl) {
+            netPnlEl.style.color = netPnl >= 0 ? '#34d399' : '#f87171';
+        }
+
+        // Re-render table rows to display updated rupee amounts
+        app.renderTrackedBreakoutsTable(items);
+    };
+
     app.loadTrackedBreakouts = async function(isLive = false) {
         const tbody = document.getElementById('breakoutTrackedTableBody');
         const liveBtn = document.getElementById('btnTrackedLiveRefresh');
@@ -142,6 +274,7 @@
         if (strategy && strategy !== 'ALL') params.set('strategy', strategy);
         if (sortBy) params.set('sort_by', sortBy);
         if (isLive) params.set('live', 'true');
+        params.set('capital', String(app._trackedBreakoutCapital || 1000000));
         params.set('limit', '200');
 
         try {
@@ -178,7 +311,7 @@
             setEl('bkTrackedKpiTopTicker', summary.max_return_ticker || '—');
             setEl('bkTrackedKpiActiveCount', `${summary.active_count || 0} active / ${summary.triggered_count || 0} fired`);
 
-            app.renderTrackedBreakoutsTable(app._trackedBreakoutsData);
+            app.recalculatePortfolioSimulation();
         } catch (e) {
             console.error('[BREAKOUT-TRACKED] Load error:', e);
             if (tbody) {
@@ -254,11 +387,15 @@
                     best_outcome: item.outcome || 'ACTIVE',
                     best_outcome_label: item.outcome_label || null,
                     best_one_liner: item.what_happened_summary || item.explanation_one_liner || '',
+                    simulated_pnl: 0,
+                    simulated_allocation: 0,
                 });
             }
 
             const g = groupedMap.get(sym);
             g.setups.push(item);
+            g.simulated_pnl += (item.simulated_pnl != null ? Number(item.simulated_pnl) : 0);
+            g.simulated_allocation += (item.simulated_allocation != null ? Number(item.simulated_allocation) : 0);
 
             if (item.company_name && (!g.company_name || g.company_name === g.ticker)) g.company_name = item.company_name;
             if (item.industry && item.industry !== '—') g.industry = item.industry;
@@ -528,7 +665,11 @@
                 const sRet = s.realized_return_pct;
                 const sRetColor = sRet > 0 ? '#34d399' : (sRet < 0 ? '#f87171' : '#94a3b8');
                 const sRetBg = sRet > 0 ? 'rgba(16,185,129,0.15)' : (sRet < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
+                const sRetBorder = sRet > 0 ? 'rgba(16,185,129,0.3)' : (sRet < 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
                 const sRetFormatted = sRet != null ? `${sRet >= 0 ? '+' : ''}${sRet.toFixed(2)}%` : '—';
+                const sSimPnl = s.simulated_pnl != null ? s.simulated_pnl : (s.simulated_allocation ? (s.simulated_allocation * (sRet / 100)) : null);
+                const sPnlFormatted = sSimPnl != null ? app.formatInr(sSimPnl, true) : '';
+                const sBookNote = s.simulated_booking_note || '';
 
                 const sGain = s.max_gain_pct != null ? s.max_gain_pct : s.peak_gain_pct;
                 const sGainStr = sGain != null ? `+${Number(sGain).toFixed(2)}%` : '—';
@@ -551,7 +692,10 @@
                             <div style="margin-top:0.1rem;"><span style="background:${sStatusBg};border:1px solid ${sStatusBorder};color:${sStatusColor};font-size:0.52rem;font-weight:800;padding:0.02rem 0.25rem;border-radius:2px;">${sStatus}</span></div>
                         </td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;">
-                            <span style="font-size:0.70rem;font-weight:700;color:${sRetColor};background:${sRetBg};padding:0.08rem 0.35rem;border-radius:3px;font-variant-numeric:tabular-nums;">${sRetFormatted}</span>
+                            <span style="font-size:0.70rem;font-weight:700;color:${sRetColor};background:${sRetBg};border:1px solid ${sRetBorder};padding:0.08rem 0.35rem;border-radius:3px;font-variant-numeric:tabular-nums;" title="${sBookNote || sOutLabel}">
+                                ${sPnlFormatted ? `${sPnlFormatted} ` : ''}(${sRetFormatted})
+                            </span>
+                            ${sBookNote ? `<div style="font-size:0.55rem;color:#94a3b8;font-family:var(--font-mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;" title="${sBookNote}">${sBookNote}</div>` : ''}
                         </td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.70rem;color:#34d399;font-weight:700;font-variant-numeric:tabular-nums;">${sGainStr}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.68rem;color:#cbd5e1;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${sOutLabel}">${sOutLabel}</td>
@@ -564,6 +708,15 @@
                     </tr>
                 `;
             }).join('');
+
+            const groupPnl = g.simulated_pnl || 0;
+            const groupAlloc = g.simulated_allocation || 0;
+            const groupRet = groupAlloc > 0 ? ((groupPnl / groupAlloc) * 100) : (ret || 0);
+            const groupPnlColor = groupPnl > 0 ? '#34d399' : (groupPnl < 0 ? '#f87171' : '#94a3b8');
+            const groupPnlBg = groupPnl > 0 ? 'rgba(16,185,129,0.15)' : (groupPnl < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
+            const groupPnlBorder = groupPnl > 0 ? 'rgba(16,185,129,0.3)' : (groupPnl < 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
+            const groupPnlFormatted = app.formatInr(groupPnl, true);
+            const groupRetFormatted = `${groupRet >= 0 ? '+' : ''}${groupRet.toFixed(2)}%`;
 
             return `
                 <tr class="bk-table-row" data-ticker="${sym}">
@@ -626,11 +779,14 @@
                         </div>
                     </td>
 
-                    <!-- Return % -->
+                    <!-- Return % & Booked P&L -->
                     <td style="padding:0.55rem 0.65rem;text-align:right;border-right:1px solid rgba(255,255,255,0.03);">
-                        <span style="display:inline-block;font-weight:800;font-size:0.76rem;color:${retColor};background:${retBg};border:1px solid ${retBorder};padding:0.12rem 0.45rem;border-radius:4px;font-variant-numeric:tabular-nums;">
-                            ${retFormatted}
+                        <span style="display:inline-block;font-weight:800;font-size:0.76rem;color:${groupPnlColor};background:${groupPnlBg};border:1px solid ${groupPnlBorder};padding:0.12rem 0.45rem;border-radius:4px;font-variant-numeric:tabular-nums;" title="Simulated Booked P&L across ${setupCount} setup(s)">
+                            ${groupPnlFormatted} (${groupRetFormatted})
                         </span>
+                        <div style="font-size:0.58rem;color:#64748b;font-family:var(--font-mono);margin-top:2px;">
+                            Alloc: ${app.formatInr(groupAlloc)}
+                        </div>
                     </td>
 
                     <!-- Max Gain & Peak -->

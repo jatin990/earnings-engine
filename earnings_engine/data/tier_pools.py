@@ -69,6 +69,47 @@ class PoolEntry:
         return getattr(self, key, default)
 
 
+def _extract_entry_result(entry: Any) -> dict[str, Any]:
+    """Safely extract the result dict from either a PoolEntry dataclass or a raw dict."""
+    if entry is None:
+        return {}
+    if hasattr(entry, "result"):
+        return getattr(entry, "result") or {}
+    if isinstance(entry, dict):
+        if "result" in entry and isinstance(entry["result"], dict):
+            return entry["result"]
+        return entry
+    return {}
+
+
+def _get_entry_consecutive_low(entry: Any) -> int:
+    """Safely extract consecutive_low strike counter from PoolEntry or dict."""
+    if hasattr(entry, "consecutive_low"):
+        return int(getattr(entry, "consecutive_low") or 0)
+    if isinstance(entry, dict):
+        return int(entry.get("consecutive_low", 0))
+    return 0
+
+
+def _set_entry_consecutive_low(entry: Any, value: int) -> None:
+    """Safely update consecutive_low strike counter on PoolEntry or dict."""
+    if hasattr(entry, "consecutive_low"):
+        setattr(entry, "consecutive_low", value)
+    elif isinstance(entry, dict):
+        entry["consecutive_low"] = value
+
+
+def _set_entry_result(entry: Any, result: dict[str, Any]) -> None:
+    """Safely update result payload on PoolEntry or dict."""
+    if hasattr(entry, "result"):
+        setattr(entry, "result", result)
+    elif isinstance(entry, dict):
+        if "result" in entry:
+            entry["result"] = result
+        else:
+            entry.update(result)
+
+
 class TierPoolManager:
     """Universal state machine and lifecycle manager for Hot / Warm / Cold tier pools."""
 
@@ -366,12 +407,13 @@ class TierPoolManager:
             is_guarded = self.cfg.custom_hot_demotion_guard(updated_result)
 
         if score >= self.cfg.hot_demotion_threshold or is_guarded:
-            entry.consecutive_low = 0
-            entry.result = updated_result
+            _set_entry_consecutive_low(entry, 0)
+            _set_entry_result(entry, updated_result)
             return "HOT"
 
-        entry.consecutive_low += 1
-        if entry.consecutive_low >= self.cfg.demotion_strikes:
+        cur_strikes = _get_entry_consecutive_low(entry) + 1
+        _set_entry_consecutive_low(entry, cur_strikes)
+        if cur_strikes >= self.cfg.demotion_strikes:
             del self._pool["hot"][key]
             ticker = str(updated_result.get("ticker", key.split("::")[0]))
             strat = updated_result.get("strategy") or (key.split("::")[1] if "::" in key else "DEFAULT")
@@ -415,7 +457,7 @@ class TierPoolManager:
         settings: Settings | None = None,
     ) -> str:
         """Apply 2-strike hysteresis on Warm candidates before removing to Cold."""
-        entry: PoolEntry | None = self._pool["warm"].get(key)
+        entry: PoolEntry | dict[str, Any] | None = self._pool["warm"].get(key)
         if not entry:
             return "COLD"
 
@@ -425,12 +467,13 @@ class TierPoolManager:
             is_guarded = self.cfg.custom_warm_demotion_guard(updated_result)
 
         if score >= self.cfg.warm_demotion_threshold or is_guarded:
-            entry.consecutive_low = 0
-            entry.result = updated_result
+            _set_entry_consecutive_low(entry, 0)
+            _set_entry_result(entry, updated_result)
             return "WARM"
 
-        entry.consecutive_low += 1
-        if entry.consecutive_low >= self.cfg.demotion_strikes:
+        cur_strikes = _get_entry_consecutive_low(entry) + 1
+        _set_entry_consecutive_low(entry, cur_strikes)
+        if cur_strikes >= self.cfg.demotion_strikes:
             del self._pool["warm"][key]
             ticker = str(updated_result.get("ticker", key.split("::")[0]))
             strat = updated_result.get("strategy") or (key.split("::")[1] if "::" in key else "DEFAULT")
@@ -459,10 +502,10 @@ class TierPoolManager:
         # Sort Hot items first, then Warm items
         for entry in sorted(
             self._pool["hot"].values(),
-            key=lambda e: float(e.result.get("composite_score", e.result.get("score", 0)) or 0),
+            key=lambda e: float(_extract_entry_result(e).get("composite_score", _extract_entry_result(e).get("score", 0)) or 0),
             reverse=True,
         ):
-            res = entry.result
+            res = _extract_entry_result(entry)
             t = str(res.get("ticker", "")).upper()
             if t and t not in seen:
                 seen.add(t)
@@ -470,10 +513,10 @@ class TierPoolManager:
 
         for entry in sorted(
             self._pool["warm"].values(),
-            key=lambda e: float(e.result.get("composite_score", e.result.get("score", 0)) or 0),
+            key=lambda e: float(_extract_entry_result(e).get("composite_score", _extract_entry_result(e).get("score", 0)) or 0),
             reverse=True,
         ):
-            res = entry.result
+            res = _extract_entry_result(entry)
             t = str(res.get("ticker", "")).upper()
             if t and t not in seen:
                 seen.add(t)
@@ -490,9 +533,9 @@ class TierPoolManager:
         """Return cached candidates filtered by tier (HOT, WARM, or ALL)."""
         target = (tier or "ALL").upper().strip()
         if target == "HOT":
-            return [e.result for e in self._pool["hot"].values()]
+            return [_extract_entry_result(e) for e in self._pool["hot"].values()]
         elif target == "WARM":
-            return [e.result for e in self._pool["warm"].values()]
+            return [_extract_entry_result(e) for e in self._pool["warm"].values()]
         return list(self._pool["candidates"])
 
     def get_pool_stats(self, settings: Settings | None = None) -> dict[str, Any]:

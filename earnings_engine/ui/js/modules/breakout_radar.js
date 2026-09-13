@@ -1415,7 +1415,7 @@
                     rowClass += ' bk-row-selected';
                 }
 
-                return `<tr class="${rowClass}${isBreakingOut ? ' breakout-row-on-fire' : ''}" data-ticker="${ticker}" onclick="app.selectBreakoutCandidate('${ticker}')" style="cursor:pointer;">${cellsHtml}</tr>`;
+                return `<tr class="${rowClass}${isBreakingOut ? ' breakout-row-on-fire' : ''}" data-ticker="${ticker}" onclick="app.selectBreakoutCandidate('${ticker}', false, true)" style="cursor:pointer;">${cellsHtml}</tr>`;
             });
 
             tbody.innerHTML = rows.join('');
@@ -1425,14 +1425,47 @@
                 const targetTicker = (app._selectedBreakoutTicker && candidates.some(c => c.ticker === app._selectedBreakoutTicker))
                     ? app._selectedBreakoutTicker
                     : candidates[0].ticker;
-                app.selectBreakoutCandidate(targetTicker, false);
+                app.selectBreakoutCandidate(targetTicker, false, false);
             }
         };
 
         // ==========================================
-        // 🎯 CANDIDATE SELECTION & SETUP INSPECTOR
+        // 🎯 CANDIDATE SELECTION & SETUP INSPECTOR DRAWER
         // ==========================================
-        app.selectBreakoutCandidate = function(ticker, autoScroll) {
+        app.openBreakoutInspectorDrawer = function() {
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            const backdrop = document.getElementById('breakoutInspectorBackdrop');
+            if (drawer) {
+                drawer.style.right = '0px';
+            }
+            if (backdrop) {
+                backdrop.style.display = 'block';
+                setTimeout(() => { backdrop.style.opacity = '1'; }, 10);
+            }
+        };
+
+        app.closeBreakoutInspectorDrawer = function() {
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            const backdrop = document.getElementById('breakoutInspectorBackdrop');
+            if (drawer) {
+                drawer.style.right = '-540px';
+            }
+            if (backdrop) {
+                backdrop.style.opacity = '0';
+                setTimeout(() => { backdrop.style.display = 'none'; }, 220);
+            }
+        };
+
+        app.toggleBreakoutInspectorDrawer = function() {
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            if (drawer && (drawer.style.right === '0px' || drawer.style.right === '0')) {
+                app.closeBreakoutInspectorDrawer();
+            } else {
+                app.openBreakoutInspectorDrawer();
+            }
+        };
+
+        app.selectBreakoutCandidate = function(ticker, autoScroll, openDrawer) {
             if (!ticker) return;
             app._selectedBreakoutTicker = ticker;
 
@@ -1457,10 +1490,14 @@
                 || { ticker: ticker };
 
             app.renderBreakoutSetupInspector(candidate);
+
+            if (openDrawer) {
+                app.openBreakoutInspectorDrawer();
+            }
         };
 
         app.inspectBreakoutStock = function(ticker, autoScroll) {
-            app.selectBreakoutCandidate(ticker, autoScroll !== false);
+            app.selectBreakoutCandidate(ticker, autoScroll !== false, true);
         };
 
         app.renderBreakoutSetupInspector = function(candidate) {
@@ -1860,6 +1897,11 @@
 
                 const list = app._currentRenderedBreakoutList || [];
                 if (list.length === 0) return;
+
+                if (e.key === 'Escape') {
+                    app.closeBreakoutInspectorDrawer();
+                    return;
+                }
 
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
@@ -2373,7 +2415,7 @@
 
         app.renderBreakoutEvaluatedCard = function(c) {
             if (c && c.ticker) {
-                app.selectBreakoutCandidate(c.ticker, true);
+                app.selectBreakoutCandidate(c.ticker, true, true);
             }
             const card = document.getElementById('breakoutEvaluatedStockCard');
             if (!card) return;

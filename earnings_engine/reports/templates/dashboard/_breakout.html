@@ -1186,7 +1186,7 @@
     background: #18181b !important;
     border-color: rgba(255, 255, 255, 0.2);
 }
-/* Active Row Selection & Split Inspector Sync */
+/* Active Row Selection & Setup Inspector Drawer */
 .bk-row-selected {
     background: #18181b !important;
     border-left: 3px solid #ffffff !important;
@@ -1196,14 +1196,11 @@
     color: #ffffff !important;
 }
 
-/* Responsive Split Collapse */
-@media (max-width: 1024px) {
-    #breakoutSplitGrid {
-        grid-template-columns: 1fr !important;
-    }
-    #breakoutSplitRight {
-        position: static !important;
-        max-height: none !important;
-    }
+/* Slide-over Drawer Smooth Transitions */
+#tab-breakout #breakoutInspectorDrawer {
+    transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+#tab-breakout #breakoutInspectorBackdrop {
+    transition: opacity 0.2s ease !important;
 }
 </style>
