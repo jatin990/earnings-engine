@@ -45,3 +45,7 @@ scratch/
 *.jpg
 =
 money_club.sqlite3
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
