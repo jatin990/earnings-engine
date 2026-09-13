@@ -3545,8 +3545,13 @@ def get_order_flow_analytics(
             })
         footprint_matrix.append({
             "date": b["date"],
+            "open": b.get("open", b["close"]),
+            "high": b_h,
+            "low": b_l,
             "close": b["close"],
+            "volume": b_v,
             "delta": b["delta"],
+            "cvd": b.get("cvd", 0),
             "clusters": clusters,
         })
 
@@ -3620,6 +3625,7 @@ def get_order_flow_analytics(
             "delta_regime": delta_bias,
             "cvd_history_bars": cvd_bars[-20:],
         },
+        "cvd_history_bars": cvd_bars[-20:],
         "order_book_walls": {
             "buy_wall_floor": round(buy_wall, 2),
             "sell_wall_ceiling": round(sell_wall, 2),
