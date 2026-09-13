@@ -527,6 +527,17 @@
                 : '—';
             const curP = g.current_price != null ? `₹${Number(g.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
 
+            // Check if any setup in the group is late
+            const anyLateSetup = g.setups.find(s => {
+                const ideal = s.ideal_entry_price != null ? Number(s.ideal_entry_price) : (s.data?.calculation_notes?.ideal_entry_price != null ? Number(s.data.calculation_notes.ideal_entry_price) : null);
+                return Boolean(s.is_late || (ideal != null && s.signal_price > ideal * 1.002));
+            });
+            const parentLateBadge = anyLateSetup
+                ? `<div style="font-size:0.58rem;color:#fca5a5;margin-top:2px;line-height:1.2;" title="Late Detection: Signal was detected near or above breakout trigger.">
+                     <span style="background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;padding:0.04rem 0.25rem;border-radius:3px;font-weight:700;">⚠️ Late Entry</span>
+                   </div>`
+                : '';
+
             // Quote Timestamp & Staleness Formatting for parent row
             const rawQuoteTs = g.quote_timestamp || g.current_date || '';
             let quoteTsLabel = rawQuoteTs;
@@ -678,7 +689,7 @@
                 const sOutLabel = s.outcome_label || s.outcome || 'ACTIVE';
 
                 return `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(2,6,23,0.6);transition:background 0.15s;" onmouseenter="this.style.background='rgba(30,41,59,0.5)'" onmouseleave="this.style.background='rgba(2,6,23,0.6)'">
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(2,6,23,0.6);transition:background 0.15s;cursor:pointer;" onmouseenter="this.style.background='rgba(30,41,59,0.5)'" onmouseleave="this.style.background='rgba(2,6,23,0.6)'" onclick="app.inspectBreakoutStock('${sym}')" title="Click to inspect setup forensics in Slide-Over Drawer">
                         <td style="padding:0.4rem 0.5rem;font-size:0.68rem;color:#64748b;font-weight:700;font-variant-numeric:tabular-nums;">#${sId}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.72rem;white-space:nowrap;">${sStratBadge}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.72rem;color:#cbd5e1;font-variant-numeric:tabular-nums;">${sDateLabel}</td>
@@ -700,7 +711,7 @@
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.70rem;color:#34d399;font-weight:700;font-variant-numeric:tabular-nums;">${sGainStr}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.68rem;color:#cbd5e1;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${sOutLabel}">${sOutLabel}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:center;font-size:0.72rem;font-weight:700;color:#38bdf8;">${sScore.toFixed(0)}</td>
-                        <td style="padding:0.4rem 0.5rem;text-align:center;">
+                        <td style="padding:0.4rem 0.5rem;text-align:center;" onclick="event.stopPropagation();">
                             <button type="button" onclick="app.untrackSingleSetup(${sId}, '${sym}')" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3);font-size:0.64rem;padding:0.15rem 0.4rem;border-radius:3px;cursor:pointer;font-weight:600;" title="Untrack this specific setup (#${sId})">
                                 🗑️ Untrack
                             </button>
@@ -719,7 +730,7 @@
             const groupRetFormatted = `${groupRet >= 0 ? '+' : ''}${groupRet.toFixed(2)}%`;
 
             return `
-                <tr class="bk-table-row" data-ticker="${sym}">
+                <tr class="bk-table-row" data-ticker="${sym}" onclick="app.inspectBreakoutStock('${sym}')" style="cursor:pointer;" title="Click to inspect setup forensics in Slide-Over Drawer">
                     <!-- Stock & Setup Confluence Cluster -->
                     <td style="padding:0.55rem 0.65rem;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
@@ -752,7 +763,8 @@
 
                     <!-- Signal Price -->
                     <td style="padding:0.55rem 0.65rem;text-align:right;font-weight:600;color:#94a3b8;font-size:0.75rem;font-variant-numeric:tabular-nums;border-right:1px solid rgba(255,255,255,0.03);">
-                        ${sigP}
+                        <div>${sigP}</div>
+                        ${parentLateBadge}
                     </td>
 
                     <!-- Trigger Level -->
@@ -811,8 +823,11 @@
                     </td>
 
                     <!-- Actions -->
-                    <td style="padding:0.55rem 0.65rem;text-align:center;white-space:nowrap;">
+                    <td style="padding:0.55rem 0.65rem;text-align:center;white-space:nowrap;" onclick="event.stopPropagation();">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                            <button type="button" onclick="app.inspectBreakoutStock('${sym}');" class="btn btn-sm" style="background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-size:0.68rem;padding:0.22rem 0.45rem;border-radius:4px;cursor:pointer;font-weight:700;" title="Inspect in Slide-Over Forensics Drawer">
+                                ⚡ Forensics
+                            </button>
                             <button type="button" onclick="app.toggleTrackedSetupRow('${cleanSym}')" class="btn btn-sm" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;padding:0.22rem 0.45rem;border-radius:4px;cursor:pointer;font-weight:600;" title="View Setup Breakdown">
                                 🔍 Setups (${setupCount})
                             </button>

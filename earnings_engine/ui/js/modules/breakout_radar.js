@@ -1450,16 +1450,108 @@
             }
         };
 
+        app.setBreakoutChartHeight = function(height) {
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
+            const tvWrap = document.getElementById('bkInspTradingViewContainer');
+            const maxBtn = document.getElementById('bkInspChartMaxBtn');
+            const h380Btn = document.getElementById('bkChartH380Btn');
+            const h480Btn = document.getElementById('bkChartH480Btn');
+            const h620Btn = document.getElementById('bkChartH620Btn');
+
+            const hStr = typeof height === 'number' ? `${height}px` : String(height);
+            if (wrap) wrap.style.height = hStr;
+            if (tvWrap) tvWrap.style.height = hStr;
+
+            // Update button styles
+            const hNum = typeof height === 'number' ? height : parseInt(height, 10);
+            [h380Btn, h480Btn, h620Btn].forEach(b => {
+                if (b) {
+                    b.style.background = 'transparent';
+                    b.style.color = '#94a3b8';
+                    b.style.fontWeight = '400';
+                }
+            });
+            if (hNum === 380 && h380Btn) {
+                h380Btn.style.background = 'rgba(56,189,248,0.18)';
+                h380Btn.style.color = '#38bdf8';
+                h380Btn.style.fontWeight = '700';
+            } else if (hNum === 480 && h480Btn) {
+                h480Btn.style.background = 'rgba(56,189,248,0.18)';
+                h480Btn.style.color = '#38bdf8';
+                h480Btn.style.fontWeight = '700';
+            } else if (hNum === 620 && h620Btn) {
+                h620Btn.style.background = 'rgba(56,189,248,0.18)';
+                h620Btn.style.color = '#38bdf8';
+                h620Btn.style.fontWeight = '700';
+            }
+            if (maxBtn) {
+                maxBtn.textContent = '⤢ Max';
+                maxBtn.style.color = '#a78bfa';
+            }
+
+            try {
+                localStorage.setItem('breakout_chart_height', hStr);
+            } catch (e) {}
+
+            if (app.resizeBreakoutChart) {
+                setTimeout(app.resizeBreakoutChart, 50);
+            }
+        };
+
+        app.toggleBreakoutChartMaximize = function() {
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
+            const maxBtn = document.getElementById('bkInspChartMaxBtn');
+            if (!wrap) return;
+
+            const isMax = wrap.getAttribute('data-maximized') === 'true';
+            if (isMax) {
+                wrap.removeAttribute('data-maximized');
+                let prevHeight = 480;
+                try {
+                    const stored = localStorage.getItem('breakout_chart_height');
+                    if (stored && !stored.includes('vh')) prevHeight = stored;
+                } catch (e) {}
+                app.setBreakoutChartHeight(prevHeight);
+                if (maxBtn) {
+                    maxBtn.textContent = '⤢ Max';
+                    maxBtn.style.color = '#a78bfa';
+                }
+            } else {
+                wrap.setAttribute('data-maximized', 'true');
+                const maxH = 'calc(100vh - 240px)';
+                app.setBreakoutChartHeight(maxH);
+                if (maxBtn) {
+                    maxBtn.textContent = '⤓ Restore';
+                    maxBtn.style.color = '#34d399';
+                }
+            }
+        };
+
+        app.fitBreakoutChartScale = function() {
+            if (app._bkLightweightChart) {
+                app._bkLightweightChart.timeScale().fitContent();
+            }
+        };
+
         app.openBreakoutInspectorDrawer = function() {
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
             if (drawer) {
-                let savedWidth = '540px';
+                let savedWidth = '720px';
                 try {
-                    savedWidth = localStorage.getItem('breakout_inspector_drawer_width') || '540px';
+                    savedWidth = localStorage.getItem('breakout_inspector_drawer_width') || '720px';
                 } catch (e) {}
                 drawer.style.width = savedWidth;
                 drawer.style.right = '0px';
+
+                // Restore saved chart height
+                try {
+                    const savedHeight = localStorage.getItem('breakout_chart_height');
+                    if (savedHeight) {
+                        app.setBreakoutChartHeight(savedHeight);
+                    }
+                } catch (e) {}
+
                 if (app.resizeBreakoutChart) {
                     setTimeout(app.resizeBreakoutChart, 80);
                 }
@@ -1474,7 +1566,7 @@
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
             if (drawer) {
-                const curWidth = drawer.offsetWidth || 540;
+                const curWidth = drawer.offsetWidth || 720;
                 drawer.style.right = `-${curWidth + 40}px`;
             }
             if (backdrop) {
@@ -1536,8 +1628,12 @@
             app._bkDrawerResizeAttached = true;
             document.addEventListener('DOMContentLoaded', () => {
                 initDrawerResizer();
+                initChartVerticalResizer();
             });
-            setTimeout(initDrawerResizer, 500);
+            setTimeout(() => {
+                initDrawerResizer();
+                initChartVerticalResizer();
+            }, 500);
         }
 
         function initDrawerResizer() {
@@ -1565,7 +1661,7 @@
                 if (!isResizing) return;
                 const deltaX = startX - e.clientX;
                 const maxAllowed = Math.floor(window.innerWidth * 0.96);
-                const newWidth = Math.min(maxAllowed, Math.max(420, startWidth + deltaX));
+                const newWidth = Math.min(maxAllowed, Math.max(480, startWidth + deltaX));
                 drawer.style.width = `${newWidth}px`;
                 if (app.resizeBreakoutChart) {
                     app.resizeBreakoutChart();
@@ -1585,6 +1681,44 @@
                 if (app.resizeBreakoutChart) {
                     setTimeout(app.resizeBreakoutChart, 50);
                 }
+            });
+        }
+
+        function initChartVerticalResizer() {
+            const vResizer = document.getElementById('bkInspChartVerticalResizer');
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
+            const tvWrap = document.getElementById('bkInspTradingViewContainer');
+            if (!vResizer || !wrap || vResizer._attached) return;
+            vResizer._attached = true;
+
+            let isVResizing = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            vResizer.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                isVResizing = true;
+                startY = e.clientY;
+                startHeight = wrap.offsetHeight || 480;
+                document.body.style.cursor = 'ns-resize';
+                document.body.style.userSelect = 'none';
+                vResizer.style.background = 'rgba(56,189,248,0.4)';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isVResizing) return;
+                const deltaY = e.clientY - startY;
+                const maxAllowed = Math.floor(window.innerHeight * 0.85);
+                const newHeight = Math.min(maxAllowed, Math.max(280, startHeight + deltaY));
+                app.setBreakoutChartHeight(newHeight);
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (!isVResizing) return;
+                isVResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                vResizer.style.background = 'rgba(255,255,255,0.04)';
             });
         }
 
@@ -1643,10 +1777,15 @@
 
         app.resizeBreakoutChart = function() {
             const container = document.getElementById('bkInspLightweightChartContainer');
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
             if (app._bkLightweightChart && container) {
                 const w = container.clientWidth;
+                const h = wrap ? (wrap.clientHeight || wrap.offsetHeight) : 480;
                 if (w > 0) {
-                    app._bkLightweightChart.applyOptions({ width: w });
+                    app._bkLightweightChart.applyOptions({
+                        width: w,
+                        height: h > 0 ? h : 480,
+                    });
                 }
             }
         };
@@ -1669,6 +1808,7 @@
 
         app.initBreakoutQuantumChart = async function(ticker, candidate, wallsData) {
             const container = document.getElementById('bkInspLightweightChartContainer');
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
             const loadingOverlay = document.getElementById('bkInspChartLoadingOverlay');
             const badge = document.getElementById('bkInspChartSymbolBadge');
             const popout = document.getElementById('bkInspTvPopoutLink');
@@ -1697,10 +1837,11 @@
             }
 
             try {
-                const chartWidth = container.clientWidth || 480;
+                const chartWidth = container.clientWidth || 600;
+                const chartHeight = wrap ? (wrap.clientHeight || wrap.offsetHeight || 480) : 480;
                 const chart = window.LightweightCharts.createChart(container, {
                     width: chartWidth,
-                    height: 300,
+                    height: chartHeight,
                     layout: {
                         background: { type: 'solid', color: '#050508' },
                         textColor: '#94a3b8',

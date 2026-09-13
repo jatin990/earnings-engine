@@ -364,7 +364,7 @@
         <!-- ======================================================== -->
         <div id="breakoutInspectorBackdrop" onclick="app.closeBreakoutInspectorDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:99980;transition:opacity 0.2s ease;"></div>
 
-        <aside id="breakoutInspectorDrawer" style="position:fixed;top:0;right:-600px;width:540px;min-width:420px;max-width:96vw;height:100vh;background:#09090b;border-left:1px solid rgba(255,255,255,0.14);z-index:99985;box-shadow:-20px 0 60px rgba(0,0,0,0.9);display:flex;flex-direction:column;transition:right 0.25s cubic-bezier(0.16, 1, 0.3, 1);overflow:hidden;">
+        <aside id="breakoutInspectorDrawer" style="position:fixed;top:0;right:-750px;width:720px;min-width:480px;max-width:96vw;height:100vh;background:#09090b;border-left:1px solid rgba(255,255,255,0.14);z-index:99985;box-shadow:-20px 0 60px rgba(0,0,0,0.9);display:flex;flex-direction:column;transition:right 0.25s cubic-bezier(0.16, 1, 0.3, 1);overflow:hidden;">
             <!-- ↔️ Left Resizer Drag Handle -->
             <div id="breakoutDrawerResizer" title="Drag to adjust drawer width" style="position:absolute;left:0;top:0;bottom:0;width:7px;cursor:ew-resize;z-index:99990;background:transparent;transition:background 0.15s ease;"></div>
 
@@ -381,9 +381,10 @@
                 <div style="display:flex;align-items:center;gap:0.3rem;">
                     <!-- Width Presets -->
                     <div style="display:flex;align-items:center;gap:0.2rem;background:#000000;border:1px solid rgba(255,255,255,0.1);padding:0.12rem 0.25rem;border-radius:4px;font-family:var(--font-mono);">
-                        <button type="button" onclick="app.setBreakoutDrawerWidth(540)" class="btn btn-sm" style="background:transparent;border:none;color:#94a3b8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;" title="Standard width (540px)">540</button>
-                        <button type="button" onclick="app.setBreakoutDrawerWidth(780)" class="btn btn-sm" style="background:transparent;border:none;color:#94a3b8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;" title="Wide width (780px)">780</button>
-                        <button type="button" onclick="app.setBreakoutDrawerWidth('95vw')" class="btn btn-sm" style="background:transparent;border:none;color:#38bdf8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;font-weight:700;" title="Full screen width (95vw)">Max ⇱</button>
+                        <button type="button" onclick="app.setBreakoutDrawerWidth(640)" class="btn btn-sm" style="background:transparent;border:none;color:#94a3b8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;" title="Compact width (640px)">640</button>
+                        <button type="button" onclick="app.setBreakoutDrawerWidth(880)" class="btn btn-sm" style="background:transparent;border:none;color:#94a3b8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;" title="Wide Pro width (880px)">880</button>
+                        <button type="button" onclick="app.setBreakoutDrawerWidth(1100)" class="btn btn-sm" style="background:transparent;border:none;color:#94a3b8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;" title="Ultra-Wide width (1100px)">1100</button>
+                        <button type="button" onclick="app.setBreakoutDrawerWidth('96vw')" class="btn btn-sm" style="background:transparent;border:none;color:#38bdf8;font-size:0.60rem;padding:0.1rem 0.3rem;cursor:pointer;font-weight:700;" title="Full screen width (96vw)">Max ⇱</button>
                     </div>
                     <button type="button" onclick="app.closeBreakoutInspectorDrawer()" class="btn-icon" style="background:transparent;border:none;color:#94a3b8;font-size:1.15rem;cursor:pointer;padding:0.2rem 0.45rem;" title="Close Inspector (Esc)">✕</button>
                 </div>
@@ -431,12 +432,21 @@
                                     <span style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em;">📈 Chart &amp; Walls</span>
                                     <span id="bkInspChartSymbolBadge" style="color: #38bdf8; font-size: 0.60rem; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.25); padding: 0.04rem 0.3rem; border-radius: 3px;">TCS.NS</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                    <!-- Chart Height Quick Selectors -->
+                                    <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.58rem;">
+                                        <button type="button" id="bkChartH380Btn" onclick="app.setBreakoutChartHeight(380)" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="Compact height (380px)">380h</button>
+                                        <button type="button" id="bkChartH480Btn" onclick="app.setBreakoutChartHeight(480)" class="btn btn-sm" style="background: rgba(56,189,248,0.18); border: none; color: #38bdf8; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Standard height (480px)">480h</button>
+                                        <button type="button" id="bkChartH620Btn" onclick="app.setBreakoutChartHeight(620)" class="btn btn-sm" style="background: transparent; border: none; color: #94a3b8; padding: 0.1rem 0.3rem; cursor: pointer;" title="Tall height (620px)">620h</button>
+                                        <button type="button" id="bkInspChartMaxBtn" onclick="app.toggleBreakoutChartMaximize()" class="btn btn-sm" style="background: transparent; border: none; color: #a78bfa; padding: 0.1rem 0.3rem; cursor: pointer; font-weight: 700;" title="Toggle Full Viewport Chart Height">⤢ Max</button>
+                                    </div>
+
                                     <!-- Chart Mode Switcher -->
                                     <div style="display: flex; align-items: center; background: #12141c; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 0.08rem; font-family: var(--font-mono); font-size: 0.60rem;">
                                         <button type="button" id="bkChartModeNativeBtn" onclick="app.switchBreakoutChartMode('native')" style="background: rgba(56,189,248,0.18); color: #38bdf8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; font-weight: 700; cursor: pointer;">Native + Walls</button>
                                         <button type="button" id="bkChartModeTvBtn" onclick="app.switchBreakoutChartMode('tv')" style="background: transparent; color: #94a3b8; border: none; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer;">TradingView</button>
                                     </div>
+                                    <button type="button" onclick="app.fitBreakoutChartScale()" class="btn btn-sm" style="background: #18181b; border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; font-size: 0.60rem; padding: 0.12rem 0.35rem; border-radius: 3px; cursor: pointer; font-family: var(--font-mono);" title="Fit Candles to Viewport">⟲ Fit</button>
                                     <a id="bkInspTvPopoutLink" href="#" target="_blank" style="color: #38bdf8; font-size: 0.62rem; text-decoration: none; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.2rem;">
                                         <span>TV ↗</span>
                                     </a>
@@ -444,7 +454,7 @@
                             </div>
 
                             <!-- Native Quantum Lightweight Chart Container -->
-                            <div id="bkInspLightweightChartWrap" style="height: 300px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
+                            <div id="bkInspLightweightChartWrap" style="height: 480px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508; position: relative;">
                                 <div id="bkInspLightweightChartContainer" style="width: 100%; height: 100%;"></div>
                                 <div id="bkInspChartLoadingOverlay" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,5,8,0.85); color: #94a3b8; font-family: var(--font-mono); font-size: 0.72rem; z-index: 5;">
                                     <span>⏳ Loading chart &amp; wall levels...</span>
@@ -452,7 +462,12 @@
                             </div>
 
                             <!-- TradingView Embed Widget Container (Toggled via TV mode) -->
-                            <div id="bkInspTradingViewContainer" style="display: none; height: 300px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508;">
+                            <div id="bkInspTradingViewContainer" style="display: none; height: 480px; width: 100%; border-radius: 4px; overflow: hidden; background: #050508;">
+                            </div>
+
+                            <!-- ↕️ Interactive Vertical Chart Resizer Bar -->
+                            <div id="bkInspChartVerticalResizer" title="Drag vertically to resize chart height" style="height: 6px; width: 100%; cursor: ns-resize; background: rgba(255,255,255,0.04); margin-top: 4px; border-radius: 3px; display: flex; align-items: center; justify-content: center; transition: background 0.15s ease;">
+                                <div style="width: 36px; height: 2px; background: rgba(255,255,255,0.2); border-radius: 1px;"></div>
                             </div>
                         </div>
 
@@ -1004,8 +1019,9 @@
         </div>
 
         <!-- Footer note -->
-        <div style="margin-top:0.55rem; font-size:0.68rem; color:#64748b; display:flex; align-items:center; gap:0.4rem;">
-            <span>🛡️ Audited history tracks real-world outcome accuracy from the moment a breakout setup was identified.</span>
+        <div style="margin-top:0.55rem; font-size:0.68rem; color:#64748b; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.4rem;">
+            <span>🛡️ Audited history tracks real-world outcome accuracy from the moment a breakout setup was identified. <span style="color:#38bdf8;">Click any row to open Setup Inspector Slide-Over HUD &amp; Order Book Walls</span></span>
+            <span style="color:#a1a1aa; font-family:var(--font-mono); font-size:0.64rem;">💡 Late entries flag setups identified after breakout move started</span>
         </div>
     </div>
 </div>
