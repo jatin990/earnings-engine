@@ -120,8 +120,8 @@ def test_automation_schedules_init_and_fetch_performance(tmp_path):
 
 def test_sync_tables_and_watermark_configuration():
     """Verify SYNC_TABLES contains all registered tables and watermarks correctly prioritize."""
-    assert len(SYNC_TABLES) == 72
-    assert len(set(SYNC_TABLES)) == 72  # No duplicate table names
+    assert len(SYNC_TABLES) == 75
+    assert len(set(SYNC_TABLES)) == 75  # No duplicate table names
 
     # Essential missing tables now confirmed in list
     assert "automation_schedules" in SYNC_TABLES
@@ -129,6 +129,9 @@ def test_sync_tables_and_watermark_configuration():
     assert "option_chain_history" in SYNC_TABLES
     assert "tri_confluence_metrics" in SYNC_TABLES
     assert "institutional_accumulation_cache" in SYNC_TABLES
+    assert "institutional_quarantine" in SYNC_TABLES
+    assert "institutional_audit_log" in SYNC_TABLES
+    assert "data_provenance_meta" in SYNC_TABLES
     assert "credit_cards" in SYNC_TABLES
     assert "credit_card_otp_requests" in SYNC_TABLES
     assert "net_worth_snapshots" in SYNC_TABLES

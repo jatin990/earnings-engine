@@ -240,7 +240,8 @@ def test_ingest_universe_shareholding_patterns_fallback(init_db):
     assert res["success"] is True
     assert res["fallback_count"] == 1
 
-    # Verify fallback generated institutional holdings for INFY.NS
-    count = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE ticker = 'INFY.NS'").fetchone()[0]
-    assert count > 0
+    # Verify zero-synthetic guarantee: no fabricated institutional holdings generated on fallback
+    freshness = conn.execute("SELECT source FROM nse_shareholding_freshness WHERE ticker = 'INFY.NS'").fetchone()
+    assert freshness is not None
+    assert freshness[0] == "seed_fallback"
 

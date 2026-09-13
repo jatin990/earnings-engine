@@ -228,6 +228,8 @@ def mark_shareholding_fetched(
             "INSERT OR REPLACE INTO nse_shareholding_freshness (ticker, fetched_at, source, entities_count) VALUES (?, ?, ?, ?)",
             (sym, now_iso, source, entities_count),
         )
+        if hasattr(local_conn, "commit"):
+            local_conn.commit()
     except Exception as e:
         logger.debug("[NSE-SHP] mark_shareholding_fetched error: %s", e)
 
