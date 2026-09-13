@@ -3425,7 +3425,8 @@
                 const nexusEmpty = document.getElementById('nexusInstEmpty');
                 if (nexusEmpty) nexusEmpty.style.display = 'block';
                 ['nexusInstHeader', 'nexusInstReturnsStrip', 'nexusInstShareholdingWrap',
-                 'nexusInstBlockDealsWrap', 'nexusInstHoldingsWrap'].forEach(id => {
+                 'nexusInstBlockDealsWrap', 'nexusInstHoldingsWrap', 'nexusInstLoading',
+                 'nexusInstFlowMetrics'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.style.display = 'none';
                 });

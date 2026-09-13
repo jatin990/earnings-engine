@@ -1879,7 +1879,15 @@
             const clean = String(ticker).trim().toUpperCase();
             const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : clean + '.NS';
             this._nexusInstLoading = true;
+
+            // Show loading skeleton, hide other states
+            const loadEl = document.getElementById('nexusInstLoading');
             const emptyEl = document.getElementById('nexusInstEmpty');
+            const headerEl = document.getElementById('nexusInstHeader');
+            if (loadEl) loadEl.style.display = 'block';
+            if (emptyEl) emptyEl.style.display = 'none';
+            if (headerEl) headerEl.style.display = 'none';
+
             try {
                 const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}`);
                 if (res.ok) {
@@ -1887,10 +1895,12 @@
                     this.renderNexusInstitutionalPanel(data);
                 } else if (emptyEl) {
                     emptyEl.style.display = 'block';
+                    if (loadEl) loadEl.style.display = 'none';
                 }
             } catch (e) {
                 console.error('[INSTITUTIONAL] Failed loading nexus panel data:', e);
                 if (emptyEl) emptyEl.style.display = 'block';
+                if (loadEl) loadEl.style.display = 'none';
             } finally {
                 this._nexusInstLoading = false;
             }
@@ -2082,6 +2092,49 @@
                     }).join('');
                     if (holdingsWrap) holdingsWrap.style.display = 'block';
                 }
+            }
+
+            // ── Institutional Flow Metrics (Crore summary row) ──
+            const flowMetricsEl = document.getElementById('nexusInstFlowMetrics');
+            if (flowMetricsEl) {
+                const netFlow = data.net_flow_cr != null ? Number(data.net_flow_cr) : (data.increase_amount_cr != null ? Number(data.increase_amount_cr) : null);
+                const grossIn = data.gross_inflow_cr != null ? Number(data.gross_inflow_cr) : null;
+                const grossOut = data.gross_outflow_cr != null ? Number(data.gross_outflow_cr) : null;
+                const totalAmt = data.total_amount_cr != null ? Number(data.total_amount_cr) : null;
+                const fundsAcc = data.funds_accumulating_count != null ? Number(data.funds_accumulating_count) : null;
+                const fundsSell = data.funds_selling_count != null ? Number(data.funds_selling_count) : null;
+
+                const fmtCr = (v, showSign) => {
+                    if (v == null) return '—';
+                    const prefix = showSign && v > 0 ? '+' : '';
+                    return `${prefix}₹${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 1 })} Cr`;
+                };
+                const crCol = (v) => v != null ? (v > 0 ? '#34d399' : v < 0 ? '#f87171' : '#a1a1aa') : '#52525b';
+
+                const netFlowEl = document.getElementById('nexusInstNetFlow');
+                const grossInEl = document.getElementById('nexusInstGrossIn');
+                const grossOutEl = document.getElementById('nexusInstGrossOut');
+                const totalAmtEl = document.getElementById('nexusInstTotalAmt');
+                const fundsAccEl = document.getElementById('nexusInstFundsAcc');
+
+                if (netFlowEl) {
+                    netFlowEl.innerHTML = `<div style="color:#71717a;font-size:0.56rem;">NET FLOW</div><div style="font-weight:700;color:${crCol(netFlow)};font-size:0.78rem;">${fmtCr(netFlow, true)}</div>`;
+                }
+                if (grossInEl) {
+                    grossInEl.innerHTML = `<div style="color:#71717a;font-size:0.56rem;">GROSS INFLOW</div><div style="font-weight:700;color:#34d399;font-size:0.78rem;">${fmtCr(grossIn, false)}</div>`;
+                }
+                if (grossOutEl) {
+                    grossOutEl.innerHTML = `<div style="color:#71717a;font-size:0.56rem;">GROSS OUTFLOW</div><div style="font-weight:700;color:#f87171;font-size:0.78rem;">${fmtCr(grossOut, false)}</div>`;
+                }
+                if (totalAmtEl) {
+                    totalAmtEl.innerHTML = `<div style="color:#71717a;font-size:0.56rem;">TOTAL HOLDINGS</div><div style="font-weight:700;color:#fff;font-size:0.78rem;">${fmtCr(totalAmt, false)}</div>`;
+                }
+                if (fundsAccEl) {
+                    const fundsAccStr = fundsAcc != null ? `${fundsAcc}` : '—';
+                    const fundsSellStr = fundsSell != null ? `${fundsSell}` : '—';
+                    fundsAccEl.innerHTML = `<div style="color:#71717a;font-size:0.56rem;">FUNDS IN / OUT</div><div style="font-size:0.78rem;"><span style="font-weight:700;color:#34d399;">${fundsAccStr}</span><span style="color:#52525b;"> / </span><span style="font-weight:700;color:#f87171;">${fundsSellStr}</span></div>`;
+                }
+                flowMetricsEl.style.display = 'grid';
             }
         },
 
