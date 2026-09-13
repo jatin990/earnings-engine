@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
             --bg-void: #000000;
@@ -1270,6 +1271,58 @@
                 <div id="iVolSurge" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—x</div>
             </div>
         </div>
+
+        <!-- 📈 SECTION: INTERACTIVE PRICE ACTION & VOLUME CHART -->
+        <section class="card" id="cardStockChart" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                    <span style="color: #38bdf8;">📈</span>
+                    <span>Interactive Technical Chart</span>
+                    <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">TradingView Canvas · SMA 20/50/200</span>
+                </div>
+
+                <!-- Overlays Legend & Range Selectors -->
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.72rem; font-family: var(--font-mono);">
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #38bdf8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8;"></span>SMA 20</span>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #fbbf24;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>SMA 50</span>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #818cf8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #818cf8;"></span>SMA 200</span>
+                    </div>
+
+                    <!-- Range Selector Buttons -->
+                    <div class="chart-range-group" style="display: inline-flex; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px;">
+                        <button type="button" id="btnRange1M" class="btn-chart-range" onclick="setChartRange('1M')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">1M</button>
+                        <button type="button" id="btnRange3M" class="btn-chart-range" onclick="setChartRange('3M')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">3M</button>
+                        <button type="button" id="btnRange6M" class="btn-chart-range" onclick="setChartRange('6M')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">6M</button>
+                        <button type="button" id="btnRange1Y" class="btn-chart-range active" onclick="setChartRange('1Y')" style="background: rgba(56,189,248,0.2); border: none; color: #38bdf8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">1Y</button>
+                        <button type="button" id="btnRangeALL" class="btn-chart-range" onclick="setChartRange('ALL')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">ALL</button>
+                    </div>
+
+                    <button type="button" onclick="loadStockDetailChartData()" class="btn-section-action cyan-subtle" title="Refresh Price Bars" style="font-size: 0.72rem; padding: 0.25rem 0.55rem; cursor: pointer;">
+                        🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- Interactive Crosshair HUD Info Bar -->
+            <div id="chartHudBar" style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.05); padding: 0.45rem 0.85rem; border-radius: 6px; margin-bottom: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem;">
+                <div style="color: #94a3b8;"><span style="color: #64748b;">DATE: </span><strong id="hudDate" style="color: #e2e8f0;">—</strong></div>
+                <div><span style="color: #64748b;">O: </span><strong id="hudOpen" style="color: #e2e8f0;">—</strong></div>
+                <div><span style="color: #64748b;">H: </span><strong id="hudHigh" style="color: #34d399;">—</strong></div>
+                <div><span style="color: #64748b;">L: </span><strong id="hudLow" style="color: #f87171;">—</strong></div>
+                <div><span style="color: #64748b;">C: </span><strong id="hudClose" style="color: #38bdf8;">—</strong></div>
+                <div><span style="color: #64748b;">VOL: </span><strong id="hudVol" style="color: #e2e8f0;">—</strong></div>
+                <div id="hudChangePill" style="display: none; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">—</div>
+            </div>
+
+            <!-- Canvas Container with Loading Overlay -->
+            <div style="position: relative; width: 100%; height: 420px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
+                <div id="stockDetailChartContainer" style="width: 100%; height: 100%;"></div>
+                <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 10;">
+                    <span>Loading interactive candlestick series...</span>
+                </div>
+            </div>
+        </section>
 
         <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
         <section class="card" id="cardFactorEvaluation" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
@@ -4599,6 +4652,273 @@
             }
         }
 
+        // =========================================================================
+        // 📈 Interactive Stock Detail Candlestick & Volume Chart (TradingView)
+        // =========================================================================
+        let stockChartInstance = null;
+        let stockCandleSeries = null;
+        let stockVolumeSeries = null;
+        let stockSma20Series = null;
+        let stockSma50Series = null;
+        let stockSma200Series = null;
+        let stockChartRawRecords = [];
+        let activeChartRange = '1Y';
+
+        function calculateSMA(data, period) {
+            const result = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) continue;
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += data[i - j].close;
+                }
+                result.push({
+                    time: data[i].date || data[i].time,
+                    value: parseFloat((sum / period).toFixed(2)),
+                });
+            }
+            return result;
+        }
+
+        async function initStockDetailChart() {
+            const container = document.getElementById('stockDetailChartContainer');
+            if (!container || !window.LightweightCharts) return;
+
+            if (stockChartInstance) {
+                try {
+                    stockChartInstance.remove();
+                } catch (e) {
+                    console.debug('Error disposing old chart', e);
+                }
+            }
+
+            const chart = window.LightweightCharts.createChart(container, {
+                width: container.clientWidth || 800,
+                height: 420,
+                layout: {
+                    background: { type: 'solid', color: '#090a10' },
+                    textColor: '#cbd5e1',
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono), monospace",
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                },
+                crosshair: {
+                    mode: window.LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    scaleMargins: { top: 0.08, bottom: 0.22 },
+                },
+                timeScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+
+            // Candlestick series
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderVisible: false,
+                wickUpColor: '#10b981',
+                wickDownColor: '#ef4444',
+            });
+
+            // Volume histogram overlay series
+            const volumeSeries = chart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: '', // overlay
+                scaleMargins: { top: 0.82, bottom: 0 },
+            });
+
+            // Moving Average Overlays
+            const sma20 = chart.addLineSeries({
+                color: '#38bdf8',
+                lineWidth: 1.5,
+                title: 'SMA 20',
+            });
+            const sma50 = chart.addLineSeries({
+                color: '#fbbf24',
+                lineWidth: 1.5,
+                title: 'SMA 50',
+            });
+            const sma200 = chart.addLineSeries({
+                color: '#818cf8',
+                lineWidth: 2,
+                title: 'SMA 200',
+            });
+
+            stockChartInstance = chart;
+            stockCandleSeries = candleSeries;
+            stockVolumeSeries = volumeSeries;
+            stockSma20Series = sma20;
+            stockSma50Series = sma50;
+            stockSma200Series = sma200;
+
+            // Responsive ResizeObserver
+            const ro = new ResizeObserver(entries => {
+                if (!entries || entries.length === 0) return;
+                const { width, height } = entries[0].contentRect;
+                if (width > 0 && height > 0) {
+                    chart.applyOptions({ width, height: 420 });
+                }
+            });
+            ro.observe(container);
+
+            // Crosshair Tooltip / HUD Update
+            chart.subscribeCrosshairMove(param => {
+                const el = (id) => document.getElementById(id);
+                if (!param || !param.time || !param.seriesData) {
+                    updateHudWithLastBar();
+                    return;
+                }
+                const candleData = param.seriesData.get(candleSeries);
+                const volData = param.seriesData.get(volumeSeries);
+                if (candleData) {
+                    if (el('hudDate')) el('hudDate').textContent = param.time;
+                    if (el('hudOpen')) el('hudOpen').textContent = candleData.open != null ? '₹' + candleData.open.toFixed(2) : '—';
+                    if (el('hudHigh')) el('hudHigh').textContent = candleData.high != null ? '₹' + candleData.high.toFixed(2) : '—';
+                    if (el('hudLow')) el('hudLow').textContent = candleData.low != null ? '₹' + candleData.low.toFixed(2) : '—';
+                    if (el('hudClose')) el('hudClose').textContent = candleData.close != null ? '₹' + candleData.close.toFixed(2) : '—';
+                    if (volData && el('hudVol')) {
+                        const v = volData.value;
+                        el('hudVol').textContent = v >= 1e7 ? (v / 1e7).toFixed(2) + ' Cr' : (v >= 1e5 ? (v / 1e5).toFixed(2) + ' L' : v.toLocaleString());
+                    }
+                    const diff = candleData.close - candleData.open;
+                    const pct = candleData.open > 0 ? (diff / candleData.open) * 100 : 0;
+                    const pill = el('hudChangePill');
+                    if (pill) {
+                        pill.style.display = 'inline-block';
+                        pill.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+                        pill.style.background = pct >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+                        pill.style.color = pct >= 0 ? '#34d399' : '#f87171';
+                    }
+                }
+            });
+
+            await loadStockDetailChartData();
+        }
+
+        function updateHudWithLastBar() {
+            const el = (id) => document.getElementById(id);
+            if (!stockChartRawRecords || stockChartRawRecords.length === 0) return;
+            const last = stockChartRawRecords[stockChartRawRecords.length - 1];
+            const prev = stockChartRawRecords.length > 1 ? stockChartRawRecords[stockChartRawRecords.length - 2] : last;
+            if (!last) return;
+            if (el('hudDate')) el('hudDate').textContent = last.date || last.time;
+            if (el('hudOpen')) el('hudOpen').textContent = '₹' + Number(last.open).toFixed(2);
+            if (el('hudHigh')) el('hudHigh').textContent = '₹' + Number(last.high).toFixed(2);
+            if (el('hudLow')) el('hudLow').textContent = '₹' + Number(last.low).toFixed(2);
+            if (el('hudClose')) el('hudClose').textContent = '₹' + Number(last.close).toFixed(2);
+            if (el('hudVol')) {
+                const v = last.volume || 0;
+                el('hudVol').textContent = v >= 1e7 ? (v / 1e7).toFixed(2) + ' Cr' : (v >= 1e5 ? (v / 1e5).toFixed(2) + ' L' : v.toLocaleString());
+            }
+            const diff = last.close - prev.close;
+            const pct = prev.close > 0 ? (diff / prev.close) * 100 : 0;
+            const pill = el('hudChangePill');
+            if (pill) {
+                pill.style.display = 'inline-block';
+                pill.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+                pill.style.background = pct >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+                pill.style.color = pct >= 0 ? '#34d399' : '#f87171';
+            }
+        }
+
+        async function loadStockDetailChartData() {
+            const overlay = document.getElementById('chartLoadingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+            try {
+                const resp = await fetch(`/api/v1/price-history/${encodeURIComponent(ACTIVE_SYM)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const records = await resp.json();
+                if (!records || records.length === 0) {
+                    if (overlay) overlay.innerHTML = `<span style="color:#ef4444;">No price bars available for ${ACTIVE_SYM}</span>`;
+                    return;
+                }
+
+                stockChartRawRecords = records;
+                const candles = [];
+                const volumes = [];
+
+                records.forEach(r => {
+                    const itemTime = r.date;
+                    candles.push({
+                        time: itemTime,
+                        open: r.open,
+                        high: r.high,
+                        low: r.low,
+                        close: r.close,
+                    });
+                    volumes.push({
+                        time: itemTime,
+                        value: r.volume,
+                        color: r.close >= r.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)',
+                    });
+                });
+
+                if (stockCandleSeries) stockCandleSeries.setData(candles);
+                if (stockVolumeSeries) stockVolumeSeries.setData(volumes);
+                if (stockSma20Series) stockSma20Series.setData(calculateSMA(records, 20));
+                if (stockSma50Series) stockSma50Series.setData(calculateSMA(records, 50));
+                if (stockSma200Series) stockSma200Series.setData(calculateSMA(records, 200));
+
+                if (overlay) overlay.style.display = 'none';
+                updateHudWithLastBar();
+                setChartRange(activeChartRange);
+            } catch (err) {
+                console.error('Error loading chart data:', err);
+                if (overlay) overlay.innerHTML = `<span style="color:#ef4444;">Failed to load price bars (${err.message})</span>`;
+            }
+        }
+
+        function setChartRange(range) {
+            activeChartRange = range;
+            ['1M', '3M', '6M', '1Y', 'ALL'].forEach(r => {
+                const btn = document.getElementById(`btnRange${r}`);
+                if (btn) {
+                    if (r === range) {
+                        btn.style.background = 'rgba(56,189,248,0.2)';
+                        btn.style.color = '#38bdf8';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#94a3b8';
+                    }
+                }
+            });
+
+            if (!stockChartInstance || !stockChartRawRecords || stockChartRawRecords.length === 0) return;
+
+            if (range === 'ALL') {
+                stockChartInstance.timeScale().fitContent();
+                return;
+            }
+
+            const total = stockChartRawRecords.length;
+            let barsToShow = 250;
+            if (range === '1M') barsToShow = 22;
+            else if (range === '3M') barsToShow = 65;
+            else if (range === '6M') barsToShow = 130;
+            else if (range === '1Y') barsToShow = 252;
+
+            const fromIdx = Math.max(0, total - barsToShow);
+            const fromDate = stockChartRawRecords[fromIdx]?.date;
+            const toDate = stockChartRawRecords[total - 1]?.date;
+
+            if (fromDate && toDate) {
+                stockChartInstance.timeScale().setVisibleRange({
+                    from: fromDate,
+                    to: toDate,
+                });
+            } else {
+                stockChartInstance.timeScale().fitContent();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const stockIntSel = document.getElementById('stockLiveIntervalSelect');
             if (stockIntSel) stockIntSel.value = String(stockLiveIntervalMs);
@@ -4609,6 +4929,7 @@
             loadOmniRouteModels();
             fetchStockDetails();
             fetchRateLimits();
+            initStockDetailChart();
         });
     </script>
 

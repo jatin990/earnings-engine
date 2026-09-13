@@ -280,6 +280,47 @@ input:focus, select:focus, textarea:focus {
     transform: scale(1.15);
 }
 
+/* ========================================================================= */
+/* ⚡ Breakout Radar High-Density Table & Micro-Interactions                */
+/* ========================================================================= */
+.bk-table-row {
+    transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    user-select: none;
+}
+
+.bk-table-row:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.bk-table-row:active {
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    transform: scale(0.998);
+}
+
+.bk-table-row.bk-row-selected {
+    background: #13151f !important;
+    box-shadow: inset 3px 0 0 0 #38bdf8 !important;
+}
+
+.bk-table-row.bk-row-selected td {
+    color: #ffffff;
+}
+
+/* Satisfying Tactile Button Clicks */
+.btn-tactile {
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+.btn-tactile:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.btn-tactile:active {
+    transform: translateY(1px) scale(0.96);
+}
+
 /* Tooltip */
 .tooltip {
     position: relative;

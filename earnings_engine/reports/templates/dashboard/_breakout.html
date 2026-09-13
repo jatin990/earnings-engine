@@ -377,74 +377,111 @@
                     <!-- Populated Inspector Content -->
                     <div id="breakoutInspectorContent" style="display: none;">
                         <!-- Header Card -->
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem; margin-bottom: 0.85rem;">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.65rem; margin-bottom: 0.65rem;">
                             <div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <span id="bkInspTicker" style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; font-family: var(--font-mono); letter-spacing: -0.02em;">TICKER</span>
-                                    <span id="bkInspTierBadge" class="badge" style="background:#27272a; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-size: 0.65rem; padding: 0.15rem 0.45rem; font-weight: 700;">HOT</span>
-                                    <span id="bkInspStrategyBadge" class="badge" style="background: #18181b; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.12); font-size: 0.65rem; padding: 0.15rem 0.45rem; font-family: var(--font-mono);">CLASSIC</span>
+                                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                    <span id="bkInspTicker" style="font-size: 1.2rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); letter-spacing: -0.02em;">TICKER</span>
+                                    <span id="bkInspTierBadge" class="badge" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); font-size: 0.62rem; padding: 0.12rem 0.4rem; font-weight: 800;">HOT</span>
+                                    <span id="bkInspStrategyBadge" class="badge" style="background: #18181b; color: #38bdf8; border: 1px solid rgba(56,189,248,0.25); font-size: 0.62rem; padding: 0.12rem 0.4rem; font-family: var(--font-mono);">CLASSIC</span>
                                 </div>
-                                <div id="bkInspCompany" style="font-size: 0.76rem; color: #94a3b8; margin-top: 0.15rem; font-weight: 500;">Company Name · Sector</div>
+                                <div id="bkInspCompany" style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.15rem; font-weight: 500;">Company Name · Sector</div>
                             </div>
                             <div style="text-align: right;">
-                                <div id="bkInspPrice" style="font-size: 1.25rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono);">₹0.00</div>
-                                <div id="bkInspChange" style="font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); color: #f4f4f5;">+0.00% (1D)</div>
+                                <div id="bkInspPrice" style="font-size: 1.2rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono);">₹0.00</div>
+                                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.3rem; margin-top: 0.1rem;">
+                                    <span id="bkInspChange" style="font-size: 0.70rem; font-weight: 800; font-family: var(--font-mono); color: #34d399;">+0.00%</span>
+                                    <span id="bkInspFreshness" style="font-size: 0.58rem; background: #18181b; color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); padding: 0.04rem 0.25rem; border-radius: 3px; font-family: var(--font-mono);">LIVE</span>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- ⚡ Actionable Setup Verdict Banner -->
+                        <div id="bkInspVerdictBanner" style="display: flex; align-items: center; justify-content: space-between; background: #12141c; border: 1px solid rgba(56,189,248,0.25); border-left: 3px solid #38bdf8; border-radius: 5px; padding: 0.45rem 0.65rem; margin-bottom: 0.65rem; font-family: var(--font-mono); font-size: 0.68rem;">
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span id="bkInspVerdictIcon" style="font-size: 0.8rem;">⚡</span>
+                                <span id="bkInspVerdictText" style="font-weight: 700; color: #f8fafc;">COILING NEAR RESISTANCE CEILING</span>
+                            </div>
+                            <span id="bkInspVerdictSub" style="font-size: 0.60rem; color: #38bdf8; font-weight: 700;">CONVICTION HIGH</span>
+                        </div>
+
                         <!-- 📐 Execution Blueprint & Risk-Reward Card -->
-                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem 0.85rem; margin-bottom: 0.85rem;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
-                                <div style="font-size: 0.68rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
+                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+                                <div style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
                                     🎯 Execution Blueprint (PIT)
                                 </div>
-                                <div id="bkInspRrBadge" style="font-size: 0.68rem; font-weight: 700; color: #ffffff; font-family: var(--font-mono); background: #18181b; border: 1px solid rgba(255,255,255,0.2); padding: 0.1rem 0.4rem; border-radius: 3px;">
+                                <div id="bkInspRrBadge" style="font-size: 0.66rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); padding: 0.08rem 0.35rem; border-radius: 3px;">
                                     R:R 2.5x
                                 </div>
                             </div>
 
-                            <!-- Visual Multi-Point Execution Range Bar -->
-                            <div style="margin-bottom: 0.75rem; padding: 0 0.2rem;">
-                                <div style="display: flex; justify-content: space-between; font-size: 0.62rem; color: #94a3b8; font-family: var(--font-mono); margin-bottom: 0.25rem;">
-                                    <span>SL: <span id="bkInspBarSl" style="color:#ffffff;">₹0</span></span>
-                                    <span>Price: <span id="bkInspBarPrice" style="color:#ffffff;">₹0</span></span>
-                                    <span>Trigger: <span id="bkInspBarTrigger" style="color:#ffffff;">₹0</span></span>
-                                    <span>Target: <span id="bkInspBarTarget" style="color:#ffffff;">₹0</span></span>
+                            <!-- Visual Multi-Point Execution Range Bar (Red SL Zone -> Buffer -> Green Target Zone) -->
+                            <div style="margin-bottom: 0.65rem; padding: 0 0.15rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.60rem; color: #94a3b8; font-family: var(--font-mono); margin-bottom: 0.2rem;">
+                                    <span style="color:#f87171;">SL: <span id="bkInspBarSl" style="font-weight:700;">₹0</span></span>
+                                    <span style="color:#ffffff;">LTP: <span id="bkInspBarPrice" style="font-weight:700;">₹0</span></span>
+                                    <span style="color:#38bdf8;">Trigger: <span id="bkInspBarTrigger" style="font-weight:700;">₹0</span></span>
+                                    <span style="color:#34d399;">Target: <span id="bkInspBarTarget" style="font-weight:700;">₹0</span></span>
                                 </div>
-                                <div style="position: relative; height: 7px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: visible; margin: 0.4rem 0;">
+                                <div style="position: relative; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: visible; margin: 0.35rem 0;">
                                     <!-- Stop loss to Target track zone -->
-                                    <div id="bkInspBarZone" style="position: absolute; left: 0%; right: 0%; height: 100%; background: #27272a; border-radius: 4px;"></div>
+                                    <div id="bkInspBarZone" style="position: absolute; left: 0%; right: 0%; height: 100%; background: linear-gradient(90deg, rgba(239,68,68,0.35) 0%, rgba(255,255,255,0.06) 45%, rgba(16,185,129,0.35) 100%); border-radius: 4px;"></div>
                                     <!-- Price marker pin -->
-                                    <div id="bkInspBarPriceMarker" style="position: absolute; left: 45%; top: -3px; width: 3px; height: 13px; background: #ffffff; border-radius: 2px; box-shadow: 0 0 6px rgba(255,255,255,0.8); transform: translateX(-50%);" title="Current Price"></div>
+                                    <div id="bkInspBarPriceMarker" style="position: absolute; left: 45%; top: -3px; width: 4px; height: 14px; background: #ffffff; border-radius: 2px; box-shadow: 0 0 8px #38bdf8; transform: translateX(-50%); z-index: 5;" title="Current Price"></div>
                                     <!-- Trigger marker pin -->
-                                    <div id="bkInspBarTriggerMarker" style="position: absolute; left: 55%; top: -2px; width: 2px; height: 11px; background: #a1a1aa; border-radius: 1px; transform: translateX(-50%);" title="Breakout Trigger"></div>
+                                    <div id="bkInspBarTriggerMarker" style="position: absolute; left: 55%; top: -2px; width: 2px; height: 12px; background: #38bdf8; border-radius: 1px; transform: translateX(-50%); z-index: 4;" title="Breakout Trigger"></div>
                                 </div>
                             </div>
 
-                            <!-- Detailed Metrics Grid -->
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; text-align: center; font-family: var(--font-mono);">
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
-                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Stop Loss</div>
-                                    <div id="bkInspSl" style="font-size: 0.78rem; font-weight: 700; color: #f4f4f5; margin-top: 0.1rem;">₹0.00</div>
-                                    <div id="bkInspSlPct" style="font-size: 0.58rem; color: #71717a;">-0.0%</div>
+                            <!-- Detailed Metrics Grid with Red/Green Directional Styling -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; text-align: center; font-family: var(--font-mono);">
+                                <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2); padding: 0.3rem; border-radius: 4px;">
+                                    <div style="font-size: 0.58rem; color: #f87171; text-transform: uppercase; font-weight:700;">Stop Loss</div>
+                                    <div id="bkInspSl" style="font-size: 0.76rem; font-weight: 800; color: #f87171; margin-top: 0.08rem;">₹0.00</div>
+                                    <div id="bkInspSlPct" style="font-size: 0.58rem; color: #fca5a5; font-weight:600;">-0.0%</div>
                                 </div>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
-                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Trigger / Gap</div>
-                                    <div id="bkInspTrigger" style="font-size: 0.78rem; font-weight: 700; color: #f4f4f5; margin-top: 0.1rem;">₹0.00</div>
-                                    <div id="bkInspGapPct" style="font-size: 0.58rem; color: #a1a1aa;">+0.0%</div>
+                                <div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.2); padding: 0.3rem; border-radius: 4px;">
+                                    <div style="font-size: 0.58rem; color: #38bdf8; text-transform: uppercase; font-weight:700;">Trigger / Gap</div>
+                                    <div id="bkInspTrigger" style="font-size: 0.76rem; font-weight: 800; color: #38bdf8; margin-top: 0.08rem;">₹0.00</div>
+                                    <div id="bkInspGapPct" style="font-size: 0.58rem; color: #bae6fd; font-weight:600;">+0.0%</div>
                                 </div>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
-                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Target (ATR)</div>
-                                    <div id="bkInspTarget" style="font-size: 0.78rem; font-weight: 700; color: #ffffff; margin-top: 0.1rem;">₹0.00</div>
-                                    <div id="bkInspTargetPct" style="font-size: 0.58rem; color: #a1a1aa;">+0.0%</div>
+                                <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); padding: 0.3rem; border-radius: 4px;">
+                                    <div style="font-size: 0.58rem; color: #34d399; text-transform: uppercase; font-weight:700;">Target (ATR)</div>
+                                    <div id="bkInspTarget" style="font-size: 0.76rem; font-weight: 800; color: #34d399; margin-top: 0.08rem;">₹0.00</div>
+                                    <div id="bkInspTargetPct" style="font-size: 0.58rem; color: #a7f3d0; font-weight:600;">+0.0%</div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- ⚡ 5-Pillar Score Meters Card (Executive Monochrome) -->
-                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem 0.85rem; margin-bottom: 0.85rem;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
-                                <div style="font-size: 0.68rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
+                        <!-- 📊 Institutional Flow & Volatility Intelligence HUD -->
+                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem;">
+                            <div style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); margin-bottom: 0.4rem;">
+                                📊 Order Flow &amp; Volatility Metrics
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; font-family: var(--font-mono); font-size: 0.66rem;">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0.45rem; border-radius: 4px;">
+                                    <div style="color: #71717a; font-size: 0.58rem;">Volume Surge (vs 20D)</div>
+                                    <div id="bkInspVolSurge" style="font-weight: 800; color: #34d399; font-size: 0.76rem; margin-top: 0.05rem;">1.0x</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0.45rem; border-radius: 4px;">
+                                    <div style="color: #71717a; font-size: 0.58rem;">Institutional Flows (QoQ)</div>
+                                    <div id="bkInspInstFlow" style="font-weight: 800; color: #38bdf8; font-size: 0.76rem; margin-top: 0.05rem;">No Data</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0.45rem; border-radius: 4px;">
+                                    <div style="color: #71717a; font-size: 0.58rem;">Daily Expected Move (ATR-14)</div>
+                                    <div id="bkInspAtrMove" style="font-weight: 700; color: #f8fafc; font-size: 0.74rem; margin-top: 0.05rem;">₹0.00 (±0.0%)</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.3rem 0.45rem; border-radius: 4px;">
+                                    <div style="color: #71717a; font-size: 0.58rem;">52W High Ceiling Distance</div>
+                                    <div id="bkInsp52wDist" style="font-weight: 700; color: #cbd5e1; font-size: 0.74rem; margin-top: 0.05rem;">-0.0%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ⚡ 5-Pillar Score Meters Card -->
+                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.75rem; margin-bottom: 0.65rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+                                <div style="font-size: 0.66rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
                                     ⚡ 5-Pillar Score Decomposition
                                 </div>
                                 <div style="display: flex; align-items: baseline; gap: 0.25rem;">
@@ -453,84 +490,90 @@
                                 </div>
                             </div>
 
-                            <div style="display: flex; flex-direction: column; gap: 0.45rem; font-family: var(--font-mono);">
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono);">
                                 <!-- Pillar 1: Resistance Proximity -->
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
                                         <span style="color: #cbd5e1;">🎯 Resistance Ceiling</span>
                                         <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreRes">0</span> <span style="color: #52525b;">/ 40</span></span>
                                     </div>
                                     <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarRes" style="height: 100%; width: 0%; background: #f4f4f5; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                        <div id="bkInspBarRes" style="height: 100%; width: 0%; background: #38bdf8; border-radius: 2px; transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
 
                                 <!-- Pillar 2: Volume Expansion -->
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
                                         <span style="color: #cbd5e1;">📊 Volume Surge</span>
                                         <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreVol">0</span> <span style="color: #52525b;">/ 10</span></span>
                                     </div>
                                     <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarVol" style="height: 100%; width: 0%; background: #d4d4d8; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                        <div id="bkInspBarVol" style="height: 100%; width: 0%; background: #34d399; border-radius: 2px; transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
 
                                 <!-- Pillar 3: Price Volatility Compression -->
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
                                         <span style="color: #cbd5e1;">🗜️ Price Compression</span>
                                         <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreComp">0</span> <span style="color: #52525b;">/ 10</span></span>
                                     </div>
                                     <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarComp" style="height: 100%; width: 0%; background: #a1a1aa; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                        <div id="bkInspBarComp" style="height: 100%; width: 0%; background: #a78bfa; border-radius: 2px; transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
 
                                 <!-- Pillar 4: Trend Momentum -->
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
                                         <span style="color: #cbd5e1;">🚀 Trend Momentum</span>
                                         <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreMom">0</span> <span style="color: #52525b;">/ 25</span></span>
                                     </div>
                                     <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarMom" style="height: 100%; width: 0%; background: #e4e4e7; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                        <div id="bkInspBarMom" style="height: 100%; width: 0%; background: #34d399; border-radius: 2px; transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
 
                                 <!-- Pillar 5: Fundamental Quality -->
                                 <div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.62rem; margin-bottom: 0.12rem;">
                                         <span style="color: #cbd5e1;">📈 Fundamental Quality</span>
                                         <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreFund">0</span> <span style="color: #52525b;">/ 15</span></span>
                                     </div>
                                     <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
-                                        <div id="bkInspBarFund" style="height: 100%; width: 0%; background: #71717a; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                        <div id="bkInspBarFund" style="height: 100%; width: 0%; background: #60a5fa; border-radius: 2px; transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- 🔄 Catalyst & Lifecycle Notes -->
-                        <div id="bkInspCatalystCard" style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.8rem; margin-bottom: 0.85rem; font-size: 0.70rem;">
-                            <div style="font-size: 0.64rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); margin-bottom: 0.3rem;">
+                        <div id="bkInspCatalystCard" style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.55rem 0.75rem; margin-bottom: 0.65rem; font-size: 0.68rem;">
+                            <div style="font-size: 0.62rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); margin-bottom: 0.25rem;">
                                 💡 Setup Catalyst &amp; Context
                             </div>
-                            <div id="bkInspCatalystText" style="color: #cbd5e1; line-height: 1.45;">
+                            <div id="bkInspCatalystText" style="color: #cbd5e1; line-height: 1.4;">
                                 Coiling near resistance ceiling with volume expansion.
                             </div>
                         </div>
 
                         <!-- 🛠️ Quick Action Buttons -->
-                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                            <a id="bkInspStockDetailLink" href="#" target="_blank" class="btn btn-sm" style="flex: 1; text-align: center; background: #18181b; color: #ffffff; border: 1px solid rgba(255,255,255,0.25); font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.5rem; border-radius: 4px; text-decoration: none;">
-                                ↗ Full Stock Detail
-                            </a>
-                            <button type="button" id="bkInspCopyLevelsBtn" onclick="app.copyCurrentBreakoutLevels()" class="btn btn-sm" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.18); font-size: 0.72rem; padding: 0.3rem 0.6rem; border-radius: 4px;" title="Copy execution parameters to clipboard">
-                                📋 Copy Levels
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <button type="button" id="bkInspChartBtn" onclick="app.openSelectedBreakoutChart()" class="btn btn-sm btn-tactile" style="flex: 1; text-align: center; background: #18181b; color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); font-size: 0.70rem; font-weight: 700; padding: 0.28rem 0.45rem; border-radius: 4px;" title="Launch interactive TradingView split chart">
+                                📈 Multi-Chart
                             </button>
-                            <button type="button" id="bkInspHistoryBtn" onclick="app.openSelectedBreakoutHistory()" class="btn btn-sm" style="background: #18181b; color: #a1a1aa; border: 1px solid rgba(255,255,255,0.18); font-size: 0.72rem; padding: 0.3rem 0.55rem; border-radius: 4px;" title="View transition audit history">
-                                📜 Audit
+                            <button type="button" id="bkInspWatchlistBtn" onclick="app.addSelectedBreakoutToWatchlist()" class="btn btn-sm btn-tactile" style="background: #18181b; color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); font-size: 0.70rem; font-weight: 700; padding: 0.28rem 0.45rem; border-radius: 4px;" title="Add ticker to watchlist">
+                                ⭐ Watchlist
+                            </button>
+                            <a id="bkInspStockDetailLink" href="#" target="_blank" class="btn btn-sm btn-tactile" style="background: #18181b; color: #ffffff; border: 1px solid rgba(255,255,255,0.22); font-size: 0.70rem; font-weight: 700; padding: 0.28rem 0.45rem; border-radius: 4px; text-decoration: none;">
+                                ↗ Full Detail
+                            </a>
+                            <button type="button" id="bkInspCopyLevelsBtn" onclick="app.copyCurrentBreakoutLevels()" class="btn btn-sm btn-tactile" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.18); font-size: 0.70rem; padding: 0.28rem 0.45rem; border-radius: 4px;" title="Copy execution parameters to clipboard">
+                                📋 Copy Plan
+                            </button>
+                            <button type="button" id="bkInspNotesBtn" onclick="app.openSelectedBreakoutNotes()" class="btn btn-sm btn-tactile" style="background: #18181b; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); font-size: 0.70rem; padding: 0.28rem 0.45rem; border-radius: 4px;" title="View reasoning & calculation notes">
+                                🧠 Notes
                             </button>
                         </div>
                     </div>

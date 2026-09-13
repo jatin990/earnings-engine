@@ -714,16 +714,28 @@ async def get_price_history(
             df = df[df.index >= start_date]
         if end_date:
             df = df[df.index <= end_date]
+        import math
         records = []
         for dt, row in df.iterrows():
-            records.append({
-                "date": dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt),
-                "open": float(row.get("open", 0.0)),
-                "high": float(row.get("high", 0.0)),
-                "low": float(row.get("low", 0.0)),
-                "close": float(row.get("close", 0.0)),
-                "volume": int(row.get("volume", 0)),
-            })
+            try:
+                o = float(row.get("open", 0.0))
+                h = float(row.get("high", 0.0))
+                l = float(row.get("low", 0.0))
+                c = float(row.get("close", 0.0))
+                v_raw = row.get("volume", 0)
+                v = int(v_raw) if (v_raw is not None and not (isinstance(v_raw, float) and math.isnan(v_raw))) else 0
+                if math.isnan(o) or math.isnan(h) or math.isnan(l) or math.isnan(c) or c <= 0:
+                    continue
+                records.append({
+                    "date": dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt),
+                    "open": round(o, 2),
+                    "high": round(h, 2),
+                    "low": round(l, 2),
+                    "close": round(c, 2),
+                    "volume": max(0, v),
+                })
+            except Exception:
+                continue
         return records
     except Exception as e:
         logger.exception("Error fetching price history for %s: %s", ticker, e)

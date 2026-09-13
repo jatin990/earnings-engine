@@ -104,7 +104,7 @@
                             <span>🧠</span> Claude Only
                         </button>
                         <button type="button" id="btnModalModel-free-only" onclick="app.runModalConsensus('free only')" class="btn-model-opt free-only" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run free only lightweight model">
-                            <span>💎</span> Free Tier
+                            <span>⚡</span> Free Tier
                         </button>
                         <button type="button" id="btnModalModel-claude" onclick="app.runModalConsensus('claude')" class="btn-model-opt claude" style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run claude orchestrator model">
                             <span>🤖</span> Claude
@@ -150,7 +150,7 @@
             <div id="srModalKronosSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                     <h4 style="margin:0;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">
-                        <span>🔮 Kronos AI 14-Day Deep Learning Trajectory</span>
+                        <span>🤖 Kronos AI 14-Day Neural Trajectory</span>
                         <span id="srModalKronosBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
                     <button type="button" id="srModalKronosRunBtn" onclick="app.runModalKronos()" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:0.75rem;">⚡ Run Kronos AI</button>
@@ -334,7 +334,7 @@
                     <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-right:0.2rem;">OmniRoute Model:</span>
                     <button type="button" id="modalBtn-antigravity" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['antigravityonly'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-weight:700;" title="Run Antigravity Workhorse (~1.2s Fast)">⚡ antigravityonly</button>
                     <button type="button" id="modalBtn-claude-only" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['claude only'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;font-weight:700;" title="Run Claude Only (Architecture & System Design)">🧠 claude only</button>
-                    <button type="button" id="modalBtn-free-only" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['free only'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;" title="Run Free Tier (Fast / Routine)">💎 free only</button>
+                    <button type="button" id="modalBtn-free-only" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['free only'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;" title="Run Free Tier (Fast / Routine)">⚡ free only</button>
                     <button type="button" id="modalBtn-claude" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['claude'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;font-weight:700;" title="Run Claude Orchestrator">🤖 claude</button>
                     <button type="button" id="modalBtn-local" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['local/deepseek-r1:8b'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;" title="Run Local-AI (Offline Free)">💻 Local-AI</button>
                     <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run OmniRoute 4-Model Catalog in Parallel">🧠 All Models</button>
@@ -382,7 +382,7 @@
                 </div>
 
                 <div class="card" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(245,158,11,0.3);">
-                    <div style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛑 Resistance / Exit</div>
+                    <div style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🎯 Resistance / Target</div>
                     <div id="catConsensusResistance" style="font-size:1.35rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);">₹—</div>
                     <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Profit target zone</div>
                 </div>
@@ -1057,8 +1057,8 @@
                     <label style="font-size:0.74rem;font-weight:600;color:#94a3b8;">Select Scanner Feed:</label>
                     <select id="exportRadarType" style="height:32px;background:#000000;border:1px solid rgba(255,255,255,0.14);border-radius:6px;color:#ffffff;font-size:0.78rem;padding:0 0.5rem;outline:none;">
                         <option value="breakout">⚡ Breakout Radar Setups</option>
-                        <option value="swing">🌊 Swing Channel Ranges</option>
-                        <option value="gainers">🚀 Daily Top Gainers &amp; Drivers</option>
+                        <option value="swing">📈 Swing Channel Ranges</option>
+                        <option value="gainers">📈 Daily Top Gainers &amp; Drivers</option>
                     </select>
                 </div>
 

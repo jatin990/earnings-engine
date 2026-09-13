@@ -21,13 +21,13 @@
 
         <!-- Modal Sub-Navigation Bar -->
         <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.75rem; background: rgba(11, 14, 23, 0.9); border-bottom: 1px solid rgba(255, 255, 255, 0.08); flex-wrap: wrap;">
-            <button type="button" id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🗂️ Visible Tabs</button>
-            <button type="button" id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
-            <button type="button" id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
+            <button type="button" id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">Visible Tabs</button>
+            <button type="button" id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">Themes & Colors</button>
+            <button type="button" id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">Environment Variables</button>
             <button type="button" id="ccNavRateLimits" onclick="app.switchCustomizerTab('ratelimits')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">⚡ Rate Limits & Quotas</button>
-            <button type="button" id="ccNavKeys" onclick="app.switchCustomizerTab('keys')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔐 Friend Passcodes</button>
+            <button type="button" id="ccNavKeys" onclick="app.switchCustomizerTab('keys')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">Passcodes & Access</button>
             {% if has_diagnostics_key or has_tracker_key %}
-            <button type="button" id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🖥️ System Diagnostics & Telemetry</button>
+            <button type="button" id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">System Diagnostics</button>
             {% endif %}
         </div>
 
@@ -64,7 +64,7 @@
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #2563eb;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #38bdf8;"></div>
                             </div>
-                            <strong style="font-size: 0.85rem; color: #f8fafc;">🌌 Obsidian Slate (Default)</strong>
+                            <strong style="font-size: 0.85rem; color: #f8fafc;">Obsidian Slate (Default)</strong>
                         </div>
                         <div onclick="app.applyPresetTheme('sapphire')" class="theme-card" style="background: #010510; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
                             <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
@@ -72,7 +72,7 @@
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #06b6d4;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #3b82f6;"></div>
                             </div>
-                            <strong style="font-size: 0.85rem;">💎 Sapphire Midnight</strong>
+                            <strong style="font-size: 0.85rem;">Sapphire Midnight</strong>
                         </div>
                         <div onclick="app.applyPresetTheme('cyberpunk')" class="theme-card" style="background: #030a08; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
                             <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
@@ -80,7 +80,7 @@
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #10b981;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #0ea5e9;"></div>
                             </div>
-                            <strong style="font-size: 0.85rem;">⚡ Cyber Emerald</strong>
+                            <strong style="font-size: 0.85rem;">Cyber Emerald</strong>
                         </div>
                         <div onclick="app.applyPresetTheme('amethyst')" class="theme-card" style="background: #080a12; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
                             <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
@@ -88,7 +88,7 @@
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #38bdf8;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #f59e0b;"></div>
                             </div>
-                            <strong style="font-size: 0.85rem;">🪙 Titanium Amber</strong>
+                            <strong style="font-size: 0.85rem;">Titanium Amber</strong>
                         </div>
                         <div onclick="app.applyPresetTheme('light')" class="theme-card" style="background: #f8fafc; color: #0f172a; border: 1px solid rgba(15,23,42,0.2); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
                             <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
