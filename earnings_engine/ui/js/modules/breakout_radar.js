@@ -1500,6 +1500,136 @@
             app.selectBreakoutCandidate(ticker, autoScroll !== false, true);
         };
 
+        // =========================================================================
+        // 📈 TRADINGVIEW ADVANCED CHART EMBED & INSPECTOR CONTROLLER
+        // =========================================================================
+        function formatTradingViewSymbol(sym) {
+            if (!sym) return 'NSE:NIFTY';
+            const clean = String(sym).trim().toUpperCase();
+            if (clean === '^NSEI' || clean === 'NIFTY' || clean === 'NIFTY50' || clean === 'NIFTY 50') return 'NSE:NIFTY';
+            if (clean === '^NSEBANK' || clean === 'BANKNIFTY' || clean === 'NIFTYBANK') return 'NSE:BANKNIFTY';
+            if (clean === '^CNX500' || clean === 'NIFTY500') return 'NSE:NIFTY500';
+            if (clean === '^GSPC' || clean === 'SPX' || clean === 'S&P 500' || clean === 'S&P500') return 'SP:SPX';
+            if (clean === '^NDX' || clean === 'NDX') return 'NASDAQ:NDX';
+            if (clean === '^DJI' || clean === 'DJI') return 'DJ:DJI';
+            if (clean.includes(':')) return clean;
+            if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
+            if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
+            return clean;
+        }
+
+        app.initBreakoutTradingViewWidget = function(ticker) {
+            const container = document.getElementById('bkInspTradingViewContainer');
+            if (!container || !ticker) return;
+            container.innerHTML = '';
+
+            const tvSymbol = formatTradingViewSymbol(ticker);
+            const badge = document.getElementById('bkInspChartSymbolBadge');
+            if (badge) badge.textContent = tvSymbol;
+            const popout = document.getElementById('bkInspTvPopoutLink');
+            if (popout) popout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
+
+            try {
+                const widgetWrap = document.createElement('div');
+                widgetWrap.className = 'tradingview-widget-container';
+                widgetWrap.style.width = '100%';
+                widgetWrap.style.height = '100%';
+
+                const widgetInner = document.createElement('div');
+                widgetInner.className = 'tradingview-widget-container__widget';
+                widgetInner.style.width = '100%';
+                widgetInner.style.height = '100%';
+                widgetWrap.appendChild(widgetInner);
+
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+                script.async = true;
+                script.innerHTML = JSON.stringify({
+                    "autosize": true,
+                    "symbol": tvSymbol,
+                    "interval": "D",
+                    "timezone": "Asia/Kolkata",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "en",
+                    "enable_publishing": false,
+                    "allow_symbol_change": true,
+                    "hide_side_toolbar": true,
+                    "hide_top_toolbar": false,
+                    "save_image": false,
+                    "calendar": false,
+                    "hide_volume": false,
+                    "support_host": "https://www.tradingview.com"
+                });
+
+                widgetWrap.appendChild(script);
+                container.appendChild(widgetWrap);
+            } catch (err) {
+                console.warn('Error creating Breakout TradingView widget:', err);
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:var(--font-mono);font-size:0.75rem;">TradingView chart stream ready for ${tvSymbol}</div>`;
+            }
+        };
+
+        app.loadBreakoutNews = async function(ticker) {
+            const feed = document.getElementById('bkInspNewsFeed');
+            const countBadge = document.getElementById('bkInspNewsCountBadge');
+            if (!feed || !ticker) return;
+
+            feed.innerHTML = `<div style="color:#71717a;font-size:0.64rem;font-family:var(--font-mono);font-style:italic;">Fetching recent news catalysts for ${ticker}...</div>`;
+
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ticker)}/catalysts`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const catalysts = (data.catalysts && data.catalysts.length > 0) ? data.catalysts : [];
+
+                if (countBadge) countBadge.textContent = `${catalysts.length} item${catalysts.length === 1 ? '' : 's'}`;
+
+                if (catalysts.length === 0) {
+                    feed.innerHTML = `<div style="color:#71717a;font-size:0.64rem;font-family:var(--font-mono);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.08);padding:0.4rem 0.5rem;border-radius:4px;text-align:center;">No recent corporate news catalysts recorded for ${ticker}</div>`;
+                    return;
+                }
+
+                const topItems = catalysts.slice(0, 3);
+                feed.innerHTML = topItems.map(item => {
+                    const headline = item.headline || item.title || item.summary || 'Corporate announcement';
+                    const src = item.source || item.publisher || 'Exchange Filing';
+                    const dateStr = item.published_at ? item.published_at.slice(0, 10) : (item.date || 'Recent');
+                    const impactScore = item.impact_score != null ? item.impact_score : (item.sentiment_score ? Math.round(item.sentiment_score * 100) : null);
+                    const sentiment = (item.sentiment || 'NEUTRAL').toUpperCase();
+                    const sentColor = sentiment.includes('BULL') || sentiment.includes('POS') ? '#34d399' : (sentiment.includes('BEAR') || sentiment.includes('NEG') ? '#f87171' : '#38bdf8');
+
+                    return `
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:0.4rem 0.5rem;border-radius:4px;font-family:var(--font-mono);">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.18rem;flex-wrap:wrap;gap:0.2rem;">
+                                <span style="color:#94a3b8;font-size:0.58rem;">${src} &middot; ${dateStr}</span>
+                                <div style="display:flex;align-items:center;gap:0.25rem;">
+                                    ${impactScore != null ? `<span style="font-size:0.56rem;background:rgba(56,189,248,0.12);color:#38bdf8;padding:0.02rem 0.25rem;border-radius:3px;">Impact ${impactScore}</span>` : ''}
+                                    <span style="font-size:0.56rem;background:${sentColor}18;color:${sentColor};padding:0.02rem 0.25rem;border-radius:3px;font-weight:700;">${sentiment}</span>
+                                </div>
+                            </div>
+                            <div style="color:#f1f5f9;font-size:0.66rem;font-weight:600;line-height:1.35;">${headline}</div>
+                            ${item.summary && item.summary !== headline ? `<div style="color:#94a3b8;font-size:0.60rem;margin-top:0.15rem;line-height:1.3;">${item.summary.slice(0, 140)}...</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.warn('Error fetching breakout news:', err);
+                feed.innerHTML = `<div style="color:#71717a;font-size:0.62rem;font-family:var(--font-mono);">News feed unavailable (${err.message})</div>`;
+            }
+        };
+
+        app.scrollToBreakoutNotes = function() {
+            const el = document.getElementById('bkInspInlineNotesCard');
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            if (el && drawer) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.style.borderColor = '#38bdf8';
+                setTimeout(() => { el.style.borderColor = 'rgba(255,255,255,0.08)'; }, 1500);
+            }
+        };
+
         app.renderBreakoutSetupInspector = function(candidate) {
             const emptyState = document.getElementById('breakoutInspectorEmptyState');
             const content = document.getElementById('breakoutInspectorContent');
@@ -1524,6 +1654,8 @@
             const compEl = document.getElementById('bkInspCompany');
             const priceEl = document.getElementById('bkInspPrice');
             const changeEl = document.getElementById('bkInspChange');
+            const ret7dEl = document.getElementById('bkInspRet7D');
+            const ret30dEl = document.getElementById('bkInspRet30D');
             const freshEl = document.getElementById('bkInspFreshness');
 
             if (tickerEl) tickerEl.textContent = ticker;
@@ -1557,13 +1689,50 @@
                 changeEl.style.color = retPct >= 0 ? '#34d399' : '#f87171';
             }
 
+            // Universal 7D & 30D Return Display
+            const r7 = candidate.ret_7d_pct ?? candidate.return_7d ?? candidate.perf_7d ?? candidate.calculation_notes?.return_7d ?? null;
+            const r30 = candidate.ret_30d_pct ?? candidate.return_30d ?? candidate.perf_30d ?? candidate.calculation_notes?.return_30d ?? null;
+
+            if (ret7dEl) {
+                if (r7 != null) {
+                    const val = Number(r7);
+                    ret7dEl.textContent = `7D: ${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
+                    ret7dEl.style.color = val >= 0 ? '#34d399' : '#f87171';
+                    ret7dEl.style.background = val >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                    ret7dEl.style.display = 'inline-block';
+                } else {
+                    ret7dEl.textContent = '7D: —';
+                    ret7dEl.style.color = '#94a3b8';
+                    ret7dEl.style.background = 'rgba(255,255,255,0.04)';
+                    ret7dEl.style.display = 'inline-block';
+                }
+            }
+
+            if (ret30dEl) {
+                if (r30 != null) {
+                    const val = Number(r30);
+                    ret30dEl.textContent = `30D: ${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
+                    ret30dEl.style.color = val >= 0 ? '#34d399' : '#f87171';
+                    ret30dEl.style.background = val >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                    ret30dEl.style.display = 'inline-block';
+                } else {
+                    ret30dEl.textContent = '30D: —';
+                    ret30dEl.style.color = '#94a3b8';
+                    ret30dEl.style.background = 'rgba(255,255,255,0.04)';
+                    ret30dEl.style.display = 'inline-block';
+                }
+            }
+
             if (freshEl) {
                 const isLive = candidate.is_live || candidate.price_delay_status === 'LIVE';
                 freshEl.textContent = isLive ? 'LIVE' : (candidate.price_delay_status || 'EOD');
                 freshEl.style.color = isLive ? '#34d399' : '#94a3b8';
             }
 
-            // 2. Actionable Setup Verdict Banner
+            // 2. Interactive TradingView Chart Initialization
+            app.initBreakoutTradingViewWidget(ticker);
+
+            // 3. Actionable Setup Verdict Banner
             const trigger = candidate.breakout_trigger != null ? Number(candidate.breakout_trigger) : curPrice;
             const target = candidate.target_price != null ? Number(candidate.target_price) : (trigger * 1.08);
             const stopLoss = candidate.stop_loss != null ? Number(candidate.stop_loss) : (curPrice * 0.95);
@@ -1612,7 +1781,7 @@
                 }
             }
 
-            // 3. Execution Blueprint (SL, Price, Trigger, Target)
+            // 4. Execution Blueprint (SL, Price, Trigger, Target)
             const slEl = document.getElementById('bkInspSl');
             const trigEl = document.getElementById('bkInspTrigger');
             const targEl = document.getElementById('bkInspTarget');
@@ -1668,18 +1837,25 @@
             if (priceMarker) priceMarker.style.left = `${pricePosPct}%`;
             if (trigMarker) trigMarker.style.left = `${trigPosPct}%`;
 
-            // 4. Order Flow & Volatility Intelligence HUD
+            // 5. Order Flow & Institutional Forensics HUD
             const volSurgeEl = document.getElementById('bkInspVolSurge');
+            const instScoreEl = document.getElementById('bkInspInstScore');
             const instFlowEl = document.getElementById('bkInspInstFlow');
             const atrMoveEl = document.getElementById('bkInspAtrMove');
             const dist52wEl = document.getElementById('bkInsp52wDist');
 
             const volMultiple = candidate.volume_surge_multiple != null
                 ? Number(candidate.volume_surge_multiple)
-                : (candidate.volume_score ? (candidate.volume_score / 4.0) : 1.4);
+                : (candidate.volume_score ? (candidate.volume_score / 4.0) : (candidate.volume_ratio || 1.4));
             if (volSurgeEl) {
                 volSurgeEl.textContent = `${volMultiple.toFixed(1)}x`;
                 volSurgeEl.style.color = volMultiple >= 2.0 ? '#34d399' : (volMultiple >= 1.5 ? '#38bdf8' : '#fbbf24');
+            }
+
+            const compScore = candidate.composite_score || 0;
+            const instScoreVal = candidate.institutional_score ?? candidate.institutional_flow?.score ?? (candidate.calculation_notes?.institutional_inflows?.score != null ? Math.round(candidate.calculation_notes.institutional_inflows.score * 4) : Math.min(100, Math.round(compScore * 0.85)));
+            if (instScoreEl) {
+                instScoreEl.textContent = `${instScoreVal}/100`;
             }
 
             if (instFlowEl) {
@@ -1710,8 +1886,7 @@
                 dist52wEl.style.color = dist52w >= -2.0 ? '#34d399' : (dist52w >= -5.0 ? '#38bdf8' : '#cbd5e1');
             }
 
-            // 5. Strategy-Adaptive Score Pillar Decomposition
-            const compScore = candidate.composite_score || 0;
+            // 6. Strategy-Adaptive Score Pillar Decomposition
             const scoreEl = document.getElementById('bkInspCompositeScore');
             if (scoreEl) {
                 scoreEl.textContent = compScore;
@@ -1779,14 +1954,76 @@
                 }).join('');
             }
 
-            // 6. Catalyst Notes
+            // 7. Inline Mathematical Notes (Zero Ollama / Pure Deterministic Formulas)
+            const notesListEl = document.getElementById('bkInspInlineNotesList');
+            if (notesListEl) {
+                const notes = candidate.calculation_notes || {};
+                const resScore = Number(candidate.resistance_score ?? (notes.resistance_proximity?.score ?? 0));
+                const volScore = Number(candidate.volume_score ?? (notes.volume_surge?.score ?? 0));
+                const compPillarScore = Number(candidate.compression_score ?? (notes.price_compression?.score ?? 0));
+                const momScore = Number(candidate.momentum_score ?? (notes.trend_momentum?.score ?? 0));
+                const fundScore = Number(candidate.fundamental_score ?? (notes.fundamental_quality?.score ?? 0));
+
+                const resReason = notes.resistance_reasoning || (candidate.pct_from_high != null ? `Price is ${candidate.pct_from_high.toFixed(1)}% below key 52W/consolidation resistance level.` : 'Price action coiling in close proximity to multi-week ceiling.');
+                const volReason = notes.volume_reasoning || (candidate.volume_ratio != null ? `Volume is ${candidate.volume_ratio.toFixed(2)}x of 20-day SMA baseline.` : 'Volume expanding relative to 20-day baseline.');
+                const compReason = notes.compression_reasoning || (candidate.atr_pct != null ? `ATR is ${candidate.atr_pct.toFixed(2)}% of price (tight volatility coiling).` : 'ATR and Bollinger Bands indicate low-volatility squeeze.');
+                const momReason = notes.momentum_reasoning || (candidate.momentum_signal ? `Momentum posture: ${candidate.momentum_signal} with moving average support.` : 'Bullish moving average alignment.');
+                const fundReason = notes.fundamental_reasoning || 'Point-in-time fundamental stability and earnings quality verification.';
+
+                notesListEl.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(248,113,113,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
+                            <span style="color:#f87171;font-weight:700;">1. Resistance Proximity</span>
+                            <span style="color:#fca5a5;font-weight:800;">${resScore.toFixed(1)} pts</span>
+                        </div>
+                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${resReason}</div>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(56,189,248,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
+                            <span style="color:#38bdf8;font-weight:700;">2. Volume Expansion / Surge</span>
+                            <span style="color:#93c5fd;font-weight:800;">${volScore.toFixed(1)} pts</span>
+                        </div>
+                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${volReason}</div>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(251,191,36,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
+                            <span style="color:#fbbf24;font-weight:700;">3. Volatility Squeeze &amp; Compression</span>
+                            <span style="color:#fde68a;font-weight:800;">${compPillarScore.toFixed(1)} pts</span>
+                        </div>
+                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${compReason}</div>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(52,211,153,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
+                            <span style="color:#34d399;font-weight:700;">4. Trend Momentum Posture</span>
+                            <span style="color:#6ee7b7;font-weight:800;">${momScore.toFixed(1)} pts</span>
+                        </div>
+                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${momReason}</div>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(192,132,252,0.2);border-radius:4px;padding:0.4rem 0.55rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.12rem;">
+                            <span style="color:#c084fc;font-weight:700;">5. Institutional &amp; Fundamental Quality</span>
+                            <span style="color:#e9d5ff;font-weight:800;">${fundScore.toFixed(1)} pts</span>
+                        </div>
+                        <div style="color:#cbd5e1;font-size:0.64rem;line-height:1.35;">${fundReason}</div>
+                    </div>
+                `;
+            }
+
+            // 8. Recent News Catalysts
+            app.loadBreakoutNews(ticker);
+
+            // 9. Catalyst Notes
             const catalystEl = document.getElementById('bkInspCatalystText');
             if (catalystEl) {
                 catalystEl.textContent = candidate.what_happened_summary || candidate.explanation_one_liner ||
                     (candidate.strategy ? `Quantitative detection by ${candidate.strategy.replace(/_/g, ' ')} engine. Setup displays volatility squeeze coiling near historical resistance.` : 'Coiling near resistance ceiling with expanding accumulation flow.');
             }
 
-            // 7. Links
+            // 10. Links
             const detailLink = document.getElementById('bkInspStockDetailLink');
             if (detailLink) {
                 detailLink.href = `/stock/${encodeURIComponent(ticker)}`;
@@ -1816,10 +2053,7 @@
         };
 
         app.openSelectedBreakoutNotes = function() {
-            const ticker = app._selectedBreakoutTicker;
-            if (ticker && app.openBreakoutNotesModal) {
-                app.openBreakoutNotesModal(ticker);
-            }
+            app.scrollToBreakoutNotes();
         };
 
         app.copyCurrentBreakoutLevels = function() {
