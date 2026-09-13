@@ -697,3 +697,215 @@ def ingest_universe_shareholding_patterns(
         "total_requested": len(tickers),
         "rate_limit_delay_secs": rate_limit_delay,
     }
+
+
+def parse_quarter_label(header: str) -> str:
+    """Map human month-year string (e.g. 'Jun 2026', 'Sep 2025') to Indian fiscal quarter (e.g. 'Q1 FY27', 'Q2 FY26')."""
+    m = re.match(r'([a-zA-Z]+)\s*(\d{4})', header.strip())
+    if not m:
+        return header.strip()
+    mon = m.group(1).lower()[:3]
+    yr = int(m.group(2))
+    if mon == 'jun':
+        return f'Q1 FY{str(yr + 1)[-2:]}'
+    elif mon == 'sep':
+        return f'Q2 FY{str(yr + 1)[-2:]}'
+    elif mon == 'dec':
+        return f'Q3 FY{str(yr + 1)[-2:]}'
+    elif mon == 'mar':
+        return f'Q4 FY{str(yr)[-2:]}'
+    return header.strip()
+
+
+def fetch_multi_quarter_shareholding(
+    ticker: str,
+    max_quarters: int = 8,
+    session: requests.Session | None = None,
+) -> list[dict[str, Any]] | None:
+    """Fetch authentic multi-quarter shareholding patterns from official corporate disclosures."""
+    clean_sym = ticker.replace(".NS", "").replace(".BO", "").strip().upper()
+    if not clean_sym:
+        return None
+
+    sess = session or requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    url = f"https://www.screener.in/company/{clean_sym}/consolidated/"
+    resp = None
+    try:
+        resp = sess.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            url = f"https://www.screener.in/company/{clean_sym}/"
+            resp = sess.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return None
+    except Exception as e:
+        logger.debug("[SHP-MULTI] Network fetch error for %s: %s", clean_sym, e)
+        return None
+
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(resp.text, "html.parser")
+        section = soup.find("section", id="shareholding")
+        if not section:
+            return None
+        table = section.find("table")
+        if not table:
+            return None
+
+        headers_list = [th.get_text(strip=True) for th in table.find_all("th") if th.get_text(strip=True)]
+        rows_data: dict[str, list[float]] = {}
+        for tr in table.find_all("tr"):
+            tds = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if tds:
+                cat = tds[0].replace("+", "").strip().lower()
+                vals = []
+                for v in tds[1:]:
+                    clean_v = v.replace("%", "").replace(",", "").strip()
+                    try:
+                        vals.append(float(clean_v) if clean_v else 0.0)
+                    except ValueError:
+                        vals.append(0.0)
+                rows_data[cat] = vals
+
+        quarters = []
+        for h in headers_list:
+            quarters.append((h, parse_quarter_label(h)))
+
+        p_vals = rows_data.get("promoters", [])
+        f_vals = rows_data.get("fiis", [])
+        d_vals = rows_data.get("diis", [])
+        g_vals = rows_data.get("government", []) or rows_data.get("others", [])
+        pub_vals = rows_data.get("public", [])
+
+        parsed_patterns: list[dict[str, Any]] = []
+        target_sym = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO") or "." in ticker) else f"{ticker}.NS"
+
+        for idx, (raw_h, q_lbl) in enumerate(quarters):
+            p = p_vals[idx] if idx < len(p_vals) else 0.0
+            f = f_vals[idx] if idx < len(f_vals) else 0.0
+            d = d_vals[idx] if idx < len(d_vals) else 0.0
+            g = g_vals[idx] if idx < len(g_vals) else 0.0
+            pub = pub_vals[idx] if idx < len(pub_vals) else 0.0
+
+            # Proportional float normalization so sum strictly equals 100.00%
+            tot = p + f + d + g + pub
+            if tot > 0:
+                p_norm = round((p / tot) * 100.0, 2)
+                f_norm = round((f / tot) * 100.0, 2)
+                d_norm = round((d / tot) * 100.0, 2)
+                g_norm = round((g / tot) * 100.0, 2)
+                pub_norm = round(max(0.0, 100.0 - (p_norm + f_norm + d_norm + g_norm)), 2)
+            else:
+                p_norm, f_norm, d_norm, g_norm, pub_norm = p, f, d, g, pub
+
+            parsed_patterns.append({
+                "ticker": target_sym,
+                "raw_quarter": raw_h,
+                "quarter": q_lbl,
+                "promoter_pct": p_norm,
+                "fii_pct": f_norm,
+                "dii_mf_pct": d_norm,
+                "public_retail_pct": pub_norm,
+                "other_pct": g_norm,
+            })
+
+        if max_quarters and max_quarters > 0:
+            parsed_patterns = parsed_patterns[-max_quarters:]
+
+        return parsed_patterns
+
+    except Exception as e:
+        logger.debug("[SHP-MULTI] Parse error for %s: %s", clean_sym, e)
+        return None
+
+
+def ingest_multi_quarter_shareholding_batch(
+    tickers: list[str],
+    max_workers: int = 5,
+    max_quarters: int = 4,
+    settings: Settings | None = None,
+    progress_callback: Any = None,
+) -> dict[str, Any]:
+    """Batch ingest authentic multi-quarter shareholding patterns across target equities concurrently."""
+    import concurrent.futures
+
+    settings = settings or Settings()
+    conn = get_db_connection(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    logger.info(
+        "[SHP-MULTI] Ingesting authentic multi-quarter patterns (last %d quarters) for %d equities...",
+        max_quarters,
+        len(tickers),
+    )
+
+    all_db_rows: list[tuple[Any, ...]] = []
+    successful_tickers: list[str] = []
+    failed_tickers: list[str] = []
+
+    def _worker(sym: str) -> tuple[str, list[dict[str, Any]] | None]:
+        time.sleep(0.05)  # Polite micro-pause
+        sess = requests.Session()
+        res = fetch_multi_quarter_shareholding(sym, max_quarters=max_quarters, session=sess)
+        return sym, res
+
+    total = len(tickers)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_worker, sym): sym for sym in tickers}
+        completed = 0
+        for fut in concurrent.futures.as_completed(futures):
+            completed += 1
+            sym, patterns = fut.result()
+            if patterns:
+                successful_tickers.append(sym)
+                for p in patterns:
+                    all_db_rows.append((
+                        p["ticker"],
+                        p["quarter"],
+                        p["promoter_pct"],
+                        p["fii_pct"],
+                        p["dii_mf_pct"],
+                        p["public_retail_pct"],
+                        p["other_pct"],
+                        now_iso,
+                    ))
+            else:
+                failed_tickers.append(sym)
+
+            if progress_callback:
+                progress_callback(completed, total, sym)
+
+    # Persist all patterns to SQLite in batched transactions
+    if all_db_rows:
+        batch_size = 500
+        for i in range(0, len(all_db_rows), batch_size):
+            chunk = all_db_rows[i : i + batch_size]
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO shareholding_patterns (
+                    ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
+                    public_retail_pct, other_pct, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                chunk,
+            )
+        if hasattr(conn, "commit"):
+            conn.commit()
+        logger.info("[SHP-MULTI] Successfully persisted %d quarterly pattern records into SQLite.", len(all_db_rows))
+
+    # Recalculate accumulation cache
+    from earnings_engine.data.institutional_accumulation import recalculate_all_institutional_metrics
+    recalc_res = recalculate_all_institutional_metrics(settings=settings, force=True)
+
+    return {
+        "success": True,
+        "total_requested": total,
+        "successful_tickers_count": len(successful_tickers),
+        "failed_tickers_count": len(failed_tickers),
+        "total_records_inserted": len(all_db_rows),
+        "accumulation_cache_equities": recalc_res.get("equities_processed", 0),
+    }

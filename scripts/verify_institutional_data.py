@@ -53,7 +53,10 @@ from earnings_engine.data.institutional_accumulation import (
     fetch_live_corporate_ownership_batch,
     init_institutional_db,
 )
-from earnings_engine.data.nse_shareholding import ingest_universe_shareholding_patterns
+from earnings_engine.data.nse_shareholding import (
+    ingest_universe_shareholding_patterns,
+    ingest_multi_quarter_shareholding_batch,
+)
 from earnings_engine.data.universe import get_universe
 from earnings_engine.data.watchlists import get_watchlist
 
@@ -369,6 +372,29 @@ def ingest_nse_universe_data(
     return res
 
 
+def ingest_multi_quarter_data(
+    tickers: list[str],
+    settings: Settings,
+    max_quarters: int = 4,
+    max_workers: int = 5,
+) -> dict[str, Any]:
+    """Ingest authentic multi-quarter shareholding patterns (e.g. last 4 quarters) across target equities."""
+    print("\n" + "=" * 78)
+    print(f" [*] INGESTING AUTHENTIC {max_quarters}-QUARTER SHAREHOLDING PATTERNS FOR {len(tickers)} EQUITIES")
+    print("=" * 78)
+
+    res = ingest_multi_quarter_shareholding_batch(
+        tickers=tickers,
+        max_workers=max_workers,
+        max_quarters=max_quarters,
+        settings=settings,
+        progress_callback=lambda curr, tot, sym: print(f"    [{curr}/{tot}] Ingested {max_quarters}Q patterns for {sym}...", end="\r", flush=True) if curr % 10 == 0 or curr == tot else None,
+    )
+    print()
+    print(f"  * Multi-Quarter Ingestion Summary: {res.get('successful_tickers_count', 0)}/{res.get('total_requested', 0)} equities succeeded ({res.get('total_records_inserted', 0)} total quarterly records persisted).")
+    return res
+
+
 def sync_to_turso_cloud(settings: Settings) -> bool:
     """Sync and override cleaned institutional tables in Turso cloud database."""
     print("\n" + "=" * 78)
@@ -406,6 +432,8 @@ def main() -> int:
     parser.add_argument("--clean-synthetic", "--purge", action="store_true", help="Purge all synthetic/mock records")
     parser.add_argument("--verify-live", nargs="*", help="Fetch live corporate ownership for given tickers (or use --all/--universe)")
     parser.add_argument("--ingest-nse", action="store_true", help="Ingest official quarterly shareholding filings from NSE India API")
+    parser.add_argument("--ingest-quarters", action="store_true", help="Ingest authentic multi-quarter shareholding patterns (e.g. last 4 quarters)")
+    parser.add_argument("--quarters", type=int, default=4, help="Number of historical quarters to ingest (default: 4)")
     parser.add_argument("--universe", type=str, default=None, help="Universe or watchlist name (e.g. NIFTY50, NIFTY500, NSE_ALL, my_watchlist)")
     parser.add_argument("--all", action="store_true", help="Target all equities in universe and database")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of equities to process")
@@ -428,13 +456,13 @@ def main() -> int:
         logging.getLogger("earnings_engine").setLevel(logging.DEBUG)
         logging.getLogger("verify_institutional_data").setLevel(logging.DEBUG)
 
-    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.sync_turso]):
+    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.ingest_quarters, args.sync_turso]):
         args.audit = True
 
     if args.clean_synthetic:
         clean_synthetic_institutional_records(settings)
 
-    if args.verify_live is not None or args.ingest_nse:
+    if args.verify_live is not None or args.ingest_nse or args.ingest_quarters:
         targets = resolve_target_tickers(
             tickers_arg=args.verify_live,
             universe_arg=args.universe,
@@ -442,6 +470,13 @@ def main() -> int:
             limit=args.limit,
             settings=settings,
         )
+        if args.ingest_quarters:
+            ingest_multi_quarter_data(
+                tickers=targets,
+                settings=settings,
+                max_quarters=args.quarters,
+                max_workers=args.workers,
+            )
         if args.ingest_nse:
             ingest_nse_universe_data(targets, settings)
         if args.verify_live is not None:

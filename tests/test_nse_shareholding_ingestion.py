@@ -16,6 +16,8 @@ from earnings_engine.data.nse_shareholding import (
     parse_shareholding_response,
     extract_and_persist_stock_shareholding,
     ingest_universe_shareholding_patterns,
+    parse_quarter_label,
+    ingest_multi_quarter_shareholding_batch,
 )
 from earnings_engine.data.institutional_accumulation import (
     get_all_funds_activity,
@@ -244,4 +246,87 @@ def test_ingest_universe_shareholding_patterns_fallback(init_db):
     freshness = conn.execute("SELECT source FROM nse_shareholding_freshness WHERE ticker = 'INFY.NS'").fetchone()
     assert freshness is not None
     assert freshness[0] == "seed_fallback"
+
+
+def test_parse_quarter_label():
+    """Verify fiscal quarter mappings for all 4 quarters across financial years."""
+    assert parse_quarter_label("Jun 2026") == "Q1 FY27"
+    assert parse_quarter_label("Sep 2025") == "Q2 FY26"
+    assert parse_quarter_label("Dec 2025") == "Q3 FY26"
+    assert parse_quarter_label("Mar 2026") == "Q4 FY26"
+    assert parse_quarter_label("Jun 2025") == "Q1 FY26"
+    assert parse_quarter_label("Mar 2025") == "Q4 FY25"
+
+
+def test_ingest_multi_quarter_shareholding_batch(init_db):
+    """Verify multi-quarter pattern ingestion parses and persists 4 historical quarters per stock."""
+    settings = init_db
+    conn = get_db_connection(settings)
+
+    mock_quarters = [
+        {
+            "ticker": "RELIANCE.NS",
+            "raw_quarter": "Sep 2025",
+            "quarter": "Q2 FY26",
+            "promoter_pct": 50.30,
+            "fii_pct": 21.80,
+            "dii_mf_pct": 8.10,
+            "public_retail_pct": 19.80,
+            "other_pct": 0.0,
+        },
+        {
+            "ticker": "RELIANCE.NS",
+            "raw_quarter": "Dec 2025",
+            "quarter": "Q3 FY26",
+            "promoter_pct": 50.30,
+            "fii_pct": 22.00,
+            "dii_mf_pct": 8.30,
+            "public_retail_pct": 19.40,
+            "other_pct": 0.0,
+        },
+        {
+            "ticker": "RELIANCE.NS",
+            "raw_quarter": "Mar 2026",
+            "quarter": "Q4 FY26",
+            "promoter_pct": 50.31,
+            "fii_pct": 22.10,
+            "dii_mf_pct": 8.45,
+            "public_retail_pct": 19.14,
+            "other_pct": 0.0,
+        },
+        {
+            "ticker": "RELIANCE.NS",
+            "raw_quarter": "Jun 2026",
+            "quarter": "Q1 FY27",
+            "promoter_pct": 50.31,
+            "fii_pct": 22.50,
+            "dii_mf_pct": 8.60,
+            "public_retail_pct": 18.59,
+            "other_pct": 0.0,
+        },
+    ]
+
+    with patch("earnings_engine.data.nse_shareholding.fetch_multi_quarter_shareholding", return_value=mock_quarters):
+        res = ingest_multi_quarter_shareholding_batch(
+            tickers=["RELIANCE.NS"],
+            max_workers=1,
+            max_quarters=4,
+            settings=settings,
+        )
+
+    assert res["success"] is True
+    assert res["successful_tickers_count"] == 1
+    assert res["total_records_inserted"] == 4
+
+    # Verify rows in database
+    rows = conn.execute(
+        "SELECT quarter, promoter_pct, fii_pct, dii_mf_pct FROM shareholding_patterns WHERE ticker = 'RELIANCE.NS' ORDER BY quarter"
+    ).fetchall()
+    assert len(rows) == 4
+    quarters = [r[0] for r in rows]
+    assert "Q1 FY27" in quarters
+    assert "Q4 FY26" in quarters
+    assert "Q3 FY26" in quarters
+    assert "Q2 FY26" in quarters
+
 
