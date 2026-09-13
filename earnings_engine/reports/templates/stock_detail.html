@@ -2114,6 +2114,9 @@
                     if (isManualRefresh) {
                         showStockToast(`Live quote updated for ${ACTIVE_SYM}: ₹${data.quote?.current_price || '—'}`, 'success');
                     }
+                    if (!stockLiquidityData || !stockLiquidityData.spot_price) {
+                        loadStockLiquidityWalls();
+                    }
                 }
             } catch (e) {
                 console.error('Quote fetch error:', e);
@@ -2251,6 +2254,9 @@
                     renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
                     if (isManual) showStockToast('Technical structure and swing ranges updated', 'success');
+                    if (!stockLiquidityData || !stockLiquidityData.support_strike) {
+                        loadStockLiquidityWalls();
+                    }
                 }
             } catch (e) {
                 console.error('Technicals fetch error:', e);
@@ -4783,7 +4789,9 @@
             if (clean.includes(':')) return clean;
             if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
             if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
-            return clean;
+            const knownUSTickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'SPY', 'QQQ', 'AMD', 'INTC', 'NFLX', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS'];
+            if (knownUSTickers.includes(clean)) return clean;
+            return 'NSE:' + clean;
         }
 
         function initTradingViewOnlineWidget() {
@@ -5064,6 +5072,9 @@
                 if (overlay) overlay.style.display = 'none';
                 updateHudWithLastBar();
                 setChartRange(activeChartRange);
+                if (!stockLiquidityData || !stockLiquidityData.spot_price) {
+                    loadStockLiquidityWalls();
+                }
             } catch (err) {
                 console.error('Error loading chart data:', err);
                 if (overlay) overlay.innerHTML = `<span style="color:#ef4444;">Failed to load price bars (${err.message})</span>`;
@@ -5166,6 +5177,12 @@
                 }
             }
 
+            if (!spotPrice && stockState.quote && stockState.quote.current_price) {
+                spotPrice = stockState.quote.current_price;
+            }
+            if (!spotPrice && stockState.technical && stockState.technical.close) {
+                spotPrice = stockState.technical.close;
+            }
             if (!spotPrice && stockChartRawRecords.length > 0) {
                 spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
             }
@@ -5237,6 +5254,12 @@
             const svg = document.getElementById('liquidityDepthSvg');
             if (!svg) return;
 
+            if (!spotPrice && stockState.quote && stockState.quote.current_price) {
+                spotPrice = stockState.quote.current_price;
+            }
+            if (!spotPrice && stockState.technical && stockState.technical.close) {
+                spotPrice = stockState.technical.close;
+            }
             if (!spotPrice && stockChartRawRecords.length > 0) {
                 spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
             }
@@ -5246,20 +5269,18 @@
             }
 
             let filteredStrikes = (strikes || []).filter(s => s.strike && s.strike > spotPrice * 0.75 && s.strike < spotPrice * 1.25);
-            if (filteredStrikes.length < 4) {
-                const sup = supportStrike || (spotPrice * 0.95);
-                const res = resistanceStrike || (spotPrice * 1.05);
-                filteredStrikes = [
-                    { strike: sup * 0.96, put_oi: 800000, call_oi: 50000 },
-                    { strike: sup * 0.98, put_oi: 1200000, call_oi: 80000 },
-                    { strike: sup, put_oi: 2500000, call_oi: 150000 },
-                    { strike: spotPrice * 0.99, put_oi: 900000, call_oi: 400000 },
-                    { strike: spotPrice, put_oi: 600000, call_oi: 600000 },
-                    { strike: spotPrice * 1.01, put_oi: 350000, call_oi: 950000 },
-                    { strike: res, put_oi: 120000, call_oi: 2800000 },
-                    { strike: res * 1.02, put_oi: 60000, call_oi: 1400000 },
-                    { strike: res * 1.04, put_oi: 30000, call_oi: 900000 },
-                ];
+            if (filteredStrikes.length < 2) {
+                const el = (id) => document.getElementById(id);
+                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
+                if (el('depthMinStrike')) el('depthMinStrike').textContent = supportStrike ? `₹${Math.round(supportStrike).toLocaleString('en-IN')}` : '—';
+                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = resistanceStrike ? `₹${Math.round(resistanceStrike).toLocaleString('en-IN')}` : '—';
+                const supText = supportStrike ? `Support ₹${Number(supportStrike).toLocaleString('en-IN')}` : 'Support —';
+                const resText = resistanceStrike ? `Resistance ₹${Number(resistanceStrike).toLocaleString('en-IN')}` : 'Resistance —';
+                svg.innerHTML = `
+                    <text x="300" y="65" text-anchor="middle" fill="#94a3b8" font-size="12" font-family="monospace" font-weight="bold">Non-F&O Equity · Spot: ₹${Number(spotPrice).toFixed(2)}</text>
+                    <text x="300" y="90" text-anchor="middle" fill="#64748b" font-size="11" font-family="monospace">Swing Liquidity Levels: ${supText} | ${resText}</text>
+                `;
+                return;
             }
 
             filteredStrikes.sort((a, b) => a.strike - b.strike);

@@ -1492,11 +1492,13 @@
             }
         };
 
-        app.selectBreakoutCandidate = function(ticker, autoScroll, openDrawer) {
+        app.selectBreakoutCandidate = function(tickerOrCandidate, autoScroll, openDrawer) {
+            if (!tickerOrCandidate) return;
+            const ticker = typeof tickerOrCandidate === 'object' ? tickerOrCandidate.ticker : tickerOrCandidate;
             if (!ticker) return;
             app._selectedBreakoutTicker = ticker;
 
-            const rows = document.querySelectorAll('#breakoutTableBody tr[data-ticker]');
+            const rows = document.querySelectorAll('#breakoutTableBody tr[data-ticker], #breakoutTrackedTableBody tr[data-ticker]');
             rows.forEach((row, idx) => {
                 const rowTicker = row.getAttribute('data-ticker');
                 if (rowTicker === ticker) {
@@ -1510,8 +1512,10 @@
                 }
             });
 
-            const candidate = (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
+            const candidate = (typeof tickerOrCandidate === 'object' ? tickerOrCandidate : null)
+                || (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
                 || (app._breakoutData || []).find(c => c.ticker === ticker)
+                || (app._trackedBreakoutsData || []).find(c => c.ticker === ticker)
                 || { ticker: ticker };
 
             if (app.renderBreakoutSetupInspector) {
@@ -2064,7 +2068,9 @@
             if (clean.includes(':')) return clean;
             if (clean.endsWith('.NS')) return 'NSE:' + clean.slice(0, -3);
             if (clean.endsWith('.BO')) return 'BSE:' + clean.slice(0, -3);
-            return clean;
+            const knownUSTickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'GOOG', 'META', 'TSLA', 'SPY', 'QQQ', 'AMD', 'INTC', 'NFLX', 'BRK.B', 'JNJ', 'JPM', 'V', 'PG', 'UNH', 'HD', 'MA', 'DIS'];
+            if (knownUSTickers.includes(clean)) return clean;
+            return 'NSE:' + clean;
         }
 
         app.initBreakoutTradingViewWidget = function(ticker) {
