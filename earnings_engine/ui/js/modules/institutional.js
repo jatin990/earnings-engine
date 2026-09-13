@@ -2042,9 +2042,254 @@
         _smartMoneyNewEntrantsOnly: false,
         _smartMoneyEmergingOnly: false,
         _smartMoneyGoodEpsOnly: false,
+        _smartMoneyStrategy: 'ALL_STRATEGIES',
+        _smartMoneyStatus: 'active',
+        _smartMoneyForensicDossier: null,
+        _smartMoneyForensicTab: 'buyers',
         _smartMoneyStocks: [],
         _smartMoneySelectedStock: null,
         _smartMoneyRawData: null,
+
+
+
+        selectSmartMoneyStrategy(strategy) {
+
+            this._smartMoneyStrategy = strategy;
+
+            ['ALL_STRATEGIES', 'WHALE_CONVICTION', 'BLOCK_DEAL_MOMENTUM', 'DUAL_ACCELERATION', 'DOMESTIC_ABSORPTION'].forEach(s => {
+
+                const btn = document.getElementById('btnSmStrat-' + s);
+
+                if (btn) {
+
+                    btn.style.background = s === strategy ? '#ffffff' : 'transparent';
+
+                    btn.style.color = s === strategy ? '#09090b' : '#a1a1aa';
+
+                    btn.style.borderColor = s === strategy ? '#ffffff' : 'transparent';
+
+                }
+
+            });
+
+            this._smartMoneySortColumn = 'score';
+
+            this._smartMoneySortAsc = false;
+
+            this.loadSmartMoneyRadar(true);
+
+        },
+
+
+
+        switchForensicsTab(tab) {
+
+            this._smartMoneyForensicTab = tab;
+
+            ['buyers', 'quarterly', 'blocks', 'signals'].forEach(t => {
+
+                const btn = document.getElementById('btnForensicTab-' + t);
+
+                const pane = document.getElementById('instForensicPane-' + t);
+
+                if (btn) {
+
+                    btn.style.background = t === tab ? '#ffffff' : 'transparent';
+
+                    btn.style.color = t === tab ? '#09090b' : '#a1a1aa';
+
+                    btn.style.borderColor = t === tab ? '#ffffff' : 'transparent';
+
+                }
+
+                if (pane) pane.style.display = t === tab ? 'block' : 'none';
+
+            });
+
+            if (this._smartMoneySelectedStock) {
+
+                this.renderForensicsTab(tab);
+
+            }
+
+        },
+
+
+
+        renderForensicsTab(tab) {
+
+            const dossier = this._smartMoneyForensicDossier;
+
+            if (!dossier) return;
+
+            const container = document.getElementById('instForensicPane-' + tab);
+
+            if (!container) return;
+
+            if (tab === 'quarters') tab = 'quarterly';
+
+            if (tab === 'buyers') {
+
+                const buyers = dossier.buyers || [];
+
+                const badge = document.getElementById('instSmBuyerCountBadge');
+
+                if (badge) badge.textContent = `${buyers.length} Buyers Logged`;
+
+                const tbody = document.getElementById('instSmBuyersTableBody');
+
+                if (!tbody) return;
+
+                if (!buyers.length) {
+
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:#71717a;">No institutional buyers on record.</td></tr>';
+
+                    return;
+
+                }
+
+                tbody.innerHTML = buyers.map(b => {
+
+                    const cls = b.entity_type || b.fund_type || 'Institution';
+
+                    const stakePct = b.stake_pct != null ? `${Number(b.stake_pct).toFixed(2)}%` : '—';
+
+                    const chgPct = b.change_pct != null ? `${Number(b.change_pct) >= 0 ? '+' : ''}${Number(b.change_pct).toFixed(2)}%` : '—';
+
+                    const capCr = b.capital_cr != null ? `₹${Number(b.capital_cr).toLocaleString(undefined, {maximumFractionDigits:1})} Cr` : '—';
+
+                    const qty = b.quantity != null ? Number(b.quantity).toLocaleString('en-IN') : (b.shares != null ? Number(b.shares).toLocaleString('en-IN') : '—');
+
+                    const price = b.buy_price != null ? `₹${Number(b.buy_price).toFixed(2)}` : (b.price != null ? `₹${Number(b.price).toFixed(2)}` : '—');
+
+                    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${b.name || b.fund_name || '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;color:#a1a1aa;">${cls}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#38bdf8;">${stakePct}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${Number(chgPct.replace(/[+%]/g,'') || 0) >= 0 ? '#34d399' : '#f87171'};">${chgPct}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${qty}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${price}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#10b981;">${capCr}</td>
+                        <td style="padding:0.4rem 0.6rem;color:#71717a;font-size:0.65rem;">${b.quarter || b.date || b.filing_date || '—'}</td>
+                    </tr>`;
+                }).join('');
+
+                return;
+
+            }
+
+            if (tab === 'quarterly') {
+
+                const fin = dossier.quarterly_income || dossier.quarterly_financials || [];
+
+                const tbody = document.getElementById('instSmQuarterlyTableBody');
+
+                if (!tbody) return;
+
+                if (!fin.length) {
+
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:#71717a;">No quarterly financial filings on record.</td></tr>';
+
+                    return;
+
+                }
+
+                tbody.innerHTML = fin.map(f => `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${f.quarter || '—'}</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${Number(f.revenue_cr || 0).toLocaleString(undefined, {maximumFractionDigits:0})} Cr</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${Number(f.net_profit_cr || 0).toLocaleString(undefined, {maximumFractionDigits:0})} Cr</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${f.yoy_pat_growth_pct != null && f.yoy_pat_growth_pct >= 0 ? '#34d399' : (f.yoy_pat_growth_pct != null && f.yoy_pat_growth_pct < 0 ? '#f87171' : '#a1a1aa')};">${f.yoy_pat_growth_pct != null ? `${f.yoy_pat_growth_pct >= 0 ? '+' : ''}${Number(f.yoy_pat_growth_pct).toFixed(1)}%` : '—'}</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${f.operating_margin_pct != null ? `${Number(f.operating_margin_pct).toFixed(1)}%` : '—'}</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${f.net_margin_pct != null ? `${Number(f.net_margin_pct).toFixed(1)}%` : '—'}</td>
+                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${f.eps != null ? Number(f.eps).toFixed(2) : '—'}</td>
+                    <td style="padding:0.4rem 0.6rem;color:#71717a;font-size:0.65rem;">${f.period_end_date || f.quarter || '—'}</td>
+                </tr>`).join('');
+
+                return;
+
+            }
+
+            if (tab === 'blocks') {
+
+                const deals = dossier.block_deals || [];
+
+                const tbody = document.getElementById('instSmBlockDealsTableBody') || document.getElementById('instSmBlockDealsContainer');
+
+                if (!tbody) return;
+
+                if (!deals.length) {
+
+                    tbody.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">No major exchange block deals on record.</div>';
+
+                    return;
+
+                }
+
+                tbody.innerHTML = deals.map(d => `
+                    <div style="background:#18181b;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
+                        <div>
+                            <span style="font-weight:700;color:${d.deal_type === 'BUY' ? '#34d399' : '#f87171'};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type || 'DEAL'}]</span>
+                            <strong style="color:#ffffff;">${d.client_name || d.name || '—'}</strong>
+                            <span style="color:#71717a;margin-left:0.3rem;">${d.deal_date || d.date || ''}</span>
+                        </div>
+                        <div style="font-family:var(--font-mono);color:#a1a1aa;text-align:right;">
+                            ${d.quantity ? Number(d.quantity).toLocaleString('en-IN') + ' sh @ ' : ''}₹${d.price != null ? Number(d.price).toFixed(2) : '—'}
+                            <div style="color:#10b981;">₹${Number(d.value_cr || 0).toLocaleString(undefined, {maximumFractionDigits:2})} Cr${d.pct_equity != null ? ` · ${Number(d.pct_equity).toFixed(2)}%` : ''}</div>
+                        </div>
+                    </div>`).join('');
+
+                return;
+
+            }
+
+            if (tab === 'signals') {
+
+                const signal = dossier.signal_timeline || [];
+
+                const container = document.getElementById('instSmSignalTimelineContainer');
+
+                if (!container) return;
+
+                const timelineSrc = Array.isArray(signal) ? signal : [];
+
+                if (!timelineSrc.length) {
+
+                    container.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">No discovery signal history on record.</div>';
+
+                    return;
+
+                }
+
+                container.innerHTML = timelineSrc.map(sg => {
+
+                    const sigRet = sg.outcome_return_pct;
+
+                    const retStr = sigRet != null ? `${sigRet >= 0 ? '+' : ''}${Number(sigRet).toFixed(2)}%` : '—';
+
+                    const retCol = sigRet != null && sigRet >= 0 ? '#34d399' : '#f87171';
+
+                    const status = sg.lifecycle_status || 'ACTIVE';
+
+                    const stBadge = status === 'TARGET_HIT' ? ['rgba(16,185,129,0.2)','#34d399'] : (status === 'DISTRIBUTION_EXIT' ? ['rgba(239,68,68,0.2)','#f87171'] : (status === 'COOLING_OFF' ? ['rgba(245,158,11,0.2)','#fbbf24'] : ['rgba(56,189,248,0.2)','#38bdf8']));
+
+                    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${sg.strategy || '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#a1a1aa;">${sg.signal_date || '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.signal_price != null ? Number(sg.signal_price).toFixed(2) : '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${sg.current_price != null ? `₹${Number(sg.current_price).toFixed(2)}` : '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${retCol};">${retStr}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.target_price != null ? Number(sg.target_price).toFixed(2) : '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.stop_loss != null ? Number(sg.stop_loss).toFixed(2) : '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${sg.days_elapsed != null ? `${sg.days_elapsed}d` : '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;"><span style="font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${stBadge[0]};color:${stBadge[1]};">${status}</span></td>
+                    </tr>`;
+                }).join('');
+
+                return;
+
+            }
+
+        },
 
 
 
@@ -2354,7 +2599,7 @@
 
             try {
 
-                let url = API_BASE + `/api/v1/institutional/recent-accumulation?window=${encodeURIComponent(this._smartMoneyWindow)}&entity_focus=${encodeURIComponent(this._smartMoneyEntityFocus)}&min_cr=${this._smartMoneyMinCr}&sort_by=${encodeURIComponent(this._smartMoneySortBy)}&limit=60`;
+                let url = API_BASE + `/api/v1/institutional/signals?strategy=${encodeURIComponent(this._smartMoneyStrategy)}&status=${encodeURIComponent(this._smartMoneyStatus)}&sort_by=${encodeURIComponent(this._smartMoneySortBy)}&limit=60`;
                 if (this._smartMoneyNewEntrantsOnly) {
                     url += '&new_entrants_only=true';
                 }
@@ -2377,7 +2622,7 @@
 
                 this._smartMoneyRawData = data;
 
-                this._smartMoneyStocks = data.stocks || [];
+                this._smartMoneyStocks = data.signals || [];
                 this._smartMoneySortColumn = 'score';
                 this._smartMoneySortAsc = false;
 
@@ -3088,6 +3333,29 @@
                     `;
                     }).join('');
                 }
+            }
+
+
+            // Fetch 360° Forensic Dossier and populate 4-tab drawer
+            const badge = document.getElementById('instSmBuyerCountBadge');
+            if (badge) badge.textContent = '⏳ Loading forensics...';
+            const finBadge = document.getElementById('instSmFinCountBadge');
+            if (finBadge) finBadge.textContent = '⏳';
+            const dealsBadge = document.getElementById('instSmDealsCountBadge');
+            if (dealsBadge) dealsBadge.textContent = '⏳';
+            const sigBadge = document.getElementById('instSmSignalCountBadge');
+            if (sigBadge) sigBadge.textContent = '⏳';
+
+            this._smartMoneyForensicDossier = null;
+            try {
+                const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(stock.ticker)}/forensics`);
+                if (fRes.ok) {
+                    const dossier = await fRes.json();
+                    this._smartMoneyForensicDossier = dossier;
+                    this.renderForensicsTab(this._smartMoneyForensicTab);
+                }
+            } catch (err) {
+                console.warn('[INST] Forensic dossier fetch failed:', err);
             }
         },
 
