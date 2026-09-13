@@ -55,6 +55,15 @@ CLAUDE_CODE_OMNIROUTE_MODELS: list[dict[str, Any]] = [
         "available": True,
     },
     {
+        "id": "dahl",
+        "name": "🌐 Dahl (MiniMax M2.7 & DeepSeek-V4-Flash)",
+        "tier": "FREE",
+        "provider": "Dahl Inference",
+        "description": "High-throughput free tier inference via MiniMax M2.7 & DeepSeek-V4-Flash.",
+        "recommended": False,
+        "available": True,
+    },
+    {
         "id": "auto/smart",
         "name": "🔮 Auto Smart (Smart Coding Gateway)",
         "tier": "SMART",
@@ -73,6 +82,7 @@ DEFAULT_OMNIROUTE_MODELS = [
     "antigravity/gemini-3.7-flash-medium",
     "antigravity/gemini-3.8-flash-tiered",
     "antigravity/claude-sonnet-4-6",
+    "dahl",
     "openai/gpt-4o-mini",
     "meta-llama/llama-3.3-70b-instruct",
     "google/gemini-2.0-flash",
@@ -699,7 +709,7 @@ class OmniRouteClient:
                             {"role": "user", "content": prompt},
                         ],
                         "temperature": 0.2,
-                        "max_tokens": 350,
+                        "max_tokens": 1200,
                     },
                     timeout=effective_timeout,
                 )
@@ -731,8 +741,18 @@ class OmniRouteClient:
                         logger.warning("[OMNIROUTE] Model %s returned empty content from %s; failing fast to heuristics.", model_name, completions_url)
                         break
 
-                    clean_json = re.sub(r"^```(?:json)?", "", raw_content, flags=re.MULTILINE).strip()
+                    # Strip reasoning tokens / chain of thought <think>...</think>
+                    cleaned_content = re.sub(r"<think>[\s\S]*?</think>", "", raw_content).strip()
+                    if not cleaned_content and raw_content:
+                        cleaned_content = raw_content
+
+                    clean_json = re.sub(r"^```(?:json)?", "", cleaned_content, flags=re.MULTILINE).strip()
                     clean_json = re.sub(r"```$", "", clean_json, flags=re.MULTILINE).strip()
+
+                    # Extract outermost JSON object if wrapped by preamble or trailer
+                    json_match = re.search(r"(\{[\s\S]*\})", clean_json)
+                    if json_match:
+                        clean_json = json_match.group(1).strip()
 
                     try:
                         parsed = json.loads(clean_json)
