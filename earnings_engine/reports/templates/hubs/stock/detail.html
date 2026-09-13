@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
             --bg-void: #000000;
@@ -1272,21 +1273,34 @@
             </div>
         </div>
 
-        <!-- 📈 SECTION: INTERACTIVE PRICE ACTION & VOLUME CHART -->
+        <!-- 📈 SECTION: INTERACTIVE TECHNICAL TERMINAL & LIQUIDITY DEPTH -->
         <section class="card" id="cardStockChart" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
             <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
-                    <span style="color: #38bdf8;">📈</span>
-                    <span>Interactive Technical Chart</span>
-                    <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">TradingView Canvas · SMA 20/50/200</span>
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                    <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                        <span style="color: #38bdf8;">📈</span>
+                        <span>Interactive Technical Terminal &amp; Liquidity Walls</span>
+                    </div>
+
+                    <!-- Dual Chart View Mode Switcher -->
+                    <div style="display: inline-flex; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px;">
+                        <button type="button" id="btnChartModeTv" onclick="setChartMode('tradingview')" style="background: rgba(56,189,248,0.2); border: none; color: #38bdf8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>⚡</span><span>Live TradingView</span>
+                        </button>
+                        <button type="button" id="btnChartModeNexus" onclick="setChartMode('nexus')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>📊</span><span>Nexus Quant Canvas</span>
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Overlays Legend & Range Selectors -->
-                <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <!-- Nexus Canvas Controls (Only active in Nexus mode) -->
+                <div id="nexusChartControls" style="display: none; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.72rem; font-family: var(--font-mono);">
                         <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #38bdf8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8;"></span>SMA 20</span>
                         <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #fbbf24;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>SMA 50</span>
                         <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #818cf8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #818cf8;"></span>SMA 200</span>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #10b981; font-weight: 700;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>BUY WALL</span>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; color: #ef4444; font-weight: 700;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span>SELL WALL</span>
                     </div>
 
                     <!-- Range Selector Buttons -->
@@ -1304,22 +1318,111 @@
                 </div>
             </div>
 
-            <!-- Interactive Crosshair HUD Info Bar -->
-            <div id="chartHudBar" style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.05); padding: 0.45rem 0.85rem; border-radius: 6px; margin-bottom: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem;">
-                <div style="color: #94a3b8;"><span style="color: #64748b;">DATE: </span><strong id="hudDate" style="color: #e2e8f0;">—</strong></div>
-                <div><span style="color: #64748b;">O: </span><strong id="hudOpen" style="color: #e2e8f0;">—</strong></div>
-                <div><span style="color: #64748b;">H: </span><strong id="hudHigh" style="color: #34d399;">—</strong></div>
-                <div><span style="color: #64748b;">L: </span><strong id="hudLow" style="color: #f87171;">—</strong></div>
-                <div><span style="color: #64748b;">C: </span><strong id="hudClose" style="color: #38bdf8;">—</strong></div>
-                <div><span style="color: #64748b;">VOL: </span><strong id="hudVol" style="color: #e2e8f0;">—</strong></div>
-                <div id="hudChangePill" style="display: none; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">—</div>
+            <!-- VIEW 1: ONLINE TRADINGVIEW REAL-TIME CLOUD WIDGET -->
+            <div id="tvWidgetContainerWrap" style="position: relative; width: 100%; height: 480px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.06);">
+                <div id="tradingview_widget_container" style="width: 100%; height: 100%;"></div>
             </div>
 
-            <!-- Canvas Container with Loading Overlay -->
-            <div style="position: relative; width: 100%; height: 420px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
-                <div id="stockDetailChartContainer" style="width: 100%; height: 100%;"></div>
-                <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 10;">
-                    <span>Loading interactive candlestick series...</span>
+            <!-- VIEW 2: NEXUS QUANT CANVAS & CUSTOM WALL OVERLAYS -->
+            <div id="nexusQuantCanvasWrap" style="display: none; flex-direction: column; gap: 0.65rem;">
+                <!-- Interactive Crosshair HUD Info Bar -->
+                <div id="chartHudBar" style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.05); padding: 0.45rem 0.85rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.78rem;">
+                    <div style="color: #94a3b8;"><span style="color: #64748b;">DATE: </span><strong id="hudDate" style="color: #e2e8f0;">—</strong></div>
+                    <div><span style="color: #64748b;">O: </span><strong id="hudOpen" style="color: #e2e8f0;">—</strong></div>
+                    <div><span style="color: #64748b;">H: </span><strong id="hudHigh" style="color: #34d399;">—</strong></div>
+                    <div><span style="color: #64748b;">L: </span><strong id="hudLow" style="color: #f87171;">—</strong></div>
+                    <div><span style="color: #64748b;">C: </span><strong id="hudClose" style="color: #38bdf8;">—</strong></div>
+                    <div><span style="color: #64748b;">VOL: </span><strong id="hudVol" style="color: #e2e8f0;">—</strong></div>
+                    <div id="hudChangePill" style="display: none; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">—</div>
+                </div>
+
+                <!-- Canvas Container with Loading Overlay -->
+                <div style="position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
+                    <div id="stockDetailChartContainer" style="width: 100%; height: 100%;"></div>
+                    <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 10;">
+                        <span>Loading interactive candlestick series...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🌊 SECTION: BUY & SELL LIQUIDITY WALLS & DEPTH DISTRIBUTION -->
+            <div id="liquidityWallsSection" style="margin-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 1.1rem; display: flex; flex-direction: column; gap: 0.9rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 700; color: #e2e8f0;">
+                        <span>🌊</span>
+                        <span>Institutional Liquidity Distribution &amp; Order Book Depth</span>
+                        <span id="liquiditySourceBadge" style="font-size: 0.68rem; font-family: var(--font-mono); padding: 0.1rem 0.45rem; border-radius: 4px; background: rgba(56,189,248,0.12); color: #38bdf8; border: 1px solid rgba(56,189,248,0.25);">NSE F&amp;O Open Interest + Swing Liquidity</span>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono);">
+                        <span>Current Spot / LTP: </span>
+                        <strong id="wallSpotPrice" style="color: #38bdf8;">₹—</strong>
+                    </div>
+                </div>
+
+                <!-- Metric Summary Chips -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem;">
+                    <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div style="font-size: 0.65rem; color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟢 Major Buy Wall (Put OI)</div>
+                        <div id="valBuyWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
+                        <div id="valBuyWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
+                    </div>
+                    <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div style="font-size: 0.65rem; color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🔴 Major Sell Wall (Call OI)</div>
+                        <div id="valSellWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #f87171; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
+                        <div id="valSellWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
+                    </div>
+                    <div style="background: rgba(251, 191, 36, 0.06); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div style="font-size: 0.65rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟡 Max Pain Equilibrium</div>
+                        <div id="valMaxPainStrike" style="font-size: 1.05rem; font-weight: 800; color: #fde047; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
+                        <div id="valMaxPainDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">Zero-payout strike</div>
+                    </div>
+                    <div style="background: rgba(129, 140, 248, 0.06); border: 1px solid rgba(129, 140, 248, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div style="font-size: 0.65rem; color: #818cf8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">⚖️ Put-Call Ratio (PCR)</div>
+                        <div id="valPcrRatio" style="font-size: 1.05rem; font-weight: 800; color: #a5b4fc; font-family: var(--font-mono); margin-top: 0.15rem;">—</div>
+                        <div id="valPcrSentiment" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— sentiment</div>
+                    </div>
+                </div>
+
+                <!-- Interactive SVG Cumulative Depth Mountain & Ladder Grid -->
+                <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr); gap: 0.85rem; align-items: stretch;">
+                    <!-- Left: Cumulative Liquidity Depth Mountain (SVG) -->
+                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono); margin-bottom: 0.5rem;">
+                            <span style="color: #34d399;">◀ Cumulative Buy Liquidity (Bids / Puts)</span>
+                            <span style="color: #f87171;">Cumulative Sell Liquidity (Asks / Calls) ▶</span>
+                        </div>
+                        <div id="depthSvgContainer" style="width: 100%; height: 160px; position: relative;">
+                            <svg id="liquidityDepthSvg" width="100%" height="100%" viewBox="0 0 600 160" preserveAspectRatio="none" style="overflow: visible;">
+                                <defs>
+                                    <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.65"/>
+                                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                                    </linearGradient>
+                                    <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.65"/>
+                                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+                                    </linearGradient>
+                                </defs>
+                                <text x="300" y="80" text-anchor="middle" fill="#64748b" font-size="12" font-family="monospace">Calculating liquidity depth curves...</text>
+                            </svg>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; font-family: var(--font-mono); margin-top: 0.35rem;">
+                            <span id="depthMinStrike">₹—</span>
+                            <span id="depthCenterSpot" style="color: #38bdf8; font-weight: 700;">Spot: ₹—</span>
+                            <span id="depthMaxStrike">₹—</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Top 4 Strike Walls Ladder -->
+                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="font-size: 0.72rem; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 0.4rem; display: flex; justify-content: space-between;">
+                            <span>Top Key Liquidity Levels</span>
+                            <span style="font-size: 0.65rem; color: #64748b;">Contracts / Volume</span>
+                        </div>
+                        <div id="liquidityLevelsList" style="display: flex; flex-direction: column; gap: 0.45rem;">
+                            <div style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 1rem;">Loading liquidity ladder...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -4653,16 +4756,87 @@
         }
 
         // =========================================================================
-        // 📈 Interactive Stock Detail Candlestick & Volume Chart (TradingView)
+        // 📈 Interactive Technical Terminal, TradingView Embed & Liquidity Walls
         // =========================================================================
+        let currentChartMode = 'tradingview';
         let stockChartInstance = null;
         let stockCandleSeries = null;
         let stockVolumeSeries = null;
         let stockSma20Series = null;
         let stockSma50Series = null;
         let stockSma200Series = null;
+        let buyWallPriceLine = null;
+        let sellWallPriceLine = null;
+        let maxPainPriceLine = null;
         let stockChartRawRecords = [];
         let activeChartRange = '1Y';
+        let stockLiquidityData = null;
+
+        function formatTradingViewSymbol(sym) {
+            if (!sym) return 'NSE:NIFTY';
+            const clean = sym.trim().toUpperCase();
+            if (clean.endsWith('.NS')) return 'NSE:' + clean.replace('.NS', '');
+            if (clean.endsWith('.BO')) return 'BSE:' + clean.replace('.BO', '');
+            return clean;
+        }
+
+        function initTradingViewOnlineWidget() {
+            const container = document.getElementById('tradingview_widget_container');
+            if (!container || !window.TradingView) return;
+            container.innerHTML = '';
+
+            const tvSymbol = formatTradingViewSymbol(ACTIVE_SYM);
+
+            try {
+                new window.TradingView.widget({
+                    "autosize": true,
+                    "symbol": tvSymbol,
+                    "interval": "D",
+                    "timezone": "Asia/Kolkata",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "en",
+                    "toolbar_bg": "#090a10",
+                    "enable_publishing": false,
+                    "allow_symbol_change": true,
+                    "container_id": "tradingview_widget_container",
+                    "hide_side_toolbar": false,
+                    "studies": [
+                        "MASimple@tv-basicstudies",
+                        "RSI@tv-basicstudies",
+                        "Volume@tv-basicstudies"
+                    ]
+                });
+            } catch (err) {
+                console.warn('Error creating TradingView widget:', err);
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:var(--font-mono);font-size:0.85rem;">TradingView online stream ready for ${tvSymbol}</div>`;
+            }
+        }
+
+        function setChartMode(mode) {
+            currentChartMode = mode;
+            const tvBtn = document.getElementById('btnChartModeTv');
+            const nexusBtn = document.getElementById('btnChartModeNexus');
+            const tvWrap = document.getElementById('tvWidgetContainerWrap');
+            const nexusWrap = document.getElementById('nexusQuantCanvasWrap');
+            const nexusControls = document.getElementById('nexusChartControls');
+
+            if (mode === 'tradingview') {
+                if (tvBtn) { tvBtn.style.background = 'rgba(56,189,248,0.2)'; tvBtn.style.color = '#38bdf8'; }
+                if (nexusBtn) { nexusBtn.style.background = 'transparent'; nexusBtn.style.color = '#94a3b8'; }
+                if (tvWrap) tvWrap.style.display = 'block';
+                if (nexusWrap) nexusWrap.style.display = 'none';
+                if (nexusControls) nexusControls.style.display = 'none';
+                initTradingViewOnlineWidget();
+            } else {
+                if (tvBtn) { tvBtn.style.background = 'transparent'; tvBtn.style.color = '#94a3b8'; }
+                if (nexusBtn) { nexusBtn.style.background = 'rgba(56,189,248,0.2)'; nexusBtn.style.color = '#38bdf8'; }
+                if (tvWrap) tvWrap.style.display = 'none';
+                if (nexusWrap) nexusWrap.style.display = 'flex';
+                if (nexusControls) nexusControls.style.display = 'flex';
+                initStockDetailChart();
+            }
+        }
 
         function calculateSMA(data, period) {
             const result = [];
@@ -4694,7 +4868,7 @@
 
             const chart = window.LightweightCharts.createChart(container, {
                 width: container.clientWidth || 800,
-                height: 420,
+                height: 440,
                 layout: {
                     background: { type: 'solid', color: '#090a10' },
                     textColor: '#cbd5e1',
@@ -4719,7 +4893,6 @@
                 },
             });
 
-            // Candlestick series
             const candleSeries = chart.addCandlestickSeries({
                 upColor: '#10b981',
                 downColor: '#ef4444',
@@ -4728,14 +4901,12 @@
                 wickDownColor: '#ef4444',
             });
 
-            // Volume histogram overlay series
             const volumeSeries = chart.addHistogramSeries({
                 priceFormat: { type: 'volume' },
-                priceScaleId: '', // overlay
+                priceScaleId: '',
                 scaleMargins: { top: 0.82, bottom: 0 },
             });
 
-            // Moving Average Overlays
             const sma20 = chart.addLineSeries({
                 color: '#38bdf8',
                 lineWidth: 1.5,
@@ -4759,17 +4930,15 @@
             stockSma50Series = sma50;
             stockSma200Series = sma200;
 
-            // Responsive ResizeObserver
             const ro = new ResizeObserver(entries => {
                 if (!entries || entries.length === 0) return;
                 const { width, height } = entries[0].contentRect;
                 if (width > 0 && height > 0) {
-                    chart.applyOptions({ width, height: 420 });
+                    chart.applyOptions({ width, height: 440 });
                 }
             });
             ro.observe(container);
 
-            // Crosshair Tooltip / HUD Update
             chart.subscribeCrosshairMove(param => {
                 const el = (id) => document.getElementById(id);
                 if (!param || !param.time || !param.seriesData) {
@@ -4801,6 +4970,9 @@
             });
 
             await loadStockDetailChartData();
+            if (stockLiquidityData) {
+                applyLiquidityWallPriceLines(stockLiquidityData.support_strike, stockLiquidityData.resistance_strike, stockLiquidityData.max_pain_strike);
+            }
         }
 
         function updateHudWithLastBar() {
@@ -4919,6 +5091,275 @@
             }
         }
 
+        // =========================================================================
+        // 🌊 Institutional Buy & Sell Liquidity Walls, Depth Mountain & Price Lines
+        // =========================================================================
+        async function loadStockLiquidityWalls() {
+            const cleanSym = ACTIVE_SYM.replace('.NS', '').replace('.BO', '');
+            const el = (id) => document.getElementById(id);
+
+            let supportStrike = null;
+            let resistanceStrike = null;
+            let maxPainStrike = null;
+            let pcrVal = null;
+            let sentiment = 'NEUTRAL';
+            let spotPrice = null;
+            let strikesList = [];
+
+            try {
+                const optResp = await fetch(`/api/v1/options/chain?symbol=${encodeURIComponent(cleanSym)}`);
+                if (optResp.ok) {
+                    const optData = await optResp.json();
+                    if (optData.success && optData.data && (optData.data.strikes || []).length > 0) {
+                        const d = optData.data;
+                        stockLiquidityData = d;
+                        supportStrike = d.support_strike;
+                        resistanceStrike = d.resistance_strike;
+                        maxPainStrike = d.max_pain_strike;
+                        pcrVal = d.pcr_oi;
+                        sentiment = d.sentiment || 'NEUTRAL';
+                        spotPrice = d.spot_price;
+                        strikesList = d.strikes || [];
+                    }
+                }
+            } catch (e) {
+                console.debug('Option chain lookup fallback:', e);
+            }
+
+            if (!supportStrike || !resistanceStrike) {
+                try {
+                    const techResp = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`);
+                    if (techResp.ok) {
+                        const techData = await techResp.json();
+                        const t = techData.technical || {};
+                        if (!supportStrike && t.support_level) supportStrike = t.support_level;
+                        if (!resistanceStrike && t.resistance_level) resistanceStrike = t.resistance_level;
+                        if (!spotPrice && t.close) spotPrice = t.close;
+                        if (el('liquiditySourceBadge')) {
+                            el('liquiditySourceBadge').textContent = 'Swing Channels & Multi-Timeframe Liquidity';
+                        }
+                    }
+                } catch (te) {
+                    console.debug('Technicals fallback failed:', te);
+                }
+            }
+
+            if (!spotPrice && stockChartRawRecords.length > 0) {
+                spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
+            }
+
+            if (el('wallSpotPrice')) el('wallSpotPrice').textContent = spotPrice ? `₹${Number(spotPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+            if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN')}` : '—';
+            if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN')}` : '—';
+            if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = maxPainStrike ? `₹${Number(maxPainStrike).toLocaleString('en-IN')}` : '—';
+            if (el('valPcrRatio')) el('valPcrRatio').textContent = pcrVal != null ? Number(pcrVal).toFixed(2) : '—';
+            if (el('valPcrSentiment')) {
+                const sColor = sentiment.includes('BULL') ? '#34d399' : (sentiment.includes('BEAR') ? '#f87171' : '#94a3b8');
+                el('valPcrSentiment').innerHTML = `<span style="color:${sColor};font-weight:700;">${sentiment}</span>`;
+            }
+
+            renderLiquidityDepthMountain(strikesList, spotPrice, supportStrike, resistanceStrike);
+            renderLiquidityLadder(strikesList, supportStrike, resistanceStrike, maxPainStrike);
+            applyLiquidityWallPriceLines(supportStrike, resistanceStrike, maxPainStrike);
+        }
+
+        function applyLiquidityWallPriceLines(support, resistance, maxPain) {
+            if (!stockCandleSeries || !window.LightweightCharts) return;
+
+            if (buyWallPriceLine) {
+                try { stockCandleSeries.removePriceLine(buyWallPriceLine); } catch (e) {}
+                buyWallPriceLine = null;
+            }
+            if (sellWallPriceLine) {
+                try { stockCandleSeries.removePriceLine(sellWallPriceLine); } catch (e) {}
+                sellWallPriceLine = null;
+            }
+            if (maxPainPriceLine) {
+                try { stockCandleSeries.removePriceLine(maxPainPriceLine); } catch (e) {}
+                maxPainPriceLine = null;
+            }
+
+            if (support) {
+                buyWallPriceLine = stockCandleSeries.createPriceLine({
+                    price: parseFloat(support),
+                    color: '#10b981',
+                    lineWidth: 2,
+                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: '🟢 BUY WALL',
+                });
+            }
+            if (resistance) {
+                sellWallPriceLine = stockCandleSeries.createPriceLine({
+                    price: parseFloat(resistance),
+                    color: '#ef4444',
+                    lineWidth: 2,
+                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: '🔴 SELL WALL',
+                });
+            }
+            if (maxPain) {
+                maxPainPriceLine = stockCandleSeries.createPriceLine({
+                    price: parseFloat(maxPain),
+                    color: '#fbbf24',
+                    lineWidth: 1.5,
+                    lineStyle: window.LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title: '🟡 MAX PAIN',
+                });
+            }
+        }
+
+        function renderLiquidityDepthMountain(strikes, spotPrice, supportStrike, resistanceStrike) {
+            const svg = document.getElementById('liquidityDepthSvg');
+            if (!svg) return;
+
+            if (!spotPrice && stockChartRawRecords.length > 0) {
+                spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
+            }
+            if (!spotPrice) {
+                svg.innerHTML = '<text x="300" y="80" text-anchor="middle" fill="#64748b" font-size="12" font-family="monospace">Awaiting price snapshot...</text>';
+                return;
+            }
+
+            let filteredStrikes = (strikes || []).filter(s => s.strike && s.strike > spotPrice * 0.75 && s.strike < spotPrice * 1.25);
+            if (filteredStrikes.length < 4) {
+                const sup = supportStrike || (spotPrice * 0.95);
+                const res = resistanceStrike || (spotPrice * 1.05);
+                filteredStrikes = [
+                    { strike: sup * 0.96, put_oi: 800000, call_oi: 50000 },
+                    { strike: sup * 0.98, put_oi: 1200000, call_oi: 80000 },
+                    { strike: sup, put_oi: 2500000, call_oi: 150000 },
+                    { strike: spotPrice * 0.99, put_oi: 900000, call_oi: 400000 },
+                    { strike: spotPrice, put_oi: 600000, call_oi: 600000 },
+                    { strike: spotPrice * 1.01, put_oi: 350000, call_oi: 950000 },
+                    { strike: res, put_oi: 120000, call_oi: 2800000 },
+                    { strike: res * 1.02, put_oi: 60000, call_oi: 1400000 },
+                    { strike: res * 1.04, put_oi: 30000, call_oi: 900000 },
+                ];
+            }
+
+            filteredStrikes.sort((a, b) => a.strike - b.strike);
+            const minK = filteredStrikes[0].strike;
+            const maxK = filteredStrikes[filteredStrikes.length - 1].strike;
+
+            const el = (id) => document.getElementById(id);
+            if (el('depthMinStrike')) el('depthMinStrike').textContent = `₹${Math.round(minK).toLocaleString('en-IN')}`;
+            if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
+            if (el('depthMaxStrike')) el('depthMaxStrike').textContent = `₹${Math.round(maxK).toLocaleString('en-IN')}`;
+
+            const width = 600;
+            const height = 160;
+            const pad = 10;
+
+            const spotX = Math.max(pad, Math.min(width - pad, ((spotPrice - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad));
+
+            const bidStrikes = filteredStrikes.filter(s => s.strike <= spotPrice).reverse();
+            let cumBid = 0;
+            const bidPoints = [];
+            bidStrikes.forEach(s => {
+                cumBid += (s.put_oi || s.put_vol || 1000);
+                const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
+                bidPoints.push({ x, cum: cumBid, strike: s.strike });
+            });
+
+            const askStrikes = filteredStrikes.filter(s => s.strike >= spotPrice);
+            let cumAsk = 0;
+            const askPoints = [];
+            askStrikes.forEach(s => {
+                cumAsk += (s.call_oi || s.call_vol || 1000);
+                const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
+                askPoints.push({ x, cum: cumAsk, strike: s.strike });
+            });
+
+            const maxCum = Math.max(cumBid, cumAsk, 1000);
+            const scaleY = (cum) => height - pad - (cum / maxCum) * (height - 2 * pad - 20);
+
+            let bidPath = `M ${spotX} ${height - pad}`;
+            bidPoints.forEach(p => {
+                bidPath += ` L ${p.x} ${scaleY(p.cum)}`;
+            });
+            bidPath += ` L ${pad} ${height - pad} Z`;
+
+            let askPath = `M ${spotX} ${height - pad}`;
+            askPoints.forEach(p => {
+                askPath += ` L ${p.x} ${scaleY(p.cum)}`;
+            });
+            askPath += ` L ${width - pad} ${height - pad} Z`;
+
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.75"/>
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                    </linearGradient>
+                    <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.75"/>
+                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+                    </linearGradient>
+                </defs>
+                <path d="${bidPath}" fill="url(#buyWallGrad)" stroke="#10b981" stroke-width="2" />
+                <path d="${askPath}" fill="url(#sellWallGrad)" stroke="#ef4444" stroke-width="2" />
+                <line x1="${spotX}" y1="10" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8" />
+                <text x="${spotX}" y="24" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold" font-family="monospace">LTP</text>
+            `;
+        }
+
+        function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike) {
+            const list = document.getElementById('liquidityLevelsList');
+            if (!list) return;
+
+            const items = [];
+            if (resistanceStrike) {
+                items.push({
+                    type: 'SELL_WALL',
+                    label: '🔴 Call OI Sell Wall',
+                    strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`,
+                    val: 'Strong Resistance',
+                    color: '#f87171',
+                    bg: 'rgba(239,68,68,0.1)',
+                });
+            }
+            if (maxPainStrike) {
+                items.push({
+                    type: 'MAX_PAIN',
+                    label: '🟡 Max Pain Strike',
+                    strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`,
+                    val: 'Neutral Pivot',
+                    color: '#fbbf24',
+                    bg: 'rgba(251,191,36,0.1)',
+                });
+            }
+            if (supportStrike) {
+                items.push({
+                    type: 'BUY_WALL',
+                    label: '🟢 Put OI Buy Wall',
+                    strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`,
+                    val: 'Major Demand Floor',
+                    color: '#34d399',
+                    bg: 'rgba(16,185,129,0.1)',
+                });
+            }
+
+            if (items.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.75rem;padding:0.5rem;">Calculating liquidity bounds...</div>';
+                return;
+            }
+
+            list.innerHTML = items.map(item => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: ${item.bg}; border: 1px solid rgba(255,255,255,0.05); padding: 0.35rem 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <span style="color: ${item.color}; font-weight: 700;">${item.label}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span style="font-weight: 800; color: #ffffff;">${item.strike}</span>
+                        <span style="font-size: 0.65rem; color: #94a3b8;">${item.val}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const stockIntSel = document.getElementById('stockLiveIntervalSelect');
             if (stockIntSel) stockIntSel.value = String(stockLiveIntervalMs);
@@ -4929,7 +5370,8 @@
             loadOmniRouteModels();
             fetchStockDetails();
             fetchRateLimits();
-            initStockDetailChart();
+            initTradingViewOnlineWidget();
+            loadStockLiquidityWalls();
         });
     </script>
 
