@@ -6,7 +6,7 @@
   "github": {
     "autoJobCancellation": true
   },
-  "ignoreCommand": "bash scripts/vercel_ignore_step.sh",
+  "ignoreCommand": "bash vercel_ignore_step.sh",
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
