@@ -59,6 +59,7 @@ SYNC_TABLES = [
     "news_catalysts",
     "news_catalysts_tickers",
     "news_catalyst_outcomes",
+    "news_feed_runs",
     "quarter_repeater_predictions",
     "tri_confluence_metrics",
     "option_chain_history",

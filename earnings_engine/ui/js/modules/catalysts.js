@@ -104,8 +104,22 @@ Object.assign(app, {
                     `;
 
                     grpFeeds.forEach(f => {
-                        const lastIng = f.last_ingested_at ? this.formatExactTime(f.last_ingested_at) : 'Active / Scheduled';
+                        const scanTime = f.last_scanned_at ? this.formatExactTime(f.last_scanned_at) : (f.last_ingested_at ? this.formatExactTime(f.last_ingested_at) : 'Active / Scheduled');
                         const typeColor = f.type.includes('XML') ? '#34d399' : (f.type.includes('API') ? '#c084fc' : '#60a5fa');
+
+                        let resultBadge = '';
+                        if (f.last_run_status === 'ERROR') {
+                            resultBadge = `<span style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:0.04rem 0.35rem;border-radius:3px;font-weight:600;" title="${f.last_error_message || 'Fetch error'}">⚠️ Error</span>`;
+                        } else if (f.last_articles_added != null) {
+                            if (f.last_articles_added > 0) {
+                                resultBadge = `<span style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.35rem;border-radius:3px;font-weight:700;" title="${f.last_articles_fetched || 0} fetched in last scan">+${f.last_articles_added} added</span>`;
+                            } else {
+                                resultBadge = `<span style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);padding:0.04rem 0.35rem;border-radius:3px;" title="${f.last_articles_fetched || 0} fetched (0 net new)">0 new</span>`;
+                            }
+                        } else {
+                            resultBadge = `<span style="background:rgba(56,189,248,0.08);color:#38bdf8;border:1px solid rgba(56,189,248,0.2);padding:0.04rem 0.35rem;border-radius:3px;">Ready</span>`;
+                        }
+
                         html += `
                             <div style="padding:0.45rem 0.6rem;background:#050508;border:1px solid rgba(255,255,255,0.06);border-radius:5px;display:flex;flex-direction:column;gap:0.25rem;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;gap:0.3rem;">
@@ -116,9 +130,9 @@ Object.assign(app, {
                                     <span>${f.category}</span>
                                     <a href="${f.url}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:none;" title="Open Feed Source">Source ↗</a>
                                 </div>
-                                <div style="font-size:0.64rem;color:#94a3b8;font-family:var(--font-mono);border-top:1px dashed rgba(255,255,255,0.06);padding-top:0.2rem;display:flex;justify-content:space-between;align-items:center;">
-                                    <span style="color:#64748b;">Last Ingest:</span>
-                                    <span style="color:#e2e8f0;">${lastIng}</span>
+                                <div style="font-size:0.64rem;color:#94a3b8;font-family:var(--font-mono);border-top:1px dashed rgba(255,255,255,0.06);padding-top:0.25rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.2rem;">
+                                    <span style="color:#64748b;" title="Last execution scan time">Scan: <span style="color:#e2e8f0;">${scanTime}</span></span>
+                                    ${resultBadge}
                                 </div>
                             </div>
                         `;
@@ -870,6 +884,63 @@ Object.assign(app, {
                 this.renderCatalysts();
             },
 
+            clusterCatalysts(items) {
+                if (!items || !items.length) return [];
+                const clusterMap = new Map();
+                const orderedClusters = [];
+
+                items.forEach(c => {
+                    const ticker = (c.ticker || 'MARKET').toUpperCase();
+                    let clusterKey = '';
+                    if (c.canonical_hash && c.canonical_hash.length >= 8) {
+                        clusterKey = `${ticker}::hash::${c.canonical_hash}`;
+                    } else {
+                        let cleanTitle = (c.title || '')
+                            .toLowerCase()
+                            .replace(/^[a-z0-9_.\-]+:\s*/i, '')
+                            .replace(/\s*[-–—|]\s*(the\s+)?(economic times|moneycontrol|livemint|business standard|ndtv profit|reuters|cnbc|financial express|hindu businessline).*$/i, '')
+                            .replace(/[^a-z0-9\s]/g, ' ')
+                            .split(/\s+/)
+                            .filter(w => w.length > 2 && !['the', 'and', 'for', 'with', 'from', 'ltd', 'limited', 'shares', 'stock', 'stocks', 'today', 'live', 'says', 'reports', 'news', 'update', 'corp', 'company', 'india'].includes(w))
+                            .slice(0, 6)
+                            .join('_');
+                        if (!cleanTitle) cleanTitle = (c.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 25);
+                        clusterKey = `${ticker}::${cleanTitle}`;
+                    }
+
+                    if (!clusterMap.has(clusterKey)) {
+                        const clusterObj = {
+                            key: clusterKey,
+                            primary: c,
+                            duplicates: []
+                        };
+                        clusterMap.set(clusterKey, clusterObj);
+                        orderedClusters.push(clusterObj);
+                    } else {
+                        const clusterObj = clusterMap.get(clusterKey);
+                        if ((c.impact_score || 0) > (clusterObj.primary.impact_score || 0) && (c.ai_analysis || (c.summary && c.summary.length > (clusterObj.primary.summary ? clusterObj.primary.summary.length : 0)))) {
+                            clusterObj.duplicates.push(clusterObj.primary);
+                            clusterObj.primary = c;
+                        } else {
+                            clusterObj.duplicates.push(c);
+                        }
+                    }
+                });
+
+                return orderedClusters;
+            },
+
+            toggleCatalystDuplicates(clusterId) {
+                const drawer = document.getElementById(`catDuplicatesDrawer_${clusterId}`);
+                const chevron = document.getElementById(`catDupChevron_${clusterId}`);
+                if (!drawer) return;
+                const isHidden = drawer.style.display === 'none' || !drawer.style.display;
+                drawer.style.display = isHidden ? 'block' : 'none';
+                if (chevron) {
+                    chevron.innerHTML = isHidden ? '▲' : '▾';
+                }
+            },
+
             renderCatalysts() {
                 const feedGrid = document.getElementById('catalystsFeedGrid');
                 const countBadge = document.getElementById('catFeedCountBadge');
@@ -917,7 +988,16 @@ Object.assign(app, {
                     return (b.impact_score || 0) - (a.impact_score || 0);
                 });
 
-                if (countBadge) countBadge.textContent = filtered.length + ' headlines';
+                this._lastFilteredCatalysts = filtered;
+
+                // Group multi-source duplicates into clusters
+                const clusters = this.clusterCatalysts(filtered);
+
+                if (countBadge) {
+                    countBadge.textContent = (clusters.length === filtered.length)
+                        ? filtered.length + ' headlines'
+                        : `${clusters.length} stories (${filtered.length} headlines)`;
+                }
 
                 // Synchronously update top KPI summary cards based on the filtered dataset
                 const totalCount = filtered.length;
@@ -949,14 +1029,16 @@ Object.assign(app, {
                 if (biasEl) biasEl.innerHTML = '<span style="color:#34d399;">' + bullCount + '</span> / <span style="color:#f87171;">' + bearCount + '</span>';
                 if (topCatEl) topCatEl.textContent = topCat;
 
-                this._lastFilteredCatalysts = filtered;
-
-                if (!filtered.length) {
+                if (!clusters.length) {
                     feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);">No catalysts matching selected filter criteria. Click "⚡ Scan Feeds" to discover live headlines.</div>';
                     return;
                 }
 
-                feedGrid.innerHTML = filtered.map(c => {
+                feedGrid.innerHTML = clusters.map(cl => {
+                    const c = cl.primary;
+                    const duplicates = cl.duplicates || [];
+                    const clusterId = (c.ticker + '_' + (c.canonical_hash || cl.key)).replace(/[^a-zA-Z0-9]/g, '_');
+
                     const isHigh = c.impact_level === 'HIGH';
                     const isBull = c.direction === 'BULLISH';
                     const isBear = c.direction === 'BEARISH';
@@ -1066,6 +1148,50 @@ Object.assign(app, {
                     const isSel = (this.selectedCatalysts && this.selectedCatalysts.has(c.ticker + '|||' + c.title)) ? 'checked' : '';
                     const hasStripContent = Boolean(priceBadge || aiTargetBadge || projBadge || c.expected_horizon || c.volatility_est);
 
+                    // Clubbed duplicates UI
+                    let clubbedSection = '';
+                    if (duplicates.length > 0) {
+                        const allPubs = Array.from(new Set([c.publisher || 'Source', ...duplicates.map(d => d.publisher || 'Source')]));
+                        const pubsPreview = allPubs.slice(0, 3).join(', ') + (allPubs.length > 3 ? ` +${allPubs.length - 3}` : '');
+
+                        clubbedSection = `
+                            <div style="margin-top:0.15rem;">
+                                <button type="button" onclick="app.toggleCatalystDuplicates('${clusterId}')" id="catDupToggleBtn_${clusterId}" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);color:#38bdf8;padding:0.12rem 0.45rem;border-radius:4px;font-size:0.68rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;font-weight:600;" title="Click to view ${duplicates.length} additional coverage source(s)">
+                                    <span>📰</span>
+                                    <span>Clubbed Coverage (${duplicates.length + 1} sources: ${pubsPreview})</span>
+                                    <span id="catDupChevron_${clusterId}">▾</span>
+                                </button>
+                            </div>
+
+                            <div id="catDuplicatesDrawer_${clusterId}" style="display:none;background:#030712;border:1px solid rgba(56,189,248,0.2);border-radius:5px;padding:0.45rem 0.65rem;margin:0.25rem 0 0.25rem 0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;padding-bottom:0.25rem;border-bottom:1px solid rgba(255,255,255,0.06);">
+                                    <span style="font-size:0.68rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);">
+                                        📰 Multi-Publisher & Exchange Coverage (${duplicates.length} duplicate/alternate reports)
+                                    </span>
+                                    <button type="button" onclick="app.toggleCatalystDuplicates('${clusterId}')" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:0.65rem;">✕ Close</button>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:0.3rem;">
+                                    ${duplicates.map(dup => {
+                                        const dupDate = this.formatNewsDate(dup.published_at);
+                                        const dupLink = dup.link
+                                            ? `<a href="${dup.link}" target="_blank" rel="noopener noreferrer" style="color:#e2e8f0;text-decoration:none;font-weight:600;font-size:0.75rem;" onmouseover="this.style.color='#60a5fa'" onmouseout="this.style.color='#e2e8f0'">${dup.title} <span style="font-size:0.65rem;opacity:0.7;">↗</span></a>`
+                                            : `<span style="color:#e2e8f0;font-weight:600;font-size:0.75rem;">${dup.title}</span>`;
+                                        return `
+                                            <div style="padding:0.3rem 0.45rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:4px;display:flex;flex-direction:column;gap:0.15rem;">
+                                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;font-family:var(--font-mono);">
+                                                    <span style="color:#38bdf8;font-weight:600;">${dup.publisher || 'Media Source'}</span>
+                                                    <span style="color:#71717a;">${dupDate}</span>
+                                                </div>
+                                                <div>${dupLink}</div>
+                                                ${(dup.summary && dup.summary !== dup.title) ? `<div style="font-size:0.7rem;color:#94a3b8;line-height:1.35;">${dup.summary}</div>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+
                     return `
                     <div class="card" style="margin:0;padding:0.65rem 0.85rem;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;display:flex;flex-direction:column;gap:0.45rem;transition:border-color 0.15s ease;">
 
@@ -1106,6 +1232,7 @@ Object.assign(app, {
                         <div style="display:flex;flex-direction:column;gap:0.2rem;">
                             <div>${headlineLink}</div>
                             ${c.summary ? `<p style="margin:0;font-size:0.76rem;color:#94a3b8;line-height:1.42;">${c.summary}</p>` : ''}
+                            ${clubbedSection}
                         </div>
 
                         <!-- ROW 3: Price Action, Targets & Horizon Strip (Clean Minimal) -->

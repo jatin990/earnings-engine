@@ -268,6 +268,25 @@ def _connect(settings: Settings) -> Any:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_ticker ON news_catalysts_tickers (ticker)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
 
+        # News Feed Ingestion Audit & Telemetry Runs
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS news_feed_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feed_id TEXT NOT NULL,
+                feed_name TEXT,
+                source_key TEXT,
+                scanned_at TEXT NOT NULL,
+                articles_fetched INTEGER DEFAULT 0,
+                articles_added INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'SUCCESS',
+                error_message TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nfr_feed_id_scanned ON news_feed_runs (feed_id, scanned_at DESC)")
+
         try:
             existing_cols = set()
             for r in conn.execute("PRAGMA table_info(news_catalysts)").fetchall():
@@ -1056,25 +1075,146 @@ def get_recent_news_activity(
         return results
 
 
+def record_feed_run(
+    feed_id: str,
+    feed_name: str,
+    source_key: str,
+    articles_fetched: int,
+    articles_added: int,
+    status: str = "SUCCESS",
+    error_message: str | None = None,
+    scanned_at: str | None = None,
+    settings: Settings | None = None,
+) -> None:
+    """Record an ingestion execution run for a specific news / regulatory feed."""
+    settings = settings or Settings()
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    scan_time = scanned_at or now_str
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT INTO news_feed_runs (
+                feed_id, feed_name, source_key, scanned_at,
+                articles_fetched, articles_added, status, error_message, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                feed_id, feed_name, source_key, scan_time,
+                int(articles_fetched), int(articles_added), status,
+                error_message, now_str
+            )
+        )
+        conn.commit()
+
+
+def record_feed_runs_batch(
+    runs: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> None:
+    """Batch-insert news feed ingestion execution logs."""
+    if not runs:
+        return
+    settings = settings or Settings()
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    with _connect(settings) as conn:
+        for r in runs:
+            conn.execute(
+                """
+                INSERT INTO news_feed_runs (
+                    feed_id, feed_name, source_key, scanned_at,
+                    articles_fetched, articles_added, status, error_message, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    r.get("feed_id", "unknown"),
+                    r.get("feed_name", ""),
+                    r.get("source_key", "rss"),
+                    r.get("scanned_at") or now_str,
+                    int(r.get("articles_fetched", 0)),
+                    int(r.get("articles_added", 0)),
+                    r.get("status", "SUCCESS"),
+                    r.get("error_message"),
+                    now_str,
+                )
+            )
+        conn.commit()
+
+
+def get_latest_feed_runs(settings: Settings | None = None) -> dict[str, dict[str, Any]]:
+    """Query the most recent ingestion run for every recorded feed in news_feed_runs."""
+    settings = settings or Settings()
+    latest: dict[str, dict[str, Any]] = {}
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                """
+                SELECT nfr.*
+                FROM news_feed_runs nfr
+                INNER JOIN (
+                    SELECT feed_id, MAX(id) as max_id
+                    FROM news_feed_runs
+                    GROUP BY feed_id
+                ) latest_sub ON nfr.id = latest_sub.max_id
+                """
+            ).fetchall()
+            for r in rows:
+                latest[r["feed_id"]] = dict(r)
+        except Exception as e:
+            logger.debug("[CATALYSTS] Failed querying latest feed runs: %s", e)
+    return latest
+
+
 def harvest_broadband_news(settings: Settings | None = None, run_ai: bool = True) -> dict[str, Any]:
     """Harvest market-wide broadband news feeds (MoneyControl, ET, Mint, NDTV, Google, BSE/NSE)."""
     settings = settings or Settings()
     t0 = time.perf_counter()
-    from earnings_engine.data.news_sources import fetch_all_broadband_news
-    from earnings_engine.data.news_pipeline import process_and_verify_news_items, save_verified_news_records
+    from earnings_engine.data.news_sources import fetch_all_broadband_news_with_feed_telemetry
+    from earnings_engine.data.news_pipeline import process_and_verify_news_items, save_verified_news_records_with_feed_breakdown
 
-    raw_items = fetch_all_broadband_news(timeout=6.5)
+    raw_items, feed_telemetry = fetch_all_broadband_news_with_feed_telemetry(timeout=6.5)
     saved_cnt = 0
+    feed_added_counts: dict[str, int] = {}
     if raw_items:
         articles = process_and_verify_news_items(raw_items, settings=settings, run_ai=run_ai)
         if articles:
-            saved_cnt = save_verified_news_records(articles, settings=settings)
+            saved_cnt, feed_added_counts = save_verified_news_records_with_feed_breakdown(articles, settings=settings)
+
+    # Attach added counts to each feed telemetry run and persist to news_feed_runs
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    runs_to_record: list[dict[str, Any]] = []
+    for f in feed_telemetry:
+        f_id = f.get("feed_id", "")
+        f_fetched = f.get("articles_fetched", 0)
+        f_added = feed_added_counts.get(f_id, 0)
+        status = f.get("status", "SUCCESS")
+        if status == "SUCCESS":
+            if f_added > 0:
+                status = "SUCCESS"
+            elif f_fetched > 0:
+                status = "NO_NEW_ARTICLES"
+            else:
+                status = "NO_NEW_ARTICLES"
+        runs_to_record.append({
+            "feed_id": f_id,
+            "feed_name": f.get("feed_name", ""),
+            "source_key": f.get("source_key", "rss"),
+            "scanned_at": f.get("scanned_at") or now_str,
+            "articles_fetched": f_fetched,
+            "articles_added": f_added,
+            "status": status,
+            "error_message": f.get("error_message"),
+        })
+
+    if runs_to_record:
+        record_feed_runs_batch(runs_to_record, settings=settings)
 
     elapsed = round(time.perf_counter() - t0, 2)
-    logger.info("[NEWS-HARVESTER] Broadband harvest completed in %.2fs: %d raw fetched, %d verified & saved", elapsed, len(raw_items), saved_cnt)
+    logger.info("[NEWS-HARVESTER] Broadband harvest completed in %.2fs: %d raw fetched, %d verified & saved across %d feeds", elapsed, len(raw_items), saved_cnt, len(runs_to_record))
     return {
         "raw_fetched": len(raw_items),
         "saved_count": saved_cnt,
+        "feeds_scanned": len(runs_to_record),
         "elapsed_seconds": elapsed,
     }
 
