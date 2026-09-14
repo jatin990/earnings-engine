@@ -15,10 +15,12 @@ from earnings_engine.api.dependencies import (
     get_template_env,
     require_scope,
     AddGroupMemberRequest,
+    AddPackingItemRequest,
     AttachGroupTripsRequest,
     CreateTripGroupRequest,
     CreateTripRequest,
     SuggestTripActivityRequest,
+    UpdatePackingStatusRequest,
     UpdateTripGroupRequest,
 )
 from earnings_engine.data.db import get_db_connection
@@ -328,6 +330,100 @@ async def lookup_friend_endpoint(
         "name": name,
         "passcode": passcode,
     }
+
+
+# ---------------------------------------------------------------------------
+# Itinerary endpoints (must precede /{trip_id}/activities to avoid route conflict)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/v1/trips/{trip_id}/itinerary")
+async def get_trip_itinerary_endpoint(
+    trip_id: str, session: dict = Depends(require_scope("can_view_trips"))
+):
+    """Retrieve the day-by-day itinerary for a trip, ordered by day number."""
+    from earnings_engine.data.trips import get_trip_itinerary
+
+    conn = get_db_connection(_settings)
+    with conn:
+        days = get_trip_itinerary(conn, trip_id)
+    return {"success": True, "count": len(days), "itinerary": days}
+
+
+# ---------------------------------------------------------------------------
+# Packing list endpoints (must precede /{trip_id}/activities to avoid route conflict)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/v1/trips/{trip_id}/packing")
+async def get_trip_packing_endpoint(
+    trip_id: str, session: dict = Depends(require_scope("can_view_trips"))
+):
+    """Retrieve all packing items for a trip with per-member status dictionaries."""
+    from earnings_engine.data.trips import get_packing_items
+
+    conn = get_db_connection(_settings)
+    with conn:
+        items = get_packing_items(conn, trip_id)
+    return {"success": True, "count": len(items), "items": items}
+
+
+@router.post("/api/v1/trips/{trip_id}/packing")
+async def add_packing_item_endpoint(
+    trip_id: str,
+    req: AddPackingItemRequest,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Add a new packing item to a trip. Any authenticated member may add items."""
+    from earnings_engine.data.trips import add_packing_item
+
+    conn = get_db_connection(_settings)
+    with conn:
+        item = add_packing_item(conn, trip_id, req.name, req.category, req.added_by)
+    return {"success": True, "item": item}
+
+
+@router.delete("/api/v1/trips/{trip_id}/packing/{item_id}")
+async def delete_packing_item_endpoint(
+    trip_id: str,
+    item_id: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Delete a packing item (owner only). Removes all associated status records."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if not (role == "owner" or "admin" in scopes or "*" in scopes):
+        raise HTTPException(status_code=403, detail="Owner access required to delete packing items.")
+
+    from earnings_engine.data.trips import delete_packing_item
+
+    conn = get_db_connection(_settings)
+    with conn:
+        delete_packing_item(conn, item_id)
+    return {"success": True, "deleted": item_id}
+
+
+@router.patch("/api/v1/trips/{trip_id}/packing/{item_id}/status")
+async def update_packing_status_endpoint(
+    trip_id: str,
+    item_id: str,
+    req: UpdatePackingStatusRequest,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Update the packing status for a (item, member) pair. Valid values: pending | packed | confirmed."""
+    valid_statuses = {"pending", "packed", "confirmed"}
+    if req.status not in valid_statuses:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status '{req.status}'. Must be one of: {sorted(valid_statuses)}",
+        )
+
+    from earnings_engine.data.trips import update_packing_status
+
+    conn = get_db_connection(_settings)
+    with conn:
+        row = update_packing_status(conn, item_id, req.member_name, req.status)
+    return {"success": True, "status": row}
 
 
 @router.get("/api/v1/trips/{trip_id}/activities")
