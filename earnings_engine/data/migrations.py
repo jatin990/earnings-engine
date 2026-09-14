@@ -1981,14 +1981,16 @@ def _migration_042_nepal_abc_trek(conn: Any) -> None:
 
     now_str = datetime.now().isoformat(timespec="seconds")
 
-    # 1. Purge fabricated mock trips and their children
-    for trip_id in ("trip_001", "trip_002", "trip_003"):
-        try:
-            conn.execute("DELETE FROM trip_activities WHERE trip_id = ?", (trip_id,))
-            conn.execute("DELETE FROM trip_group_trips WHERE trip_id = ?", (trip_id,))
-            conn.execute("DELETE FROM trips WHERE id = ?", (trip_id,))
-        except Exception:
-            pass
+    # 1. Full purge — keep only ABC trek data; delete everything else
+    try:
+        conn.execute("DELETE FROM trip_packing_status WHERE item_id IN (SELECT item_id FROM trip_packing_items WHERE trip_id != 'trip_nepal_abc_2026')")
+        conn.execute("DELETE FROM trip_packing_items WHERE trip_id != 'trip_nepal_abc_2026'")
+        conn.execute("DELETE FROM trip_itinerary_days WHERE trip_id != 'trip_nepal_abc_2026'")
+        conn.execute("DELETE FROM trip_activities WHERE trip_id NOT IN ('trip_nepal_abc_2026', 'trip_001', 'trip_002', 'trip_003')")
+        conn.execute("DELETE FROM trip_group_trips WHERE trip_id NOT IN ('trip_nepal_abc_2026', 'trip_001', 'trip_002', 'trip_003')")
+        conn.execute("DELETE FROM trips WHERE id NOT IN ('trip_nepal_abc_2026')")
+    except Exception:
+        pass
 
     # 2. Delete fabricated access passcodes
     for code in ("VIP-ALL-ACCESS", "TRIP-EXPLORER", "CARDS-REWARDS"):
