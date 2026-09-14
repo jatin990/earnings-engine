@@ -5355,14 +5355,16 @@
             filteredStrikes.sort((a, b) => a.strike - b.strike);
             const minK = filteredStrikes[0].strike;
             const maxK = filteredStrikes[filteredStrikes.length - 1].strike;
+            const midK = (minK + maxK) / 2;
 
             const el = (id) => document.getElementById(id);
             if (el('depthMinStrike')) el('depthMinStrike').textContent = `₹${Math.round(minK).toLocaleString('en-IN')}`;
+            if (el('depthMidStrike')) el('depthMidStrike').textContent = `₹${Math.round(midK).toLocaleString('en-IN')}`;
             if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
             if (el('depthMaxStrike')) el('depthMaxStrike').textContent = `₹${Math.round(maxK).toLocaleString('en-IN')}`;
 
             const width = 600;
-            const height = 160;
+            const height = 190;
             const pad = 10;
 
             const spotX = Math.max(pad, Math.min(width - pad, ((spotPrice - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad));
@@ -5386,7 +5388,23 @@
             });
 
             const maxCum = Math.max(cumBid, cumAsk, 1000);
-            const scaleY = (cum) => height - pad - (cum / maxCum) * (height - 2 * pad - 20);
+            const scaleY = (cum) => height - pad - (cum / maxCum) * (height - 2 * pad - 24);
+
+            // Find peak points
+            const maxBidCum = bidPoints.length ? Math.max(...bidPoints.map(p => p.cum)) : 0;
+            const maxAskCum = askPoints.length ? Math.max(...askPoints.map(p => p.cum)) : 0;
+            const peakBid = bidPoints.find(p => p.cum === maxBidCum) || null;
+            const peakAsk = askPoints.find(p => p.cum === maxAskCum) || null;
+
+            // Y-axis grid ticks (3 levels)
+            const gridLines = [0.25, 0.5, 0.75].map(frac => {
+                const y = scaleY(maxCum * frac);
+                const label = (maxCum * frac / 1000).toFixed(0) + 'K';
+                return `<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
+                        <text x="${pad - 2}" y="${y + 3}" text-anchor="end" fill="#475569" font-size="8" font-family="monospace">${label}</text>`;
+            }).join('');
+
+            const yAxisLabel = `<text x="${pad - 2}" y="${scaleY(maxCum) + 3}" text-anchor="end" fill="#475569" font-size="8" font-family="monospace">${(maxCum / 1000).toFixed(0)}K</text>`;
 
             let bidPath = `M ${spotX} ${height - pad}`;
             bidPoints.forEach(p => {
@@ -5400,89 +5418,90 @@
             });
             askPath += ` L ${width - pad} ${height - pad} Z`;
 
+            // Peak labels
+            const peakBidLabel = peakBid ? `<text x="${Math.max(pad + 4, peakBid.x - 2)}" y="${scaleY(peakBid.cum) - 5}" text-anchor="middle" fill="#10b981" font-size="8" font-family="monospace" font-weight="bold">${(peakBid.cum / 1000).toFixed(1)}K</text>` : '';
+            const peakAskLabel = peakAsk ? `<text x="${Math.min(width - pad - 4, peakAsk.x + 2)}" y="${scaleY(peakAsk.cum) - 5}" text-anchor="middle" fill="#ef4444" font-size="8" font-family="monospace" font-weight="bold">${(peakAsk.cum / 1000).toFixed(1)}K</text>` : '';
+
+            const spotGlowId = 'spotGlow';
+            const buyGradId = 'buyWallGrad';
+            const sellGradId = 'sellWallGrad';
+
             svg.innerHTML = `
                 <defs>
-                    <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.75"/>
-                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                    <linearGradient id="${buyGradId}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.78"/>
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.04"/>
                     </linearGradient>
-                    <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.75"/>
-                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+                    <linearGradient id="${sellGradId}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.78"/>
+                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.04"/>
                     </linearGradient>
+                    <radialGradient id="${spotGlowId}" cx="${spotX}" cy="50%" r="40" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.18"/>
+                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+                    </radialGradient>
                 </defs>
-                <path d="${bidPath}" fill="url(#buyWallGrad)" stroke="#10b981" stroke-width="2" />
-                <path d="${askPath}" fill="url(#sellWallGrad)" stroke="#ef4444" stroke-width="2" />
-                <line x1="${spotX}" y1="10" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8" />
-                <text x="${spotX}" y="24" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold" font-family="monospace">LTP</text>
+                <rect x="${pad}" y="${pad}" width="${width - 2 * pad}" height="${height - 2 * pad}" fill="url(#${spotGlowId})" />
+                ${gridLines}
+                ${yAxisLabel}
+                <path d="${bidPath}" fill="url(#${buyGradId})" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 2" />
+                <path d="${askPath}" fill="url(#${sellGradId})" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 2" />
+                ${peakBidLabel}
+                ${peakAskLabel}
+                <line x1="${spotX}" y1="${pad}" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.75" />
+                <text x="${spotX}" y="${pad + 10}" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="bold" font-family="monospace">LTP</text>
             `;
+
+            // Update cumulative totals in label badges
+            const fmtK = v => v >= 1000000 ? `${(v / 1000000).toFixed(2)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
+            if (el('depthBuyLabel')) el('depthBuyLabel').textContent = `◀ Buy: ${fmtK(cumBid)} Puts`;
+            if (el('depthSellLabel')) el('depthSellLabel').textContent = `Calls: ${fmtK(cumAsk)} ▶`;
         }
 
         function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike, isFno) {
             const list = document.getElementById('liquidityLevelsList');
             if (!list) return;
 
+            let spotPrice = stockState.quote && stockState.quote.current_price || null;
+            if (!spotPrice && stockState.technical && stockState.technical.close) spotPrice = stockState.technical.close;
+            if (!spotPrice && stockChartRawRecords.length > 0) spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
+
+            const fmtK = v => v >= 1000000 ? `${(v / 1000000).toFixed(2)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
+
+            let maxOi = 1;
+            if (isFno && Array.isArray(strikes)) {
+                strikes.forEach(s => {
+                    const oi = s.put_oi || s.call_oi || s.put_vol || s.call_vol || 0;
+                    if (oi > maxOi) maxOi = oi;
+                });
+            }
+
+            const pctFromSpot = (strike) => {
+                if (!spotPrice || !strike) return null;
+                return ((strike - spotPrice) / spotPrice) * 100;
+            };
+
             const items = [];
             if (isFno) {
                 if (resistanceStrike) {
-                    items.push({
-                        type: 'SELL_WALL',
-                        label: '🔴 Call OI Sell Wall',
-                        strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`,
-                        val: 'Strong Resistance',
-                        color: '#f87171',
-                        bg: 'rgba(239,68,68,0.1)',
-                    });
+                    const oi = (strikes.find(s => s && s.strike === resistanceStrike) || {}).call_oi || 0;
+                    const barPct = maxOi > 1 ? Math.min(100, (oi / maxOi) * 100) : 50;
+                    items.push({ type: 'SELL_WALL', label: '🔴 Sell Wall · Call OI', strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`, barPct, oi, pct: pctFromSpot(resistanceStrike), color: '#f87171', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)' });
                 }
                 if (maxPainStrike) {
-                    items.push({
-                        type: 'MAX_PAIN',
-                        label: '🟡 Max Pain Strike',
-                        strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`,
-                        val: 'Neutral Pivot',
-                        color: '#fbbf24',
-                        bg: 'rgba(251,191,36,0.1)',
-                    });
+                    const oi = (strikes.find(s => s && s.strike === maxPainStrike) || {}).call_oi || 0;
+                    const barPct = maxOi > 1 ? Math.min(100, (oi / maxOi) * 100) : 50;
+                    items.push({ type: 'MAX_PAIN', label: '🟡 Max Pain · Neutral', strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`, barPct, oi, pct: pctFromSpot(maxPainStrike), color: '#fbbf24', bg: 'rgba(251,191,36,0.07)', border: 'rgba(251,191,36,0.2)' });
                 }
                 if (supportStrike) {
-                    items.push({
-                        type: 'BUY_WALL',
-                        label: '🟢 Put OI Buy Wall',
-                        strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`,
-                        val: 'Major Demand Floor',
-                        color: '#34d399',
-                        bg: 'rgba(16,185,129,0.1)',
-                    });
+                    const oi = (strikes.find(s => s && s.strike === supportStrike) || {}).put_oi || 0;
+                    const barPct = maxOi > 1 ? Math.min(100, (oi / maxOi) * 100) : 50;
+                    items.push({ type: 'BUY_WALL', label: '🟢 Buy Wall · Put OI', strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`, barPct, oi, pct: pctFromSpot(supportStrike), color: '#34d399', bg: 'rgba(16,185,129,0.07)', border: 'rgba(16,185,129,0.2)' });
                 }
             } else {
-                if (resistanceStrike) {
-                    items.push({
-                        type: 'TECH_RES',
-                        label: '🔴 Technical Resistance Ceiling',
-                        strike: `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-                        val: 'Breakout Pivot',
-                        color: '#f87171',
-                        bg: 'rgba(239,68,68,0.08)',
-                    });
-                }
-                if (supportStrike) {
-                    items.push({
-                        type: 'TECH_SUP',
-                        label: '🟢 Technical Support Floor',
-                        strike: `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-                        val: 'Demand Baseline',
-                        color: '#34d399',
-                        bg: 'rgba(16,185,129,0.08)',
-                    });
-                }
-                items.push({
-                    type: 'FNO_STATUS',
-                    label: '🛡️ Equity Derivatives Status',
-                    strike: 'Not in F&O',
-                    val: 'Cash Market Only',
-                    color: '#94a3b8',
-                    bg: 'rgba(148,163,184,0.06)',
-                });
+                if (resistanceStrike) items.push({ type: 'TECH_RES', label: '🔴 Resistance Ceiling', strike: `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, barPct: 60, oi: 0, pct: pctFromSpot(resistanceStrike), color: '#f87171', bg: 'rgba(239,68,68,0.07)', border: 'rgba(239,68,68,0.2)' });
+                if (supportStrike) items.push({ type: 'TECH_SUP', label: '🟢 Support Floor', strike: `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, barPct: 60, oi: 0, pct: pctFromSpot(supportStrike), color: '#34d399', bg: 'rgba(16,185,129,0.07)', border: 'rgba(16,185,129,0.2)' });
+                items.push({ type: 'FNO_STATUS', label: '🛡️ F&O Status', strike: 'Non-F&O', barPct: 0, oi: 0, pct: null, color: '#94a3b8', bg: 'rgba(148,163,184,0.05)', border: 'rgba(148,163,184,0.15)' });
             }
 
             if (items.length === 0) {
@@ -5490,17 +5509,24 @@
                 return;
             }
 
-            list.innerHTML = items.map(item => `
-                <div style="display: flex; justify-content: space-between; align-items: center; background: ${item.bg}; border: 1px solid rgba(255,255,255,0.05); padding: 0.35rem 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem;">
-                    <div style="display: flex; align-items: center; gap: 0.4rem;">
-                        <span style="color: ${item.color}; font-weight: 700;">${item.label}</span>
+            list.innerHTML = items.map(item => {
+                const pctBadge = item.pct !== null
+                    ? `<span style="font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${item.color}22;color:${item.color};border:1px solid ${item.color}44;font-family:var(--font-mono);white-space:nowrap;">${item.pct > 0 ? '+' : ''}${item.pct.toFixed(1)}%</span>`
+                    : '';
+                const oiLabel = item.oi > 0 ? `<span style="font-size:0.62rem;color:#64748b;">${fmtK(item.oi)} OI</span>` : '';
+                return `
+                <div style="position:relative;background:${item.bg};border:1px solid ${item.border};border-left:3px solid ${item.color};border-radius:6px;padding:0.4rem 0.6rem;overflow:hidden;font-family:var(--font-mono);">
+                    <div style="position:absolute;top:0;left:0;bottom:0;width:${item.barPct}%;background:${item.color}12;border-right:1px solid ${item.color}30;transition:width 0.3s ease;"></div>
+                    <div style="position:relative;display:flex;justify-content:space-between;align-items:center;gap:0.35rem;">
+                        <span style="font-size:0.7rem;color:${item.color};font-weight:700;">${item.label}</span>
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-shrink:0;">
+                            <span style="font-size:0.8rem;font-weight:800;color:#e2e8f0;">${item.strike}</span>
+                            ${pctBadge}
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <span style="font-weight: 800; color: #ffffff;">${item.strike}</span>
-                        <span style="font-size: 0.65rem; color: #94a3b8;">${item.val}</span>
-                    </div>
-                </div>
-            `).join('');
+                    ${oiLabel ? `<div style="position:relative;margin-top:0.15rem;font-size:0.6rem;color:#64748b;">${oiLabel}</div>` : ''}
+                </div>`;
+            }).join('');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
