@@ -118,6 +118,17 @@ class AttachGroupTripsRequest(BaseModel):
     trip_ids: list[str]
 
 
+class AddPackingItemRequest(BaseModel):
+    name: str
+    category: str = "Misc"
+    added_by: str = "owner"
+
+
+class UpdatePackingStatusRequest(BaseModel):
+    member_name: str
+    status: str  # "pending" | "packed" | "confirmed"
+
+
 class CreateCardRequest(BaseModel):
     card_name: str
     issuer: str
