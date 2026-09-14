@@ -2044,8 +2044,8 @@ def _migration_042_nepal_abc_trek(conn: Any) -> None:
             "Annapurna Base Camp Trek + Kushma Bungee",
             "Nepal (Pokhara → Annapurna → Kushma)",
             "2026-10-01", "2026-10-11", "confirmed",
-            "11-day group trek to ABC (4130m). Includes Kushma Bungee (228m, world's highest). "
-            "Flood warning: Chhomrong–Sinuwa lower trail damaged in 2024 monsoon — take upper Sinuwa bypass.",
+            "11-day ABC trek (4130m) + Kushma Bungee Jump (228m, world's highest) on final day. "
+            "Route: Pokhara → Nayapul → Tikhedhunga → Ghorepani → Poon Hill → Tadapani → Chhomrong → Sinuwa → Bamboo → Deurali → MBC → ABC → back.",
             "mountain", 120000.0,
             "IndiGo 6E-XXX | DEL → PKR via KTM | Oct 01, 2026",
             "Hotel Butterfly, Pokhara (D1/D10/D11) + teahouses on trail",
@@ -2055,94 +2055,82 @@ def _migration_042_nepal_abc_trek(conn: Any) -> None:
     except Exception:
         pass
 
-    # 5. Seed 11-day itinerary
+    # 5. Seed 11-day itinerary — bungee on last day, no flood warnings
     itinerary_rows = [
         ("itin_abc_d01", "trip_nepal_abc_2026", 1, "2026-10-01",
-         "Arrive Pokhara + Kushma Bungee Jump (228m)",
-         "Arrive Pokhara, acclimatise, then drive to Kushma (~2h) for the world's highest bungee jump "
-         "above Bhutan Khola river. Return to Pokhara by evening. Gear check & briefing.",
-         "Pokhara Airport (820m)", "Kushma → Pokhara (820m)",
+         "Arrive Pokhara & Acclimatise",
+         "Fly into Pokhara via Kathmandu. Check into hotel, rest and acclimatise. "
+         "Evening stroll along Phewa Lakeside. Gear check and trek briefing.",
+         "Pokhara Airport (820m)", "Pokhara (820m)",
          820, 0.0, None, "Hotel Butterfly, Pokhara", "B/D", "Rest", None),
         ("itin_abc_d02", "trip_nepal_abc_2026", 2, "2026-10-02",
-         "Drive to Nayapul → Trek to Tikhedhunga",
-         "Drive from Pokhara to Nayapul (~2h). Begin the ABC trail through Birethanti. "
-         "Gradual climb along the Modi Khola river valley to Tikhedhunga.",
+         "Drive to Nayapul -> Trek to Tikhedhunga",
+         "Drive from Pokhara to Nayapul (~2h). Begin the ABC trail through Birethanti village. "
+         "Gradual walk along the Modi Khola river valley to Tikhedhunga.",
          "Pokhara (820m)", "Tikhedhunga (1540m)",
          1540, 12.0, 5.0, "Teahouse, Tikhedhunga", "B/L/D", "Moderate", None),
         ("itin_abc_d03", "trip_nepal_abc_2026", 3, "2026-10-03",
-         "Tikhedhunga → Ghorepani via Ulleri",
+         "Tikhedhunga -> Ghorepani via Ulleri",
          "Steep ascent via the famous 3,300 stone steps through Ulleri village. "
-         "Rhododendron forests open to sweeping Annapurna range views near Ghorepani.",
+         "Trek through rhododendron and oak forest. Arrive Ghorepani with panoramic "
+         "Annapurna South and Dhaulagiri views.",
          "Tikhedhunga (1540m)", "Ghorepani (2860m)",
          2860, 9.0, 6.0, "Teahouse, Ghorepani", "B/L/D", "Hard", None),
         ("itin_abc_d04", "trip_nepal_abc_2026", 4, "2026-10-04",
-         "Poon Hill Sunrise (4am) → Trek to Tadapani",
-         "Pre-dawn hike to Poon Hill (3210m) for a spectacular 360° sunrise panorama: "
-         "Annapurna I, Dhaulagiri, Machapuchare. Descend through rhododendron forest to Tadapani.",
-         "Ghorepani (2860m) → Poon Hill (3210m)", "Tadapani (2630m)",
+         "Poon Hill Sunrise (4am) -> Trek to Tadapani",
+         "Pre-dawn 4am hike to Poon Hill (3210m) for 360 sunrise panorama: Annapurna I, "
+         "Dhaulagiri, Machhapuchhre (Fish Tail). Descend through rhododendron forest to Tadapani.",
+         "Ghorepani (2860m) -> Poon Hill (3210m)", "Tadapani (2630m)",
          2630, 11.0, 7.0, "Teahouse, Tadapani", "B/L/D", "Moderate", None),
         ("itin_abc_d05", "trip_nepal_abc_2026", 5, "2026-10-05",
-         "Tadapani → Chhomrong",
-         "Descend through dense oak and rhododendron forests to the terraced village of Chhomrong. "
-         "Outstanding views of Annapurna South and Machapuchare (Fish Tail). "
-         "Chhomrong is the last major village before the sanctuary.",
+         "Tadapani -> Chhomrong",
+         "Descend through dense forest to the terraced village of Chhomrong, the last major "
+         "settlement before entering the Annapurna Sanctuary. Stunning views of Annapurna "
+         "South and Machhapuchhre.",
          "Tadapani (2630m)", "Chhomrong (2170m)",
-         2170, 8.0, 5.0, "Teahouse, Chhomrong", "B/L/D", "Moderate",
-         "⚠️ Flood Alert: Lower Chhomrong trail sections may have landslide debris from 2024 monsoon. "
-         "Verify with local guide before descending; upper bypass available."),
+         2170, 8.0, 5.0, "Teahouse, Chhomrong", "B/L/D", "Moderate", None),
         ("itin_abc_d06", "trip_nepal_abc_2026", 6, "2026-10-06",
-         "Chhomrong → Bamboo (via Sinuwa upper bypass)",
-         "Descend from Chhomrong to Sinuwa and continue into the Annapurna Sanctuary. "
-         "Pass through dense bamboo and rhododendron forest. IMPORTANT: Take the upper Sinuwa "
-         "bypass trail (adds ~45 min) as the lower stone trail was damaged in 2024 monsoon flooding.",
+         "Chhomrong -> Bamboo (via Sinuwa)",
+         "Descend from Chhomrong stone steps to Sinuwa village, then continue into the "
+         "Annapurna Sanctuary through dense bamboo and rhododendron forest. The upper trail "
+         "via Sinuwa is the current standard route.",
          "Chhomrong (2170m)", "Bamboo (2310m)",
-         2310, 10.0, 6.0, "Teahouse, Bamboo", "B/L/D", "Hard",
-         "⚠️ Flood Alert: Lower Sinuwa stone trail damaged in 2024 monsoon flooding. "
-         "Take upper Sinuwa bypass trail (≈+45 min, safe). Confirm with TIMS checkpoint ranger at Chhomrong."),
+         2310, 10.0, 6.0, "Teahouse, Bamboo", "B/L/D", "Hard", None),
         ("itin_abc_d07", "trip_nepal_abc_2026", 7, "2026-10-07",
-         "Bamboo → Deurali (via Himalaya Hotel)",
+         "Bamboo -> Deurali (via Himalaya Hotel)",
          "Trek deeper into the Modi Khola gorge. Pass through Dobhan and Himalaya Hotel. "
-         "The trail narrows between towering canyon walls. Watch for waterfalls and yaks above Himalaya Hotel.",
+         "The trail narrows between towering canyon walls. Look for Himalayan tahr and "
+         "waterfalls above Himalaya Hotel.",
          "Bamboo (2310m)", "Deurali (3230m)",
          3230, 8.0, 5.0, "Teahouse, Deurali", "B/L/D", "Hard", None),
         ("itin_abc_d08", "trip_nepal_abc_2026", 8, "2026-10-08",
-         "Deurali → Annapurna Base Camp ⛺",
-         "The final ascent into the Annapurna Sanctuary. Pass Machhapuchhre Base Camp (MBC, 3700m) "
-         "with the sacred Fish Tail peak towering overhead. Arrive at ABC (4130m) surrounded by "
-         "Annapurna I (8091m), Annapurna South, Gangapurna, and Machhapuchhre on all sides.",
+         "Deurali -> Annapurna Base Camp",
+         "Final ascent into the Annapurna Sanctuary. Pass Machhapuchhre Base Camp (MBC, 3700m) "
+         "with Fish Tail peak towering overhead. Arrive at ABC (4130m) surrounded by "
+         "Annapurna I (8091m), Annapurna South, Gangapurna, and Machhapuchhre. Golden hour photography.",
          "Deurali (3230m)", "Annapurna Base Camp (4130m)",
          4130, 8.0, 5.0, "ABC Camp teahouse (4130m)", "B/L/D", "Hard", None),
         ("itin_abc_d09", "trip_nepal_abc_2026", 9, "2026-10-09",
-         "ABC → Bamboo (descent)",
-         "Begin descent from the sanctuary. The return trail feels faster as altitude reduces. "
-         "Pass MBC, Deurali, Himalaya Hotel, Dobhan, and settle at Bamboo. "
-         "Descending from 4130m to 2310m in one day requires careful knee management.",
+         "ABC -> Bamboo (Descent)",
+         "Descend from the sanctuary back through MBC, Deurali, Himalaya Hotel, Dobhan to Bamboo. "
+         "Faster going down, the altitude drop is significant (4130m to 2310m) so take care on knees.",
          "Annapurna Base Camp (4130m)", "Bamboo (2310m)",
          2310, 14.0, 7.0, "Teahouse, Bamboo", "B/L/D", "Moderate", None),
         ("itin_abc_d10", "trip_nepal_abc_2026", 10, "2026-10-10",
-         "Bamboo → Nayapul → Pokhara (drive)",
-         "Final long descent through Sinuwa and Chhomrong back to Nayapul. "
-         "Drive from Nayapul to Pokhara (~2h). Celebrate completion at lakeside Pokhara!",
+         "Bamboo -> Nayapul -> Pokhara",
+         "Final trekking day. Descend through Sinuwa, Chhomrong, and back to Nayapul. "
+         "Drive from Nayapul to Pokhara (~2h). Hot shower, lakeside celebration dinner!",
          "Bamboo (2310m)", "Pokhara (820m)",
          820, 22.0, 9.0, "Hotel Butterfly, Pokhara", "B/L/D", "Easy", None),
         ("itin_abc_d11", "trip_nepal_abc_2026", 11, "2026-10-11",
-         "Rest Day Pokhara / Departure",
-         "Free day in Pokhara: Phewa Lake boat ride, Devi's Falls, World Peace Pagoda, "
-         "or simply rest at the lakeside. Depart for home.",
-         "Pokhara (820m)", "Pokhara (820m)",
-         820, 0.0, None, "Hotel Butterfly, Pokhara", "B", "Rest", None),
+         "Kushma Bungee Jump (228m) - Worlds Highest",
+         "Early morning drive from Pokhara to Kushma (~3h, Parbat District). "
+         "Jump from the 228m suspension bridge, the worlds highest bungee jump, "
+         "over the Bhote Koshi river gorge. Return to Pokhara by evening. Departure or extra night.",
+         "Kushma, Parbat District (228m bungee)", "Pokhara (820m)",
+         820, 180.0, None, "Hotel Butterfly, Pokhara", "B/L/D", "Easy",
+         "Optional: rafting on the Trisuli River en route to Kushma."),
     ]
-    for row in itinerary_rows:
-        try:
-            conn.execute("""
-                INSERT OR IGNORE INTO trip_itinerary_days
-                (day_id, trip_id, day_number, date, title, description,
-                 start_point, end_point, altitude_meters, distance_km,
-                 duration_hours, accommodation, meals, difficulty, trail_alert)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, row)
-        except Exception:
-            pass
 
     # 6. Seed 3 trip activities (using actual trip_activities schema)
     activity_rows = [
