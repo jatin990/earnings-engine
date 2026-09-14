@@ -104,6 +104,21 @@ NSE_STATIC_RSS_FEEDS = [
     ("https://nsearchives.nseindia.com/content/RSS/Circulars.xml", "NSE Circulars", "exchange_circular"),
 ]
 
+# Generic/versioned filename labels used by NSE SAST/Regulation feeds — NOT real symbols.
+# These must be rejected before being used as ticker candidates by _resolve_symbol.
+NSE_SAST_GENERIC_FILENAMES: set[str] = {
+    "disclosure", "disclosure1", "disclosure2", "disclosure3",
+    "reg", "regulation", "regulation29", "regulation31",
+    "intimation", "intimatoin",  # NSE typo preserved to not break patterns
+    "intimationregulation", "intimationregulation29", "intimationregulation31",
+    "declaration", "decl",
+    "tko", "tko_agsl",
+    "sast", "sastdisclosure", "sast_disclosure",
+    "announcement", "ann", "pdf", "pdf_", "press_release", "pressrelease",
+    "xbrl", "xml", "zip", "corp", "corporate",
+    "templ", "temp", "temp1",
+}
+
 GOOGLE_BROADBAND_QUERIES = [
     ("Indian stock market when:1d", "Google News Markets"),
     ("BSE NSE corporate announcements when:1d", "Google News Announcements"),
@@ -493,14 +508,35 @@ def fetch_nse_static_rss_feeds(
                 return known_symbols[c]
             return f"{c}.NS"
 
-        # 2. PDF filename prefix e.g. "/corporate/HUBTOWN_12092026..." or "/corporate/SIS_..."
+        # 2. PDF/zip filename prefix from NSE corporate archive links
+        # e.g. /corporate/HINDCON_09082026123016_53122.zip or /corporate/PAISALO1_...
         link_m = re.search(r"/corporate/([A-Za-z0-9]+)_", link_str)
         if link_m:
             cand = link_m.group(1).upper()
-            if cand in known_symbols:
-                return known_symbols[cand]
-            if len(cand) >= 2 and not cand.startswith("XBRL") and not cand.startswith("INDAS"):
-                return f"{cand}.NS"
+            cand_lower = cand.lower()
+
+            # Reject known generic NSE SAST/Regulation filename labels
+            if cand_lower in NSE_SAST_GENERIC_FILENAMES:
+                pass  # reject, fall through
+            # Reject repeated-digit suffixes (NSE version codes like PAISALO11111)
+            elif re.search(r"(\d)\1{4,}$", cand):
+                pass  # reject
+            else:
+                # Normalize versioned symbols: PAISALO1 → PAISALO, PAISALO2 → PAISALO
+                base_sym = re.sub(r"(\d)+$", "", cand)  # strip trailing digits
+                if base_sym and base_sym != cand:
+                    # Prefer normalized base symbol if known
+                    if base_sym in known_symbols:
+                        return known_symbols[base_sym]
+                    # If base looks like a real symbol (≥3 letters, not a generic label)
+                    if len(base_sym) >= 3 and base_sym.lower() not in NSE_SAST_GENERIC_FILENAMES:
+                        return f"{base_sym}.NS"
+
+                # Direct candidate
+                if cand in known_symbols:
+                    return known_symbols[cand]
+                if len(cand) >= 3 and not cand.lower().startswith(("xbrl", "indas")):
+                    return f"{cand}.NS"
 
         # 3. Clean company name from title e.g. "V.S.T Tillers Tractors Limited - Ex-Date: 16-Sep-2026"
         comp_candidate = title_str.split(" - ")[0].split(" : ")[0].strip()

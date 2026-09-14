@@ -20,6 +20,40 @@ from earnings_engine.data.news_verifier import NewsVerifier
 
 logger = logging.getLogger(__name__)
 
+# Tickers that look like NSE generic SAST/Regulation filename labels — not real symbols.
+_NEWS_GENERIC_TICKER_WORDS: frozenset[str] = frozenset({
+    "DISCLOSURE", "DISCLOSURE1", "DISCLOSURE2", "DISCLOSURE3",
+    "REGULATION", "REG", "INTIMATION", "INTIMATOIN",
+    "DECLARATION", "DECL", "ANN", "ANNOUNCEMENT", "ANNOUNC",
+    "TOKO", "TOKO_AGSL",
+    "SAST", "SASTDISCLOSURE",
+    "TEMP", "TEMPLATE", "TEM", "TEM1",
+    "XBRL", "INDAS", "PDF", "ZIP", "PRESSRELEASE",
+})
+
+
+def _is_resolvable_ticker(sym: str) -> bool:
+    """Return True if sym is a plausible NSE/US ticker (guards against garbage from RSS feed parsing).
+
+    Rejects: generic NSE SAST/Regulation filename labels, tickers with ≥5 consecutive
+    repeated digits (e.g. PAISALO11111, a version-code artifact), and strings < 3 chars.
+    """
+    import re
+    s = sym.replace(".NS", "").replace(".BO", "")
+    if not s or len(s) < 3:
+        return False
+    # Reject NSE version-code artifacts: PAISALO11111 (5+ same consecutive digits)
+    if re.search(r"(\d)\1{4,}", s):
+        return False
+    # Reject known generic NSE filename labels (exact or prefix match for compound garbage)
+    s_upper = s.upper()
+    if s_upper in _NEWS_GENERIC_TICKER_WORDS:
+        return False
+    # Reject compound garbage like INTIMATIONREGULATION31 (contains generic word as prefix)
+    if any(s_upper.startswith(w) for w in _NEWS_GENERIC_TICKER_WORDS if len(w) >= 4):
+        return False
+    return True
+
 
 def ensure_news_verification_schema(settings: Settings | None = None) -> None:
     """Ensure news_catalysts table has all verification columns and indexes."""
@@ -188,7 +222,12 @@ def process_and_verify_news_items(
                     if needs_fetch:
                         try:
                             from earnings_engine.data.prices import fetch_prices
-                            fetch_prices(ticker, settings, force=True)
+                            if not _is_resolvable_ticker(ticker):
+                                logger.debug("[NEWS-PIPELINE] Skip price fetch for unresolvable ticker %s", ticker)
+                                ticker = ""
+                                needs_fetch = False
+                            elif ticker:
+                                fetch_prices(ticker, settings, force=True)
                             sig_row = p_conn.execute(
                                 f"SELECT close, date FROM price_history WHERE ticker = ? AND date {date_comp} ? AND close > 0 ORDER BY date DESC LIMIT 1",
                                 (ticker, pub_d),
