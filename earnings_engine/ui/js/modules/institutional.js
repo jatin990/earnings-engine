@@ -1958,6 +1958,11 @@
             const ret30dEl = document.getElementById('nexusInst30dVal');
             const ret1yEl = document.getElementById('nexusInst1yVal');
             const mcapEl = document.getElementById('nexusInstMcapVal');
+            // Returns strip uses distinct IDs so getElementById finds the right element
+            const ret7dStripEl = document.getElementById('nexusInstReturns7dVal');
+            const ret30dStripEl = document.getElementById('nexusInstReturns30dVal');
+            const ret1yStripEl = document.getElementById('nexusInstReturns1yVal');
+            const mcapStripEl = document.getElementById('nexusInstReturnsMcapVal');
             const scoreLineEl = document.getElementById('nexusInstScoreLine');
             const shContainer = document.getElementById('nexusInstShareholdingContainer');
             const shWrap = document.getElementById('nexusInstShareholdingWrap');
@@ -1989,9 +1994,13 @@
             const fmt = (v) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '—';
             const col = (v) => v != null ? (v >= 0 ? '#34d399' : '#f87171') : '#a1a1aa';
             if (ret7dEl) { ret7dEl.textContent = fmt(ret7d); ret7dEl.style.color = col(ret7d); }
+            if (ret7dStripEl) { ret7dStripEl.textContent = fmt(ret7d); ret7dStripEl.style.color = col(ret7d); }
             if (ret30dEl) { ret30dEl.textContent = fmt(ret30d); ret30dEl.style.color = col(ret30d); }
+            if (ret30dStripEl) { ret30dStripEl.textContent = fmt(ret30d); ret30dStripEl.style.color = col(ret30d); }
             if (ret1yEl) { ret1yEl.textContent = fmt(ret1y); ret1yEl.style.color = col(ret1y); }
+            if (ret1yStripEl) { ret1yStripEl.textContent = fmt(ret1y); ret1yStripEl.style.color = col(ret1y); }
             if (mcapEl) mcapEl.textContent = data.market_cap_cr ? `₹${Number(Math.round(data.market_cap_cr)).toLocaleString()} Cr` : '—';
+            if (mcapStripEl) mcapStripEl.textContent = data.market_cap_cr ? `₹${Number(Math.round(data.market_cap_cr)).toLocaleString()} Cr` : '—';
 
             // Score line
             const incAmtStr = data.increase_amount_cr != null

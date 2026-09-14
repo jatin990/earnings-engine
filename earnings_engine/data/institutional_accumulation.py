@@ -471,29 +471,8 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any, allow_network: bo
             pass
 
     # STRICT ANTI-FABRICATION CONTRACT:
-    # If shareholding patterns or institutional holdings do not exist for this ticker,
-    # we NEVER fabricate synthetic holders, dummy quarters, or artificial multipliers.
-    # We only save real shareholding data if promoter_pct or institutions_pct was retrieved
-    # from verified live corporate ownership.
-    if live_meta.get("promoter_pct") is not None or live_meta.get("institutions_pct") is not None:
-        existing_pats = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE ticker = ?", (sym,)).fetchone()[0]
-        if existing_pats == 0:
-            promoter_val = round(float(live_meta.get("promoter_pct") or 0.0), 2)
-            inst_val = round(float(live_meta.get("institutions_pct") or 0.0), 2)
-            fii_val = round(inst_val * 0.45, 2) if inst_val > 0 else 0.0
-            dii_val = round(inst_val * 0.55, 2) if inst_val > 0 else 0.0
-            retail_val = round(max(0.0, 100.0 - (promoter_val + fii_val + dii_val)), 2)
-            if promoter_val > 0 or inst_val > 0:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO shareholding_patterns (
-                        ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
-                        public_retail_pct, other_pct, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (sym, "Q1 FY27", promoter_val, fii_val, dii_val, retail_val, 0.0, now_iso),
-                )
-
+    # If shareholding patterns do not exist for this ticker, we do not fabricate synthetic
+    # FII/DII splits or dummy quarter rows. True multi-quarter filings come from verified regulatory filings.
     if hasattr(conn, "commit"):
         conn.commit()
 
@@ -1256,8 +1235,11 @@ def get_stock_institutional_activity(
                 return round(float(row[0]), 2), str(row[1])
             return None, None
 
+        # Sort raw quarter rows strictly descending by calendar start date
+        sorted_p_rows = sorted(p_rows, key=lambda r: _get_quarter_start_date(r[0]), reverse=True)
+
         patterns: list[dict[str, Any]] = []
-        for idx, p in enumerate(p_rows):
+        for idx, p in enumerate(sorted_p_rows):
             q_name = p[0]
             dii_val = round(float(p[3]), 2)
             pub_val = round(float(p[4]), 2)
