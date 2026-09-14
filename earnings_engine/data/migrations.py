@@ -2232,6 +2232,27 @@ def _migration_042_nepal_abc_trek(conn: Any) -> None:
     conn.commit()
 
 
+def _migration_043_missing_query_indexes(conn: Any) -> None:
+    """Add indexes to cover hot query patterns that lack explicit index coverage.
+
+    Gap analysis from codebase grep (as of 2026-09):
+    - breakout_radar.tier           : WHERE tier IN ('HOT','WARM')           cross_strategy.py
+    - breakout_radar.outcome        : WHERE outcome IN (...)                  api/routers/system.py
+    - breakout_radar.detected_at    : WHERE detected_at >= 'now - 7d'        pre_market_setups.py
+    - swing_radar.tier              : WHERE tier IN ('HOT','WARM')           cross_strategy.py
+    """
+    for idx_name, tbl, cols in [
+        ("idx_breakout_radar_tier",        "breakout_radar", "(tier)"),
+        ("idx_breakout_radar_outcome",     "breakout_radar", "(outcome)"),
+        ("idx_breakout_radar_detected_at", "breakout_radar", "(detected_at DESC)"),
+        ("idx_swing_radar_tier",           "swing_radar",    "(tier)"),
+    ]:
+        try:
+            conn.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {tbl} {cols}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2276,6 +2297,7 @@ MIGRATIONS: list[Migration] = [
     Migration(40, "040_purge_invalid_price_history_nan_records", _migration_040_purge_invalid_price_history_nan_records),
     Migration(41, "041_smart_money_strategies_and_financials", _migration_041_smart_money_strategies_and_financials),
     Migration(42, "042_nepal_abc_trek_purge_and_seed", _migration_042_nepal_abc_trek),
+    Migration(43, "043_missing_query_indexes", _migration_043_missing_query_indexes),
 ]
 
 
