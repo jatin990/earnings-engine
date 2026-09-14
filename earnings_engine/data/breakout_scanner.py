@@ -3703,43 +3703,104 @@ def get_order_flow_analytics(
     sell_wall = vah
     max_pain = poc
     option_strikes: list[dict[str, Any]] = []
+    call_wall_oi = 0.0
+    put_wall_oi = 0.0
 
+    # Integrate real Option Chain data using analyze_option_chain
     try:
-        from earnings_engine.data.options import get_option_chain
-        opt = get_option_chain(canon_sym, settings)
-        if opt and isinstance(opt, dict):
-            s = opt.get("summary") or {}
-            if s.get("call_wall"):
-                sell_wall = float(s["call_wall"])
-            if s.get("put_wall"):
-                buy_wall = float(s["put_wall"])
-            if s.get("max_pain"):
-                max_pain = float(s["max_pain"])
-            if opt.get("strikes"):
-                option_strikes = opt.get("strikes")[:15]
+        from earnings_engine.data.fno_directory import is_fno_eligible
+        from earnings_engine.data.option_chain import analyze_option_chain
+        if is_fno_eligible(canon_sym):
+            opt = analyze_option_chain(canon_sym, spot_price=cur_p, settings=settings)
+            if opt and isinstance(opt, dict):
+                sell_wall = float(opt.get("resistance_strike") or vah)
+                buy_wall = float(opt.get("support_strike") or val)
+                max_pain = float(opt.get("max_pain_strike") or poc)
+                if opt.get("strikes"):
+                    option_strikes = opt.get("strikes")[:20]
+                for strike in option_strikes:
+                    if abs(strike.get("strike", 0) - sell_wall) < 1.0:
+                        call_wall_oi = float(strike.get("ce_oi", 0))
+                    if abs(strike.get("strike", 0) - buy_wall) < 1.0:
+                        put_wall_oi = float(strike.get("pe_oi", 0))
     except Exception:
         pass
 
-    # Build Unified Horizontal Order Book Depth Spread
+    # Build Two-Sided Unified Price Ladder (Expanded for Sell-Side Depth)
     order_book_spread: list[dict[str, Any]] = []
-    if profile_bins:
-        max_vol = max(1, max(bin_item["volume"] for bin_item in profile_bins))
-        for bin_item in profile_bins:
-            p_lvl = bin_item["price"]
-            is_support = p_lvl <= cur_p
-            order_book_spread.append({
-                "price": p_lvl,
-                "type": "SUPPORT_BID" if is_support else "RESISTANCE_ASK",
-                "volume": bin_item["volume"],
-                "buy_volume": bin_item["buy_volume"],
-                "sell_volume": bin_item["sell_volume"],
-                "spread_depth_pct": round((bin_item["volume"] / max_vol) * 100, 1),
-                "is_poc": bin_item["is_poc"],
-                "is_vah": bin_item["is_vah"],
-                "is_val": bin_item["is_val"],
-                "is_buy_wall": abs(p_lvl - buy_wall) < (step if 'step' in locals() else 5.0),
-                "is_sell_wall": abs(p_lvl - sell_wall) < (step if 'step' in locals() else 5.0),
-            })
+    if cur_p > 0:
+        p_min = float(recent_df["low"].min()) if not recent_df.empty and "low" in recent_df.columns else (cur_p * 0.92)
+        p_max = float(recent_df["high"].max()) if not recent_df.empty and "high" in recent_df.columns else (cur_p * 1.08)
+
+        # Extend bounds symmetrically for sell-side depth (asks above spot)
+        upper_price = max(p_max, cur_p * 1.08, (sell_wall * 1.02) if sell_wall > cur_p else cur_p * 1.08)
+        lower_price = min(p_min, cur_p * 0.92, (buy_wall * 0.98) if buy_wall > 0 and buy_wall < cur_p else cur_p * 0.92)
+
+        num_bins = 30
+        upper_bins = int(round(num_bins * ((upper_price - cur_p) / max(1.0, upper_price - lower_price))))
+        lower_bins = num_bins - upper_bins
+        upper_bins = max(12, min(18, upper_bins))
+        lower_bins = num_bins - upper_bins
+
+        upper_grid = np.linspace(cur_p, upper_price, upper_bins + 1) if upper_bins > 0 else []
+        lower_grid = np.linspace(lower_price, cur_p, lower_bins + 1) if lower_bins > 0 else []
+
+        # Helper to map historical bin volume near a target price
+        hist_bins_map = {b["price"]: b for b in profile_bins} if profile_bins else {}
+        def find_nearest_hist_bin(target_price):
+            if not hist_bins_map:
+                return None
+            return min(hist_bins_map.values(), key=lambda b: abs(b["price"] - target_price))
+
+        max_vol = max(1, max(b["volume"] for b in profile_bins)) if profile_bins else 1
+
+        def make_spread_level(price, side_type, hist_bin=None, tag=None):
+            vol = hist_bin["volume"] if hist_bin else int(1000 + 2000 * max(0, 1 - abs(price - cur_p) / (cur_p * 0.05)))
+            bv = hist_bin["buy_volume"] if hist_bin else int(vol * max(0.05, min(0.95, (price - (price - 0.1)) / max(0.01, 0.2)))) if side_type == "SUPPORT_BID" else int(vol * 0.35)
+            sv = hist_bin["sell_volume"] if hist_bin else int(vol - bv)
+            return {
+                "price": round(price, 2),
+                "type": side_type,
+                "volume": vol,
+                "buy_volume": bv,
+                "sell_volume": sv,
+                "spread_depth_pct": round((vol / max_vol) * 100, 1),
+                "is_poc": bool(hist_bin["is_poc"]) if hist_bin else bool(abs(price - poc) < (upper_grid[1] - upper_grid[0] if len(upper_grid) > 1 else 1.0)),
+                "is_vah": bool(hist_bin["is_vah"]) if hist_bin else bool(abs(price - vah) < (upper_grid[1] - upper_grid[0] if len(upper_grid) > 1 else 1.0)),
+                "is_val": bool(hist_bin["is_val"]) if hist_bin else bool(abs(price - val) < (lower_grid[1] - lower_grid[0] if len(lower_grid) > 1 else 1.0)),
+                "is_buy_wall": bool(abs(price - buy_wall) < ((upper_grid[1] - upper_grid[0]) if len(upper_grid) > 1 else 5.0)),
+                "is_sell_wall": bool(abs(price - sell_wall) < ((upper_grid[1] - upper_grid[0]) if len(upper_grid) > 1 else 5.0)),
+                "is_call_wall": bool(abs(price - sell_wall) < ((upper_grid[1] - upper_grid[0]) if len(upper_grid) > 1 else 5.0) and call_wall_oi > 0),
+                "is_put_wall": bool(abs(price - buy_wall) < ((lower_grid[1] - lower_grid[0]) if len(lower_grid) > 1 else 5.0) and put_wall_oi > 0),
+                "is_max_pain": bool(abs(price - max_pain) < ((upper_grid[1] - upper_grid[0]) if len(upper_grid) > 1 else 5.0)),
+            }
+
+        # Build Ask / Sell Side Ladder (Above Spot)
+        for price in reversed(upper_grid[1:]):
+            order_book_spread.append(make_spread_level(price, "RESISTANCE_ASK", find_nearest_hist_bin(price)))
+
+        # Build Bid / Buy Side Ladder (Below Spot)
+        for price in lower_grid[:-1]:
+            order_book_spread.append(make_spread_level(price, "SUPPORT_BID", find_nearest_hist_bin(price)))
+
+    # Fallback if no levels generated (e.g. zero-cur_p guard path)
+    if not order_book_spread and cur_p > 0:
+        order_book_spread.append({
+            "price": round(cur_p, 2),
+            "type": "SPOT",
+            "volume": 1,
+            "buy_volume": 1,
+            "sell_volume": 0,
+            "spread_depth_pct": 100.0,
+            "is_poc": True,
+            "is_vah": False,
+            "is_val": False,
+            "is_buy_wall": False,
+            "is_sell_wall": False,
+            "is_call_wall": False,
+            "is_put_wall": False,
+            "is_max_pain": False,
+        })
 
     gocharting_url = f"https://gocharting.com/terminal?ticker={bse_sym}"
     tv_url = f"https://www.tradingview.com/chart/?symbol={bse_sym}"
