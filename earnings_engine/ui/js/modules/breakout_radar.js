@@ -1732,7 +1732,7 @@
             }
         };
 
-        app.selectBreakoutCandidate = function(tickerOrCandidate, autoScroll, openDrawer) {
+        app.selectBreakoutCandidate = async function(tickerOrCandidate, autoScroll, openDrawer) {
             if (!tickerOrCandidate) return;
             const ticker = typeof tickerOrCandidate === 'object' ? tickerOrCandidate.ticker : tickerOrCandidate;
             if (!ticker) return;
@@ -1757,6 +1757,45 @@
                 || (app._breakoutData || []).find(c => c.ticker === ticker)
                 || (app._trackedBreakoutsData || []).find(c => c.ticker === ticker)
                 || { ticker: ticker };
+
+            // ── Freshness Pass: enrich stale 52W high, current price, and 7D/30D returns
+            // from a live quote so the inspector drawer always shows current ground-truth.
+            // This fixes stale `high_52w` from the scanner's last scan snapshot and
+            // populates `ret_7d_pct` / `ret_30d_pct` when the scanner hasn't computed them yet.
+            if (ticker) {
+                try {
+                    const quoteRes = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(ticker)}/quote`);
+                    if (quoteRes && quoteRes.ok) {
+                        const qData = await quoteRes.json();
+                        const quote = qData.quote || qData;
+                        if (quote) {
+                            if (quote.week_52_high) candidate.high_52w = Number(quote.week_52_high);
+                            if (quote.week_52_low)  candidate.low_52w  = Number(quote.week_52_low);
+                            if (quote.current_price) candidate.current_price = Number(quote.current_price);
+                            // Also pull 7D / 30D from the technical block
+                            if (quote.ret_7d_pct != null)  candidate.ret_7d_pct  = quote.ret_7d_pct;
+                            if (quote.ret_30d_pct != null)  candidate.ret_30d_pct = quote.ret_30d_pct;
+                            if (quote.day_change_pct != null) candidate.day_change_pct = quote.day_change_pct;
+                        }
+                    }
+                } catch (_e) {
+                    // Fallback: use scanner-cached values (non-blocking)
+                }
+                // Also try the technical endpoint for momentum returns when quote missed them
+                try {
+                    const techRes = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(ticker)}/technicals`);
+                    if (techRes && techRes.ok) {
+                        const tData = await techRes.json();
+                        const tech = tData.technical || tData;
+                        if (tech) {
+                            if (candidate.ret_7d_pct == null && tech.momentum_7d != null)  candidate.ret_7d_pct  = tech.momentum_7d;
+                            if (candidate.ret_30d_pct == null && tech.momentum_30d != null) candidate.ret_30d_pct = tech.momentum_30d;
+                        }
+                    }
+                } catch (_e) {
+                    // Non-blocking
+                }
+            }
 
             if (app.renderBreakoutSetupInspector) {
                 app.renderBreakoutSetupInspector(candidate);

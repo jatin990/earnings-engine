@@ -454,12 +454,14 @@ def _get_ticker_returns_batch(
     return results
 
 
-def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
+def _ensure_institutional_data_for_ticker(sym: str, conn: Any, allow_network: bool = True) -> None:
     """Persist institutional flow data grounded strictly in live corporate ownership & price history."""
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # 1. Retrieve live corporate ownership data
-    live_meta = fetch_live_corporate_ownership(sym, conn)
+    #    allow_network=True by default so newly-listed tickers not yet in
+    #    the local cache get seeded from yfinance on first access.
+    live_meta = fetch_live_corporate_ownership(sym, conn, allow_network=allow_network)
 
     # Persist company name if we got one from yfinance
     if live_meta.get("short_name") and conn:

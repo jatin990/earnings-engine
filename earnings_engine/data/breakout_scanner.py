@@ -3124,6 +3124,12 @@ def compute_technical_decision_metrics(
         if avg_vol_20 > 0:
             volume_surge_ratio = round(today_vol / avg_vol_20, 2)
 
+    # 7D Return %
+    ret_7d_pct = None
+    if len(closes) >= 6:
+        idx_7 = max(0, len(closes) - 8)
+        ret_7d_pct = round(((current_price / float(closes.iloc[idx_7])) - 1.0) * 100.0, 2)
+
     # 30D Return %
     ret_30d_pct = None
     if len(closes) >= 20:
@@ -3158,6 +3164,7 @@ def compute_technical_decision_metrics(
         "rsi_14": rsi_14,
         "volume_surge_ratio": volume_surge_ratio,
         "ret_30d_pct": ret_30d_pct,
+        "ret_7d_pct": ret_7d_pct,
     }
 
 
