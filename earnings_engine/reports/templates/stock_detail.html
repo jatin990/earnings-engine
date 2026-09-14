@@ -1089,6 +1089,104 @@
             animation: spin 0.6s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ━━━ SIDEBAR LAYOUT ━━━ */
+        .page-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 270px) minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+        .stock-sidebar {
+            position: sticky;
+            top: 64px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        @media (max-width: 1100px) {
+            .page-layout {
+                grid-template-columns: 1fr;
+            }
+            .stock-sidebar {
+                position: static;
+                order: -1;
+            }
+        }
+
+        /* Sidebar Card */
+        .sidebar-card {
+            background: linear-gradient(180deg, #0e1019 0%, #08090f 100%);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 12px 28px -8px rgba(0,0,0,0.8), inset 0 1px 0 0 rgba(255,255,255,0.06);
+        }
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #ffffff;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .sidebar-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.78rem;
+        }
+        .sidebar-row:last-child { border-bottom: none; }
+        .sidebar-label {
+            font-size: 0.68rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .sidebar-value {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+        }
+        /* Earnings mini-table */
+        .earnings-mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.72rem;
+        }
+        .earnings-mini-table th {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            padding: 0.3rem 0;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .earnings-mini-table td {
+            padding: 0.32rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 0.7rem;
+        }
+        .earnings-mini-table tr:last-child td { border-bottom: none; }
+        .earnings-mini-table .qtr-date {
+            font-weight: 700;
+            color: #e2e8f0;
+            font-family: var(--font-sans);
+        }
     </style>
 </head>
 <body>
@@ -1234,6 +1332,55 @@
                 </div>
             </div>
         </section>
+
+        <!-- ━━━ LEFT SIDEBAR + MAIN CONTENT LAYOUT ━━━ -->
+        <div class="page-layout">
+
+            <!-- LEFT SIDEBAR: EARNINGS CALENDAR & RECENT RESULTS -->
+            <aside class="stock-sidebar">
+
+                <!-- Next Earnings Date -->
+                <section class="sidebar-card" id="sidebarNextEarnings">
+                    <div class="sidebar-header"><span style="color: var(--amber);">🗓️</span> Next Earnings</div>
+                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">Date</span>
+                            <span class="sidebar-value" id="sbNextEarnDate" style="color: var(--sky);">—</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">Days Away</span>
+                            <span class="sidebar-value" id="sbNextEarnDays">—</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">EPS Estimate</span>
+                            <span class="sidebar-value" id="sbNextEarnEst">—</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Last 4 Quarters -->
+                <section class="sidebar-card" id="sidebarEarningsHistory">
+                    <div class="sidebar-header"><span style="color: var(--emerald);">📊</span> Last 4 Quarters</div>
+                    <div style="overflow-x:auto;">
+                        <table class="earnings-mini-table">
+                            <thead>
+                                <tr>
+                                    <th>Quarter</th>
+                                    <th style="text-align:right;">EPS Est / Act</th>
+                                    <th style="text-align:right;">Reaction</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sbEarningsBody">
+                                <tr><td colspan="3" style="text-align:center;color:var(--text-tertiary);font-family:var(--font-sans);padding:0.6rem 0;">Loading earnings signals...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </aside>
+
+            <!-- MAIN CONTENT COLUMN -->
+            <section class="sidebar-main" style="display:flex;flex-direction:column;gap:1.75rem;min-width:0;">
 
         <!-- ━━━ INSTANT STATS BAR: Returns · Composite Scores ━━━ -->
         <div id="instantStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.65rem;padding:0.85rem 1.1rem;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
@@ -1767,7 +1914,7 @@
                         <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
                         <div class="section-actions">
                             <button type="button" id="btnFetchNewsDelta" onclick="fetchNewsDelta()" class="btn-section-action cyan-subtle" title="Fetch fresh news headlines, press releases, and corporate exchange announcements">
-                                🔄 Fetch from Sources
+                                🔁 Fetch Latest
                             </button>
                             <button type="button" id="btnRecalcNewsSentiment" onclick="fetchStockCatalystsOnly(true)" class="btn-section-action primary-subtle" title="Re-evaluate news sentiment, impact scoring (0-100%), and catalyst rankings">
                                 ⚡ Refresh Sentiment
@@ -2081,6 +2228,11 @@
 
         </section>
 
+            </section>
+        <!-- END MAIN CONTENT COLUMN -->
+        </div>
+        <!-- END PAGE LAYOUT -->
+
     </main>
 
     <script>
@@ -2316,6 +2468,7 @@
                     const data = await res.json();
                     stockState.earnings_history = data.earnings_history || [];
                     renderEarnings(stockState.earnings_history);
+                    renderEarningsSidebar(stockState.earnings_history);
                     if (isManual) showStockToast('Earnings track record updated', 'success');
                 }
             } catch (e) {
@@ -3592,6 +3745,55 @@
             }).join('');
         }
 
+        function renderEarningsSidebar(history) {
+            const body = document.getElementById('sbEarningsBody');
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upcoming = history.find(e => e.earnings_date > todayStr);
+            const past = history.filter(e => e.earnings_date <= todayStr).slice(0, 4);
+
+            // ── Next Earnings Date ──
+            const dateEl = document.getElementById('sbNextEarnDate');
+            const daysEl = document.getElementById('sbNextEarnDays');
+            const estEl  = document.getElementById('sbNextEarnEst');
+            if (upcoming) {
+                if (dateEl) dateEl.textContent = upcoming.earnings_date;
+                const daysAway = Math.ceil((new Date(upcoming.earnings_date) - new Date()) / 86400000);
+                if (daysEl) {
+                    daysEl.textContent = `${daysAway}d`;
+                    daysEl.style.color = daysAway <= 14 ? 'var(--rose)' : daysAway <= 30 ? 'var(--amber)' : 'var(--text-primary)';
+                }
+                if (estEl) estEl.textContent = upcoming.eps_estimate != null ? `₹${upcoming.eps_estimate}` : '—';
+            } else {
+                if (dateEl) dateEl.textContent = 'No upcoming date';
+                if (daysEl) daysEl.textContent = '—';
+                if (estEl)  estEl.textContent = '—';
+            }
+
+            // ── Last 4 Quarters ──
+            if (!body) return;
+            if (!past.length) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-tertiary);font-family:var(--font-sans);padding:0.5rem 0;">No historical earnings signals found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = past.map(e => {
+                const d = new Date(e.earnings_date);
+                const qLabel = `${['Q1','Q2','Q3','Q4'][Math.floor(d.getMonth()/3)]} ${d.getFullYear()}`;
+                const epsEst = e.eps_estimate != null ? `₹${e.eps_estimate}` : '—';
+                const epsRep = e.eps_reported != null ? `₹${e.eps_reported}` : '—';
+                const surp = e.surprise_pct;
+                const surpText = surp != null ? `${surp >= 0 ? '+' : ''}${surp.toFixed(1)}%` : '—';
+                const surpColor = surp != null ? (surp >= 0 ? 'var(--emerald)' : 'var(--rose)') : 'var(--text-tertiary)';
+                return `
+                    <tr>
+                        <td class="qtr-date" style="white-space:nowrap;">${qLabel}<div style="font-size:0.58rem;color:#64748b;font-weight:400;">${e.earnings_date}</div></td>
+                        <td style="text-align:right;white-space:nowrap;"><span style="color:#64748b;">${epsEst}</span> / <span style="color:#e2e8f0;">${epsRep}</span></td>
+                        <td style="text-align:right;color:${surpColor};font-weight:700;">${surpText}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         async function calculateSingleEps(earningsDate) {
             const row = document.getElementById(`row-earnings-${earningsDate}`);
             if (row) row.style.opacity = '0.5';
@@ -3747,7 +3949,7 @@
             const btn = document.getElementById('btnFetchNewsDelta');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching Sources...';
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching.';
             }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/fetch-news`, {
@@ -3767,7 +3969,7 @@
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '🔄 Fetch from Sources';
+                    btn.innerHTML = '🔁 Fetch Latest';
                 }
             }
         }
