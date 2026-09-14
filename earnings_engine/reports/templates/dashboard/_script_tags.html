@@ -1,6 +1,6 @@
-    <!-- ================================================================ -->
+<!-- ================================================================ -->
     <!-- Nexus Dashboard — Core Foundation Script Loader v20260828_v23_modular -->
-    <!-- Feature modules are loaded on-demand dynamically via app.loadTabModules() -->
+    <!-- Feature modules (catalysts, premarket) are also loaded on-demand dynamically via app.loadTabModules() -->
     <!-- ================================================================ -->
 
     <!-- Core Foundation & Shell -->
@@ -14,5 +14,13 @@
     <script src="/static/js/modules/watchlist_drawer.js?v=20260828_v23_modular"></script>
     <script src="/static/js/modules/alerts.js?v=20260828_v23_modular"></script>
     <script src="/static/js/modules/export_center.js?v=20260828_v23_modular"></script>
+
+    <!-- Dashboard core (defines app.init, switchTab, loadTabModules, etc.) -->
     <script src="/static/js/dashboard.js?v=20260828_v23_modular"></script>
+
+    <!-- Feature modules (also loaded on-demand via app.loadTabModules()) -->
+    <script src="/static/js/modules/catalysts.js?v=20260828_v23_modular"></script>
+    <script src="/static/js/modules/premarket.js?v=20260828_v23_modular"></script>
+    <script src="/static/js/modules/consensus.js?v=20260828_v23_modular"></script>
+    <script src="/static/js/modules/swing.js?v=20260828_v23_modular"></script>
     <script src="/static/js/modules/sidebar_badges.js?v=20260828_v23_modular"></script>
