@@ -192,32 +192,52 @@ def run_yfinance_checks(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return flagged
 
 
+def _extract_date(updated_at: str | None) -> str:
+    """Extract YYYY-MM-DD (or date-time prefix) from updated_at."""
+    if not updated_at:
+        return "unknown"
+    return updated_at[:10]
+
+
 def print_summary_table(flagged: list[dict[str, Any]]) -> None:
-    """Print a formatted summary table of all flagged rows."""
+    """Print a formatted summary table of all flagged rows, grouped by date."""
     if not flagged:
         print("\n  No suspicious rows found. Database is clean.\n")
         return
 
-    header = (
-        f"{'Ticker':<18} {'Quarter':<14} {'Prom%':>7} {'FII%':>7} "
+    # Group by date
+    from collections import defaultdict
+    by_date: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in flagged:
+        by_date[_extract_date(row["updated_at"])].append(row)
+
+    row_line = (
+        f"  {'Ticker':<18} {'Quarter':<14} {'Prom%':>7} {'FII%':>7} "
         f"{'DII%':>7} {'Pub%':>7} {'Updated At':<22} {'Reasons'}"
     )
-    sep = "-" * len(header)
+    sep = "-" * len(row_line)
 
-    print(f"\n  {sep}")
-    print(f"  {header}")
-    print(f"  {sep}")
+    print()
 
-    for row in flagged:
-        print(
-            f"  {row['ticker']:<18} {row['quarter']:<14} "
-            f"{row['promoter_pct']:>7.1f} {row['fii_pct']:>7.1f} "
-            f"{row['dii_mf_pct']:>7.1f} {row['public_retail_pct']:>7.1f} "
-            f"{(row['updated_at'] or 'N/A'):<22} {', '.join(row['reasons'])}"
-        )
+    for date_key in sorted(by_date.keys()):
+        group = by_date[date_key]
+        print(f"  === {date_key}  ({len(group)} rows) ===")
+        print(f"  {sep}")
+        print(f"  {row_line}")
+        print(f"  {sep}")
 
-    print(f"  {sep}")
-    print(f"  Total flagged rows: {len(flagged)}\n")
+        for row in group:
+            print(
+                f"  {row['ticker']:<18} {row['quarter']:<14} "
+                f"{row['promoter_pct']:>7.1f} {row['fii_pct']:>7.1f} "
+                f"{row['dii_mf_pct']:>7.1f} {row['public_retail_pct']:>7.1f} "
+                f"{(row['updated_at'] or 'N/A'):<22} {', '.join(row['reasons'])}"
+            )
+
+        print(f"  {sep}")
+        print()
+
+    print(f"  Grand total flagged: {len(flagged)} rows across {len(by_date)} date group(s)\n")
 
 
 def delete_flagged(conn: Any, flagged: list[dict[str, Any]]) -> dict[str, int]:
