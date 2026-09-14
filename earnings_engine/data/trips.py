@@ -577,6 +577,141 @@ def resolve_user_accessible_trips(
     return trips
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Trip Itinerary CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_trip_itinerary(conn, trip_id: str) -> list[dict[str, Any]]:
+    """Return all itinerary days for a trip ordered by day_number."""
+    rows = conn.execute("""
+        SELECT
+            day_id, trip_id, day_number, date, title, description,
+            start_point, end_point, altitude_meters, distance_km,
+            duration_hours, accommodation, meals, difficulty, trail_alert,
+            created_at
+        FROM trip_itinerary_days
+        WHERE trip_id = ?
+        ORDER BY day_number ASC
+    """, (trip_id,)).fetchall()
+    return [
+        {
+            "day_id": r[0], "trip_id": r[1], "day_number": r[2], "date": r[3],
+            "title": r[4], "description": r[5], "start_point": r[6],
+            "end_point": r[7], "altitude_meters": r[8], "distance_km": r[9],
+            "duration_hours": r[10], "accommodation": r[11], "meals": r[12],
+            "difficulty": r[13], "trail_alert": r[14], "created_at": r[15],
+        }
+        for r in rows
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trip Packing Items CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_packing_items(conn, trip_id: str) -> list[dict[str, Any]]:
+    """Return all packing items for a trip with per-member statuses as a dict.
+
+    Each item dict includes: item_id, name, category, added_by, created_at,
+    statuses: {member_name: status}
+    Query trip_packing_status joined to trip_packing_items.
+    """
+    item_rows = conn.execute("""
+        SELECT item_id, name, category, added_by, created_at
+        FROM trip_packing_items
+        WHERE trip_id = ?
+        ORDER BY category ASC, name ASC
+    """, (trip_id,)).fetchall()
+
+    if not item_rows:
+        return []
+
+    item_ids = [r[0] for r in item_rows]
+    statuses_map: dict[str, dict[str, str]] = {iid: {} for iid in item_ids}
+
+    placeholders = ",".join("?" for _ in item_ids)
+    status_rows = conn.execute(f"""
+        SELECT item_id, member_name, status
+        FROM trip_packing_status
+        WHERE item_id IN ({placeholders})
+    """, item_ids).fetchall()
+    for sr in status_rows:
+        statuses_map.setdefault(sr[0], {})[sr[1]] = sr[2]
+
+    result = []
+    for r in item_rows:
+        result.append({
+            "item_id": r[0], "name": r[1], "category": r[2],
+            "added_by": r[3], "created_at": r[4],
+            "statuses": statuses_map.get(r[0], {}),
+        })
+    return result
+
+
+def add_packing_item(
+    conn,
+    trip_id: str,
+    name: str,
+    category: str,
+    added_by: str,
+) -> dict[str, Any]:
+    """Insert a new packing item and return it as a dict."""
+    item_id = str(uuid.uuid4())
+    created_at = datetime.utcnow().isoformat() + "Z"
+    conn.execute("""
+        INSERT INTO trip_packing_items (item_id, trip_id, category, name, added_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (item_id, trip_id, category, name, added_by, created_at))
+    conn.commit()
+    return {
+        "item_id": item_id, "trip_id": trip_id, "category": category,
+        "name": name, "added_by": added_by, "created_at": created_at,
+    }
+
+
+def delete_packing_item(conn, item_id: str) -> None:
+    """Delete a packing item (trip_packing_status rows cascade via FK).
+
+    If foreign_keys PRAGMA is not enabled (default in SQLite), child rows are
+    deleted manually here so the cascade contract holds regardless of PRAGMA state.
+    """
+    conn.execute("DELETE FROM trip_packing_status WHERE item_id = ?", (item_id,))
+    conn.execute("DELETE FROM trip_packing_items WHERE item_id = ?", (item_id,))
+    conn.commit()
+
+
+def update_packing_status(
+    conn,
+    item_id: str,
+    member_name: str,
+    status: str,
+) -> dict[str, Any]:
+    """Upsert status for a (item_id, member_name) pair.
+
+    Uses SQLite ON CONFLICT upsert. INSERT on new pairs, UPDATE on existing.
+    Returns the row as dict with updated status and updated_at.
+    """
+    status_id = str(uuid.uuid4())
+    conn.execute("""
+        INSERT INTO trip_packing_status (status_id, item_id, member_name, status)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(item_id, member_name)
+        DO UPDATE SET status = excluded.status, updated_at = datetime('now')
+    """, (status_id, item_id, member_name, status))
+    conn.commit()
+    row = conn.execute("""
+        SELECT status_id, item_id, member_name, status, updated_at
+        FROM trip_packing_status
+        WHERE item_id = ? AND member_name = ?
+    """, (item_id, member_name)).fetchone()
+    if row:
+        return {
+            "status_id": row[0], "item_id": row[1], "member_name": row[2],
+            "status": row[3], "updated_at": row[4],
+        }
+    return {}
+
+
 def send_trip_invite_email(
     to_email: str,
     to_name: str,
@@ -702,3 +837,63 @@ def send_trip_invite_email(
         to_name, to_email, subject, group_name, passcode, direct_url
     )
     return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Table Initialization — Itinerary & Packing
+# ─────────────────────────────────────────────────────────────────────────────
+
+def init_trip_itinerary_db(conn) -> None:
+    """Create trip_itinerary_days table if not exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_itinerary_days (
+            day_id TEXT PRIMARY KEY,
+            trip_id TEXT NOT NULL REFERENCES trips(trip_id) ON DELETE CASCADE,
+            day_number INTEGER NOT NULL,
+            date TEXT,
+            title TEXT NOT NULL,
+            description TEXT,
+            start_point TEXT,
+            end_point TEXT,
+            altitude_meters INTEGER,
+            distance_km REAL,
+            duration_hours REAL,
+            accommodation TEXT,
+            meals TEXT,
+            difficulty TEXT DEFAULT 'Moderate',
+            trail_alert TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_itinerary_trip ON trip_itinerary_days(trip_id)"
+    )
+    conn.commit()
+
+
+def init_trip_packing_db(conn) -> None:
+    """Create trip_packing_items and trip_packing_status tables if not exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_packing_items (
+            item_id TEXT PRIMARY KEY,
+            trip_id TEXT NOT NULL REFERENCES trips(trip_id) ON DELETE CASCADE,
+            category TEXT DEFAULT 'Misc',
+            name TEXT NOT NULL,
+            added_by TEXT DEFAULT 'owner',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_packing_items_trip ON trip_packing_items(trip_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_packing_status (
+            status_id TEXT PRIMARY KEY,
+            item_id TEXT NOT NULL REFERENCES trip_packing_items(item_id) ON DELETE CASCADE,
+            member_name TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(item_id, member_name)
+        )
+    """)
+    conn.commit()
