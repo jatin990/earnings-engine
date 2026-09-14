@@ -2391,379 +2391,282 @@
 
 
         renderForensicsTab(tab) {
-
             const dossier = this._smartMoneyForensicDossier;
-
             if (!dossier) return;
-
             const container = document.getElementById('instForensicPane-' + tab);
-
             if (!container) return;
-
             if (tab === 'quarters') tab = 'quarterly';
 
             if (tab === 'buyers') {
-
                 const buyers = dossier.buyers || [];
-
                 const badge = document.getElementById('instSmBuyerCountBadge');
-
                 if (badge) badge.textContent = `${buyers.length} Buyers Logged`;
-
                 const tbody = document.getElementById('instSmBuyersTableBody');
-
                 if (!tbody) return;
 
                 if (!buyers.length) {
-
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:#71717a;">No institutional buyers on record.</td></tr>';
-
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;color:#71717a;">No institutional buyers on record.</td></tr>';
                     return;
-
                 }
 
                 tbody.innerHTML = buyers.map(b => {
-
-                    const cls = b.entity_type || b.fund_type || 'Institution';
-
+                    const buyerName = b.investor_name || b.buyer_name || b.fund_name || b.name || b.client_name || 'Institution';
+                    const cls = b.entity_class || b.entity_type || b.fund_type || 'Institution';
                     const stakePct = b.stake_pct != null ? `${Number(b.stake_pct).toFixed(2)}%` : '—';
-
-                    const chgPct = b.change_pct != null ? `${Number(b.change_pct) >= 0 ? '+' : ''}${Number(b.change_pct).toFixed(2)}%` : '—';
-
-                    const capCr = b.capital_cr != null ? `₹${Number(b.capital_cr).toLocaleString(undefined, {maximumFractionDigits:1})} Cr` : '—';
-
-                    const qty = b.quantity != null ? Number(b.quantity).toLocaleString('en-IN') : (b.shares != null ? Number(b.shares).toLocaleString('en-IN') : '—');
-
-                    const price = b.buy_price != null ? `₹${Number(b.buy_price).toFixed(2)}` : (b.price != null ? `₹${Number(b.price).toFixed(2)}` : '—');
+                    const capCr = b.capital_deployed_cr != null ? `₹${Number(b.capital_deployed_cr).toLocaleString(undefined, {maximumFractionDigits:1})} Cr` : (b.capital_cr != null ? `₹${Number(b.capital_cr).toLocaleString(undefined, {maximumFractionDigits:1})} Cr` : (b.holding_value_cr != null ? `₹${Number(b.holding_value_cr).toLocaleString(undefined, {maximumFractionDigits:1})} Cr` : '—'));
+                    const qty = b.shares_held != null ? Number(b.shares_held).toLocaleString('en-IN') : (b.quantity != null ? Number(b.quantity).toLocaleString('en-IN') : (b.shares != null ? Number(b.shares).toLocaleString('en-IN') : (b.change_shares != null ? Number(b.change_shares).toLocaleString('en-IN') : '—')));
+                    const price = b.price != null ? `₹${Number(b.price).toFixed(2)}` : (b.avg_price != null ? `₹${Number(b.avg_price).toFixed(2)}` : (b.buy_price != null ? `₹${Number(b.buy_price).toFixed(2)}` : '—'));
+                    const filingDate = b.quarter || b.date || b.deal_date || b.reported_date || '—';
 
                     return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                        <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${b.name || b.fund_name || '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;color:#a1a1aa;">${cls}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#38bdf8;">${stakePct}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${Number(chgPct.replace(/[+%]/g,'') || 0) >= 0 ? '#34d399' : '#f87171'};">${chgPct}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${qty}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${price}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#10b981;">${capCr}</td>
-                        <td style="padding:0.4rem 0.6rem;color:#71717a;font-size:0.65rem;">${b.quarter || b.date || b.filing_date || '—'}</td>
+                        <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${buyerName}</td>
+                        <td style="padding:0.4rem 0.5rem;color:#a1a1aa;">${cls}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);color:#10b981;font-weight:700;">${capCr}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${stakePct}${qty !== '—' ? ` <span style="color:#71717a;font-size:0.65rem;">(${qty} sh)</span>` : ''}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${price}</td>
+                        <td style="padding:0.4rem 0.5rem;color:#71717a;font-size:0.65rem;font-family:var(--font-mono);">${filingDate}</td>
                     </tr>`;
                 }).join('');
-
                 return;
-
             }
 
             if (tab === 'quarterly') {
-
                 const fin = dossier.quarterly_income || dossier.quarterly_financials || [];
-
+                const badge = document.getElementById('instSmQuarterlyCountBadge');
+                if (badge) badge.textContent = `${fin.length} Quarters Logged`;
                 const tbody = document.getElementById('instSmQuarterlyTableBody');
-
                 if (!tbody) return;
 
                 if (!fin.length) {
-
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:#71717a;">No quarterly financial filings on record.</td></tr>';
-
+                    tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">No quarterly financial filings on record.</td></tr>';
                     return;
-
                 }
 
-                tbody.innerHTML = fin.map(f => `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                    <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${f.quarter || '—'}</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${Number(f.revenue_cr || 0).toLocaleString(undefined, {maximumFractionDigits:0})} Cr</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${Number(f.net_profit_cr || 0).toLocaleString(undefined, {maximumFractionDigits:0})} Cr</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${f.yoy_pat_growth_pct != null && f.yoy_pat_growth_pct >= 0 ? '#34d399' : (f.yoy_pat_growth_pct != null && f.yoy_pat_growth_pct < 0 ? '#f87171' : '#a1a1aa')};">${f.yoy_pat_growth_pct != null ? `${f.yoy_pat_growth_pct >= 0 ? '+' : ''}${Number(f.yoy_pat_growth_pct).toFixed(1)}%` : '—'}</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${f.operating_margin_pct != null ? `${Number(f.operating_margin_pct).toFixed(1)}%` : '—'}</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${f.net_margin_pct != null ? `${Number(f.net_margin_pct).toFixed(1)}%` : '—'}</td>
-                    <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${f.eps != null ? Number(f.eps).toFixed(2) : '—'}</td>
-                    <td style="padding:0.4rem 0.6rem;color:#71717a;font-size:0.65rem;">${f.period_end_date || f.quarter || '—'}</td>
-                </tr>`).join('');
+                tbody.innerHTML = fin.map(f => {
+                    const revCr = f.revenue_cr != null ? `₹${Number(f.revenue_cr).toLocaleString(undefined, {maximumFractionDigits:0})} Cr` : '—';
+                    const patCr = f.net_profit_cr != null ? `₹${Number(f.net_profit_cr).toLocaleString(undefined, {maximumFractionDigits:0})} Cr` : '—';
+                    const opm = f.operating_margin_pct != null ? `${Number(f.operating_margin_pct).toFixed(1)}%` : '—';
+                    const epsVal = f.eps != null ? `₹${Number(f.eps).toFixed(2)}` : '—';
+                    const yoyRev = f.yoy_revenue_growth_pct;
+                    const yoyRevStr = yoyRev != null ? `${yoyRev >= 0 ? '+' : ''}${Number(yoyRev).toFixed(1)}%` : '—';
+                    const yoyRevCol = yoyRev != null ? (yoyRev >= 0 ? '#34d399' : '#f87171') : '#a1a1aa';
+                    const yoyPat = f.yoy_pat_growth_pct;
+                    const yoyPatStr = yoyPat != null ? `${yoyPat >= 0 ? '+' : ''}${Number(yoyPat).toFixed(1)}%` : '—';
+                    const yoyPatCol = yoyPat != null ? (yoyPat >= 0 ? '#34d399' : '#f87171') : '#a1a1aa';
 
+                    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f4f4f5;">${f.quarter || '—'}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${revCr}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${patCr}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${opm}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${epsVal}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);color:${yoyRevCol};">${yoyRevStr}</td>
+                        <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);color:${yoyPatCol};">${yoyPatStr}</td>
+                    </tr>`;
+                }).join('');
                 return;
-
             }
 
             if (tab === 'blocks') {
-
                 const deals = dossier.block_deals || [];
-
-                const tbody = document.getElementById('instSmBlockDealsTableBody') || document.getElementById('instSmBlockDealsContainer');
-
-                if (!tbody) return;
+                const badge = document.getElementById('instSmBlockCountBadge');
+                if (badge) badge.textContent = `${deals.length} Deals`;
+                const container = document.getElementById('instSmBlockDealsContainer');
+                if (!container) return;
 
                 if (!deals.length) {
-
-                    tbody.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">No major exchange block deals on record.</div>';
-
+                    container.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:2rem;">No major exchange block deals on record.</div>';
                     return;
-
                 }
 
-                tbody.innerHTML = deals.map(d => `
-                    <div style="background:#18181b;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
+                container.innerHTML = deals.map(d => {
+                    const isBuy = (d.deal_type || 'BUY').toUpperCase() === 'BUY';
+                    const col = isBuy ? '#34d399' : '#f87171';
+                    const bg = isBuy ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
+                    const border = isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
+                    const valCr = d.value_cr != null ? `₹${Number(d.value_cr).toLocaleString(undefined, {maximumFractionDigits:2})} Cr` : '—';
+                    const pctEq = d.pct_equity != null ? ` · ${Number(d.pct_equity).toFixed(2)}%` : '';
+
+                    return `<div style="background:${bg};border:1px solid ${border};border-radius:4px;padding:0.45rem 0.65rem;margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
                         <div>
-                            <span style="font-weight:700;color:${d.deal_type === 'BUY' ? '#34d399' : '#f87171'};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type || 'DEAL'}]</span>
+                            <span style="font-weight:700;color:${col};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type || 'DEAL'}]</span>
                             <strong style="color:#ffffff;">${d.client_name || d.name || '—'}</strong>
-                            <span style="color:#71717a;margin-left:0.3rem;">${d.deal_date || d.date || ''}</span>
+                            <span style="color:#71717a;margin-left:0.35rem;font-size:0.65rem;font-family:var(--font-mono);">${d.deal_date || d.date || ''}</span>
                         </div>
                         <div style="font-family:var(--font-mono);color:#a1a1aa;text-align:right;">
                             ${d.quantity ? Number(d.quantity).toLocaleString('en-IN') + ' sh @ ' : ''}₹${d.price != null ? Number(d.price).toFixed(2) : '—'}
-                            <div style="color:#10b981;">₹${Number(d.value_cr || 0).toLocaleString(undefined, {maximumFractionDigits:2})} Cr${d.pct_equity != null ? ` · ${Number(d.pct_equity).toFixed(2)}%` : ''}</div>
+                            <div style="color:#10b981;font-weight:700;">${valCr}${pctEq}</div>
                         </div>
-                    </div>`).join('');
-
+                    </div>`;
+                }).join('');
                 return;
-
             }
 
             if (tab === 'signals') {
-
                 const signal = dossier.signal_timeline || [];
-
                 const container = document.getElementById('instSmSignalTimelineContainer');
-
+                const badge = document.getElementById('instSmTimelineCountBadge');
+                if (badge) badge.textContent = `${signal.length} Signals`;
                 if (!container) return;
 
                 const timelineSrc = Array.isArray(signal) ? signal : [];
-
                 if (!timelineSrc.length) {
-
-                    container.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">No discovery signal history on record.</div>';
-
+                    container.innerHTML = '<div style="color:#71717a;font-size:0.72rem;text-align:center;padding:2rem;">No discovery signal history on record.</div>';
                     return;
-
                 }
 
-                container.innerHTML = timelineSrc.map(sg => {
-
-                    const sigRet = sg.outcome_return_pct;
-
-                    const retStr = sigRet != null ? `${sigRet >= 0 ? '+' : ''}${Number(sigRet).toFixed(2)}%` : '—';
-
-                    const retCol = sigRet != null && sigRet >= 0 ? '#34d399' : '#f87171';
-
-                    const status = sg.lifecycle_status || 'ACTIVE';
-
-                    const stBadge = status === 'TARGET_HIT' ? ['rgba(16,185,129,0.2)','#34d399'] : (status === 'DISTRIBUTION_EXIT' ? ['rgba(239,68,68,0.2)','#f87171'] : (status === 'COOLING_OFF' ? ['rgba(245,158,11,0.2)','#fbbf24'] : ['rgba(56,189,248,0.2)','#38bdf8']));
-
-                    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                        <td style="padding:0.4rem 0.6rem;font-weight:700;color:#f4f4f5;">${sg.strategy || '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:#a1a1aa;">${sg.signal_date || '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.signal_price != null ? Number(sg.signal_price).toFixed(2) : '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${sg.current_price != null ? `₹${Number(sg.current_price).toFixed(2)}` : '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);color:${retCol};">${retStr}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.target_price != null ? Number(sg.target_price).toFixed(2) : '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">₹${sg.stop_loss != null ? Number(sg.stop_loss).toFixed(2) : '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;font-family:var(--font-mono);">${sg.days_elapsed != null ? `${sg.days_elapsed}d` : '—'}</td>
-                        <td style="padding:0.4rem 0.6rem;"><span style="font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${stBadge[0]};color:${stBadge[1]};">${status}</span></td>
-                    </tr>`;
-                }).join('');
-
+                container.innerHTML = `
+                    <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+                        <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.65rem;">
+                            <tr>
+                                <th style="padding:0.4rem 0.5rem;">STRATEGY</th>
+                                <th style="padding:0.4rem 0.5rem;">SIGNAL DATE</th>
+                                <th style="padding:0.4rem 0.5rem;">ENTRY (₹)</th>
+                                <th style="padding:0.4rem 0.5rem;">CURRENT (₹)</th>
+                                <th style="padding:0.4rem 0.5rem;">OUTCOME RET</th>
+                                <th style="padding:0.4rem 0.5rem;">TARGET (₹)</th>
+                                <th style="padding:0.4rem 0.5rem;">STOP LOSS</th>
+                                <th style="padding:0.4rem 0.5rem;">DAYS</th>
+                                <th style="padding:0.4rem 0.5rem;">STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${timelineSrc.map(sg => {
+                                const sigRet = sg.outcome_return_pct != null ? sg.outcome_return_pct : sg.return_since_signal_pct;
+                                const retStr = sigRet != null ? `${sigRet >= 0 ? '+' : ''}${Number(sigRet).toFixed(2)}%` : '—';
+                                const retCol = sigRet != null && sigRet >= 0 ? '#34d399' : '#f87171';
+                                const status = sg.lifecycle_status || 'ACTIVE';
+                                const stBadge = status === 'TARGET_HIT' ? ['rgba(16,185,129,0.18)','#34d399','rgba(16,185,129,0.35)'] : (status === 'DISTRIBUTION_EXIT' ? ['rgba(239,68,68,0.18)','#f87171','rgba(239,68,68,0.35)'] : (status === 'COOLING_OFF' ? ['rgba(245,158,11,0.18)','#fbbf24','rgba(245,158,11,0.35)'] : ['rgba(56,189,248,0.18)','#38bdf8','rgba(56,189,248,0.35)']));
+                                return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                                    <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f4f4f5;">${sg.strategy || '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;">${sg.signal_date || '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">₹${sg.signal_price != null ? Number(sg.signal_price).toFixed(2) : '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${sg.current_price != null ? `₹${Number(sg.current_price).toFixed(2)}` : '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${retCol};">${retStr}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">₹${sg.target_price != null ? Number(sg.target_price).toFixed(2) : '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">₹${sg.stop_loss != null ? Number(sg.stop_loss).toFixed(2) : '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);">${sg.days_elapsed != null ? `${sg.days_elapsed}d` : '—'}</td>
+                                    <td style="padding:0.4rem 0.5rem;"><span style="font-size:0.62rem;font-weight:700;padding:0.12rem 0.35rem;border-radius:3px;background:${stBadge[0]};color:${stBadge[1]};border:1px solid ${stBadge[2]};">${status}</span></td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>`;
                 return;
-
             }
-
         },
 
-
-
         sortSmartMoneyTable(col) {
-
             if (!this._smartMoneyStocks || !this._smartMoneyStocks.length) return;
 
-
-
             if (this._smartMoneySortColumn === col) {
-
                 this._smartMoneySortAsc = !this._smartMoneySortAsc;
-
             } else {
-
                 this._smartMoneySortColumn = col;
-
-                this._smartMoneySortAsc = (col === 'ticker'); // default asc for ticker, desc for numbers
-
+                this._smartMoneySortAsc = (col === 'ticker' || col === 'strategy' || col === 'status');
             }
 
-
-
             const asc = this._smartMoneySortAsc;
-
             const factor = asc ? 1 : -1;
 
-
-
             this._smartMoneyStocks.sort((a, b) => {
-
                 let vA, vB;
-
                 switch (col) {
-
                     case 'ticker':
-
                         return factor * (a.ticker || '').localeCompare(b.ticker || '');
-
+                    case 'strategy':
+                        return factor * (a.strategy || a.strategy_archetype || '').localeCompare(b.strategy || b.strategy_archetype || '');
+                    case 'signal_date':
+                        return factor * (a.signal_date || '').localeCompare(b.signal_date || '');
                     case 'price':
                         vA = a.current_price != null ? Number(a.current_price) : 0;
                         vB = b.current_price != null ? Number(b.current_price) : 0;
                         return factor * (vA - vB);
-
+                    case 'return':
                     case 'signal':
-                        vA = a.return_since_signal_pct != null ? Number(a.return_since_signal_pct) : -9999;
-                        vB = b.return_since_signal_pct != null ? Number(b.return_since_signal_pct) : -9999;
+                        vA = a.outcome_return_pct != null ? Number(a.outcome_return_pct) : (a.return_since_signal_pct != null ? Number(a.return_since_signal_pct) : -9999);
+                        vB = b.outcome_return_pct != null ? Number(b.outcome_return_pct) : (b.return_since_signal_pct != null ? Number(b.return_since_signal_pct) : -9999);
                         return factor * (vA - vB);
-
                     case 'eps':
                         vA = a.eps_growth_yoy != null ? Number(a.eps_growth_yoy) : -9999;
                         vB = b.eps_growth_yoy != null ? Number(b.eps_growth_yoy) : -9999;
                         return factor * (vA - vB);
-
                     case 'capital':
-
-                        vA = Number(a.smart_money_inflow_cr || a.capital_cr || 0);
-
-                        vB = Number(b.smart_money_inflow_cr || b.capital_cr || 0);
-
+                        vA = Number(a.smart_money_inflow_cr || a.initial_smart_money_cr || a.capital_cr || 0);
+                        vB = Number(b.smart_money_inflow_cr || b.initial_smart_money_cr || b.capital_cr || 0);
                         return factor * (vA - vB);
-
                     case 'dominance':
-
                         vA = Number(a.smart_money_dominance_pct != null ? a.smart_money_dominance_pct : (a.dominance_pct || 0));
-
                         vB = Number(b.smart_money_dominance_pct != null ? b.smart_money_dominance_pct : (b.dominance_pct || 0));
-
                         return factor * (vA - vB);
-
                     case 'whales':
-
-                        vA = (a.whale_buyers_summary || a.whale_buyers || []).length;
-
-                        vB = (b.whale_buyers_summary || b.whale_buyers || []).length;
-
+                        vA = a.whale_count != null ? Number(a.whale_count) : (a.whale_buyers_summary || a.whale_buyers || []).length;
+                        vB = b.whale_count != null ? Number(b.whale_count) : (b.whale_buyers_summary || b.whale_buyers || []).length;
                         return factor * (vA - vB);
-
+                    case 'status':
+                        return factor * (a.lifecycle_status || '').localeCompare(b.lifecycle_status || '');
                     case 'classification':
-
                         return factor * (a.accumulation_signal_badge || a.badge || '').localeCompare(b.accumulation_signal_badge || b.badge || '');
-
                     case 'score':
-
                     default:
-
-                        vA = Number(a.smart_money_conviction_score != null ? a.smart_money_conviction_score : (a.conviction_score || 0));
-
-                        vB = Number(b.smart_money_conviction_score != null ? b.smart_money_conviction_score : (b.conviction_score || 0));
-
+                        vA = Number(a.conviction_score != null ? a.conviction_score : (a.initial_score != null ? a.initial_score : (a.smart_money_conviction_score || 0)));
+                        vB = Number(b.conviction_score != null ? b.conviction_score : (b.initial_score != null ? b.initial_score : (b.smart_money_conviction_score || 0)));
                         return factor * (vA - vB);
-
                 }
-
             });
-
-
 
             // Update UI sort arrow indicators
-
-            ['ticker', 'price', 'signal', 'eps', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
-
+            ['ticker', 'strategy', 'signal_date', 'price', 'return', 'capital', 'whales', 'score', 'status', 'signal', 'eps', 'dominance', 'classification'].forEach(c => {
                 const icon = document.getElementById('smSortIcon-' + c);
-
                 if (icon) {
-
                     if (c === col) {
-
                         icon.textContent = asc ? '▲' : '▼';
-
                         icon.style.color = '#38bdf8';
-
                     } else {
-
                         icon.textContent = '↕';
-
                         icon.style.color = '#71717a';
-
                     }
-
                 }
-
             });
-
-
 
             const searchInput = document.getElementById('instSmSearchInput');
-
             if (searchInput && searchInput.value.trim()) {
-
                 this.filterSmartMoneyLocal(searchInput.value.trim());
-
             } else {
-
                 this.renderSmartMoneyTable(this._smartMoneyStocks);
-
             }
-
         },
-
-
 
         setSmartMoneyWindow(win) {
-
             this._smartMoneyWindow = win || '90d';
-
             ['30d', '90d', '180d', '365d'].forEach(w => {
-
                 const btn = document.getElementById('btnSmWin-' + w);
-
                 if (btn) {
-
                     if (w === this._smartMoneyWindow) {
-
                         btn.style.background = '#ffffff';
-
                         btn.style.color = '#09090b';
-
                         btn.style.borderColor = '#ffffff';
-
                         btn.style.fontWeight = '700';
-
                     } else {
-
                         btn.style.background = 'transparent';
-
                         btn.style.color = '#a1a1aa';
-
                         btn.style.borderColor = 'transparent';
-
                         btn.style.fontWeight = '600';
-
                     }
-
                 }
-
             });
-
             this.loadSmartMoneyRadar();
-
         },
 
-
-
         changeSmartMoneyFilter() {
-
-            const entityEl = document.getElementById('instSmEntityFocus');
-
-            const minCrEl = document.getElementById('instSmMinCrInput');
-
+            const statusEl = document.getElementById('instSmStatus');
             const sortByEl = document.getElementById('instSmSortBy');
-
-            if (entityEl) this._smartMoneyEntityFocus = entityEl.value;
-
-            if (minCrEl) this._smartMoneyMinCr = parseFloat(minCrEl.value) || 0;
-
+            const entityEl = document.getElementById('instSmEntityFocus');
+            const minCrEl = document.getElementById('instSmMinCrInput');
+            if (statusEl) this._smartMoneyStatus = statusEl.value;
             if (sortByEl) this._smartMoneySortBy = sortByEl.value;
-
-            this.loadSmartMoneyRadar();
-
+            if (entityEl) this._smartMoneyEntityFocus = entityEl.value;
+            if (minCrEl) this._smartMoneyMinCr = parseFloat(minCrEl.value) || 0;
+            this.loadSmartMoneyRadar(true);
         },
 
         toggleSmartMoneyNewEntrants() {
@@ -2823,56 +2726,33 @@
             this.loadSmartMoneyRadar(true);
         },
 
-
-
         filterSmartMoneyLocal(query) {
-
             if (!this._smartMoneyStocks || !this._smartMoneyStocks.length) return;
-
             const q = (query || '').trim().toLowerCase();
-
             if (!q) {
-
                 this.renderSmartMoneyTable(this._smartMoneyStocks);
-
                 return;
-
             }
 
             const filtered = this._smartMoneyStocks.filter(s => {
-
                 const ticker = (s.ticker || '').toLowerCase();
-
                 const name = (s.company_name || '').toLowerCase();
-
                 const sector = (s.sector || '').toLowerCase();
-
+                const strat = (s.strategy || s.strategy_archetype || '').toLowerCase();
                 const whales = (s.whale_buyers_summary || []).join(' ').toLowerCase();
-
-                return ticker.includes(q) || name.includes(q) || sector.includes(q) || whales.includes(q);
-
+                return ticker.includes(q) || name.includes(q) || sector.includes(q) || strat.includes(q) || whales.includes(q);
             });
 
             this.renderSmartMoneyTable(filtered);
-
         },
 
-
-
         async loadSmartMoneyRadar(force = false) {
-
             const tbody = document.getElementById('instSmTableBody');
-
             if (tbody) {
-
                 tbody.innerHTML = '<tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;"><span class="spinner-border spinner-border-sm" style="margin-right:0.4rem;"></span>Scanning institutional flow databases for smart money accumulation...</td></tr>';
-
             }
 
-
-
             try {
-
                 let url = API_BASE + `/api/v1/institutional/signals?strategy=${encodeURIComponent(this._smartMoneyStrategy)}&status=${encodeURIComponent(this._smartMoneyStatus)}&sort_by=${encodeURIComponent(this._smartMoneySortBy)}&limit=60`;
                 if (this._smartMoneyNewEntrantsOnly) {
                     url += '&new_entrants_only=true';
@@ -2885,22 +2765,16 @@
                 }
 
                 const res = await fetch(url);
-
                 if (!res.ok) {
-
                     throw new Error(`API returned HTTP ${res.status}`);
-
                 }
-
                 const data = await res.json();
-
                 this._smartMoneyRawData = data;
-
                 this._smartMoneyStocks = data.signals || [];
                 this._smartMoneySortColumn = 'score';
                 this._smartMoneySortAsc = false;
 
-                ['ticker', 'price', 'signal', 'eps', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
+                ['ticker', 'strategy', 'signal_date', 'price', 'return', 'capital', 'whales', 'score', 'status', 'signal', 'eps', 'dominance', 'classification'].forEach(c => {
                     const icon = document.getElementById('smSortIcon-' + c);
                     if (icon) {
                         if (c === 'score') {
@@ -2913,178 +2787,167 @@
                     }
                 });
 
-
-
                 // Update Macro KPI Cards
-
                 const summary = data.macro_summary || {};
-
                 const kpiStocks = document.getElementById('kpiSmTotalStocks');
-
                 const kpiStocksSub = document.getElementById('kpiSmTotalStocksSub');
-
                 const kpiCap = document.getElementById('kpiSmTotalCapital');
-
                 const kpiCapSub = document.getElementById('kpiSmTotalCapitalSub');
-
                 const kpiDom = document.getElementById('kpiSmAvgDominance');
-
                 const kpiDomSub = document.getElementById('kpiSmAvgDominanceSub');
-
                 const kpiLead = document.getElementById('kpiSmTopLeader');
-
                 const kpiLeadSub = document.getElementById('kpiSmTopLeaderSub');
 
-
-
                 if (kpiStocks) kpiStocks.textContent = `${data.count || this._smartMoneyStocks.length} Setups`;
-
-                if (kpiStocksSub) kpiStocksSub.textContent = `Window: ${data.period_description || this._smartMoneyWindow.toUpperCase()}`;
-
+                if (kpiStocksSub) kpiStocksSub.textContent = `Strategy: ${this._smartMoneyStrategy.replace('_', ' ')}`;
                 if (kpiCap) kpiCap.textContent = `₹${Number(summary.total_smart_money_cr || 0).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr`;
-
                 if (kpiCapSub) kpiCapSub.textContent = `Total Capital: ₹${Number(summary.total_capital_deployed_cr || 0).toLocaleString(undefined, {maximumFractionDigits:0})} Cr`;
-
                 if (kpiDom) kpiDom.textContent = `${summary.avg_smart_money_dominance_pct || 0}%`;
-
                 if (kpiDomSub) kpiDomSub.textContent = `Smart Money vs Domestic Ratio`;
-
                 if (kpiLead) kpiLead.textContent = summary.top_conviction_ticker ? summary.top_conviction_ticker.replace('.NS', '') : 'None';
-
                 if (kpiLeadSub) kpiLeadSub.textContent = summary.top_conviction_name ? `${summary.top_conviction_name} (Score ${summary.top_conviction_score || 0})` : 'Awaiting data';
-
-
 
                 this.renderSmartMoneyTable(this._smartMoneyStocks);
 
-
-
                 // Auto-inspect the top stock if available
-
                 if (this._smartMoneyStocks.length > 0) {
-
                     const targetStock = this._smartMoneyStocks.find(s => s.ticker === this._selectedTicker) || this._smartMoneyStocks[0];
-
                     this.inspectSmartMoneyStock(targetStock);
-
                 }
-
             } catch (err) {
-
                 console.error('Error loading smart money radar:', err);
-
                 if (tbody) {
-
-                    tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444;">Failed to load Smart Money Radar: ${err.message}. Please retry.</td></tr>`;
-
+                    tbody.innerHTML = `<tr><td colspan="10" style="padding:2rem;text-align:center;color:#ef4444;">Failed to load Smart Money Radar: ${err.message}. Please retry.</td></tr>`;
                 }
-
             }
-
         },
 
-
-
         renderSmartMoneyTable(stocks) {
-
             const tbody = document.getElementById('instSmTableBody');
-
             const countBadge = document.getElementById('instSmCountBadge');
-
-            if (countBadge) countBadge.textContent = `${stocks.length} stocks`;
-
+            if (countBadge) countBadge.textContent = `${stocks.length} signals`;
             if (!tbody) return;
 
-
-
             if (!stocks.length) {
-
-                tbody.innerHTML = '<tr><td colspan="8" style="padding:2.5rem;text-align:center;color:#71717a;">No equities matched the selected Smart Money criteria in this window. Try lowering Min ₹ Cr or expanding Entity Focus.</td></tr>';
-
+                tbody.innerHTML = '<tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;">No tracked smart money signals found matching the selected strategy and status filters.</td></tr>';
                 return;
-
             }
 
-
-
             tbody.innerHTML = stocks.map((s, idx) => {
-
                 const isSelected = this._smartMoneySelectedStock && (this._smartMoneySelectedStock.ticker === s.ticker);
+                const cleanTicker = (s.ticker || '').replace('.NS', '');
 
-                const cleanTicker = s.ticker.replace('.NS', '');
+                // 1. Ticker / Co
+                const compName = s.company_name || s.ticker;
+                const capCat = s.cap_category || s.sector || '';
 
-                const ret30 = s.return_30d_pct != null ? s.return_30d_pct : 0;
-
-                const ret30Col = ret30 >= 0 ? '#34d399' : '#f87171';
-
-                const ret30Str = `${ret30 >= 0 ? '+' : ''}${ret30.toFixed(1)}%`;
-
-                const priceStr = s.current_price != null ? `₹${Number(s.current_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
-
-
-
-                const smCr = Number(s.smart_money_inflow_cr || 0).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
-
-                const domPct = Number(s.smart_money_dominance_pct || 0).toFixed(0);
-
-                const domBarWidth = Math.min(100, Math.max(0, s.smart_money_dominance_pct || 0));
-
-
-
-                // Badges
-                let sigBg = 'rgba(56,189,248,0.12)';
-                let sigCol = '#38bdf8';
-                let sigBorder = 'rgba(56,189,248,0.3)';
-                if (s.classification_category === 'domestic_absorption') {
-                    sigBg = 'rgba(239,68,68,0.12)';
-                    sigCol = '#f87171';
-                    sigBorder = 'rgba(239,68,68,0.3)';
-                } else if (s.classification_category === 'high_conviction_smart_money') {
-                    sigBg = 'rgba(16,185,129,0.15)';
-                    sigCol = '#34d399';
-                    sigBorder = 'rgba(16,185,129,0.4)';
-                } else if (s.classification_category === 'fii_whale_inflow') {
-                    sigBg = 'rgba(99,102,241,0.15)';
-                    sigCol = '#818cf8';
-                    sigBorder = 'rgba(99,102,241,0.35)';
-                } else if (s.classification_category === 'super_investor_entry') {
-                    sigBg = 'rgba(245,158,11,0.15)';
-                    sigCol = '#fbbf24';
-                    sigBorder = 'rgba(245,158,11,0.35)';
-                } else if (s.classification_category === 'block_deal_frenzy') {
-                    sigBg = 'rgba(168,85,247,0.15)';
-                    sigCol = '#c084fc';
-                    sigBorder = 'rgba(168,85,247,0.35)';
+                // 2. Strategy Archetype
+                const strat = s.strategy || s.strategy_archetype || s.accumulation_signal_badge || 'WHALE_CONVICTION';
+                let stratBg = 'rgba(56,189,248,0.15)', stratCol = '#38bdf8', stratBorder = 'rgba(56,189,248,0.35)';
+                if (strat === 'WHALE_CONVICTION') {
+                    stratBg = 'rgba(99,102,241,0.18)'; stratCol = '#818cf8'; stratBorder = 'rgba(99,102,241,0.35)';
+                } else if (strat === 'BLOCK_DEAL_MOMENTUM') {
+                    stratBg = 'rgba(168,85,247,0.18)'; stratCol = '#c084fc'; stratBorder = 'rgba(168,85,247,0.35)';
+                } else if (strat === 'DUAL_ACCELERATION') {
+                    stratBg = 'rgba(16,185,129,0.18)'; stratCol = '#34d399'; stratBorder = 'rgba(16,185,129,0.35)';
+                } else if (strat === 'DOMESTIC_ABSORPTION') {
+                    stratBg = 'rgba(239,68,68,0.18)'; stratCol = '#f87171'; stratBorder = 'rgba(239,68,68,0.35)';
                 }
 
-                // Signal Date & Entry Return
+                // 3. Signal Date & Days Elapsed
                 const sigDate = s.signal_date || '—';
-                const sigPrice = s.signal_price != null ? `₹${Number(s.signal_price).toFixed(1)}` : '—';
-                const retSig = s.return_since_signal_pct != null ? s.return_since_signal_pct : 0;
-                const retSigStr = s.return_since_signal_pct != null ? `${retSig >= 0 ? '+' : ''}${retSig.toFixed(1)}%` : '—';
+                const daysElapsed = s.days_elapsed != null ? `${s.days_elapsed}d` : (s.days_on_radar != null ? `${s.days_on_radar}d` : '—');
+
+                // 4. Price (Current & Signal Entry)
+                const priceStr = s.current_price != null ? `₹${Number(s.current_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
+                const sigPriceStr = s.signal_price != null ? `₹${Number(s.signal_price).toFixed(1)}` : '—';
+
+                // 5. Outcome Return %
+                const retSig = s.outcome_return_pct != null ? s.outcome_return_pct : (s.return_since_signal_pct != null ? s.return_since_signal_pct : 0);
+                const retSigStr = (s.outcome_return_pct != null || s.return_since_signal_pct != null) ? `${retSig >= 0 ? '+' : ''}${Number(retSig).toFixed(2)}%` : '—';
                 const retSigCol = retSig >= 0 ? '#34d399' : '#f87171';
-                const newBadgeHtml = s.is_new_entrant ? '<span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);border-radius:3px;font-size:0.56rem;padding:0.04rem 0.22rem;font-weight:700;margin-left:0.25rem;">NEW</span>' : '';
 
-                // EPS YoY and Streak
-                const epsYoY = s.eps_growth_yoy;
-                const epsYoYStr = epsYoY != null ? `${epsYoY >= 0 ? '+' : ''}${epsYoY.toFixed(1)}%` : '—';
-                let epsCol = '#71717a';
-                let epsIcon = '';
-                if (epsYoY != null) {
-                    if (epsYoY >= 20) { epsCol = '#34d399'; epsIcon = '🚀 '; }
-                    else if (epsYoY > 0) { epsCol = '#38bdf8'; epsIcon = '▲ '; }
-                    else { epsCol = '#f87171'; epsIcon = '▼ '; }
-                }
-                const epsSub = s.beat_streak ? `${s.beat_streak}Q Beat` : (s.pe_ratio != null ? `P/E ${Number(s.pe_ratio).toFixed(1)}` : (s.eps_actual != null ? `EPS ₹${Number(s.eps_actual).toFixed(1)}` : '—'));
+                // 6. Smart Money Capital
+                const smCrVal = Number(s.smart_money_inflow_cr || s.initial_smart_money_cr || s.capital_cr || 0);
+                const smCrStr = `₹${smCrVal.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr`;
 
-                // Score color
-                const score = Number(s.smart_money_conviction_score || 0).toFixed(1);
+                // 7. Whales Count & Summary
+                const whaleCnt = s.whale_count != null ? s.whale_count : (s.whale_buyers_summary || s.whale_buyers || []).length;
+                const whales = (s.whale_buyers_summary || []).slice(0, 1);
+                const whalesHtml = whales.length ? `<div style="font-size:0.62rem;color:#a1a1aa;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${whales[0]}</div>` : '';
+
+                // 8. Conviction Score
+                const scoreVal = Number(s.conviction_score != null ? s.conviction_score : (s.initial_score != null ? s.initial_score : (s.smart_money_conviction_score || 0)));
+                const scoreStr = scoreVal.toFixed(1);
                 let scoreCol = '#38bdf8';
-                if (s.smart_money_conviction_score >= 80) scoreCol = '#10b981';
-                else if (s.smart_money_conviction_score >= 60) scoreCol = '#38bdf8';
-                else if (s.smart_money_conviction_score < 40) scoreCol = '#f59e0b';
+                if (scoreVal >= 80) scoreCol = '#10b981';
+                else if (scoreVal >= 60) scoreCol = '#38bdf8';
+                else if (scoreVal < 40) scoreCol = '#f59e0b';
 
-                const whales = (s.whale_buyers_summary || []).slice(0, 2);
+                // 9. Lifecycle Status Badge
+                const status = (s.lifecycle_status || 'ACTIVE').toUpperCase();
+                let stBg = 'rgba(16,185,129,0.18)', stCol = '#34d399', stBorder = 'rgba(16,185,129,0.35)', stIcon = '🟢';
+                if (status === 'TARGET_HIT') {
+                    stBg = 'rgba(56,189,248,0.18)'; stCol = '#38bdf8'; stBorder = 'rgba(56,189,248,0.35)'; stIcon = '🎯';
+                } else if (status === 'COOLING_OFF') {
+                    stBg = 'rgba(245,158,11,0.18)'; stCol = '#fbbf24'; stBorder = 'rgba(245,158,11,0.35)'; stIcon = '❄️';
+                } else if (status === 'DISTRIBUTION_EXIT') {
+                    stBg = 'rgba(239,68,68,0.18)'; stCol = '#f87171'; stBorder = 'rgba(239,68,68,0.35)'; stIcon = '🛑';
+                }
+
+                return `
+                    <tr id="smRow-${cleanTicker}" onclick="app.inspectSmartMoneyStock('${s.ticker}')" style="border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;background:${isSelected ? 'rgba(56,189,248,0.08)' : 'transparent'};transition:background 0.15s;" onmouseover="if(!this.dataset.selected) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!this.dataset.selected) this.style.background='transparent'">
+                        <td style="padding:0.45rem 0.6rem;">
+                            <div style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">
+                                <span>${cleanTicker}</span>
+                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${s.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${s.ticker}">↻</button>
+                                <span style="font-size:0.6rem;color:#71717a;font-weight:600;">${capCat}</span>
+                            </div>
+                            <div style="font-size:0.65rem;color:#a1a1aa;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${compName}
+                            </div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;">
+                            <span class="badge" style="background:${stratBg};color:${stratCol};border:1px solid ${stratBorder};font-size:0.62rem;padding:0.12rem 0.35rem;white-space:nowrap;font-weight:700;">
+                                ${strat}
+                            </span>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:700;color:#f4f4f5;font-size:0.72rem;">${sigDate}</div>
+                            <div style="font-size:0.62rem;color:#71717a;">${daysElapsed}</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:700;color:#f4f4f5;font-size:0.75rem;">${priceStr}</div>
+                            <div style="font-size:0.62rem;color:#71717a;">Entry: ${sigPriceStr}</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:800;color:${retSigCol};font-size:0.78rem;">${retSigStr}</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:800;color:#10b981;font-size:0.78rem;">${smCrStr}</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:700;color:#d4d4d8;font-size:0.72rem;">${whaleCnt} Whales</div>
+                            ${whalesHtml}
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:800;color:${scoreCol};font-size:0.8rem;">${scoreStr}</div>
+                            <div style="font-size:0.6rem;color:#71717a;">/ 100</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;">
+                            <span class="badge" style="background:${stBg};color:${stCol};border:1px solid ${stBorder};font-size:0.62rem;padding:0.12rem 0.35rem;white-space:nowrap;font-weight:700;">
+                                ${stIcon} ${status}
+                            </span>
+                        </td>
+                        <td style="padding:0.45rem 0.4rem;text-align:center;">
+                            <a href="/stock/${encodeURIComponent(s.ticker)}" target="_blank" onclick="event.stopPropagation();" title="Open Ticker Intel" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);padding:0.15rem 0.35rem;font-size:0.65rem;border-radius:4px;text-decoration:none;">
+                                ↗
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        },
                 const whalesHtml = whales.length ? whales.map(w => `<span style="display:inline-block;background:#18181b;color:#d4d4d8;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:0.08rem 0.3rem;font-size:0.62rem;margin-right:0.25rem;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${w}</span>`).join('') : '<span style="color:#71717a;font-size:0.65rem;">Exchange Flow</span>';
 
                 return `
