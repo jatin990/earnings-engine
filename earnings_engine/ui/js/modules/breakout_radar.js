@@ -1981,9 +1981,79 @@
             }
         };
 
+        // Make the Depth Spread overlay draggable so it never permanently hides the chart behind it.
+        app.initDepthSpreadDrag = function() {
+            const overlay = document.getElementById('bkInspOrderBookDepthOverlay');
+            const wrap = document.getElementById('bkInspLightweightChartWrap');
+            if (!overlay || overlay.dataset.dragBound === '1') return;
+            overlay.dataset.dragBound = '1';
+
+            const restore = () => {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('breakout_depth_pos') || 'null');
+                    if (saved && saved.left != null && wrap) {
+                        overlay.style.left = saved.left + 'px';
+                        overlay.style.top = saved.top + 'px';
+                        overlay.style.right = 'auto';
+                    }
+                } catch (e) { /* ignore malformed saved state */ }
+            };
+
+            // Delegate: overlay persists across re-renders, its innerHTML is replaced each render.
+            overlay.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                const handle = e.target.closest('#bkDepthSpreadDragHandle');
+                if (!handle) return;
+                e.preventDefault();
+                const wrapRect = wrap ? wrap.getBoundingClientRect() : { left: 0, top: 0 };
+                const rect = overlay.getBoundingClientRect();
+                app._bkDepthDrag = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    origLeft: rect.left - wrapRect.left,
+                    origTop: rect.top - wrapRect.top,
+                };
+                document.body.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                const d = app._bkDepthDrag;
+                if (!d || !wrap) return;
+                let left = d.origLeft + (e.clientX - d.startX);
+                let top = d.origTop + (e.clientY - d.startY);
+                left = Math.max(0, Math.min(left, wrap.clientWidth - overlay.offsetWidth));
+                top = Math.max(0, Math.min(top, wrap.clientHeight - 24));
+                overlay.style.left = left + 'px';
+                overlay.style.top = top + 'px';
+                overlay.style.right = 'auto';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!app._bkDepthDrag) return;
+                app._bkDepthDrag = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                try {
+                    if (wrap) {
+                        const r = overlay.getBoundingClientRect();
+                        const wrapRect = wrap.getBoundingClientRect();
+                        localStorage.setItem('breakout_depth_pos', JSON.stringify({
+                            left: Math.round(r.left - wrapRect.left),
+                            top: Math.round(r.top - wrapRect.top),
+                        }));
+                    }
+                } catch (e) { /* ignore persist failure */ }
+            });
+
+            window.addEventListener('resize', restore);
+            restore();
+        };
+
         app.renderBreakoutOrderBookSpread = function(orderFlowData, currentPrice, wallsData) {
             const overlay = document.getElementById('bkInspOrderBookDepthOverlay');
             if (!overlay) return;
+            app.initDepthSpreadDrag();
 
             const spreadBins = orderFlowData?.order_book_spread || [];
             const vp = orderFlowData?.volume_profile || {};
@@ -2099,11 +2169,12 @@
 
             overlay.innerHTML = `
                 <div style="background:rgba(5,5,8,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:4px;padding:${isExpanded ? '0.45rem 0.55rem' : '0.35rem 0.45rem'};font-family:var(--font-mono);box-shadow:0 4px 16px rgba(0,0,0,0.7);pointer-events:auto;backdrop-filter:blur(8px);">
-                    <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.2rem;margin-bottom:0.25rem;">
+                    <div id="bkDepthSpreadDragHandle" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.2rem;margin-bottom:0.25rem;cursor:grab;user-select:none;pointer-events:all;" title="Drag to reposition Depth Spread · × to collapse">
                         <span style="color:#38bdf8;font-weight:700;font-size:0.60rem;">🧱 Depth Spread</span>
-                        <div style="display:flex;align-items:center;gap:6px;">
+                        <div style="display:flex;align-items:center;gap:6px;pointer-events:all;">
                             <span style="color:#fbbf24;font-size:0.52rem;">POC: ₹${vp.poc ? Number(vp.poc).toFixed(1) : '—'}</span>
                             <button onclick="app.toggleDepthSpreadExpansion()" style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.52rem;padding:1px 5px;border-radius:3px;cursor:pointer;font-family:var(--font-mono);font-weight:700;white-space:nowrap;" title="${expandLabel} depth spread ladder">${expandIcon} ${expandLabel}</button>
+                            <button onclick="app.toggleBreakoutDepthSpread()" style="background:transparent;border:none;color:#64748b;font-size:0.62rem;cursor:pointer;padding:0 2px;line-height:1;vertical-align:middle;" title="Close Depth Spread">×</button>
                         </div>
                     </div>
                     <div style="display:flex;height:5px;border-radius:2px;overflow:hidden;margin-bottom:0.3rem;" title="Order Flow: ${buyPct}% Bids vs ${sellPct}% Asks">
