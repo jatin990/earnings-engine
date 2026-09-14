@@ -242,7 +242,7 @@
                     <span class="text-amber-400 text-sm">⏳</span>
                 </div>
                 <div id="statNextDate" class="heading-title text-xl font-extrabold text-white">--</div>
-                <div id="statNextCity" class="text-[11px] text-amber-300 font-semibold mt-1 truncate">Kyoto, Japan</div>
+                <div id="statNextCity" class="text-[11px] text-amber-300 font-semibold mt-1 truncate">Pokhara, Nepal</div>
             </div>
 
             <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
@@ -274,11 +274,11 @@
                         <span class="px-3 py-0.5 bg-sky-500/20 border border-sky-400/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider uppercase text-sky-300">Featured Expedition</span>
                         <span id="heroStatusBadge" class="px-3 py-0.5 bg-emerald-500/20 border border-emerald-400/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider uppercase text-emerald-300">Confirmed</span>
                     </div>
-                    <h2 id="heroTripTitle" class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">Kyoto & Tokyo Cherry Blossom Expedition</h2>
+                    <h2 id="heroTripTitle" class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">Annapurna Base Camp Trek + Kushma Bungee</h2>
                     <p id="heroTripDates" class="text-xs md:text-sm font-medium text-zinc-300 flex items-center gap-2 flex-wrap">
-                        <span>🗓️ Oct 10, 2026 – Oct 22, 2026</span>
+                        <span>🗓️ Oct 01, 2026 – Oct 11, 2026</span>
                         <span>•</span>
-                        <span>📍 Japan (Kyoto & Tokyo)</span>
+                        <span>📍 Nepal (Pokhara → Annapurna → Kushma)</span>
                     </p>
                 </div>
 
@@ -296,8 +296,8 @@
                         <span class="flex items-center gap-1.5"><span>✈️</span> <span>Flight Manifest</span></span>
                         <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded font-bold">Confirmed</span>
                     </div>
-                    <div id="heroFlightDetails" class="text-sm font-semibold text-white">ANA All Nippon NH-830 (BOM -> HND)</div>
-                    <div class="text-xs text-zinc-400">Baggage: 2x 23kg included • Terminal 2</div>
+                    <div id="heroFlightDetails" class="text-sm font-semibold text-white">IndiGo 6E-XXX | DEL → PKR via KTM | Oct 01, 2026</div>
+                    <div class="text-xs text-zinc-400">Baggage: 2x 23kg included • Kathmandu & Pokhara</div>
                 </div>
 
                 <div class="bg-[#050508]/80 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
@@ -305,8 +305,8 @@
                         <span class="flex items-center gap-1.5"><span>🏨</span> <span>Luxury Accommodation</span></span>
                         <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">Reserved</span>
                     </div>
-                    <div id="heroHotelDetails" class="text-sm font-semibold text-white">Hyatt Regency Kyoto & Cerulean Tower Shibuya</div>
-                    <div class="text-xs text-zinc-400">Breakfast included • Mountain & City Skyline view</div>
+                    <div id="heroHotelDetails" class="text-sm font-semibold text-white">Hotel Butterfly, Pokhara (D1/D10/D11) + teahouses on trail</div>
+                    <div class="text-xs text-zinc-400">Breakfast included • Mountain & Annapurna views</div>
                 </div>
             </div>
         </div>
@@ -350,6 +350,54 @@
 
             <div id="tripsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Trips rendered via JS -->
+            </div>
+        </section>
+
+        <!-- ================= TRIP DETAIL PANEL (shown when trip card is clicked) ================= -->
+        <section id="tripDetailPanel" class="glass-card p-6 rounded-2xl space-y-4 relative overflow-hidden hidden">
+            <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-sky-500 to-purple-500"></div>
+
+            <!-- Header with close button -->
+            <div class="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+                <div class="flex items-center gap-2">
+                    <span id="detailTripIcon" class="text-xl">🏔️</span>
+                    <div>
+                        <h3 id="detailTripTitle" class="heading-title text-base font-bold text-white">Trip Detail</h3>
+                        <p id="detailTripDates" class="text-[11px] text-zinc-400">Select a trip to view details</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeTripDetail()" class="text-zinc-400 hover:text-white font-bold p-1 text-lg">✕</button>
+            </div>
+
+            <!-- Tab bar -->
+            <div class="flex border-b border-slate-700">
+                <button onclick="switchDetailTab('overview')" id="tab-overview"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-sky-400 border-b-2 border-sky-400">
+                    Overview
+                </button>
+                <button onclick="switchDetailTab('itinerary')" id="tab-itinerary"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent">
+                    Itinerary
+                </button>
+                <button onclick="switchDetailTab('packing')" id="tab-packing"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent">
+                    Packing List
+                </button>
+            </div>
+
+            <!-- Tab panels -->
+            <div id="detail-tab-overview">
+                <!-- Trip summary cards -->
+                <div id="detailTripSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="text-xs text-slate-500">Showing activities for selected trip. Use the trip filter in Community Suggestions below to browse globally.</div>
+            </div>
+            <div id="detail-tab-itinerary" class="hidden">
+                <!-- Itinerary table + SVG elevation profile — populated by renderItinerary() -->
+            </div>
+            <div id="detail-tab-packing" class="hidden">
+                <!-- Packing checklist — populated by renderPackingList() -->
             </div>
         </section>
 
@@ -636,6 +684,7 @@
                     <div>
                         <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Cover Theme</label>
                         <select id="tripCover" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
+                            <option value="mountain">🏔️ Himalayan / Mountain Trek</option>
                             <option value="japan">🌸 Japan / Asian Garden</option>
                             <option value="swiss">🏔️ Swiss Alps / Mountains</option>
                             <option value="amalfi">⛵ Mediterranean Coast</option>
@@ -737,7 +786,36 @@
         </div>
     </div>
 
-    <!-- ================= JS ENGINE ================= -->
+    <!-- Add Packing Item Modal -->
+<div id="addPackingModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+  <div class="modal-card w-full max-w-sm rounded-2xl p-6 space-y-4">
+    <div class="flex items-center justify-between pb-3 border-b border-white/10">
+      <h3 class="heading-title text-base font-bold text-white">Add Packing Item</h3>
+      <button type="button" onclick="document.getElementById('addPackingModal').classList.add('hidden')" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
+    </div>
+    <div class="space-y-3">
+      <input id="newPackItemName" type="text" placeholder="Item name (e.g. Rain cover)"
+        class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold"/>
+      <select id="newPackItemCategory"
+        class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
+        <option>Clothing</option>
+        <option>Gear</option>
+        <option>Documents</option>
+        <option>Medicine</option>
+        <option>Nutrition</option>
+        <option selected>Misc</option>
+      </select>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="submitAddPackingItem()"
+        class="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-xl py-2 text-xs font-bold transition-colors">Add Item</button>
+      <button onclick="document.getElementById('addPackingModal').classList.add('hidden')"
+        class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl py-2 text-xs font-bold transition-colors">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= JS ENGINE ================= -->
     <script>
         let allTrips = [];
         let allGroups = [];
@@ -747,6 +825,12 @@
         let isOwner = false;
         let stagedMembers = [];
         let userVotedActivityIds = new Set();
+        let selectedTripId = null;
+        let currentItinerary = [];
+        let currentPackingItems = [];
+        let activeDetailTab = 'overview';
+        let currentTripMembers = [];
+        let currentUserName = '';
 
         // Load local voted IDs
         try {
@@ -766,6 +850,7 @@
                 const data = await tripsRes.json();
                 allTrips = data.trips || [];
                 isOwner = Boolean(data.is_owner);
+                currentUserName = (data.username || data.name || 'Vault Owner').trim();
 
                 if (groupsRes.ok) {
                     const grpData = await groupsRes.json();
@@ -917,7 +1002,8 @@
                                   t.cover_image === 'swiss' ? '🏔️' :
                                   t.cover_image === 'amalfi' ? '⛵' :
                                   t.cover_image === 'aurora' ? '🌌' :
-                                  t.cover_image === 'safari' ? '🦁' : '🌴';
+                                  t.cover_image === 'safari' ? '🦁' :
+                                  t.cover_image === 'mountain' ? '🏔️' : '🌴';
 
                 // Group badge chips
                 const groupChips = (t.groups || []).map(g => `
@@ -927,7 +1013,7 @@
                 `).join('');
 
                 return `
-                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4" onclick="openTripDetail('${t.id}')">
                         <div class="space-y-3">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <div class="flex items-center gap-1.5 flex-wrap">
@@ -972,12 +1058,12 @@
                         </div>
 
                         <div class="flex items-center justify-between pt-3 border-t border-white/[0.08]">
-                            <button type="button" onclick="openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-bold transition flex items-center gap-1.5">
+                            <button type="button" onclick="event.stopPropagation(); openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-bold transition flex items-center gap-1.5">
                                 <span>💡 Suggest Idea</span>
                             </button>
 
                             ${isOwner ? `
-                                <button type="button" onclick="deleteTrip('${t.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1">
+                                <button type="button" onclick="event.stopPropagation(); deleteTrip('${t.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1">
                                     Delete
                                 </button>
                             ` : `
@@ -989,7 +1075,88 @@
             }).join('');
         }
 
-        // ================= ACTIVITIES & SUGGESTIONS LOGIC =================
+        // ========== TRIP DETAIL PANEL FUNCTIONS ==========
+        // State (variables already declared at module level above)
+
+        // Panel open/close
+        function openTripDetail(tripId) {
+            selectedTripId = tripId;
+            const trip = allTrips.find(t => t.id === tripId);
+            if (!trip) return;
+            const iconMap = {'mountain': '⛰️', 'japan': '🌸', 'swiss': '⛰️', 'aurora': '🌌', 'amalfi': '⛵', 'safari': '🦁'};
+            document.getElementById('detailTripIcon').textContent = iconMap[trip.cover_image] || '✈️';
+            document.getElementById('detailTripTitle').textContent = trip.title;
+            document.getElementById('detailTripDates').textContent =
+                (trip.start_date || 'TBD') + ' → ' + (trip.end_date || 'TBD') + ' • ' + (trip.destination || 'Unknown');
+            const statusBg = trip.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300' :
+                             trip.status === 'completed' ? 'bg-slate-700 text-slate-300' :
+                             'bg-amber-500/20 text-amber-300';
+            const budget2 = '₹' + ((trip.estimated_budget || 0) / 1000).toLocaleString('en-IN') + 'k';
+            const dates2 = (trip.start_date || '—') + (trip.end_date ? ' → ' + trip.end_date : '');
+            document.getElementById('detailTripSummary').innerHTML =
+                '<div class="bg-[#000] border border-white/[0.08] rounded-xl p-3"><div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Status</div><span class="px-2 py-0.5 rounded text-[10px] font-bold ' + statusBg + '">' + trip.status + '</span></div>' +
+                '<div class="bg-[#000] border border-white/[0.08] rounded-xl p-3"><div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Dates</div><span class="text-xs text-zinc-200">' + dates2 + '</span></div>' +
+                '<div class="bg-[#000] border border-white/[0.08] rounded-xl p-3"><div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Destination</div><span class="text-xs text-zinc-200">' + (trip.destination || '—') + '</span></div>' +
+                '<div class="bg-[#000] border border-white/[0.08] rounded-xl p-3"><div class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">Budget</div><span class="text-xs text-zinc-200">' + budget2 + '</span></div>';
+            document.getElementById('tripDetailPanel').classList.remove('hidden');
+            switchDetailTab('overview');
+        }
+
+        function closeTripDetail() {
+            document.getElementById('tripDetailPanel').classList.add('hidden');
+            selectedTripId = null;
+            currentItinerary = [];
+            currentPackingItems = [];
+        }
+
+        // Data fetchers
+        async function fetchItinerary(tripId) {
+            const res = await fetch('/api/v1/trips/' + tripId + '/itinerary');
+            const data = await res.json();
+            currentItinerary = data.itinerary || [];
+        }
+
+        async function fetchPackingItems(tripId) {
+            const res = await fetch('/api/v1/trips/' + tripId + '/packing');
+            const data = await res.json();
+            currentPackingItems = data.items || [];
+        }
+
+        async function fetchTripMembers(tripId) {
+            const group = allGroups.find(g =>
+                g.trips && g.trips.some(t => t.trip_id === tripId)
+            );
+            currentTripMembers = group ? (group.members || []) : [];
+        }
+
+        function switchDetailTab(tab) {
+            activeDetailTab = tab;
+            ['overview','itinerary','packing'].forEach(t => {
+                const panel = document.getElementById('detail-tab-' + t);
+                const btn = document.getElementById('tab-' + t);
+                if (panel) panel.classList.toggle('hidden', t !== tab);
+                if (btn) {
+                    btn.classList.toggle('text-sky-400', t === tab);
+                    btn.classList.toggle('border-b-2', t === tab);
+                    btn.classList.toggle('border-sky-400', t === tab);
+                    btn.classList.toggle('text-slate-400', t !== tab);
+                    btn.classList.toggle('border-transparent', t !== tab);
+                }
+            });
+            if (tab === 'itinerary' && currentItinerary.length === 0 && selectedTripId) {
+                fetchItinerary(selectedTripId).then(() => renderItinerary());
+            }
+            if (tab === 'packing' && selectedTripId) {
+                fetchPackingItems(selectedTripId).then(() => renderPackingList());
+                fetchTripMembers(selectedTripId);
+            }
+        }
+
+        function toggleItineraryDay(dayId) {
+            const row = document.getElementById('itin-expand-' + dayId);
+            if (row) row.classList.toggle('hidden');
+        }
+
         function populateActivityTripFilterOptions() {
             const select = document.getElementById('actTripFilterSelect');
             if (!select) return;
@@ -1649,5 +1816,6 @@
         // Init
         document.addEventListener('DOMContentLoaded', fetchTripsData);
     </script>
+    <script src="/static/js/trips_detail.js"></script>
 </body>
 </html>
