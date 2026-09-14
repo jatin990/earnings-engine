@@ -1647,18 +1647,39 @@ def _migration_035_purge_non_fno_fo_call_wall(conn: Any) -> None:
 def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
     """Sync stale breakout_radar signal columns (signal_date, signal_price, etc.) from candidate data_json payload.
 
-    Uses batch executemany for speed — avoids N individual UPDATE round-trips.
+    Uses chunked processing + periodic commits so heavy backfills do not exceed
+    Vercel serverless's 60 s cold-start timeout:
+      - Processes rows in bounded chunks via LIMIT/OFFSET (no single fetchall).
+      - Only touches rows whose signal_date is still NULL (skips already-synced rows).
+      - Commits after every chunk to release the write lock early.
     """
+    import json
+
+    chunk_size = 500
+    updated_total = 0
+    offset = 0
+
+    # Ensure a fast path for the scan predicate — avoids a full table scan.
     try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_breakout_radar_json "
+            "ON breakout_radar(data_json)"
+        )
+    except Exception:
+        pass
+
+    while True:
+        # Fetch one bounded chunk of not-yet-synced rows (signal_date IS NULL).
         cur = conn.execute(
             "SELECT ticker, strategy, data_json FROM breakout_radar "
-            "WHERE data_json IS NOT NULL AND data_json != ''"
+            "WHERE data_json IS NOT NULL AND data_json != '' "
+            "AND signal_date IS NULL "
+            "LIMIT ? OFFSET ?",
+            (chunk_size, offset),
         )
         rows = cur.fetchall()
         if not rows:
-            return
-
-        import json
+            break
 
         batch: list[tuple] = []
         for ticker, strategy, data_json_str in rows:
@@ -1692,13 +1713,20 @@ def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
                     breakout_trigger = COALESCE(?, breakout_trigger),
                     target_price = COALESCE(?, target_price),
                     stop_loss = COALESCE(?, stop_loss)
-                WHERE ticker = ? AND strategy = ?
+                WHERE ticker = ? AND strategy = ? AND signal_date IS NULL
                 """,
                 batch,
             )
-            logger.debug("[MIGRATION-036] Batch-updated %d breakout_radar rows.", len(batch))
-    except Exception as e:
-        logger.debug("[MIGRATION-036] Execution notice: %s", e)
+            updated_total += len(batch)
+
+        # Commit each chunk so the write lock is released early; the next
+        # chunk's OFFSET re-picks rows that are still signal_date = NULL.
+        conn.commit()
+        offset += chunk_size
+        logger.debug("[MIGRATION-036] Processed chunk at offset %d (%d rows so far).", offset, updated_total)
+
+    if updated_total:
+        logger.debug("[MIGRATION-036] Batch-updated %d breakout_radar rows.", updated_total)
 
 
 def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
