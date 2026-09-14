@@ -81,7 +81,9 @@ def _is_legitimate_batch(updated_at: str) -> bool:
 
 
 def _has_fii_dii_split_signature(row: Any) -> bool:
-    """Check the 0.45/0.55 split ratio signature."""
+    """Check the 0.45/0.55 split ratio signature, but NOT for the legitimate batch."""
+    if _is_legitimate_batch(row["updated_at"] or ""):
+        return False
     fii = row["fii_pct"] or 0
     dii = row["dii_mf_pct"] or 0
     if fii <= 0 or dii <= 0:
