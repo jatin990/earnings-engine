@@ -6,6 +6,8 @@ quarterly earnings signals, multi-model AI consensus trade setup, and news catal
 
 from __future__ import annotations
 
+from datetime import datetime
+import json
 import logging
 from typing import Any
 import pandas as pd
@@ -15,7 +17,7 @@ from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.prices import fetch_prices, fetch_live_quote, load_prices
 from earnings_engine.data.market_context import _week_high_low_around, detect_swing_range
-from earnings_engine.data.swing_ranges import get_swing_range
+from earnings_engine.data.swing_ranges import get_swing_range, record_auto_range
 from earnings_engine.data.catalysts_news import get_short_term_catalysts
 from earnings_engine.consensus.storage import get_predictions
 from earnings_engine.data.earnings import refresh_earnings_from_source
@@ -238,12 +240,51 @@ def get_stock_technicals(ticker: str, settings: Settings | None = None) -> dict[
                     if avg_all > 0:
                         technical["volume_ratio_5d_20d"] = round(last_vol / avg_all, 2)
 
-    # Stored swing range override if present
+    # Handle stored swing ranges vs auto-detected ranges
     stored_sr = get_swing_range("ALL", sym, settings)
-    if stored_sr:
+    if stored_sr and stored_sr.get("source") == "user":
+        # Honor explicit manual user overrides
         technical["stored_swing_range"] = stored_sr
-        if stored_sr.get("lower_bound"): technical["support_level"] = stored_sr["lower_bound"]
-        if stored_sr.get("upper_bound"): technical["resistance_level"] = stored_sr["upper_bound"]
+        if stored_sr.get("lower_bound"):
+            technical["support_level"] = stored_sr["lower_bound"]
+        if stored_sr.get("upper_bound"):
+            technical["resistance_level"] = stored_sr["upper_bound"]
+    else:
+        # Auto mode: sync fresh calculations back to SQLite cache
+        if technical.get("support_level") is not None and technical.get("resistance_level") is not None:
+            try:
+                record_auto_range(
+                    "ALL",
+                    sym,
+                    technical["support_level"],
+                    technical["resistance_level"],
+                    cycles=technical.get("cycles"),
+                    avg_days=technical.get("avg_cycle_days"),
+                    cycles_data=auto_rng.get("cycles_data") if "auto_rng" in locals() else None,
+                    settings=settings,
+                )
+                stored_sr = get_swing_range("ALL", sym, settings)
+            except Exception as e:
+                logger.debug("Error recording auto swing range for %s: %s", sym, e)
+        technical["stored_swing_range"] = stored_sr
+
+    # Sync fresh technical metrics to tickers table if present
+    try:
+        conn = get_db_connection(settings)
+        t_row = conn.execute("SELECT metrics FROM tickers WHERE ticker = ?", (sym,)).fetchone()
+        if t_row and t_row[0]:
+            m_dict = json.loads(t_row[0]) if isinstance(t_row[0], str) else dict(t_row[0])
+            m_dict["current_support"] = technical.get("support_level")
+            m_dict["next_resistance"] = technical.get("resistance_level")
+            if stored_sr:
+                m_dict["swing_range"] = stored_sr
+            conn.execute(
+                "UPDATE tickers SET metrics = ?, last_updated = ? WHERE ticker = ?",
+                (json.dumps(m_dict), datetime.now().isoformat(), sym),
+            )
+            conn.commit()
+    except Exception as t_err:
+        logger.debug("Error syncing technicals to tickers table for %s: %s", sym, t_err)
 
     return {
         "success": True,

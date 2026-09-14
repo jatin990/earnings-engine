@@ -193,13 +193,10 @@ def record_auto_range(
         if existing:
             if existing[0] == "user":
                 return  # Don't overwrite user settings
-            # If auto-range values haven't changed, skip redundant write
-            if existing[1] == lower_val and existing[2] == upper_val:
-                return
 
         conn.execute(
             """
-            INSERT OR REPLACE INTO swing_ranges 
+            INSERT OR REPLACE INTO swing_ranges
             (watchlist, ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
