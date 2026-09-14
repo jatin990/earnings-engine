@@ -126,23 +126,23 @@
 
                         <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
 
-                            <thead>
+                            <thead style="user-select:none;">
 
                                 <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
 
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+                                    <th onclick="app.sortAccumulatingTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;">TICKER <span id="accSortIcon-ticker" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+                                    <th onclick="app.sortAccumulatingTable('score')" style="padding:0.45rem 0.5rem;cursor:pointer;">SCORE <span id="accSortIcon-score" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th onclick="app.sortAccumulatingTable('ret7d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="7-Day Price Change">7D <span id="accSortIcon-ret7d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th onclick="app.sortAccumulatingTable('ret30d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="30-Day Price Change">30D <span id="accSortIcon-ret30d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
+                                    <th onclick="app.sortAccumulatingTable('funds')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ) <span id="accSortIcon-funds" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+                                    <th onclick="app.sortAccumulatingTable('flow')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW <span id="accSortIcon-flow" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+                                    <th onclick="app.sortAccumulatingTable('stake')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Total Institutional Stake from Latest Filing">STAKE <span id="accSortIcon-stake" style="color:#71717a;margin-left:2px;">↕</span></th>
 
                                     <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
 
@@ -194,23 +194,23 @@
 
                         <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
 
-                            <thead>
+                            <thead style="user-select:none;">
 
                                 <tr style="background:#180d14;color:#fca5a5;border-bottom:1px solid rgba(239,68,68,0.15);font-family:var(--font-mono);font-size:0.66rem;">
 
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+                                    <th onclick="app.sortDistributingTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;">TICKER <span id="distSortIcon-ticker" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+                                    <th onclick="app.sortDistributingTable('score')" style="padding:0.45rem 0.5rem;cursor:pointer;">SCORE <span id="distSortIcon-score" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th onclick="app.sortDistributingTable('ret7d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="7-Day Price Change">7D <span id="distSortIcon-ret7d" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th onclick="app.sortDistributingTable('ret30d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="30-Day Price Change">30D <span id="distSortIcon-ret30d" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
+                                    <th onclick="app.sortDistributingTable('funds')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ) <span id="distSortIcon-funds" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+                                    <th onclick="app.sortDistributingTable('flow')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW <span id="distSortIcon-flow" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+                                    <th onclick="app.sortDistributingTable('stake')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Total Institutional Stake from Latest Filing">STAKE <span id="distSortIcon-stake" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
                                     <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
 
@@ -552,25 +552,25 @@
 
                 <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
 
-                    <thead>
+                    <thead style="user-select:none;">
 
                         <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
 
-                            <th style="padding:0.6rem 0.8rem;">INVESTOR / FUND NAME</th>
+                            <th onclick="app.sortFundsTable('name')" style="padding:0.6rem 0.8rem;cursor:pointer;">INVESTOR / FUND NAME <span id="fundSortIcon-name" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">CATEGORY</th>
+                            <th onclick="app.sortFundsTable('category')" style="padding:0.6rem 0.8rem;cursor:pointer;">CATEGORY <span id="fundSortIcon-category" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">TRACKED HOLDINGS</th>
+                            <th onclick="app.sortFundsTable('holdings')" style="padding:0.6rem 0.8rem;cursor:pointer;">TRACKED HOLDINGS <span id="fundSortIcon-holdings" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
+                            <th onclick="app.sortFundsTable('buying')" style="padding:0.6rem 0.8rem;cursor:pointer;">BUYING ACTIONS <span id="fundSortIcon-buying" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
+                            <th onclick="app.sortFundsTable('selling')" style="padding:0.6rem 0.8rem;cursor:pointer;">SELLING ACTIONS <span id="fundSortIcon-selling" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">30D RETURN</th>
+                            <th onclick="app.sortFundsTable('ret30d')" style="padding:0.6rem 0.8rem;cursor:pointer;">30D RETURN <span id="fundSortIcon-ret30d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">1Y RETURN</th>
+                            <th onclick="app.sortFundsTable('ret1y')" style="padding:0.6rem 0.8rem;cursor:pointer;">1Y RETURN <span id="fundSortIcon-ret1y" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">TRACKED VALUE (₹ CR)</th>
+                            <th onclick="app.sortFundsTable('aum')" style="padding:0.6rem 0.8rem;cursor:pointer;">TRACKED VALUE (₹ CR) <span id="fundSortIcon-aum" style="color:#71717a;margin-left:2px;">↕</span></th>
 
                             <th style="padding:0.6rem 0.8rem;text-align:center;">ACTIONS</th>
 

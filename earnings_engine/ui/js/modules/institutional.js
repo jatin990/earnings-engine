@@ -44,7 +44,17 @@
 
         },
 
+        // ── Accumulation Table Sort State ──
+        _accSortColumn: null,
+        _accSortAsc: true,
 
+        // ── Distribution Table Sort State ──
+        _distSortColumn: null,
+        _distSortAsc: true,
+
+        // ── Funds Table Sort State ──
+        _fundsSortColumn: null,
+        _fundsSortAsc: true,
 
         switchInstitutionalView(view) {
 
@@ -776,6 +786,183 @@
 
             }).join('');
 
+        },
+
+        // ── Sort Accumulating / Distributing Tables (shared column set) ──
+
+        _sortInstitutionalEquities(col, which) {
+            const dataKey = which === 'acc' ? 'accumulating' : 'distributing';
+            const items = this.institutionalData[dataKey];
+            if (!items || !items.length) return;
+
+            const sortKey = which === 'acc' ? '_accSortColumn' : '_distSortColumn';
+            const ascKey  = which === 'acc' ? '_accSortAsc'    : '_distSortAsc';
+
+            if (this[sortKey] === col) {
+                this[ascKey] = !this[ascKey];
+            } else {
+                this[sortKey] = col;
+                this[ascKey]  = (col === 'ticker');
+            }
+
+            const asc = this[ascKey];
+            const factor = asc ? 1 : -1;
+
+            // Stable sort: remember original position for tie-breaking
+            items.forEach((item, idx) => { item._origIdx = idx; });
+
+            items.sort((a, b) => {
+                let vA, vB, cmp;
+                switch (col) {
+                    case 'ticker':
+                        cmp = (a.ticker || '').localeCompare(b.ticker || '');
+                        break;
+                    case 'score':
+                        vA = Number(a.accumulation_score || 0);
+                        vB = Number(b.accumulation_score || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'ret7d':
+                        vA = a.return_7d_pct != null ? Number(a.return_7d_pct) : -9999;
+                        vB = b.return_7d_pct != null ? Number(b.return_7d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'ret30d':
+                        vA = a.return_30d_pct != null ? Number(a.return_30d_pct) : -9999;
+                        vB = b.return_30d_pct != null ? Number(b.return_30d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'funds':
+                        vA = (Number(a.funds_accumulating_count || 0)) - (Number(a.funds_selling_count || 0));
+                        vB = (Number(b.funds_accumulating_count || 0)) - (Number(b.funds_selling_count || 0));
+                        cmp = vA - vB;
+                        break;
+                    case 'flow':
+                        vA = Number(a.increase_amount_cr != null ? a.increase_amount_cr : (a.net_flow_cr || 0));
+                        vB = Number(b.increase_amount_cr != null ? b.increase_amount_cr : (b.net_flow_cr || 0));
+                        cmp = vA - vB;
+                        break;
+                    case 'stake':
+                        vA = Number(a.total_institutional_stake || 0);
+                        vB = Number(b.total_institutional_stake || 0);
+                        cmp = vA - vB;
+                        break;
+                    default:
+                        cmp = 0;
+                }
+                if (cmp !== 0) return factor * cmp;
+                return a._origIdx - b._origIdx; // stable tie-break
+            });
+
+            const prefix = which === 'acc' ? 'acc' : 'dist';
+            ['ticker', 'score', 'ret7d', 'ret30d', 'funds', 'flow', 'stake'].forEach(c => {
+                const icon = document.getElementById(prefix + 'SortIcon-' + c);
+                if (icon) {
+                    if (c === col) {
+                        icon.textContent = asc ? '▲' : '▼';
+                        icon.style.color = '#38bdf8';
+                    } else {
+                        icon.textContent = '↕';
+                        icon.style.color = '#71717a';
+                    }
+                }
+            });
+
+            if (which === 'acc') {
+                this.renderInstitutionalAccumulatingTable(items);
+            } else {
+                this.renderInstitutionalDistributingTable(items);
+            }
+        },
+
+        sortAccumulatingTable(col) {
+            this._sortInstitutionalEquities(col, 'acc');
+        },
+
+        sortDistributingTable(col) {
+            this._sortInstitutionalEquities(col, 'dist');
+        },
+
+        // ── Sort Funds Table ──
+
+        sortFundsTable(col) {
+            const funds = this.institutionalData.funds;
+            if (!funds || !funds.length) return;
+
+            if (this._fundsSortColumn === col) {
+                this._fundsSortAsc = !this._fundsSortAsc;
+            } else {
+                this._fundsSortColumn = col;
+                this._fundsSortAsc = (col === 'name' || col === 'category');
+            }
+
+            const asc = this._fundsSortAsc;
+            const factor = asc ? 1 : -1;
+
+            // Stable sort: remember original position for tie-breaking
+            funds.forEach((f, idx) => { f._origIdx = idx; });
+
+            funds.sort((a, b) => {
+                let vA, vB, cmp;
+                switch (col) {
+                    case 'name':
+                        cmp = (a.fund_name || '').localeCompare(b.fund_name || '');
+                        break;
+                    case 'category':
+                        cmp = (a.fund_type || '').localeCompare(b.fund_type || '');
+                        break;
+                    case 'holdings':
+                        vA = Number(a.total_positions || 0);
+                        vB = Number(b.total_positions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'buying':
+                        vA = Number(a.buying_actions || 0);
+                        vB = Number(b.buying_actions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'selling':
+                        vA = Number(a.selling_actions || 0);
+                        vB = Number(b.selling_actions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'ret30d':
+                        vA = a.return_30d_pct != null ? Number(a.return_30d_pct) : -9999;
+                        vB = b.return_30d_pct != null ? Number(b.return_30d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'ret1y':
+                        vA = a.return_1y_pct != null ? Number(a.return_1y_pct) : -9999;
+                        vB = b.return_1y_pct != null ? Number(b.return_1y_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'aum':
+                        vA = Number(a.total_aum_tracked_cr || 0);
+                        vB = Number(b.total_aum_tracked_cr || 0);
+                        cmp = vA - vB;
+                        break;
+                    default:
+                        cmp = 0;
+                }
+                if (cmp !== 0) return factor * cmp;
+                return a._origIdx - b._origIdx; // stable tie-break
+            });
+
+            ['name', 'category', 'holdings', 'buying', 'selling', 'ret30d', 'ret1y', 'aum'].forEach(c => {
+                const icon = document.getElementById('fundSortIcon-' + c);
+                if (icon) {
+                    if (c === col) {
+                        icon.textContent = asc ? '▲' : '▼';
+                        icon.style.color = '#38bdf8';
+                    } else {
+                        icon.textContent = '↕';
+                        icon.style.color = '#71717a';
+                    }
+                }
+            });
+
+            // Re-apply current investor filter after sorting
+            this.filterInvestors(this._currentInvestorFilter || 'ALL');
         },
 
 
