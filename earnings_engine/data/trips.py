@@ -848,7 +848,7 @@ def init_trip_itinerary_db(conn) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS trip_itinerary_days (
             day_id TEXT PRIMARY KEY,
-            trip_id TEXT NOT NULL REFERENCES trips(trip_id) ON DELETE CASCADE,
+            trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
             day_number INTEGER NOT NULL,
             date TEXT,
             title TEXT NOT NULL,
@@ -876,7 +876,7 @@ def init_trip_packing_db(conn) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS trip_packing_items (
             item_id TEXT PRIMARY KEY,
-            trip_id TEXT NOT NULL REFERENCES trips(trip_id) ON DELETE CASCADE,
+            trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
             category TEXT DEFAULT 'Misc',
             name TEXT NOT NULL,
             added_by TEXT DEFAULT 'owner',
