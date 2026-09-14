@@ -3712,9 +3712,13 @@
             const dist52wEl = document.getElementById('bkInsp52wDist');
             const range52wBar = document.getElementById('bkInsp52wRangeBar');
 
-            const volMultiple = candidate.volume_surge_multiple != null
-                ? Number(candidate.volume_surge_multiple)
-                : (candidate.volume_score ? (candidate.volume_score / 4.0) : (candidate.volume_ratio || 1.4));
+            // Display the ACTUAL volume_ratio (the field the filter thresholds compare
+            // against), not a derived score. volume_surge_multiple is never set by the
+            // scanner, and volume_score/4.0 produces a different number (e.g. 6.4/4=1.6)
+            // that contradicts the applied filter. Fall back only when volume_ratio is missing.
+            const volMultiple = candidate.volume_ratio != null
+                ? Number(candidate.volume_ratio)
+                : (candidate.volume_surge_multiple != null ? Number(candidate.volume_surge_multiple) : 1.4);
             if (volSurgeEl) {
                 volSurgeEl.textContent = `${volMultiple.toFixed(1)}x`;
                 volSurgeEl.style.color = volMultiple >= 2.0 ? '#34d399' : (volMultiple >= 1.5 ? '#38bdf8' : '#fbbf24');
