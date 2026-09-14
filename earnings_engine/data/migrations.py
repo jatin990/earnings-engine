@@ -1975,6 +1975,233 @@ def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
         logger.debug("[MIGRATION-035] Index notice for quarterly_financials: %s", e)
 
 
+def _migration_042_nepal_abc_trek(conn: Any) -> None:
+    """Purge fabricated trip data and seed the real Nepal ABC Trek itinerary + packing list."""
+    from earnings_engine.data.trips import init_trip_itinerary_db, init_trip_packing_db
+
+    now_str = datetime.now().isoformat(timespec="seconds")
+
+    # 1. Purge fabricated mock trips and their children
+    for trip_id in ("trip_001", "trip_002", "trip_003"):
+        try:
+            conn.execute("DELETE FROM trip_activities WHERE trip_id = ?", (trip_id,))
+            conn.execute("DELETE FROM trip_group_trips WHERE trip_id = ?", (trip_id,))
+            conn.execute("DELETE FROM trips WHERE id = ?", (trip_id,))
+        except Exception:
+            pass
+
+    # 2. Delete fabricated access passcodes
+    for code in ("VIP-ALL-ACCESS", "TRIP-EXPLORER", "CARDS-REWARDS"):
+        try:
+            conn.execute("DELETE FROM passcodes WHERE passcode = ?", (code,))
+        except Exception:
+            pass
+
+    # 3. Create new itinerary + packing tables
+    init_trip_itinerary_db(conn)
+    init_trip_packing_db(conn)
+
+    # 4. Seed real Nepal / ABC Trek trip
+    try:
+        conn.execute("""
+            INSERT OR IGNORE INTO trips
+            (id, title, destination, start_date, end_date, status, notes,
+             cover_image, estimated_budget, flight_details, hotel_details,
+             packing_list, is_shared_with_friends, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "trip_nepal_abc_2026",
+            "Annapurna Base Camp Trek + Kushma Bungee",
+            "Nepal (Pokhara → Annapurna → Kushma)",
+            "2026-10-01", "2026-10-11", "confirmed",
+            "11-day group trek to ABC (4130m). Includes Kushma Bungee (228m, world's highest). "
+            "Flood warning: Chhomrong–Sinuwa lower trail damaged in 2024 monsoon — take upper Sinuwa bypass.",
+            "mountain", 120000.0,
+            "IndiGo 6E-XXX | DEL → PKR via KTM | Oct 01, 2026",
+            "Hotel Butterfly, Pokhara (D1/D10/D11) + teahouses on trail",
+            "[]", 1,
+            now_str,
+        ))
+    except Exception:
+        pass
+
+    # 5. Seed 11-day itinerary
+    itinerary_rows = [
+        ("itin_abc_d01", "trip_nepal_abc_2026", 1, "2026-10-01",
+         "Arrive Pokhara + Kushma Bungee Jump (228m)",
+         "Arrive Pokhara, acclimatise, then drive to Kushma (~2h) for the world's highest bungee jump "
+         "above Bhutan Khola river. Return to Pokhara by evening. Gear check & briefing.",
+         "Pokhara Airport (820m)", "Kushma → Pokhara (820m)",
+         820, 0.0, None, "Hotel Butterfly, Pokhara", "B/D", "Rest", None),
+        ("itin_abc_d02", "trip_nepal_abc_2026", 2, "2026-10-02",
+         "Drive to Nayapul → Trek to Tikhedhunga",
+         "Drive from Pokhara to Nayapul (~2h). Begin the ABC trail through Birethanti. "
+         "Gradual climb along the Modi Khola river valley to Tikhedhunga.",
+         "Pokhara (820m)", "Tikhedhunga (1540m)",
+         1540, 12.0, 5.0, "Teahouse, Tikhedhunga", "B/L/D", "Moderate", None),
+        ("itin_abc_d03", "trip_nepal_abc_2026", 3, "2026-10-03",
+         "Tikhedhunga → Ghorepani via Ulleri",
+         "Steep ascent via the famous 3,300 stone steps through Ulleri village. "
+         "Rhododendron forests open to sweeping Annapurna range views near Ghorepani.",
+         "Tikhedhunga (1540m)", "Ghorepani (2860m)",
+         2860, 9.0, 6.0, "Teahouse, Ghorepani", "B/L/D", "Hard", None),
+        ("itin_abc_d04", "trip_nepal_abc_2026", 4, "2026-10-04",
+         "Poon Hill Sunrise (4am) → Trek to Tadapani",
+         "Pre-dawn hike to Poon Hill (3210m) for a spectacular 360° sunrise panorama: "
+         "Annapurna I, Dhaulagiri, Machapuchare. Descend through rhododendron forest to Tadapani.",
+         "Ghorepani (2860m) → Poon Hill (3210m)", "Tadapani (2630m)",
+         2630, 11.0, 7.0, "Teahouse, Tadapani", "B/L/D", "Moderate", None),
+        ("itin_abc_d05", "trip_nepal_abc_2026", 5, "2026-10-05",
+         "Tadapani → Chhomrong",
+         "Descend through dense oak and rhododendron forests to the terraced village of Chhomrong. "
+         "Outstanding views of Annapurna South and Machapuchare (Fish Tail). "
+         "Chhomrong is the last major village before the sanctuary.",
+         "Tadapani (2630m)", "Chhomrong (2170m)",
+         2170, 8.0, 5.0, "Teahouse, Chhomrong", "B/L/D", "Moderate",
+         "⚠️ Flood Alert: Lower Chhomrong trail sections may have landslide debris from 2024 monsoon. "
+         "Verify with local guide before descending; upper bypass available."),
+        ("itin_abc_d06", "trip_nepal_abc_2026", 6, "2026-10-06",
+         "Chhomrong → Bamboo (via Sinuwa upper bypass)",
+         "Descend from Chhomrong to Sinuwa and continue into the Annapurna Sanctuary. "
+         "Pass through dense bamboo and rhododendron forest. IMPORTANT: Take the upper Sinuwa "
+         "bypass trail (adds ~45 min) as the lower stone trail was damaged in 2024 monsoon flooding.",
+         "Chhomrong (2170m)", "Bamboo (2310m)",
+         2310, 10.0, 6.0, "Teahouse, Bamboo", "B/L/D", "Hard",
+         "⚠️ Flood Alert: Lower Sinuwa stone trail damaged in 2024 monsoon flooding. "
+         "Take upper Sinuwa bypass trail (≈+45 min, safe). Confirm with TIMS checkpoint ranger at Chhomrong."),
+        ("itin_abc_d07", "trip_nepal_abc_2026", 7, "2026-10-07",
+         "Bamboo → Deurali (via Himalaya Hotel)",
+         "Trek deeper into the Modi Khola gorge. Pass through Dobhan and Himalaya Hotel. "
+         "The trail narrows between towering canyon walls. Watch for waterfalls and yaks above Himalaya Hotel.",
+         "Bamboo (2310m)", "Deurali (3230m)",
+         3230, 8.0, 5.0, "Teahouse, Deurali", "B/L/D", "Hard", None),
+        ("itin_abc_d08", "trip_nepal_abc_2026", 8, "2026-10-08",
+         "Deurali → Annapurna Base Camp ⛺",
+         "The final ascent into the Annapurna Sanctuary. Pass Machhapuchhre Base Camp (MBC, 3700m) "
+         "with the sacred Fish Tail peak towering overhead. Arrive at ABC (4130m) surrounded by "
+         "Annapurna I (8091m), Annapurna South, Gangapurna, and Machhapuchhre on all sides.",
+         "Deurali (3230m)", "Annapurna Base Camp (4130m)",
+         4130, 8.0, 5.0, "ABC Camp teahouse (4130m)", "B/L/D", "Hard", None),
+        ("itin_abc_d09", "trip_nepal_abc_2026", 9, "2026-10-09",
+         "ABC → Bamboo (descent)",
+         "Begin descent from the sanctuary. The return trail feels faster as altitude reduces. "
+         "Pass MBC, Deurali, Himalaya Hotel, Dobhan, and settle at Bamboo. "
+         "Descending from 4130m to 2310m in one day requires careful knee management.",
+         "Annapurna Base Camp (4130m)", "Bamboo (2310m)",
+         2310, 14.0, 7.0, "Teahouse, Bamboo", "B/L/D", "Moderate", None),
+        ("itin_abc_d10", "trip_nepal_abc_2026", 10, "2026-10-10",
+         "Bamboo → Nayapul → Pokhara (drive)",
+         "Final long descent through Sinuwa and Chhomrong back to Nayapul. "
+         "Drive from Nayapul to Pokhara (~2h). Celebrate completion at lakeside Pokhara!",
+         "Bamboo (2310m)", "Pokhara (820m)",
+         820, 22.0, 9.0, "Hotel Butterfly, Pokhara", "B/L/D", "Easy", None),
+        ("itin_abc_d11", "trip_nepal_abc_2026", 11, "2026-10-11",
+         "Rest Day Pokhara / Departure",
+         "Free day in Pokhara: Phewa Lake boat ride, Devi's Falls, World Peace Pagoda, "
+         "or simply rest at the lakeside. Depart for home.",
+         "Pokhara (820m)", "Pokhara (820m)",
+         820, 0.0, None, "Hotel Butterfly, Pokhara", "B", "Rest", None),
+    ]
+    for row in itinerary_rows:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO trip_itinerary_days
+                (day_id, trip_id, day_number, date, title, description,
+                 start_point, end_point, altitude_meters, distance_km,
+                 duration_hours, accommodation, meals, difficulty, trail_alert)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, row)
+        except Exception:
+            pass
+
+    # 6. Seed 3 trip activities (using actual trip_activities schema)
+    activity_rows = [
+        ("act_kushma_bungee", "trip_nepal_abc_2026", "Owner", "owner",
+         "Kushma Bungee Jump (228m — World's Highest)", "Kushma, Gandaki Province, Nepal",
+         10000.0, 0, "accepted", now_str),
+        ("act_poon_hill_sunrise", "trip_nepal_abc_2026", "Owner", "owner",
+         "Poon Hill Sunrise Trek (4am start, 3210m)", "Poon Hill, Ghorepani, Nepal",
+         0.0, 0, "accepted", now_str),
+        ("act_abc_celebration", "trip_nepal_abc_2026", "Owner", "owner",
+         "Annapurna Base Camp Summit Celebration", "Annapurna Base Camp, Nepal (4130m)",
+         0.0, 0, "accepted", now_str),
+    ]
+    for a in activity_rows:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO trip_activities
+                (id, trip_id, suggested_by_name, suggested_by_role,
+                 activity_title, location, approx_cost, votes_count, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, a)
+        except Exception:
+            pass
+
+    # 7. Seed packing items for the ABC trek (43 items across 6 categories)
+    packing_rows = [
+        # Clothing (11)
+        ("pack_abc_boots",      "trip_nepal_abc_2026", "Clothing",   "Trekking boots (waterproof, broken-in)",     "owner", now_str),
+        ("pack_abc_baselayer",  "trip_nepal_abc_2026", "Clothing",   "Merino wool base layer (top + bottom)",      "owner", now_str),
+        ("pack_abc_downjacket", "trip_nepal_abc_2026", "Clothing",   "Down jacket / puffer",                       "owner", now_str),
+        ("pack_abc_fleece",     "trip_nepal_abc_2026", "Clothing",   "Fleece mid-layer",                           "owner", now_str),
+        ("pack_abc_rainjacket", "trip_nepal_abc_2026", "Clothing",   "Wind/rain jacket (GORE-TEX)",                "owner", now_str),
+        ("pack_abc_pants",      "trip_nepal_abc_2026", "Clothing",   "Trekking pants (2 pairs)",                   "owner", now_str),
+        ("pack_abc_socks",      "trip_nepal_abc_2026", "Clothing",   "Wool socks (4 pairs)",                       "owner", now_str),
+        ("pack_abc_gaiters",    "trip_nepal_abc_2026", "Clothing",   "Gaiters",                                    "owner", now_str),
+        ("pack_abc_gloves",     "trip_nepal_abc_2026", "Clothing",   "Gloves (inner + outer)",                     "owner", now_str),
+        ("pack_abc_beanie",     "trip_nepal_abc_2026", "Clothing",   "Beanie / balaclava",                         "owner", now_str),
+        ("pack_abc_sunhat",     "trip_nepal_abc_2026", "Clothing",   "Sun hat",                                    "owner", now_str),
+        # Gear (10)
+        ("pack_abc_poles",      "trip_nepal_abc_2026", "Gear",       "Trekking poles",                             "owner", now_str),
+        ("pack_abc_daypack",    "trip_nepal_abc_2026", "Gear",       "40–50L daypack",                        "owner", now_str),
+        ("pack_abc_sleepbag",   "trip_nepal_abc_2026", "Gear",       "Sleeping bag (rated -10°C)",            "owner", now_str),
+        ("pack_abc_headlamp",   "trip_nepal_abc_2026", "Gear",       "Headlamp + extra batteries",                 "owner", now_str),
+        ("pack_abc_sunglasses", "trip_nepal_abc_2026", "Gear",       "Sunglasses (UV400)",                         "owner", now_str),
+        ("pack_abc_waterbottle","trip_nepal_abc_2026", "Gear",       "Water bottles (2× 1L) or hydration bladder", "owner", now_str),
+        ("pack_abc_waterpur",   "trip_nepal_abc_2026", "Gear",       "Water purification tablets / Steripen",      "owner", now_str),
+        ("pack_abc_knife",      "trip_nepal_abc_2026", "Gear",       "Pocket knife / multi-tool",                  "owner", now_str),
+        ("pack_abc_drybags",    "trip_nepal_abc_2026", "Gear",       "Dry bags / ziplock bags",                    "owner", now_str),
+        ("pack_abc_map",        "trip_nepal_abc_2026", "Gear",       "Trekking map / compass",                     "owner", now_str),
+        # Documents (5)
+        ("pack_abc_passport",   "trip_nepal_abc_2026", "Documents",  "Passport",                                   "owner", now_str),
+        ("pack_abc_tims",       "trip_nepal_abc_2026", "Documents",  "TIMS card (Trekkers Information Management System)", "owner", now_str),
+        ("pack_abc_acap",       "trip_nepal_abc_2026", "Documents",  "ACAP permit (Annapurna Conservation Area)",  "owner", now_str),
+        ("pack_abc_insurance",  "trip_nepal_abc_2026", "Documents",  "Travel insurance documents",                 "owner", now_str),
+        ("pack_abc_emergency",  "trip_nepal_abc_2026", "Documents",  "Emergency contact card",                     "owner", now_str),
+        # Medicine (7)
+        ("pack_abc_diamox",     "trip_nepal_abc_2026", "Medicine",   "Diamox (altitude sickness) + prescription",  "owner", now_str),
+        ("pack_abc_deet",       "trip_nepal_abc_2026", "Medicine",   "DEET insect repellent",                      "owner", now_str),
+        ("pack_abc_blister",    "trip_nepal_abc_2026", "Medicine",   "Blister prevention & treatment",             "owner", now_str),
+        ("pack_abc_painkillers","trip_nepal_abc_2026", "Medicine",   "Ibuprofen / paracetamol",                    "owner", now_str),
+        ("pack_abc_ors",        "trip_nepal_abc_2026", "Medicine",   "Oral rehydration salts",                     "owner", now_str),
+        ("pack_abc_rxmeds",     "trip_nepal_abc_2026", "Medicine",   "Personal prescription medications",          "owner", now_str),
+        ("pack_abc_firstaid",   "trip_nepal_abc_2026", "Medicine",   "Antiseptic cream + bandages",                "owner", now_str),
+        # Nutrition (3)
+        ("pack_abc_energybars", "trip_nepal_abc_2026", "Nutrition",  "Energy bars / trail mix (5-day supply)",     "owner", now_str),
+        ("pack_abc_electrolyte","trip_nepal_abc_2026", "Nutrition",  "Electrolyte powder",                         "owner", now_str),
+        ("pack_abc_chocolate",  "trip_nepal_abc_2026", "Nutrition",  "Emergency chocolate",                        "owner", now_str),
+        # Misc (7)
+        ("pack_abc_powerbank",  "trip_nepal_abc_2026", "Misc",       "Power bank (20000mAh+)",                     "owner", now_str),
+        ("pack_abc_adapter",    "trip_nepal_abc_2026", "Misc",       "Universal adapter",                          "owner", now_str),
+        ("pack_abc_sunscreen",  "trip_nepal_abc_2026", "Misc",       "Sunscreen SPF 50+",                          "owner", now_str),
+        ("pack_abc_lipbalm",    "trip_nepal_abc_2026", "Misc",       "Lip balm (SPF)",                             "owner", now_str),
+        ("pack_abc_toiletpaper","trip_nepal_abc_2026", "Misc",       "Toilet paper + hand sanitizer",              "owner", now_str),
+        ("pack_abc_cash",       "trip_nepal_abc_2026", "Misc",       "Cash NPR (ATMs limited above Nayapul)",      "owner", now_str),
+        ("pack_abc_camera",     "trip_nepal_abc_2026", "Misc",       "Camera / GoPro",                             "owner", now_str),
+    ]
+    for p in packing_rows:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO trip_packing_items
+                (item_id, trip_id, category, name, added_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, p)
+        except Exception:
+            pass
+
+    conn.commit()
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2018,6 +2245,7 @@ MIGRATIONS: list[Migration] = [
     Migration(39, "039_strategy_tier_audit_and_swing_radar", _migration_039_strategy_tier_audit_and_swing_radar),
     Migration(40, "040_purge_invalid_price_history_nan_records", _migration_040_purge_invalid_price_history_nan_records),
     Migration(41, "041_smart_money_strategies_and_financials", _migration_041_smart_money_strategies_and_financials),
+    Migration(42, "042_nepal_abc_trek_purge_and_seed", _migration_042_nepal_abc_trek),
 ]
 
 
