@@ -8,7 +8,8 @@ Detection heuristics
 2. Tickers matching known test / placeholder names.
 3. The 0.45 / 0.55 FII-DII split signature (fii/dii ratio between 0.72-0.92).
 4. Rows updated before 2026-09-13 (pre-filing fallback seeds).
-5. Cross-check against yfinance for the first 50 suspicious rows.
+5. yfinance cross-check on ALL flagged rows — parallel (4 threads),
+   exponential-backoff retry (3 attempts), 0.3s per-thread stagger.
 
 Usage:
     python scripts/cleanup_synthetic_holdings.py              # dry-run (default)
@@ -23,6 +24,7 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,7 +50,10 @@ FII_DII_RATIO_LOW = 0.72
 FII_DII_RATIO_HIGH = 0.92
 
 YFINANCE_MAX_CHECKS = 50
-YFINANCE_SLEEP = 0.3  # seconds between yfinance calls
+YFINANCE_SLEEP = 0.3  # seconds between yfinance calls per-thread
+YF_WORKERS = 4        # parallel yfinance threads
+YF_RETRIES = 3        # retry attempts per ticker
+YF_RETRY_DELAY = 2.0  # seconds base delay between retries
 
 PRE_CUTOFF = "2026-09-13"  # anything updated before this date
 
@@ -121,34 +126,92 @@ def classify_row(row: Any) -> list[str]:
 
 
 def yfinance_cross_check(ticker: str, row: Any) -> list[str]:
-    """Cross-check a row against yfinance data. Returns additional reasons."""
+    """Cross-check a row against yfinance data with retry. Returns additional reasons."""
     reasons: list[str] = []
-    try:
-        import yfinance as yf
-        t = yf.Ticker(ticker)
-        info = t.info or {}
+    last_exc: Exception | None = None
 
-        insiders = info.get("heldPercentInsiders")  # should approximate promoter_pct
-        institutions = info.get("heldPercentInstitutions")  # should approximate fii+dii
+    # Test tickers are always synthetic — skip network call
+    if _is_test_ticker(ticker):
+        reasons.append("test_ticker")
+        return reasons
 
-        promoter = row["promoter_pct"] or 0
-        fii = row["fii_pct"] or 0
-        dii = row["dii_mf_pct"] or 0
+    for attempt in range(YF_RETRIES):
+        try:
+            import yfinance as yf
+            t = yf.Ticker(ticker)
+            info = t.info or {}
 
-        # Check: promoter differs from yfinance insiders by >25pp
-        if insiders is not None and insiders != 0 and abs(promoter - insiders * 100) > YF_INSIDER_TOLERANCE:
-            reasons.append(f"yf_insider_mismatch(promoter={promoter:.1f}, yf_insiders={insiders * 100:.1f})")
+            insiders = info.get("heldPercentInsiders")  # should approximate promoter_pct
+            institutions = info.get("heldPercentInstitutions")  # should approximate fii+dii
 
-        # Check: fii_pct > 0 but yfinance shows 0 institutions
-        if fii > 0 and institutions is not None and institutions == 0:
-            reasons.append(f"yf_zero_institutions_but_fii={fii:.1f}")
+            promoter = row["promoter_pct"] or 0
+            fii = row["fii_pct"] or 0
 
-    except ImportError:
-        logger.warning("yfinance not installed — skipping cross-check for %s", ticker)
-    except Exception as exc:
-        logger.warning("yfinance cross-check failed for %s: %s", ticker, exc)
+            # Check: promoter differs from yfinance insiders by >25pp
+            if insiders is not None and insiders != 0 and abs(promoter - insiders * 100) > YF_INSIDER_TOLERANCE:
+                reasons.append(f"yf_insider_mismatch(promoter={promoter:.1f}, yf_insiders={insiders * 100:.1f})")
 
+            # Check: fii_pct > 0 but yfinance shows 0 institutions
+            if fii > 0 and institutions is not None and institutions == 0:
+                reasons.append(f"yf_zero_institutions_but_fii={fii:.1f}")
+
+            return reasons  # success — no retry needed
+
+        except ImportError:
+            logger.warning("yfinance not installed — skipping cross-check for %s", ticker)
+            return reasons
+
+        except Exception as exc:
+            last_exc = exc
+            delay = YF_RETRY_DELAY * (2 ** attempt)  # exponential backoff
+            logger.warning(
+                "yfinance attempt %d/%d failed for %s: %s — retrying in %.1fs",
+                attempt + 1, YF_RETRIES, ticker, exc, delay
+            )
+            time.sleep(delay)
+
+    # All retries exhausted
+    logger.error("yfinance cross-check permanently failed for %s after %d attempts: %s",
+                 ticker, YF_RETRIES, last_exc)
     return reasons
+
+
+def run_yfinance_checks(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Run yfinance cross-checks on ALL flagged rows in parallel with retries."""
+    if not flagged:
+        return flagged
+
+    logger.info("Running yfinance cross-check on %d rows with %d parallel threads...",
+                len(flagged), YF_WORKERS)
+
+    checked = 0
+    failed = 0
+
+    with ThreadPoolExecutor(max_workers=YF_WORKERS) as pool:
+        futures = {
+            pool.submit(yfinance_cross_check, row["ticker"], row): row
+            for row in flagged
+        }
+
+        for future in as_completed(futures):
+            row = futures[future]
+            ticker = row["ticker"]
+            checked += 1
+            try:
+                extra = future.result()
+                if extra:
+                    row["reasons"].extend(extra)
+                logger.debug("  [yfinance] %s — extra reasons: %s", ticker, extra)
+            except Exception as exc:
+                failed += 1
+                logger.error("  [yfinance] %s — unexpected exception in future: %s", ticker, exc)
+
+            # Small stagger per thread to avoid hammering yfinance
+            time.sleep(YFINANCE_SLEEP)
+
+    logger.info("yfinance cross-check complete: %d checked, %d failed", checked, failed)
+
+    return flagged
 
 
 # ---------------------------------------------------------------------------
@@ -171,23 +234,6 @@ def find_suspicious_rows(conn: Any) -> list[dict[str, Any]]:
         if reasons:
             row["reasons"] = reasons
             flagged.append(row)
-
-    return flagged
-
-
-def run_yfinance_checks(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Run yfinance cross-checks on up to YFINANCE_MAX_CHECKS rows."""
-    checked = 0
-    for row in flagged:
-        if checked >= YFINANCE_MAX_CHECKS:
-            logger.info("Reached yfinance check limit (%d). Skipping remaining.", YFINANCE_MAX_CHECKS)
-            break
-
-        extra = yfinance_cross_check(row["ticker"], row)
-        if extra:
-            row["reasons"].extend(extra)
-        checked += 1
-        time.sleep(YFINANCE_SLEEP)
 
     return flagged
 
