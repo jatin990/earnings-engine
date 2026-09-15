@@ -269,10 +269,13 @@ async def get_news_feeds_status():
 
 
 @router.get("/api/v1/news/activity")
-async def get_news_activity_stream(limit: int = Query(50, ge=1, le=200)):
+async def get_news_activity_stream(
+    limit: int = Query(50, ge=1, le=200),
+    days: int = Query(14, ge=0, le=365, description="Lookback window in days (1, 3, 7, 14, 0 for all)"),
+):
     """Retrieve real-time live activity stream of breaking market filings."""
     try:
-        activity = await asyncio.to_thread(get_recent_news_activity, limit=limit, settings=_settings)
+        activity = await asyncio.to_thread(get_recent_news_activity, limit=limit, days=days, settings=_settings)
         return {"success": True, "count": len(activity), "activity": activity}
     except Exception as e:
         logger.exception("Error in get_news_activity_stream: %s", e)

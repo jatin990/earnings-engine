@@ -1050,27 +1050,52 @@ def scan_watchlist_catalysts(
 
 def get_recent_news_activity(
     limit: int = 50,
+    days: int = 14,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve recently harvested news catalysts with impacted stock context and plain-English summary."""
+    """Retrieve recently harvested news catalysts with impacted stock context and plain-English summary.
+
+    Applies the same recency contract as get_short_term_catalysts:
+    - SQL date window (default 14 days)
+    - is_headline_current() semantic staleness guard
+    """
     settings = settings or Settings()
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            """
-            SELECT ticker, stock_name, title, publisher, link, published_at,
-                   summary, impact_score, impact_level, category, direction,
-                   expected_horizon, volatility_est, why_it_matters, created_at
-            FROM news_catalysts
-            ORDER BY published_at DESC, id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        if days and days > 0:
+            rows = conn.execute(
+                """
+                SELECT ticker, stock_name, title, publisher, link, published_at,
+                       summary, impact_score, impact_level, category, direction,
+                       expected_horizon, volatility_est, why_it_matters, created_at
+                FROM news_catalysts
+                WHERE published_at >= datetime('now', '-' || ? || ' days')
+                  AND (verification_status IS NULL OR verification_status = 'VERIFIED')
+                ORDER BY published_at DESC, id DESC
+                LIMIT ?
+                """,
+                (days, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT ticker, stock_name, title, publisher, link, published_at,
+                       summary, impact_score, impact_level, category, direction,
+                       expected_horizon, volatility_est, why_it_matters, created_at
+                FROM news_catalysts
+                WHERE (verification_status IS NULL OR verification_status = 'VERIFIED')
+                ORDER BY published_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
 
         results = []
         for r in rows:
             d = dict(r)
+            # Secondary semantic staleness check — same guard as get_short_term_catalysts
+            if not is_headline_current(d.get("title", ""), d.get("summary", ""), d.get("published_at", "")):
+                continue
             results.append(d)
         return results
 
