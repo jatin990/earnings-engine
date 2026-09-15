@@ -72,9 +72,15 @@ def _is_test_ticker(ticker: str) -> bool:
 
 
 def _has_sum_to_100(row: Any) -> bool:
-    """Check if holding percentages sum to exactly 100."""
+    """Check if all five holding percentage columns sum to 100.
+
+    The 'other_pct' column is included because it completes the total.
+    Without it, rows with small 'other_pct' values can slip through the
+    0.01 tolerance (e.g. 99.96 vs 100.00 with other_pct=0.04).
+    """
     total = (row["promoter_pct"] or 0) + (row["fii_pct"] or 0) + \
-            (row["dii_mf_pct"] or 0) + (row["public_retail_pct"] or 0)
+            (row["dii_mf_pct"] or 0) + (row["public_retail_pct"] or 0) + \
+            (row["other_pct"] or 0)
     return abs(total - 100.0) < 0.01
 
 
@@ -164,20 +170,25 @@ def yfinance_cross_check(ticker: str, row: Any) -> tuple[list[str], str | None]:
             if fii > 0 and institutions is not None and institutions == 0:
                 reasons.append(f"yf_zero_institutions_but_fii={fii:.1f}")
 
-            # Determine verification status
+            # Determine verification status — STRICT: only "confirmed_real"
+            # when yfinance has actual data that matches within tolerance.
+            # When data is missing/empty, we cannot confirm, so keep flagged.
+
             if reasons:
                 return reasons, "confirmed_synthetic"
 
-            # yfinance data present and matches within tolerance — this is real data
+            # yfinance data present AND matches within tolerance — real data
             if insiders is not None and institutions is not None:
                 return reasons, "confirmed_real"
 
-            # yfinance returned but insiders/institutions are None — can't verify
+            # yfinance returned info but insiders/institutions are None
+            # Cannot verify — keep flagged (conservative, don't delete real data)
             if info:
                 return reasons, None  # partial data, keep flagged from heuristic
 
-            # Empty ticker (e.g., delisted)
-            return reasons, "confirmed_real"  # no info to contradict, trust heuristic
+            # yfinance returned empty info (delisted or no data available)
+            # Cannot verify — keep flagged (conservative)
+            return reasons, None
 
         except ImportError:
             logger.warning("yfinance not installed — skipping cross-check for %s", ticker)
