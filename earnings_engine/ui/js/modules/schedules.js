@@ -389,10 +389,38 @@
                     console.log(data.message);
                     setTimeout(() => this.loadAutomationSchedules(), 1500);
                     if (jobId.startsWith('breakout')) {
-                        setTimeout(() => {
-                            this.loadBreakoutRadar();
-                            this.loadBreakoutAuditLog();
-                        }, 2500);
+                        // Poll scan status and refresh only after scan actually completes
+                        const pollForScanDone = (attempts = 0) => {
+                            const maxAttempts = 40;
+                            const interval = 3000;
+                            const timer = setInterval(async () => {
+                                attempts++;
+                                try {
+                                    const statusRes = await fetch(API_BASE + '/api/v1/breakout-radar/status');
+                                    if (statusRes.ok) {
+                                        const st = await statusRes.json();
+                                        if (st.status === 'done' || (!st.is_scanning && attempts >= 3)) {
+                                            clearInterval(timer);
+                                            await window.app.loadBreakoutRadar(false);
+                                            if (typeof window.app.loadBreakoutAuditLog === 'function') {
+                                                await window.app.loadBreakoutAuditLog();
+                                            }
+                                            if (typeof window.app.updateSidebarBadges === 'function') {
+                                                await window.app.updateSidebarBadges();
+                                            }
+                                            return;
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.debug('[SCHEDULE-POLL] Status error:', e);
+                                }
+                                if (attempts >= maxAttempts) {
+                                    clearInterval(timer);
+                                    await window.app.loadBreakoutRadar(false);
+                                }
+                            }, interval);
+                        };
+                        pollForScanDone();
                     }
                 }
             } catch (e) {

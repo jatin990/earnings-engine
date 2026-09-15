@@ -116,17 +116,20 @@ def _hydrate_badge_counters_from_db(settings: Settings, force: bool = False) -> 
             if pm_count == 0:
                 pm_count = min(news_count, 4)
 
-            # 3. Active Breakout Count (Actively triggered / breaking out setups, distinct tickers)
+            # 3. Active Breakout Count — count distinct tickers from BOTH breakout_tracked_signals
+            # (resolved/audited setups) AND breakout_radar (live pool including today's day-0 signals
+            # that haven't been moved to tracked history yet).
             try:
-                row_bo_active = conn.execute(
-                    "SELECT COUNT(DISTINCT ticker) FROM breakout_tracked_signals WHERE outcome IN ('TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED')"
-                ).fetchone()
-                bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
-                if bo_count == 0:
-                    row_fallback = conn.execute(
-                        "SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE outcome IN ('TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED') OR breakout_happened = 1"
-                    ).fetchone()
-                    bo_count = int(row_fallback[0]) if row_fallback and row_fallback[0] is not None else 0
+                row_bo = conn.execute("""
+                    SELECT COUNT(*) FROM (
+                        SELECT ticker FROM breakout_tracked_signals
+                        WHERE outcome IN ('TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED')
+                        UNION
+                        SELECT ticker FROM breakout_radar
+                        WHERE breakout_happened = 1
+                    )
+                """).fetchone()
+                bo_count = int(row_bo[0]) if row_bo and row_bo[0] is not None else 0
             except Exception:
                 bo_count = 0
 
