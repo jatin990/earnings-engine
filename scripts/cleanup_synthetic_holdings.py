@@ -125,15 +125,24 @@ def classify_row(row: Any) -> list[str]:
     return reasons
 
 
-def yfinance_cross_check(ticker: str, row: Any) -> list[str]:
-    """Cross-check a row against yfinance data with retry. Returns additional reasons."""
+def yfinance_cross_check(ticker: str, row: Any) -> tuple[list[str], str | None]:
+    """Cross-check a row against yfinance data with retry.
+
+    Returns:
+        (extra_reasons, verification_status)
+        verification_status is one of:
+          "confirmed_synthetic" — yfinance contradicts the data
+          "confirmed_real"      — yfinance matches within tolerance
+          "yfinance_failed"     — all retries exhausted / no data
+          "test_ticker"         — known placeholder name
+    """
     reasons: list[str] = []
     last_exc: Exception | None = None
 
     # Test tickers are always synthetic — skip network call
     if _is_test_ticker(ticker):
         reasons.append("test_ticker")
-        return reasons
+        return reasons, "test_ticker"
 
     for attempt in range(YF_RETRIES):
         try:
@@ -155,11 +164,24 @@ def yfinance_cross_check(ticker: str, row: Any) -> list[str]:
             if fii > 0 and institutions is not None and institutions == 0:
                 reasons.append(f"yf_zero_institutions_but_fii={fii:.1f}")
 
-            return reasons  # success — no retry needed
+            # Determine verification status
+            if reasons:
+                return reasons, "confirmed_synthetic"
+
+            # yfinance data present and matches within tolerance — this is real data
+            if insiders is not None and institutions is not None:
+                return reasons, "confirmed_real"
+
+            # yfinance returned but insiders/institutions are None — can't verify
+            if info:
+                return reasons, None  # partial data, keep flagged from heuristic
+
+            # Empty ticker (e.g., delisted)
+            return reasons, "confirmed_real"  # no info to contradict, trust heuristic
 
         except ImportError:
             logger.warning("yfinance not installed — skipping cross-check for %s", ticker)
-            return reasons
+            return reasons, "yfinance_failed"
 
         except Exception as exc:
             last_exc = exc
@@ -173,19 +195,24 @@ def yfinance_cross_check(ticker: str, row: Any) -> list[str]:
     # All retries exhausted
     logger.error("yfinance cross-check permanently failed for %s after %d attempts: %s",
                  ticker, YF_RETRIES, last_exc)
-    return reasons
+    return reasons, "yfinance_failed"
 
 
 def run_yfinance_checks(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Run yfinance cross-checks on ALL flagged rows in parallel with retries."""
+    """Run yfinance cross-checks on ALL flagged rows in parallel with retries.
+
+    Removes rows from the flagged list if yfinance confirms they are real data.
+    """
     if not flagged:
         return flagged
 
     logger.info("Running yfinance cross-check on %d rows with %d parallel threads...",
                 len(flagged), YF_WORKERS)
 
-    checked = 0
-    failed = 0
+    confirmed_real: list[dict[str, Any]] = []
+    confirmed_synthetic: list[dict[str, Any]] = []
+    yf_failed: list[dict[str, Any]] = []
+    errors: int = 0
 
     with ThreadPoolExecutor(max_workers=YF_WORKERS) as pool:
         futures = {
@@ -196,22 +223,45 @@ def run_yfinance_checks(flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for future in as_completed(futures):
             row = futures[future]
             ticker = row["ticker"]
-            checked += 1
             try:
-                extra = future.result()
+                extra, status = future.result()
                 if extra:
                     row["reasons"].extend(extra)
-                logger.debug("  [yfinance] %s — extra reasons: %s", ticker, extra)
+                    logger.debug("  [yfinance] %s — extra reasons: %s", ticker, extra)
+
+                if status == "confirmed_real":
+                    confirmed_real.append(row)
+                    logger.info("  [yfinance] %s — VERIFIED REAL, removing from delete list", ticker)
+                elif status == "confirmed_synthetic":
+                    confirmed_synthetic.append(row)
+                elif status == "yfinance_failed":
+                    yf_failed.append(row)
             except Exception as exc:
-                failed += 1
+                errors += 1
                 logger.error("  [yfinance] %s — unexpected exception in future: %s", ticker, exc)
 
             # Small stagger per thread to avoid hammering yfinance
             time.sleep(YFINANCE_SLEEP)
 
-    logger.info("yfinance cross-check complete: %d checked, %d failed", checked, failed)
+    logger.info(
+        "yfinance cross-check complete: %d confirmed_real, %d confirmed_synthetic, "
+        "%d yf_failed, %d errors",
+        len(confirmed_real), len(confirmed_synthetic),
+        len(yf_failed), errors
+    )
 
-    return flagged
+    # Remove yfinance-confirmed-real rows from the flagged delete list
+    verified_real_tickers = {r["ticker"] for r in confirmed_real}
+    filtered = [row for row in flagged if row["ticker"] not in verified_real_tickers]
+
+    if confirmed_real:
+        logger.info(
+            "yfinance verified %d row(s) as real — removed from delete list: %s",
+            len(confirmed_real),
+            sorted(verified_real_tickers)
+        )
+
+    return filtered
 
 
 # ---------------------------------------------------------------------------
