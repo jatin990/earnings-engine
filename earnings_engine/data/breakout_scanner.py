@@ -4896,11 +4896,17 @@ def run_cold_scan(
 
     from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.logging_utils import BatchProgressLogger
-    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.prices import fetch_batch_live_quotes, load_prices_batch, load_price_metrics_batch
     from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
     from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
 
-    # Bulk pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    # Always refresh live quotes for the full universe first (batched), then bulk
+    # pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    try:
+        fetch_batch_live_quotes(ticker_list, settings=settings, sync_db=True, max_workers=8, force=True)
+    except Exception as e:
+        logger.debug("[BREAKOUT-COLD] Batch live quote fetch warning: %s", e)
+
     prices_map = load_prices_batch(ticker_list, settings=settings)
     metrics_map = load_price_metrics_batch(ticker_list, settings=settings)
     catalysts_map = get_recent_catalysts_batch(ticker_list, limit_per_ticker=3, settings=settings)
@@ -4997,10 +5003,10 @@ def run_warm_rescore(settings: Settings) -> None:
     from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
     from concurrent.futures import ThreadPoolExecutor
 
-    # 1. Extract tickers for live quote batch fetch
+    # 1. Extract tickers for live quote batch fetch (always live — bypass TTL cache)
     tickers_to_fetch = list({k.split("::")[0] for k in warm_keys})
     try:
-        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8, force=True)
     except Exception as e:
         logger.debug("[BREAKOUT-WARM] Batch live quote fetch warning: %s", e)
 
