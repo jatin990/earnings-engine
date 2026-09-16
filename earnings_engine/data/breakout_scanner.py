@@ -5086,7 +5086,7 @@ def run_hot_rescore(settings: Settings) -> None:
     # 1. Batch fetch latest live market quotes in parallel (single sub-second batch)
     tickers_to_fetch = list({k.split("::")[0] for k in hot_keys})
     try:
-        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8, force=True)
     except Exception as e:
         logger.debug("[BREAKOUT-HOT] Batch live quote fetch warning: %s", e)
 
