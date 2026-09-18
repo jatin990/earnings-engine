@@ -83,6 +83,8 @@ SYNC_TABLES = [
     # Institutional & Market Universe
     "institutional_holdings",
     "institutional_block_deals",
+    "bulk_block_deals",
+    "reg30_disclosures",
     "shareholding_patterns",
     "institutional_accumulation_cache",
     "nse_shareholding_freshness",

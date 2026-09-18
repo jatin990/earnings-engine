@@ -27,6 +27,7 @@ from earnings_engine.api.routers import (
     cards,
     consensus,
     dashboard,
+    deals,
     institutional,
     kronos,
     news,
@@ -46,6 +47,7 @@ from earnings_engine.api.routers import (
     wealth,
     zepto,
 )
+from earnings_engine.api import routes_reg30
 from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics, redact_sensitive_data
 
@@ -515,6 +517,8 @@ app.include_router(premarket.router)
 app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
+app.include_router(deals.router)
+app.include_router(routes_reg30.router)
 app.include_router(tri_confluence.router)
 app.include_router(options.router)
 app.include_router(swing.router)
