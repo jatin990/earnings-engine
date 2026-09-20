@@ -1595,8 +1595,13 @@
             }
         },
 
+        loadStockInstitutionalDetails(ticker, autoSwitch = false) {
+            return this.searchInstitutionalStock(ticker, autoSwitch);
+        },
+
         async triggerStockShareholdingFetch(ticker) {
             if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
             const cleanTicker = (ticker || '').trim().toUpperCase();
             const btnP1 = document.getElementById('btnInstRefreshFetchP1');
             const btnP3 = document.getElementById('btnInstRefreshFetchP3');
@@ -1626,12 +1631,16 @@
 
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    await this.loadStockInstitutionalDetails(cleanTicker, false);
-                    if (this._smartMoneyForensicDossier && this._smartMoneyForensicDossier.ticker === cleanTicker) {
+                    if (typeof self.searchInstitutionalStock === 'function') {
+                        await self.searchInstitutionalStock(cleanTicker, false);
+                    }
+                    if (self._smartMoneyForensicDossier && self._smartMoneyForensicDossier.ticker === cleanTicker) {
                         const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/forensics`);
                         if (fRes.ok) {
-                            this._smartMoneyForensicDossier = await fRes.json();
-                            this.renderForensicsTab(this._smartMoneyForensicTab || 'buyers');
+                            self._smartMoneyForensicDossier = await fRes.json();
+                            if (typeof self.renderForensicsTab === 'function') {
+                                self.renderForensicsTab(self._smartMoneyForensicTab || 'buyers');
+                            }
                         }
                     }
                 } else {
@@ -1643,9 +1652,11 @@
                     const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
                     const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
                     const fBadge = document.getElementById('instForensicFetchStatusBadge');
-                    this.renderFetchStatusBadge(p1FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
-                    this.renderFetchStatusBadge(p3FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
-                    this.renderFetchStatusBadge(fBadge, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                    if (typeof self.renderFetchStatusBadge === 'function') {
+                        self.renderFetchStatusBadge(p1FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                        self.renderFetchStatusBadge(p3FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                        self.renderFetchStatusBadge(fBadge, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                    }
                 }
             } catch (err) {
                 console.error('[INST] Ingestion error:', err);
