@@ -2636,7 +2636,7 @@
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/factor-evaluation`);
                 if (res.ok) {
                     const data = await res.json();
-                    stockState.factor_evaluation = data.factor_evaluation || data || {};
+                    stockState.factor_evaluation = data.factor_evaluation || data.data || data || {};
                     renderFactorEvaluation(stockState.factor_evaluation);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
                     if (isManual) showStockToast(`Multi-factor pillars evaluated (Composite: ${stockState.factor_evaluation.composite_score || '—'}/100)`, 'success');
