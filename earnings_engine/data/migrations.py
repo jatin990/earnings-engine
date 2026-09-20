@@ -2240,6 +2240,18 @@ def _migration_043_missing_query_indexes(conn: Any) -> None:
         except Exception:
             pass
 
+def _migration_044_shareholding_fetch_tracking(conn: Any) -> None:
+    """Enhance nse_shareholding_freshness to track detailed fetch status, error diagnostics, and duration."""
+    _add_column_if_missing(conn, "nse_shareholding_freshness", "status", "TEXT DEFAULT 'SUCCESS'")
+    _add_column_if_missing(conn, "nse_shareholding_freshness", "error_message", "TEXT DEFAULT NULL")
+    _add_column_if_missing(conn, "nse_shareholding_freshness", "response_code", "INTEGER DEFAULT 200")
+    _add_column_if_missing(conn, "nse_shareholding_freshness", "duration_ms", "REAL DEFAULT 0.0")
+    _add_column_if_missing(conn, "nse_shareholding_freshness", "updated_at", "TEXT DEFAULT NULL")
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nse_shp_fresh_status ON nse_shareholding_freshness (status)")
+    except Exception:
+        pass
+
 
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
@@ -2286,6 +2298,7 @@ MIGRATIONS: list[Migration] = [
     Migration(41, "041_smart_money_strategies_and_financials", _migration_041_smart_money_strategies_and_financials),
     Migration(42, "042_nepal_abc_trek_purge_and_seed", _migration_042_nepal_abc_trek),
     Migration(43, "043_missing_query_indexes", _migration_043_missing_query_indexes),
+    Migration(44, "044_shareholding_fetch_tracking", _migration_044_shareholding_fetch_tracking),
 ]
 
 

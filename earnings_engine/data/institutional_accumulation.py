@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from earnings_engine.config import Settings
+from earnings_engine.data.nse_shareholding import get_stock_fetch_status
 from earnings_engine.data.db import get_db_connection, is_server_environment
 from earnings_engine.data.names import _NAME_CACHE, get_name
 
@@ -1043,6 +1044,7 @@ def get_stock_institutional_activity(
                     "block_deals": json.loads(row[27] or "[]"),
                     "shareholding_patterns": pats,
                     "updated_at": row[29],
+                    "last_fetch": get_stock_fetch_status(sym, settings=settings, conn=conn),
                 }
 
         h_rows = conn.execute(
@@ -1510,6 +1512,7 @@ def get_stock_institutional_activity(
             "holdings": holdings,
             "block_deals": deals,
             "shareholding_patterns": patterns,
+            "last_fetch": get_stock_fetch_status(sym, settings=settings, conn=conn),
         }
 
     except Exception as e:
@@ -4892,6 +4895,7 @@ def get_stock_forensic_dossier(
             "shareholding_patterns": shareholding_patterns,
             "accumulation_summary": accumulation_summary,
             "as_of": datetime.now(timezone.utc).isoformat(),
+            "last_fetch": get_stock_fetch_status(sym, settings=settings, conn=conn),
         }
     except Exception as e:
         logger.exception("[INSTITUTIONAL] Error generating forensic dossier for %s: %s", ticker, e)

@@ -1563,7 +1563,108 @@
 
 
 
-        renderStockInstitutionalDetails(data) {
+                renderFetchStatusBadge(badgeEl, fetchObj) {
+            if (!badgeEl) return;
+            if (!fetchObj || fetchObj.status === 'UNTRACKED') {
+                badgeEl.textContent = '⚪ Ingestion: Untracked';
+                badgeEl.style.background = 'rgba(255,255,255,0.05)';
+                badgeEl.style.color = '#a1a1aa';
+                badgeEl.style.border = '1px solid rgba(255,255,255,0.15)';
+                badgeEl.title = 'No live filing fetch recorded for this stock yet.';
+                return;
+            }
+
+            const isSuccess = (fetchObj.status || '').toUpperCase() === 'SUCCESS';
+            const timeAgo = fetchObj.time_ago || 'Recently';
+            if (isSuccess) {
+                const src = fetchObj.source === 'EXCHANGE_REGULATORY_FILINGS' ? 'Filings' : (fetchObj.source === 'nse_api' ? 'NSE API' : fetchObj.source || 'Live');
+                const entCount = fetchObj.entities_count != null ? `${fetchObj.entities_count} entities` : 'Verified';
+                badgeEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Ingestion: Success · ${timeAgo} (${src}, ${entCount})`;
+                badgeEl.style.background = 'rgba(16,185,129,0.12)';
+                badgeEl.style.color = '#34d399';
+                badgeEl.style.border = '1px solid rgba(16,185,129,0.35)';
+                badgeEl.title = `Last verified fetch: ${fetchObj.fetched_at || ''} via ${fetchObj.source || ''}`;
+            } else {
+                const err = fetchObj.error_message || 'Fetch failed';
+                badgeEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Ingestion: Failed · ${timeAgo}`;
+                badgeEl.style.background = 'rgba(239,68,68,0.12)';
+                badgeEl.style.color = '#f87171';
+                badgeEl.style.border = '1px solid rgba(239,68,68,0.35)';
+                badgeEl.title = `Error: ${err}`;
+            }
+        },
+
+        async triggerStockShareholdingFetch(ticker) {
+            if (!ticker) return;
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnP1 = document.getElementById('btnInstRefreshFetchP1');
+            const btnP3 = document.getElementById('btnInstRefreshFetchP3');
+            const btnForensic = document.getElementById('btnForensicRefreshFetch');
+
+            const p1Err = document.getElementById('instP1IngestErrorBanner');
+            const p3Err = document.getElementById('instP3IngestErrorBanner');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+
+            if (p1Err) p1Err.style.display = 'none';
+            if (p3Err) p3Err.style.display = 'none';
+            if (fErr) fErr.style.display = 'none';
+
+            [btnP1, btnP3, btnForensic].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    await this.loadStockInstitutionalDetails(cleanTicker, false);
+                    if (this._smartMoneyForensicDossier && this._smartMoneyForensicDossier.ticker === cleanTicker) {
+                        const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/forensics`);
+                        if (fRes.ok) {
+                            this._smartMoneyForensicDossier = await fRes.json();
+                            this.renderForensicsTab(this._smartMoneyForensicTab || 'buyers');
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Ingestion failed across all exchange & regulatory endpoints.';
+                    const errHtml = `<strong>⚠️ Ingestion Halted:</strong> ${errMsg}`;
+                    if (p1Err) { p1Err.innerHTML = errHtml; p1Err.style.display = 'block'; }
+                    if (p3Err) { p3Err.innerHTML = errHtml; p3Err.style.display = 'block'; }
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+                    const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+                    const fBadge = document.getElementById('instForensicFetchStatusBadge');
+                    this.renderFetchStatusBadge(p1FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                    this.renderFetchStatusBadge(p3FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                    this.renderFetchStatusBadge(fBadge, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                }
+            } catch (err) {
+                console.error('[INST] Ingestion error:', err);
+                const errMsg = `Network exception during ingestion: ${err.message || err}`;
+                const errHtml = `<strong>⚠️ Ingestion Halted:</strong> ${errMsg}`;
+                if (p1Err) { p1Err.innerHTML = errHtml; p1Err.style.display = 'block'; }
+                if (p3Err) { p3Err.innerHTML = errHtml; p3Err.style.display = 'block'; }
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnP1, btnP3, btnForensic].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.textContent = b.id === 'btnForensicRefreshFetch' ? '🔄 Ingest Filings' : '🔄 Ingest';
+                        b.style.opacity = '1';
+                    }
+                });
+            }
+        },
+
+renderStockInstitutionalDetails(data) {
 
             if (!data) return;
 
@@ -1608,6 +1709,10 @@
             // Populate Page 1 Header
 
             if (tickerEl) tickerEl.textContent = data.ticker;
+            const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+            const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+            this.renderFetchStatusBadge(p1FetchStatus, data.last_fetch);
+            this.renderFetchStatusBadge(p3FetchStatus, data.last_fetch);
 
             if (nameEl) nameEl.textContent = data.company_name || '';
 
@@ -2167,6 +2272,10 @@
             // Identity
             const cleanVerdict = (data.verdict || 'Accumulating').replace(/^[^\w\s]+\s*/, '');
             if (tickerEl) tickerEl.textContent = data.ticker;
+            const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+            const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+            this.renderFetchStatusBadge(p1FetchStatus, data.last_fetch);
+            this.renderFetchStatusBadge(p3FetchStatus, data.last_fetch);
             if (companyEl) companyEl.textContent = data.company_name || '';
             if (verdictEl) { verdictEl.textContent = cleanVerdict; verdictEl.style.background = '#18181b'; verdictEl.style.color = '#f4f4f5'; }
 
@@ -2590,6 +2699,8 @@
             const dossier = this._smartMoneyForensicDossier;
             if (!dossier) return;
             const container = document.getElementById('instForensicPane-' + tab);
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+            if (fBadge) this.renderFetchStatusBadge(fBadge, dossier.last_fetch);
             if (!container) return;
             if (tab === 'quarters') tab = 'quarterly';
 
