@@ -1281,6 +1281,8 @@
                     <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap;">
                         <span id="instForensicFetchStatusBadge" class="badge" style="font-size:0.64rem;padding:0.15rem 0.5rem;border-radius:4px;font-family:var(--font-mono);font-weight:600;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);">⚪ Ingestion: Untracked</span>
                         <button type="button" id="btnForensicRefreshFetch" onclick="app.triggerStockShareholdingFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger verified multi-tier exchange & regulatory filing extraction">🔄 Ingest Filings</button>
+                        <button type="button" id="btnForensicBlockFetch" onclick="app.triggerStockBlockDealsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger live exchange block & bulk deals extraction">⚡ Ingest Block Deals</button>
+                        <button type="button" id="btnForensicQuarterlyFetch" onclick="app.triggerStockFinancialsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger authentic quarterly financial statements and growth extraction">📊 Ingest Financials</button>
                     </div>
                     <div id="instForensicIngestErrorBanner" style="display:none;margin-top:0.4rem;padding:0.35rem 0.55rem;border-radius:4px;font-size:0.68rem;font-family:var(--font-mono);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;"></div>
                 </div>
@@ -1333,7 +1335,10 @@
                     <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
                         <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
                             <span>Quarterly Income Statement & Growth Trajectory</span>
-                            <span id="instSmQuarterlyCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Quarters Logged</span>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span id="instSmQuarterlyCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Quarters Logged</span>
+                                <button type="button" id="btnForensicQuarterlyTabFetch" onclick="app.triggerStockFinancialsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Ingest quarterly financials">📊 Ingest Financials</button>
+                            </div>
                         </div>
                         <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
                             <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
@@ -1361,7 +1366,10 @@
                     <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
                         <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
                             <span>Exchange Block & Bulk Deals Ledger</span>
-                            <span id="instSmBlockCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Deals</span>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span id="instSmBlockCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Deals</span>
+                                <button type="button" id="btnForensicBlockTabFetch" onclick="app.triggerStockBlockDealsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Ingest block deals">⚡ Ingest Block Deals</button>
+                            </div>
                         </div>
                         <div id="instSmBlockDealsContainer" style="padding:0.6rem 0.85rem;max-height:420px;overflow-y:auto;">
                             <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:2rem;">Select a stock to view exchange block deals ledger.</div>

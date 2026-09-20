@@ -501,6 +501,66 @@ async def trigger_stock_shareholding_fetch(
         raise HTTPException(status_code=500, detail=f"Unexpected error during fetch: {str(e)}")
 
 
+@router.post("/api/v1/institutional/stock/{ticker}/fetch-financials", summary="Trigger Quarterly Financials Ingestion for Stock")
+@router.post("/api/v1/institutional/stock/{ticker}/fetch-quarterly", summary="Trigger Quarterly Financials Ingestion for Stock (Alias)")
+async def trigger_stock_financials_fetch(
+    ticker: str,
+    force: bool = Query(True, description="Bypass freshness check"),
+    fail_fast: bool = Query(False, description="Raise immediate error if all sources fail"),
+):
+    """Trigger verified quarterly income statement and growth extraction for a stock."""
+    try:
+        from earnings_engine.data.nse_shareholding import ingest_stock_quarterly_financials
+        res = await asyncio.to_thread(
+            ingest_stock_quarterly_financials,
+            ticker=ticker,
+            force=force,
+            fail_fast=fail_fast,
+            settings=_settings,
+        )
+        if not res.get("success"):
+            raise HTTPException(
+                status_code=422,
+                detail=res.get("error", "Failed to ingest authentic quarterly financial statements"),
+            )
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error triggering quarterly financials fetch for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Unexpected error during financials fetch: {str(e)}")
+
+
+@router.post("/api/v1/institutional/stock/{ticker}/fetch-block-deals", summary="Trigger Block Deals Ingestion for Stock")
+@router.post("/api/v1/institutional/stock/{ticker}/fetch-deals", summary="Trigger Block Deals Ingestion for Stock (Alias)")
+async def trigger_stock_block_deals_fetch(
+    ticker: str,
+    force: bool = Query(True, description="Bypass freshness check"),
+    fail_fast: bool = Query(False, description="Raise immediate error if all sources fail"),
+):
+    """Trigger live exchange block & bulk deals extraction for a stock."""
+    try:
+        from earnings_engine.data.nse_shareholding import ingest_stock_block_deals
+        res = await asyncio.to_thread(
+            ingest_stock_block_deals,
+            ticker=ticker,
+            force=force,
+            fail_fast=fail_fast,
+            settings=_settings,
+        )
+        if not res.get("success"):
+            raise HTTPException(
+                status_code=422,
+                detail=res.get("error", "Failed to ingest authentic exchange block deals"),
+            )
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error triggering block deals fetch for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Unexpected error during block deals fetch: {str(e)}")
+
+
 @router.get("/api/v1/institutional/stock/{ticker}")
 async def get_stock_institutional_details(ticker: str):
     """Retrieve detailed institutional shareholding breakdown for a specific stock."""

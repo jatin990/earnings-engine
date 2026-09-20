@@ -1676,7 +1676,146 @@
             }
         },
 
-renderStockInstitutionalDetails(data) {
+        async triggerStockFinancialsFetch(ticker) {
+            if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnForensic = document.getElementById('btnForensicQuarterlyFetch');
+            const btnTab = document.getElementById('btnForensicQuarterlyTabFetch');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+
+            if (fErr) fErr.style.display = 'none';
+
+            [btnForensic, btnTab].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + /api/v1/institutional/stock//fetch-financials, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const count = data.quarters_count != null ? ${data.quarters_count} Quarters : 'Verified';
+                    if (fBadge) {
+                        fBadge.innerHTML = <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Financials: Success · Just now (, );
+                        fBadge.style.background = 'rgba(16,185,129,0.12)';
+                        fBadge.style.color = '#34d399';
+                        fBadge.style.border = '1px solid rgba(16,185,129,0.35)';
+                    }
+                    const fRes = await fetch(API_BASE + /api/v1/institutional/stock//forensics);
+                    if (fRes.ok) {
+                        self._smartMoneyForensicDossier = await fRes.json();
+                        if (typeof self.renderForensicsTab === 'function') {
+                            self.renderForensicsTab(self._smartMoneyForensicTab || 'quarterly');
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Quarterly financial extraction failed across all sources.';
+                    const errHtml = <strong>⚠️ Financials Ingestion Halted:</strong> ;
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    if (fBadge) {
+                        fBadge.innerHTML = <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Financials: Failed · Just now;
+                        fBadge.style.background = 'rgba(239,68,68,0.12)';
+                        fBadge.style.color = '#f87171';
+                        fBadge.style.border = '1px solid rgba(239,68,68,0.35)';
+                    }
+                }
+            } catch (err) {
+                console.error('[INST] Network error during financials ingest:', err);
+                const errMsg = err.message || 'Network connection failed.';
+                const errHtml = <strong>⚠️ Network Error:</strong> ;
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnForensic, btnTab].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.style.opacity = '1';
+                        b.textContent = '📊 Ingest Financials';
+                    }
+                });
+            }
+        },
+
+        async triggerStockBlockDealsFetch(ticker) {
+            if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnForensic = document.getElementById('btnForensicBlockFetch');
+            const btnTab = document.getElementById('btnForensicBlockTabFetch');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+
+            if (fErr) fErr.style.display = 'none';
+
+            [btnForensic, btnTab].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + /api/v1/institutional/stock//fetch-block-deals, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const count = data.deals_count != null ? ${data.deals_count} Deals : 'Verified';
+                    if (fBadge) {
+                        fBadge.innerHTML = <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Block Deals: Success · Just now (, );
+                        fBadge.style.background = 'rgba(16,185,129,0.12)';
+                        fBadge.style.color = '#34d399';
+                        fBadge.style.border = '1px solid rgba(16,185,129,0.35)';
+                    }
+                    if (typeof self.searchInstitutionalStock === 'function') {
+                        await self.searchInstitutionalStock(cleanTicker, false);
+                    }
+                    const fRes = await fetch(API_BASE + /api/v1/institutional/stock//forensics);
+                    if (fRes.ok) {
+                        self._smartMoneyForensicDossier = await fRes.json();
+                        if (typeof self.renderForensicsTab === 'function') {
+                            self.renderForensicsTab(self._smartMoneyForensicTab || 'blocks');
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Block deals extraction failed across all exchange sources.';
+                    const errHtml = <strong>⚠️ Block Deals Ingestion Halted:</strong> ;
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    if (fBadge) {
+                        fBadge.innerHTML = <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Block Deals: Failed · Just now;
+                        fBadge.style.background = 'rgba(239,68,68,0.12)';
+                        fBadge.style.color = '#f87171';
+                        fBadge.style.border = '1px solid rgba(239,68,68,0.35)';
+                    }
+                }
+            } catch (err) {
+                console.error('[INST] Network error during block deals ingest:', err);
+                const errMsg = err.message || 'Network connection failed.';
+                const errHtml = <strong>⚠️ Network Error:</strong> ;
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnForensic, btnTab].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.style.opacity = '1';
+                        b.textContent = '⚡ Ingest Block Deals';
+                    }
+                });
+            }
+        },
+
+        renderStockInstitutionalDetails(data) {
 
             if (!data) return;
 
