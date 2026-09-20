@@ -37,6 +37,26 @@ _MARQUEE_AMC_KEYWORDS: tuple[str, ...] = (
 )
 
 
+def _get_quarter_start_date(q_str: str) -> str:
+    """Parse quarter name like 'Q1 FY26' into ISO start date string for accurate chronological sorting."""
+    m = re.search(r'Q([1-4])\s*FY(\d{2,4})', str(q_str), re.IGNORECASE)
+    if not m:
+        return "2000-01-01"
+    q_num = int(m.group(1))
+    fy_num = int(m.group(2))
+    if fy_num < 100:
+        fy_num += 2000
+    if q_num == 1:
+        return f"{fy_num - 1}-04-01"
+    elif q_num == 2:
+        return f"{fy_num - 1}-07-01"
+    elif q_num == 3:
+        return f"{fy_num - 1}-10-01"
+    elif q_num == 4:
+        return f"{fy_num}-01-01"
+    return f"{fy_num}-01-01"
+
+
 def _is_super_investor_name(name: str) -> bool:
     """Check if the given investor or fund entity name matches known Super Investors."""
     if not name:
@@ -633,7 +653,6 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
                 price_rows_by_ticker[r[0]].append((r[1], float(r[2] or 0.0)))
 
         all_tickers = sorted(list(set(list(holdings_by_ticker.keys()) + list(patterns_by_ticker.keys()) + list(deals_by_ticker.keys()))))
-        quarter_order = {"Q1 FY26": 0, "Q2 FY26": 1, "Q3 FY26": 2, "Q4 FY26": 3, "Q1 FY27": 4, "Q2 FY27": 5}
 
         db_rows = []
         for sym in all_tickers:
@@ -736,7 +755,7 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
 
             # Patterns processing
             patterns = []
-            p_rows_sorted = sorted(p_rows, key=lambda x: quarter_order.get(x[1], 0), reverse=True)
+            p_rows_sorted = sorted(p_rows, key=lambda x: _get_quarter_start_date(x[1]), reverse=True)
             latest_close_p = price_series[0][1] if price_series else None
             latest_close_d = price_series[0][0] if price_series else None
 
@@ -2018,6 +2037,7 @@ def get_top_stake_additions(
 
             # Check historical quarterly pairs from stored pattern JSON
             if len(pats) >= 3:
+                best_surge = None
                 for i in range(1, len(pats) - 1):
                     hfii_curr, hdii_curr = pats[i]["fii_pct"], pats[i]["dii_mf_pct"]
                     hfii_prev, hdii_prev = pats[i+1]["fii_pct"], pats[i+1]["dii_mf_pct"]
@@ -2027,7 +2047,7 @@ def get_top_stake_additions(
                         hinst_curr = round(hfii_curr + hdii_curr, 2)
                         h_tot_amt = round((hinst_curr / 100.0) * r[2], 1) if r[2] else round(hinst_curr * 150.0, 1)
                         h_inc_amt = round((h_delta / 100.0) * r[2], 1) if (r[2] and h_delta != 0) else round(h_delta * 120.0, 1)
-                        historical_additions.append({
+                        surge_entry = {
                             "ticker": r[0],
                             "company_name": r[1],
                             "quarter_comparison": f"{hq_curr} vs {hq_prev}",
@@ -2046,7 +2066,11 @@ def get_top_stake_additions(
                             "accumulation_score": r[3],
                             "funds_accumulating_count": r[6],
                             "return_30d_pct": r[24],
-                        })
+                        }
+                        if best_surge is None or surge_entry["inst_addition_pct"] > best_surge["inst_addition_pct"]:
+                            best_surge = surge_entry
+                if best_surge is not None:
+                    historical_additions.append(best_surge)
 
         latest_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
         historical_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
