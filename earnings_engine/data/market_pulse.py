@@ -1643,9 +1643,11 @@ def compute_market_sentiment_matrix(
         indices_data = compute_indices_quotes(settings)
 
     vix_level = 13.8
+    vix_1d_pct = 0.0
     for idx in indices_data:
         if idx["symbol"] == "^INDIAVIX":
-            vix_level = idx["current_price"]
+            vix_level = float(idx["current_price"])
+            vix_1d_pct = float(idx.get("change_pct", 0.0))
 
     vix_regime = get_volatility_regime(vix_level)
     nifty_1d = indices_data[0]["change_pct"] if indices_data else 0.5
@@ -1743,19 +1745,42 @@ def compute_market_sentiment_matrix(
         "bank_nifty": [],
     }
 
+    change_7d = 0.0
     try:
-        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' ORDER BY date DESC LIMIT 30").fetchall()
-        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' ORDER BY date DESC LIMIT 30").fetchall()
-        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' ORDER BY date DESC LIMIT 30").fetchall()
+        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
 
-        vix_map = {r[0]: float(r[1]) for r in vix_rows if r[1] is not None}
-        nifty_map = {r[0]: float(r[1]) for r in nifty_rows if r[1] is not None}
-        bank_map = {r[0]: float(r[1]) for r in bank_rows if r[1] is not None}
+        if len(nifty_rows) < 10 or len(vix_rows) < 10:
+            try:
+                from earnings_engine.data.prices import fetch_prices
+                if len(nifty_rows) < 10:
+                    fetch_prices("^NSEI", settings, force=False)
+                    nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                if len(vix_rows) < 10:
+                    fetch_prices("^INDIAVIX", settings, force=False)
+                    vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                if len(bank_rows) < 10:
+                    fetch_prices("^NSEBANK", settings, force=False)
+                    bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+            except Exception as e_fetch:
+                logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
 
-        chart_dates_raw = [r[0] for r in nifty_rows if r[0]]
-        if not chart_dates_raw:
-            chart_dates_raw = [datetime.now(timezone.utc).strftime("%Y-%m-%d")]
-        chart_dates = list(reversed(chart_dates_raw[:30]))
+        nifty_chrono = list(reversed(nifty_rows))
+        vix_chrono = list(reversed(vix_rows))
+        bank_chrono = list(reversed(bank_rows))
+
+        vix_map = {r[0]: float(r[1]) for r in vix_chrono if r[1] is not None}
+        nifty_map = {r[0]: float(r[1]) for r in nifty_chrono if r[1] is not None}
+        bank_map = {r[0]: float(r[1]) for r in bank_chrono if r[1] is not None}
+
+        all_dates_chrono = [r[0] for r in nifty_chrono if r[0]]
+        if not all_dates_chrono:
+            all_dates_chrono = [r[0] for r in vix_chrono if r[0]]
+        if not all_dates_chrono:
+            all_dates_chrono = [datetime.now(timezone.utc).strftime("%Y-%m-%d")]
+
+        target_dates = all_dates_chrono[-30:] if len(all_dates_chrono) >= 30 else all_dates_chrono
 
         fg_series = []
         vix_series = []
@@ -1766,27 +1791,45 @@ def compute_market_sentiment_matrix(
         last_known_nifty = 24800.0
         last_known_bank = 53000.0
 
-        for dt_s in chart_dates:
+        for i, dt_s in enumerate(target_dates):
             v_val = vix_map.get(dt_s, last_known_vix)
             last_known_vix = v_val
-            vix_series.append({"date": dt_s, "value": v_val})
+            vix_series.append({"date": dt_s, "value": round(v_val, 2), "close": round(v_val, 2)})
 
             n_val = nifty_map.get(dt_s, last_known_nifty)
             last_known_nifty = n_val
-            nifty_series.append({"date": dt_s, "value": n_val})
+            nifty_series.append({"date": dt_s, "value": round(n_val, 2), "close": round(n_val, 2)})
 
             b_val = bank_map.get(dt_s, last_known_bank)
             last_known_bank = b_val
-            bank_series.append({"date": dt_s, "value": b_val})
+            bank_series.append({"date": dt_s, "value": round(b_val, 2), "close": round(b_val, 2)})
 
-            v_factor = max(10.0, min(95.0, 100.0 - (v_val - 10.0) * 4.5)) if v_val else 50.0
-            m_factor = 50.0 + ((n_val - 24500.0) / 24500.0) * 100.0 if n_val else 50.0
-            fg_val = round((v_factor * 0.4) + (m_factor * 0.4) + 60.0 * 0.2, 1)
-            fg_val = max(10.0, min(90.0, fg_val))
-            fg_series.append({"date": dt_s, "value": fg_val})
+            full_idx = next((idx for idx, r in enumerate(nifty_chrono) if r[0] == dt_s), -1)
+            if full_idx >= 5 and nifty_chrono[full_idx - 5][1]:
+                prev_n5 = float(nifty_chrono[full_idx - 5][1])
+                ret_5d = ((n_val - prev_n5) / prev_n5) * 100.0 if prev_n5 > 0 else 0.0
+            elif full_idx >= 1 and nifty_chrono[full_idx - 1][1]:
+                prev_n1 = float(nifty_chrono[full_idx - 1][1])
+                ret_5d = (((n_val - prev_n1) / prev_n1) * 100.0) * 2.2 if prev_n1 > 0 else 0.0
+            else:
+                ret_5d = 0.5
+
+            hist_mom_factor = max(15.0, min(90.0, 50.0 + ret_5d * 10.0))
+            hist_vix_factor = max(10.0, min(95.0, 100.0 - (v_val - 10.0) * 4.5)) if v_val else 50.0
+            hist_breadth_factor = max(20.0, min(85.0, 50.0 + ret_5d * 5.0))
+            hist_safe_haven = 58.0
+
+            hist_fg = round(
+                (hist_vix_factor * 0.35) + (hist_mom_factor * 0.35) + (hist_breadth_factor * 0.15) + (hist_safe_haven * 0.15),
+                1,
+            )
+            hist_fg = max(5.0, min(95.0, hist_fg))
+            fg_series.append({"date": dt_s, "value": hist_fg, "score": hist_fg})
+
+        change_7d = round(fg_series[-1]["value"] - fg_series[-7]["value"], 1) if len(fg_series) >= 7 else 0.0
 
         macro_charts = {
-            "dates": chart_dates,
+            "dates": target_dates,
             "fear_greed": fg_series,
             "vix": vix_series,
             "nifty": nifty_series,
@@ -1800,6 +1843,7 @@ def compute_market_sentiment_matrix(
         "fear_greed_label": fear_greed_label,
         "fear_greed_color": fear_greed_color,
         "fear_greed_desc": fear_greed_desc,
+        "change_7d": change_7d,
         "sub_factors": {
             "vix_factor": round(vix_factor, 1),
             "momentum_factor": round(momentum_factor, 1),
@@ -1807,6 +1851,7 @@ def compute_market_sentiment_matrix(
             "safe_haven_factor": round(safe_haven_factor, 1),
         },
         "vix_level": round(vix_level, 2),
+        "vix_1d_pct": round(vix_1d_pct, 2),
         "vix_regime": vix_regime,
         "breadth": {
             "advances": advances,
@@ -2419,6 +2464,9 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         "vix_regime": sentiment_data["vix_regime"],
         "breadth": sentiment_data["breadth"],
         "institutional_flows": liquidity,
+        "liquidity": liquidity,
+        "sentiment": sentiment_data,
+        "playbook": next_day_playbook,
         "fii_net_cr": liquidity["fii_net_cr"],
         "dii_net_cr": liquidity["dii_net_cr"],
         "total_net_cr": liquidity["total_net_cr"],

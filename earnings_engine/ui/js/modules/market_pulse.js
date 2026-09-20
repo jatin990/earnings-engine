@@ -86,7 +86,8 @@
                         this.renderFearAndGreed(fg);
                         this.renderVolatility({
                             vix_level: sent.vix_level,
-                            regime: sent.vix_regime?.regime || sent.vix_regime,
+                            change_1d: sent.vix_1d_pct != null ? sent.vix_1d_pct : null,
+                            regime: sent.vix_regime?.label || sent.vix_regime?.regime || sent.vix_regime,
                             description: sent.vix_regime?.description,
                             stance: sent.vix_regime?.stance,
                         });
@@ -431,18 +432,35 @@
             const badgeEl = document.getElementById('pulseVixRegimeBadge');
             const descEl = document.getElementById('pulseVixDesc');
             const stanceEl = document.getElementById('pulseVixStance');
+            const stanceBadge = document.getElementById('pulseVixStanceBadge');
 
-            if (levelEl) levelEl.textContent = vix.vix_level != null ? vix.vix_level : '13.8';
-            if (changeEl && vix.change_1d != null) {
-                const s = vix.change_1d >= 0 ? '+' : '';
-                changeEl.textContent = `${s}${vix.change_1d}% 1D`;
-                changeEl.style.color = vix.change_1d <= 0 ? '#34d399' : '#f87171';
+            const vLevel = vix.vix_level != null ? Number(vix.vix_level) : 13.8;
+            const chg1d = vix.change_1d != null ? Number(vix.change_1d) : (vix.vix_1d_pct != null ? Number(vix.vix_1d_pct) : null);
+            const vColor = vLevel < 13 ? '#34d399' : vLevel <= 17 ? '#38bdf8' : vLevel <= 22 ? '#fbbf24' : '#f43f5e';
+
+            if (levelEl) {
+                levelEl.textContent = vLevel.toFixed(2);
+                levelEl.style.color = vColor;
             }
-            if (badgeEl && vix.regime) badgeEl.textContent = vix.regime;
+            if (changeEl && chg1d != null) {
+                const s = chg1d >= 0 ? '+' : '';
+                changeEl.textContent = `${s}${chg1d.toFixed(2)}% 1D`;
+                changeEl.style.color = chg1d <= 0 ? '#34d399' : '#f87171';
+            }
+            if (badgeEl) {
+                const rLabel = vix.regime || (vLevel < 13 ? '🟢 Low Vol (Bullish)' : vLevel <= 17 ? '🔵 Normal Vol' : vLevel <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike');
+                badgeEl.textContent = rLabel;
+                badgeEl.style.color = vColor;
+                badgeEl.style.background = vColor + '22';
+            }
             if (descEl && vix.description) descEl.textContent = vix.description;
             if (stanceEl && vix.stance) {
                 stanceEl.textContent = vix.stance.replace(/_/g, ' ');
                 stanceEl.style.color = vix.stance.includes('BULLISH') ? '#34d399' : vix.stance.includes('BEARISH') ? '#f87171' : '#fbbf24';
+            }
+            if (stanceBadge) {
+                stanceBadge.textContent = vLevel < 13 ? 'Trend Friendly' : vLevel <= 17 ? 'Safe Corridor' : vLevel <= 22 ? 'Hedge Advised' : 'High Risk';
+                stanceBadge.style.color = vColor;
             }
         },
 
@@ -1286,47 +1304,149 @@
         // =====================================================================
         renderMacroCharts(charts, participantOi = {}) {
             if (!charts) return;
+            this._lastMacroCharts = charts;
+            if (participantOi && (participantOi.history_10d || participantOi.history_7d || participantOi.participants)) {
+                this._lastOiData = participantOi;
+            }
 
             // 1. Fear & Greed 30D Trend Wave Chart
             const fgSeries = charts.fear_greed || [];
             if (fgSeries.length) {
-                this.drawSparklineChart('chartFearGreed', fgSeries.map(x => x.score), {
-                    color: '#34d399',
-                    gradientFrom: 'rgba(52, 211, 153, 0.28)',
-                    gradientTo: 'rgba(52, 211, 153, 0.01)',
+                const fgValues = fgSeries.map(x => (x.score !== undefined ? x.score : (x.value !== undefined ? x.value : 50)));
+                const fgDates = fgSeries.map(x => x.date || '');
+                const latestFg = fgValues[fgValues.length - 1];
+                const prevFg = fgValues.length >= 7 ? fgValues[fgValues.length - 7] : fgValues[0];
+                const fgDelta = Number((latestFg - prevFg).toFixed(1));
+
+                const fgColor = latestFg >= 75 ? '#10b981' : latestFg >= 55 ? '#34d399' : latestFg >= 45 ? '#fbbf24' : latestFg >= 25 ? '#f97316' : '#f43f5e';
+                const fgGrad = latestFg >= 55 ? 'rgba(52, 211, 153, 0.28)' : latestFg >= 45 ? 'rgba(251, 191, 36, 0.28)' : 'rgba(244, 63, 94, 0.28)';
+
+                this.drawSparklineChart('chartFearGreed', fgValues, {
+                    color: fgColor,
+                    gradientFrom: fgGrad,
+                    gradientTo: 'rgba(0, 0, 0, 0.01)',
                     minVal: 0,
                     maxVal: 100,
                     referenceLines: [25, 50, 75],
                     refLineColors: ['rgba(244,63,94,0.35)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.35)'],
-                    dates: fgSeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${Math.round(v)} / 100`,
+                    dates: fgDates,
+                    valueFormatter: (v) => {
+                        const s = Math.round(v);
+                        const label = s >= 75 ? 'Extreme Greed' : s >= 55 ? 'Greed' : s >= 45 ? 'Neutral' : s >= 25 ? 'Fear' : 'Extreme Fear';
+                        return `${s} / 100 (${label})`;
+                    },
                 });
+
+                const fgScoreEl = document.getElementById('pulseFgScore');
+                const fgBadgeEl = document.getElementById('pulseFgBadge');
+                const fgDeltaEl = document.getElementById('pulseFgDelta');
+                if (fgScoreEl) {
+                    fgScoreEl.textContent = Number(latestFg).toFixed(1);
+                    fgScoreEl.style.color = fgColor;
+                }
+                if (fgBadgeEl) {
+                    const label = latestFg >= 75 ? 'Extreme Greed' : latestFg >= 55 ? 'Greed / Bullish' : latestFg >= 45 ? 'Neutral Balance' : latestFg >= 25 ? 'Fear / Caution' : 'Extreme Fear';
+                    fgBadgeEl.textContent = label;
+                    fgBadgeEl.style.color = fgColor;
+                    fgBadgeEl.style.background = fgColor + '22';
+                }
+                if (fgDeltaEl) {
+                    const s = fgDelta >= 0 ? '+' : '';
+                    fgDeltaEl.textContent = `${s}${fgDelta} (7D)`;
+                    fgDeltaEl.style.color = fgDelta >= 0 ? '#34d399' : '#f87171';
+                }
             }
 
             // 2. India VIX Volatility Corridor Chart
             const vixSeries = charts.vix || [];
             if (vixSeries.length) {
-                this.drawSparklineChart('chartVix', vixSeries.map(x => x.value), {
-                    color: '#38bdf8',
-                    gradientFrom: 'rgba(56, 189, 248, 0.28)',
-                    gradientTo: 'rgba(56, 189, 248, 0.01)',
-                    referenceLines: [15, 20],
-                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(248,113,113,0.35)'],
-                    dates: vixSeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${v.toFixed(2)}`,
+                const vixValues = vixSeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 14.0)));
+                const vixDates = vixSeries.map(x => x.date || '');
+                const latestVix = vixValues[vixValues.length - 1];
+                const prevVix = vixValues.length >= 2 ? vixValues[vixValues.length - 2] : latestVix;
+                const vix1dChg = prevVix > 0 ? ((latestVix - prevVix) / prevVix) * 100 : 0;
+
+                const vixColor = latestVix < 13 ? '#34d399' : latestVix <= 17 ? '#38bdf8' : latestVix <= 22 ? '#fbbf24' : '#f43f5e';
+                const vixGrad = latestVix < 13 ? 'rgba(52, 211, 153, 0.28)' : latestVix <= 17 ? 'rgba(56, 189, 248, 0.28)' : 'rgba(244, 63, 94, 0.28)';
+
+                this.drawSparklineChart('chartVix', vixValues, {
+                    color: vixColor,
+                    gradientFrom: vixGrad,
+                    gradientTo: 'rgba(0, 0, 0, 0.01)',
+                    referenceLines: [13, 17, 22],
+                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(56,189,248,0.3)', 'rgba(244,63,94,0.35)'],
+                    dates: vixDates,
+                    valueFormatter: (v) => {
+                        const num = Number(v).toFixed(2);
+                        const reg = v < 13 ? 'Low Vol (Bullish)' : v <= 17 ? 'Normal' : v <= 22 ? 'Elevated Chop' : 'Panic';
+                        return `${num} (${reg})`;
+                    },
                 });
+
+                const vixLevelEl = document.getElementById('pulseVixLevel');
+                const vixChangeEl = document.getElementById('pulseVixChange');
+                const vixBadgeEl = document.getElementById('pulseVixRegimeBadge');
+                const vixStanceBadge = document.getElementById('pulseVixStanceBadge');
+                if (vixLevelEl) {
+                    vixLevelEl.textContent = Number(latestVix).toFixed(2);
+                    vixLevelEl.style.color = vixColor;
+                }
+                if (vixChangeEl) {
+                    const s = vix1dChg >= 0 ? '+' : '';
+                    vixChangeEl.textContent = `${s}${vix1dChg.toFixed(2)}% 1D`;
+                    vixChangeEl.style.color = vix1dChg <= 0 ? '#34d399' : '#f87171';
+                }
+                if (vixBadgeEl) {
+                    const regLabel = latestVix < 13 ? '🟢 Low Vol (Bullish)' : latestVix <= 17 ? '🔵 Normal Vol' : latestVix <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike';
+                    vixBadgeEl.textContent = regLabel;
+                    vixBadgeEl.style.color = vixColor;
+                    vixBadgeEl.style.background = vixColor + '22';
+                }
+                if (vixStanceBadge) {
+                    vixStanceBadge.textContent = latestVix < 13 ? 'Trend Friendly' : latestVix <= 17 ? 'Safe Corridor' : latestVix <= 22 ? 'Hedge Advised' : 'High Risk';
+                    vixStanceBadge.style.color = vixColor;
+                }
             }
 
             // 3. NIFTY 50 Benchmark Trajectory Chart
             const niftySeries = charts.nifty || [];
             if (niftySeries.length) {
-                this.drawSparklineChart('chartNifty', niftySeries.map(x => x.value), {
+                const niftyValues = niftySeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 24800)));
+                const niftyDates = niftySeries.map(x => x.date || '');
+                const latestNifty = niftyValues[niftyValues.length - 1];
+                const prevNifty = niftyValues.length >= 2 ? niftyValues[niftyValues.length - 2] : latestNifty;
+                const nifty1dChg = prevNifty > 0 ? ((latestNifty - prevNifty) / prevNifty) * 100 : 0;
+                const minNifty = Math.min(...niftyValues);
+                const maxNifty = Math.max(...niftyValues);
+                const mom30d = niftyValues.length > 1 ? ((latestNifty - niftyValues[0]) / niftyValues[0]) * 100 : 0;
+
+                this.drawSparklineChart('chartNifty', niftyValues, {
                     color: '#818cf8',
                     gradientFrom: 'rgba(129, 140, 248, 0.28)',
                     gradientTo: 'rgba(129, 140, 248, 0.01)',
-                    dates: niftySeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${Math.round(v).toLocaleString()}`,
+                    dates: niftyDates,
+                    valueFormatter: (v) => `${Math.round(v).toLocaleString('en-IN')}`,
                 });
+
+                const niftyLvl = document.getElementById('pulseNiftyLevel');
+                const niftyChg = document.getElementById('pulseNiftyChange');
+                const niftyLowEl = document.getElementById('pulseNifty30dLow');
+                const niftyHighEl = document.getElementById('pulseNifty30dHigh');
+                const niftyMomEl = document.getElementById('pulseNifty30dMom');
+
+                if (niftyLvl) niftyLvl.textContent = Number(latestNifty).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+                if (niftyChg) {
+                    const s = nifty1dChg >= 0 ? '+' : '';
+                    niftyChg.textContent = `${s}${nifty1dChg.toFixed(2)}% 1D`;
+                    niftyChg.style.color = nifty1dChg >= 0 ? '#34d399' : '#f87171';
+                }
+                if (niftyLowEl) niftyLowEl.textContent = `30D Low: ${Math.round(minNifty).toLocaleString('en-IN')}`;
+                if (niftyHighEl) niftyHighEl.textContent = `30D High: ${Math.round(maxNifty).toLocaleString('en-IN')}`;
+                if (niftyMomEl) {
+                    const s = mom30d >= 0 ? '+' : '';
+                    niftyMomEl.textContent = `Momentum: ${s}${mom30d.toFixed(1)}%`;
+                    niftyMomEl.style.color = mom30d >= 0 ? '#38bdf8' : '#f87171';
+                }
             }
 
             // 4. Participant OI 10D Net Contracts Trajectory (Multi-Line)
@@ -1533,7 +1653,11 @@
                     ctx.strokeStyle = options.color || '#38bdf8';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
-                    ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                    } else {
+                        ctx.rect(pillX, pillY, pillW, pillH);
+                    }
                     ctx.fill();
                     ctx.stroke();
 
@@ -2118,6 +2242,17 @@
             }
         }
     };
+
+    // Auto redraw charts on window resize or orientation change
+    let _resizePulseDebounce = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(_resizePulseDebounce);
+        _resizePulseDebounce = setTimeout(() => {
+            if (marketPulseModule._lastMacroCharts) {
+                marketPulseModule.renderMacroCharts(marketPulseModule._lastMacroCharts, marketPulseModule._lastOiData || {});
+            }
+        }, 200);
+    });
 
     window.marketPulseModule = marketPulseModule;
     window.app.marketPulse = marketPulseModule;

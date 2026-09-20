@@ -423,6 +423,7 @@ async def api_get_net_cash_liquidity(
 
 
 @router.get("/api/v1/market-pulse/sentiment")
+@router.get("/api/v1/market_pulse/sentiment")
 async def api_get_market_sentiment_matrix():
     """Retrieve Fear & Greed score, Market Breadth, Volatility Matrix, and 30D macro time-series."""
     try:
