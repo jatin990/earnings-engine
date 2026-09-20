@@ -636,8 +636,11 @@ def parse_shareholding_response(
                         act = "TRIMMED"
                         inc_c = -round(h_val_cr * (abs(chg_p) / max(0.01, prev_stk)), 2)
 
-                avg_p = round(curr_price * 0.95, 2)
-                txn_p = round(curr_price * 0.98, 2)
+                q_bench = get_quarter_benchmark_price(sym, quarter_detected, conn=conn)
+                if q_bench <= 0.0:
+                    q_bench = curr_price
+                avg_p = q_bench
+                txn_p = q_bench
 
                 holdings.append({
                     "ticker": sym,
@@ -851,30 +854,72 @@ def fetch_regulatory_shareholding_filings(
                     ent_data = ent_res.json()
                     for name, qtrs in ent_data.items():
                         q_data = {k: v for k, v in qtrs.items() if k != "setAttributes"}
-                        if q_data:
-                            latest_q_raw = list(q_data.keys())[-1]
-                            parsed_q = parse_quarter_label(latest_q_raw)
-                            stake = float(q_data[latest_q_raw] or 0.0)
+                        if not q_data:
+                            continue
+
+                        f_type = classify_institutional_entity(name)
+
+                        # Sort quarters chronologically from oldest to newest
+                        sorted_raw_qtrs = sorted(
+                            q_data.keys(),
+                            key=lambda k: get_quarter_date_range(parse_quarter_label(k))[0]
+                        )
+
+                        running_avg_price = 0.0
+                        running_recent_buy = 0.0
+                        running_recent_txn = 0.0
+                        running_recent_date = None
+                        running_recent_type = "HOLD"
+                        cum_cost = 0.0
+                        cum_stake = 0.0
+                        prev_stake = 0.0
+
+                        for raw_q in sorted_raw_qtrs:
+                            parsed_q = parse_quarter_label(raw_q)
+                            stake = float(q_data[raw_q] or 0.0)
                             if stake <= 0.0:
+                                prev_stake = 0.0
+                                cum_cost = 0.0
+                                cum_stake = 0.0
+                                running_avg_price = 0.0
                                 continue
 
-                            prev_stake = 0.0
-                            if len(q_data) >= 2:
-                                prev_q_raw = list(q_data.keys())[-2]
-                                prev_stake = float(q_data[prev_q_raw] or 0.0)
+                            q_bench_price = get_quarter_benchmark_price(target_sym, parsed_q, local_conn)
+                            if q_bench_price <= 0.0:
+                                q_bench_price = current_price
 
-                            action = "HOLD"
+                            delta_pct = round(stake - prev_stake, 2)
+                            q_sdate, q_edate = get_quarter_date_range(parsed_q)
+
                             if prev_stake == 0.0:
                                 action = "NEW BUY"
+                                running_avg_price = q_bench_price
+                                running_recent_buy = q_bench_price
+                                running_recent_txn = q_bench_price
+                                running_recent_date = q_sdate
+                                running_recent_type = "BUY"
+                                cum_cost = stake * q_bench_price
+                                cum_stake = stake
                             elif stake > prev_stake:
                                 action = "ACCUMULATED"
+                                add_stk = stake - prev_stake
+                                cum_cost += add_stk * q_bench_price
+                                cum_stake += add_stk
+                                running_avg_price = round(cum_cost / max(0.01, cum_stake), 2)
+                                running_recent_buy = q_bench_price
+                                running_recent_txn = q_bench_price
+                                running_recent_date = q_sdate
+                                running_recent_type = "BUY"
                             elif stake < prev_stake:
                                 action = "PROFIT TAKING"
+                                running_recent_txn = q_bench_price
+                                running_recent_date = q_sdate
+                                running_recent_type = "SELL"
+                            else:
+                                action = "HOLD"
 
-                            f_type = classify_institutional_entity(name)
                             shares_held = int(total_shares * (stake / 100.0))
                             val_cr = round((shares_held * current_price) / 1e7, 2)
-                            delta_pct = round(stake - prev_stake, 2)
 
                             holdings_to_save.append({
                                 "ticker": target_sym,
@@ -889,9 +934,14 @@ def fetch_regulatory_shareholding_filings(
                                 "change_shares": int(total_shares * (delta_pct / 100.0)),
                                 "change_pct": delta_pct,
                                 "reported_date": datetime.now().strftime("%Y-%m-%d"),
-                                "recent_buy_price": current_price,
-                                "avg_price": current_price,
+                                "avg_price": running_avg_price or q_bench_price,
+                                "recent_buy_price": running_recent_buy or q_bench_price,
+                                "recent_txn_price": running_recent_txn or q_bench_price,
+                                "recent_txn_date": running_recent_date or q_sdate,
+                                "recent_txn_type": running_recent_type,
                             })
+
+                            prev_stake = stake
             except Exception as e:
                 logger.debug("[SHP-REGULATORY] Entity fetch warning for %s (%s): %s", clean_sym, cls_name, e)
 
@@ -1181,6 +1231,8 @@ def ingest_universe_shareholding_patterns(
 
 def parse_quarter_label(header: str) -> str:
     """Map human month-year string (e.g. 'Jun 2026', 'Sep 2025') to Indian fiscal quarter (e.g. 'Q1 FY27', 'Q2 FY26')."""
+    if not header:
+        return "Q1 FY27"
     m = re.match(r'([a-zA-Z]+)\s*(\d{4})', header.strip())
     if not m:
         return header.strip()
@@ -1195,6 +1247,143 @@ def parse_quarter_label(header: str) -> str:
     elif mon == 'mar':
         return f'Q4 FY{str(yr)[-2:]}'
     return header.strip()
+
+
+def get_quarter_date_range(q_str: str) -> tuple[str, str]:
+    """Return ISO (start_date, end_date) for any quarter label like 'Q1 FY27' or 'Jun 2026'."""
+    if not re.search(r'Q[1-4]', str(q_str), re.IGNORECASE):
+        q_str = parse_quarter_label(str(q_str))
+    m = re.search(r'Q([1-4])\s*FY(\d{2,4})', str(q_str), re.IGNORECASE)
+    if not m:
+        return ("2026-01-01", "2026-03-31")
+    qn = int(m.group(1))
+    fyn = int(m.group(2))
+    if fyn < 100:
+        fyn += 2000
+    if qn == 1:
+        return (f"{fyn - 1}-04-01", f"{fyn - 1}-06-30")
+    elif qn == 2:
+        return (f"{fyn - 1}-07-01", f"{fyn - 1}-09-30")
+    elif qn == 3:
+        return (f"{fyn - 1}-10-01", f"{fyn - 1}-12-31")
+    elif qn == 4:
+        return (f"{fyn}-01-01", f"{fyn}-03-31")
+    return (f"{fyn}-01-01", f"{fyn}-03-31")
+
+
+def get_quarter_benchmark_price(ticker: str, quarter_str: str, conn: Any = None) -> float:
+    """Retrieve verified historical VWAP / average trading price for ticker during the quarterly filing window."""
+    if not conn:
+        return 0.0
+    clean_sym = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO") or "." in ticker) else f"{ticker}.NS"
+    s_date, e_date = get_quarter_date_range(quarter_str)
+    try:
+        # 1. Exact quarter trading window average
+        row = conn.execute(
+            "SELECT AVG(close) FROM price_history WHERE ticker = ? AND date >= ? AND date <= ?",
+            (clean_sym, s_date, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 2. Base symbol fallback
+        base_sym = clean_sym.replace(".NS", "").replace(".BO", "")
+        row = conn.execute(
+            "SELECT AVG(close) FROM price_history WHERE ticker = ? AND date >= ? AND date <= ?",
+            (base_sym, s_date, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 3. Closest available prior date price
+        row = conn.execute(
+            "SELECT close FROM price_history WHERE (ticker = ? OR ticker = ?) AND date <= ? ORDER BY date DESC LIMIT 1",
+            (clean_sym, base_sym, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 4. Earliest recorded price
+        row = conn.execute(
+            "SELECT close FROM price_history WHERE (ticker = ? OR ticker = ?) ORDER BY date ASC LIMIT 1",
+            (clean_sym, base_sym),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+    except Exception as e:
+        logger.debug("[NSE-SHP] Benchmark price error for %s (%s): %s", clean_sym, quarter_str, e)
+    return 0.0
+    mon = m.group(1).lower()[:3]
+    yr = int(m.group(2))
+    if mon == 'jun':
+        return f'Q1 FY{str(yr + 1)[-2:]}'
+    elif mon == 'sep':
+        return f'Q2 FY{str(yr + 1)[-2:]}'
+    elif mon == 'dec':
+        return f'Q3 FY{str(yr + 1)[-2:]}'
+    elif mon == 'mar':
+        return f'Q4 FY{str(yr)[-2:]}'
+    return header.strip()
+
+
+def get_quarter_date_range(q_str: str) -> tuple[str, str]:
+    """Return ISO (start_date, end_date) for any quarter label like 'Q1 FY27' or 'Jun 2026'."""
+    if not re.search(r'Q[1-4]', str(q_str), re.IGNORECASE):
+        q_str = parse_quarter_label(str(q_str))
+    m = re.search(r'Q([1-4])\s*FY(\d{2,4})', str(q_str), re.IGNORECASE)
+    if not m:
+        return ("2026-01-01", "2026-03-31")
+    qn = int(m.group(1))
+    fyn = int(m.group(2))
+    if fyn < 100:
+        fyn += 2000
+    if qn == 1:
+        return (f"{fyn - 1}-04-01", f"{fyn - 1}-06-30")
+    elif qn == 2:
+        return (f"{fyn - 1}-07-01", f"{fyn - 1}-09-30")
+    elif qn == 3:
+        return (f"{fyn - 1}-10-01", f"{fyn - 1}-12-31")
+    elif qn == 4:
+        return (f"{fyn}-01-01", f"{fyn}-03-31")
+    return (f"{fyn}-01-01", f"{fyn}-03-31")
+
+
+def get_quarter_benchmark_price(ticker: str, quarter_str: str, conn: Any = None) -> float:
+    """Retrieve verified historical VWAP / average trading price for ticker during the quarterly filing window."""
+    if not conn:
+        return 0.0
+    clean_sym = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO") or "." in ticker) else f"{ticker}.NS"
+    s_date, e_date = get_quarter_date_range(quarter_str)
+    try:
+        # 1. Exact quarter trading window average
+        row = conn.execute(
+            "SELECT AVG(close) FROM price_history WHERE ticker = ? AND date >= ? AND date <= ?",
+            (clean_sym, s_date, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 2. Base symbol fallback
+        base_sym = clean_sym.replace(".NS", "").replace(".BO", "")
+        row = conn.execute(
+            "SELECT AVG(close) FROM price_history WHERE ticker = ? AND date >= ? AND date <= ?",
+            (base_sym, s_date, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 3. Closest available prior date price
+        row = conn.execute(
+            "SELECT close FROM price_history WHERE (ticker = ? OR ticker = ?) AND date <= ? ORDER BY date DESC LIMIT 1",
+            (clean_sym, base_sym, e_date),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+        # 4. Earliest recorded price
+        row = conn.execute(
+            "SELECT close FROM price_history WHERE (ticker = ? OR ticker = ?) ORDER BY date ASC LIMIT 1",
+            (clean_sym, base_sym),
+        ).fetchone()
+        if row and row[0] and float(row[0]) > 0:
+            return round(float(row[0]), 2)
+    except Exception as e:
+        logger.debug("[NSE-SHP] Benchmark price error for %s (%s): %s", clean_sym, quarter_str, e)
+    return 0.0
 
 
 def fetch_multi_quarter_shareholding(
