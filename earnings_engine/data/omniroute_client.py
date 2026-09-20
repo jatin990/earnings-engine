@@ -25,54 +25,56 @@ logger = logging.getLogger("earnings_engine.data.omniroute_client")
 # Standard ports where diegosouzapw/OmniRoute may be hosted
 OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 
-# Claude Code 4-Model Catalog for direct OmniRoute LLM Market Analysis
+# Claude Code & CCR 5-Model Catalog for direct OmniRoute LLM Market Analysis
 CLAUDE_CODE_OMNIROUTE_MODELS: list[dict[str, Any]] = [
     {
         "id": "antigravityonly",
-        "name": "⚡ Antigravity (Claude Sonnet / DeepMind)",
+        "name": "⚡ Antigravity Only (Priority Tier)",
         "tier": "PRIMARY",
-        "provider": "Anthropic / DeepMind",
-        "description": "Primary high-reasoning coding & quant synthesis model tier.",
+        "provider": "CCR Gateway / DeepMind & Claude",
+        "description": "Primary ultra-high reasoning & quant synthesis model tier with deep financial structuring.",
         "recommended": True,
         "available": True,
     },
     {
-        "id": "claude only",
-        "name": "🏛️ Claude Only (Claude 5 / Opus 5)",
-        "tier": "ARCHITECTURE",
-        "provider": "Anthropic",
-        "description": "Frontier architectural design, quantitative formulations & deep audit.",
+        "id": "antigravity",
+        "name": "✨ OmniRoute Antigravity (Ensemble)",
+        "tier": "ENSEMBLE",
+        "provider": "OmniRoute Gateway",
+        "description": "High-availability multi-provider intelligent ensemble across top frontier providers.",
+        "recommended": True,
+        "available": True,
+    },
+    {
+        "id": "Smart Coding",
+        "name": "🧠 Smart Coding (Quant & Precision Math)",
+        "tier": "QUANT",
+        "provider": "CCR Gateway",
+        "description": "Specialized mathematical, technical pattern, and risk-reward optimization engine.",
         "recommended": True,
         "available": True,
     },
     {
         "id": "free only",
-        "name": "🚀 Free Only (Haiku / Fast Tier)",
+        "name": "🚀 Free Only (High-Throughput Fast Tier)",
         "tier": "FAST",
-        "provider": "Anthropic / Fast",
-        "description": "Low-latency, lightweight synthesis and screening.",
+        "provider": "CCR Gateway / Free Tier",
+        "description": "Low-latency, zero-token cost rapid catalyst screening & swing thesis generation.",
         "recommended": False,
         "available": True,
     },
     {
-        "id": "dahl",
-        "name": "🌐 Dahl (MiniMax M2.7 & DeepSeek-V4-Flash)",
+        "id": "auto/best-free",
+        "name": "🔮 Auto Best Free (Dynamic Smart Routing)",
         "tier": "FREE",
-        "provider": "Dahl Inference",
-        "description": "High-throughput free tier inference via MiniMax M2.7 & DeepSeek-V4-Flash.",
-        "recommended": False,
-        "available": True,
-    },
-    {
-        "id": "auto/smart",
-        "name": "🔮 Auto Smart (Smart Coding Gateway)",
-        "tier": "SMART",
-        "provider": "OmniRoute Gateway",
-        "description": "Dynamic OmniRoute smart-routing tier with optimal model allocation.",
+        "provider": "CCR Gateway / Auto Tier",
+        "description": "Dynamic load-balanced routing to top performing available free-tier providers.",
         "recommended": False,
         "available": True,
     },
 ]
+
+CCR_OMNIROUTE_MODELS = CLAUDE_CODE_OMNIROUTE_MODELS
 
 # Global cache to prevent hammering unreachable or unauthenticated local daemon
 _OMNIROUTE_AUTH_FAILURE_CACHE: dict[str, float] = {}

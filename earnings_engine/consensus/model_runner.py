@@ -21,10 +21,11 @@ logger = logging.getLogger("earnings_engine.consensus.model_runner")
 
 # Default curated model suite (Routed exclusively via OmniRoute Gateway)
 DEFAULT_MODELS = [
-    "omniroute/antigravity",
-    "omniroute/antigravity/gemini-3.7-flash-medium",
-    "omniroute/antigravity/claude-sonnet-4-6",
-    "omniroute/antigravity/gemini-3.8-flash-tiered",
+    "antigravityonly",
+    "antigravity",
+    "Smart Coding",
+    "free only",
+    "auto/best-free",
 ]
 
 # Model display names mapping
@@ -100,6 +101,17 @@ SYSTEM_PROMPT = get_horizon_system_prompt(14)
 
 # Short display names for model IDs
 MODEL_DISPLAY_NAMES: dict[str, str] = {
+    "antigravityonly": "Antigravity Only (Priority Tier)",
+    "omni router/antigravityonly": "Antigravity Only (Priority Tier)",
+    "antigravity": "OmniRoute Antigravity (Ensemble)",
+    "omni router/antigravity": "OmniRoute Antigravity (Ensemble)",
+    "Smart Coding": "Smart Coding (Quant Math)",
+    "smart-coding": "Smart Coding (Quant Math)",
+    "omni router/Smart Coding": "Smart Coding (Quant Math)",
+    "free only": "Free Only (Fast Tier)",
+    "omni router/free only": "Free Only (Fast Tier)",
+    "auto/best-free": "Auto Best Free (Dynamic)",
+    "omni router/auto/best-free": "Auto Best Free (Dynamic)",
     "deepseek/deepseek-r1": "DeepSeek-R1",
     "deepseek/deepseek-chat": "DeepSeek-V3",
     "meta-llama/llama-3.3-70b-instruct": "Llama-3.3-70B",

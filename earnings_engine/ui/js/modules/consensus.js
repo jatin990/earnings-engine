@@ -1571,6 +1571,7 @@ Object.assign(app, {
             _activeOmniTab: 'raw',
 
             initOmniRouteConsensus() {
+                this.loadConsensusAuditLedger();
                 // Restore timeframe
                 const savedTf = localStorage.getItem('omni_timeframe_days') || '14';
                 this.setOmniTimeframe(parseInt(savedTf, 10) || 14);
@@ -2100,6 +2101,57 @@ Object.assign(app, {
                         grid.innerHTML = '<div class="card" style="padding:1.5rem;color:#f87171;text-align:center;">Failed to load consensus predictions: ' + (e.message || e) + '</div>';
                     }
                 }
+            },
+
+                        async loadConsensusAuditLedger() {
+                const tbody = document.getElementById('consensusAuditTableBody');
+                if (!tbody) return;
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/consensus/audit?limit=100');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const records = data.audit_records || [];
+                    if (!records.length) {
+                        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">No historical consensus audit predictions found.</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = records.map(r => {
+                        const dir = (r.consensus_direction || 'NEUTRAL').toUpperCase();
+                        const isBull = dir.includes('BULL');
+                        const isBear = dir.includes('BEAR');
+                        const dirColor = isBull ? '#34d399' : (isBear ? '#f43f5e' : '#94a3b8');
+                        const dirBg = isBull ? 'rgba(16,185,129,0.15)' : (isBear ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)');
+                        const isSettled = r.settlement_status === 'SETTLED';
+                        const settleColor = isSettled ? (r.direction_correct ? '#34d399' : '#f43f5e') : '#fbbf24';
+                        const settleBg = isSettled ? (r.direction_correct ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)') : 'rgba(245,158,11,0.15)';
+                        const outRet = r.actual_return_pct != null ? ${r.actual_return_pct >= 0 ? '+' : ''}% : '—';
+                        return <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <td style="padding: 0.6rem 0.75rem; color: #94a3b8;"></td>
+                            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: #f8fafc;"></td>
+                            <td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">D</td>
+                            <td style="padding: 0.6rem 0.75rem;"><span style="background:;color:;padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;"></span></td>
+                            <td style="padding: 0.6rem 0.75rem; color: #38bdf8; font-weight: 600;">₹</td>
+                            <td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">₹</td>
+                            <td style="padding: 0.6rem 0.75rem;"><span style="background:;color:;padding:0.15rem 0.45rem;border-radius:4px;font-weight:600;"></span></td>
+                            <td style="padding: 0.6rem 0.75rem; color: ; font-weight: 700;"></td>
+                            <td style="padding: 0.6rem 0.75rem; text-align: right;">
+                                <button type="button" onclick="app.inspectTrace()" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; cursor: pointer;">Trace</button>
+                            </td>
+                        </tr>;
+                    }).join('');
+                } catch (e) {
+                    console.warn('Failed to load consensus audit ledger:', e);
+                }
+            },
+
+            filterConsensusAuditTable() {
+                const search = (document.getElementById('omniAuditSearchInput')?.value || '').trim().toUpperCase();
+                const rows = document.querySelectorAll('#consensusAuditTableBody tr');
+                rows.forEach(r => {
+                    if (r.children.length < 2) return;
+                    const sym = (r.children[1].textContent || '').trim().toUpperCase();
+                    r.style.display = (!search || sym.includes(search)) ? '' : 'none';
+                });
             },
 
             renderConsensusKpis(stats) {
