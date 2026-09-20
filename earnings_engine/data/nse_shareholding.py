@@ -659,9 +659,9 @@ def parse_shareholding_response(
                     "avg_price": avg_p,
                     "recent_buy_price": txn_p,
                     "recent_txn_price": txn_p,
-                    "recent_txn_date": now_iso[:10],
+                    "recent_txn_date": get_quarter_date_range(quarter_detected)[1],
                     "recent_txn_type": "BUY" if act in ("NEW BUY", "ACCUMULATED") else ("TRIM" if act == "TRIMMED" else "HOLD"),
-                    "reported_date": now_iso[:10],
+                    "reported_date": get_quarter_date_range(quarter_detected)[1],
                 })
 
         else:
@@ -933,7 +933,7 @@ def fetch_regulatory_shareholding_filings(
                                 "action": action,
                                 "change_shares": int(total_shares * (delta_pct / 100.0)),
                                 "change_pct": delta_pct,
-                                "reported_date": datetime.now().strftime("%Y-%m-%d"),
+                                "reported_date": q_edate,
                                 "avg_price": running_avg_price or q_bench_price,
                                 "recent_buy_price": running_recent_buy or q_bench_price,
                                 "recent_txn_price": running_recent_txn or q_bench_price,

@@ -680,7 +680,12 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
                     p1y = price_series[idx_1y][1]
                     ret_1y = round(((latest_c - p1y) / p1y) * 100.0, 2) if p1y > 0 else None
 
-            # Holdings processing
+            # Holdings processing (using latest active quarter per fund)
+            latest_h_by_fund = {}
+            for r in sorted(h_rows, key=lambda x: _get_quarter_start_date(x[4])):
+                latest_h_by_fund[r[2]] = r
+            active_h_rows = sorted(latest_h_by_fund.values(), key=lambda x: float(x[6] or 0.0), reverse=True)
+
             holdings = []
             accumulating_count = 0
             selling_count = 0
@@ -688,7 +693,7 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
             gross_inflow_cr = 0.0
             gross_outflow_cr = 0.0
 
-            for r in h_rows:
+            for r in active_h_rows:
                 act = (r[9] or "HOLD").upper()
                 is_buy = act in ("NEW BUY", "ACCUMULATED")
                 is_trim = act in ("TRIMMED", "SOLD OUT")
@@ -1095,6 +1100,12 @@ def get_stock_institutional_activity(
                 (sym,),
             ).fetchall()
 
+        # Deduplicate to latest reported quarter position per fund
+        latest_h_by_fund = {}
+        for r in sorted(h_rows, key=lambda x: _get_quarter_start_date(x[4])):
+            latest_h_by_fund[r[2]] = r
+        active_h_rows = sorted(latest_h_by_fund.values(), key=lambda x: float(x[6] or 0.0), reverse=True)
+
         holdings: list[dict[str, Any]] = []
         accumulating_count = 0
         selling_count = 0
@@ -1102,7 +1113,7 @@ def get_stock_institutional_activity(
         gross_inflow_cr = 0.0
         gross_outflow_cr = 0.0
 
-        for r in h_rows:
+        for r in active_h_rows:
             act = (r[9] or "HOLD").upper()
             is_buy = act in ("NEW BUY", "ACCUMULATED")
             is_trim = act in ("TRIMMED", "SOLD OUT")
