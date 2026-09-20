@@ -2115,29 +2115,35 @@ Object.assign(app, {
                         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">No historical consensus audit predictions found.</td></tr>';
                         return;
                     }
-                    tbody.innerHTML = records.map(r => {
+                    tbody.innerHTML = records.map(function(r) {
                         const dir = (r.consensus_direction || 'NEUTRAL').toUpperCase();
-                        const isBull = dir.includes('BULL');
-                        const isBear = dir.includes('BEAR');
+                        const isBull = dir.indexOf('BULL') !== -1;
+                        const isBear = dir.indexOf('BEAR') !== -1;
                         const dirColor = isBull ? '#34d399' : (isBear ? '#f43f5e' : '#94a3b8');
                         const dirBg = isBull ? 'rgba(16,185,129,0.15)' : (isBear ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)');
                         const isSettled = r.settlement_status === 'SETTLED';
                         const settleColor = isSettled ? (r.direction_correct ? '#34d399' : '#f43f5e') : '#fbbf24';
                         const settleBg = isSettled ? (r.direction_correct ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)') : 'rgba(245,158,11,0.15)';
-                        const outRet = r.actual_return_pct != null ? ${r.actual_return_pct >= 0 ? '+' : ''}% : '—';
-                        return <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                            <td style="padding: 0.6rem 0.75rem; color: #94a3b8;"></td>
-                            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: #f8fafc;"></td>
-                            <td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">D</td>
-                            <td style="padding: 0.6rem 0.75rem;"><span style="background:;color:;padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;"></span></td>
-                            <td style="padding: 0.6rem 0.75rem; color: #38bdf8; font-weight: 600;">₹</td>
-                            <td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">₹</td>
-                            <td style="padding: 0.6rem 0.75rem;"><span style="background:;color:;padding:0.15rem 0.45rem;border-radius:4px;font-weight:600;"></span></td>
-                            <td style="padding: 0.6rem 0.75rem; color: ; font-weight: 700;"></td>
-                            <td style="padding: 0.6rem 0.75rem; text-align: right;">
-                                <button type="button" onclick="app.inspectTrace()" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; cursor: pointer;">Trace</button>
-                            </td>
-                        </tr>;
+                        const outRet = (r.actual_return_pct != null) ? ((r.actual_return_pct >= 0 ? '+' : '') + Number(r.actual_return_pct).toFixed(1) + '%') : '—';
+                        const createdDate = r.created_at ? r.created_at.split(' ')[0] : '—';
+                        const tf = r.timeframe_days || 14;
+                        const tp = r.consensus_target_price ? ('₹' + Number(r.consensus_target_price).toFixed(2)) : '—';
+                        const asof = r.as_of_price ? ('₹' + Number(r.as_of_price).toFixed(2)) : '—';
+                        const stat = r.settlement_status || 'PENDING';
+
+                        return '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">' +
+                            '<td style="padding: 0.6rem 0.75rem; color: #94a3b8;">' + createdDate + '</td>' +
+                            '<td style="padding: 0.6rem 0.75rem; font-weight: 700; color: #f8fafc;">' + (r.ticker || '') + '</td>' +
+                            '<td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">' + tf + 'D</td>' +
+                            '<td style="padding: 0.6rem 0.75rem;"><span style="background:' + dirBg + ';color:' + dirColor + ';padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;">' + dir + '</span></td>' +
+                            '<td style="padding: 0.6rem 0.75rem; color: #38bdf8; font-weight: 600;">' + tp + '</td>' +
+                            '<td style="padding: 0.6rem 0.75rem; color: #cbd5e1;">' + asof + '</td>' +
+                            '<td style="padding: 0.6rem 0.75rem;"><span style="background:' + settleBg + ';color:' + settleColor + ';padding:0.15rem 0.45rem;border-radius:4px;font-weight:600;">' + stat + '</span></td>' +
+                            '<td style="padding: 0.6rem 0.75rem; color: ' + settleColor + '; font-weight: 700;">' + outRet + '</td>' +
+                            '<td style="padding: 0.6rem 0.75rem; text-align: right;">' +
+                                '<button type="button" onclick="app.inspectTrace(' + r.id + ')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; cursor: pointer;">Trace</button>' +
+                            '</td>' +
+                        '</tr>';
                     }).join('');
                 } catch (e) {
                     console.warn('Failed to load consensus audit ledger:', e);
@@ -2147,10 +2153,10 @@ Object.assign(app, {
             filterConsensusAuditTable() {
                 const search = (document.getElementById('omniAuditSearchInput')?.value || '').trim().toUpperCase();
                 const rows = document.querySelectorAll('#consensusAuditTableBody tr');
-                rows.forEach(r => {
+                rows.forEach(function(r) {
                     if (r.children.length < 2) return;
                     const sym = (r.children[1].textContent || '').trim().toUpperCase();
-                    r.style.display = (!search || sym.includes(search)) ? '' : 'none';
+                    r.style.display = (!search || sym.indexOf(search) !== -1) ? '' : 'none';
                 });
             },
 
