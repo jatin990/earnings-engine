@@ -2222,83 +2222,58 @@
 
 
             let holdingsRowsHtml = '';
-
             if (!holdings.length) {
-
                 holdingsRowsHtml = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:#71717a;">No fund positions recorded for this ticker yet.</td></tr>';
-
             } else {
-
                 holdingsRowsHtml = holdings.map(h => {
-
-                    const act = h.action;
-
+                    const act = (h.action || 'HOLD').toUpperCase();
                     const isBuy = act === 'NEW BUY';
-
                     const isAcc = act === 'ACCUMULATED';
-
-                    const isTrim = act === 'TRIMMED';
-
+                    const isTrim = act === 'TRIMMED' || act === 'PROFIT TAKING' || act === 'SOLD OUT';
+                    const isBase = act === 'BASELINE' || act === 'PRE-IPO';
                     const actBg = '#18181b';
-
-                    const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
-
-
+                    const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : isBase ? '#a78bfa' : '#a1a1aa';
 
                     const changePct = h.change_pct != null ? h.change_pct : 0;
-
-                    const changeStr = changePct > 0 ? `+${changePct}%` : `${changePct}%`;
-
-
+                    const changeStr = changePct > 0 ? `+${changePct}%` : (changePct < 0 ? `${changePct}%` : '0.0%');
 
                     const incAmountCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
-
-                    const incAmountCol = incAmountCr >= 0 ? '#34d399' : '#f87171';
-
-                    const incAmountStr = `${incAmountCr >= 0 ? '+' : ''}₹${Number(incAmountCr).toFixed(2)} Cr`;
-
+                    const incAmountCol = incAmountCr > 0 ? '#34d399' : (incAmountCr < 0 ? '#f87171' : '#71717a');
+                    const incAmountStr = incAmountCr !== 0 ? `${incAmountCr > 0 ? '+' : ''}₹${Number(incAmountCr).toFixed(2)} Cr` : '—';
                     const totAmountCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
 
+                    const avgPriceHtml = (h.avg_price != null && h.avg_price > 0)
+                        ? `₹${Number(h.avg_price).toFixed(2)}`
+                        : (isBase || (!h.avg_price && (h.fund_type && (h.fund_type.includes('AIF') || h.fund_type.includes('Institutional')))))
+                            ? '<span style="color:#a1a1aa;" title="Pre-IPO acquisition or unquoted baseline">Pre-IPO</span>'
+                            : '—';
 
+                    const txnPrice = h.recent_txn_price != null ? h.recent_txn_price : (h.recent_buy_price != null ? h.recent_buy_price : null);
+                    const txnType = (h.recent_txn_type || '').toUpperCase();
+                    const txnCol = txnType === 'BUY' ? '#34d399' : (txnType === 'SELL' ? '#f87171' : '#a1a1aa');
+                    const txnTypeBadge = txnType && txnType !== 'HOLD' ? ` <span style="font-size:0.58rem;font-weight:700;color:${txnCol};">[${txnType}]</span>` : '';
+                    const txnDateAttr = h.recent_txn_date ? ` title="${h.recent_txn_date}"` : '';
+                    const recentTxnHtml = txnPrice != null ? `<span${txnDateAttr}>₹${Number(txnPrice).toFixed(2)}${txnTypeBadge}</span>` : '—';
 
                     return `
-
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-
                             <td style="padding:0.5rem 0.6rem;font-weight:700;color:#ffffff;cursor:pointer;" onclick="app.inspectFundPortfolio('${h.fund_name}')">
-
                                 <span style="color:#ffffff;">${h.fund_name}</span>
-
                             </td>
-
                             <td style="padding:0.5rem 0.5rem;color:#a1a1aa;font-size:0.68rem;">${h.fund_type}</td>
-
                             <td style="padding:0.5rem 0.5rem;">
-
                                 <span class="signal-badge" style="background:${actBg};color:${actCol};border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.1rem 0.35rem;">${h.action}</span>
-
                             </td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${h.stake_pct}%</td>
-
-                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-
-                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.65rem;">${h.recent_buy_price ? `₹${Number(h.recent_buy_price).toFixed(2)}` : '—'}</td>
-
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">${avgPriceHtml}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.65rem;">${recentTxnHtml}</td>
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${incAmountCol};">${incAmountStr}</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.68rem;">${h.reported_date || '—'}</td>
-
                         </tr>
-
                     `;
-
                 }).join('');
-
             }
 
             if (tbody) tbody.innerHTML = holdingsRowsHtml;
@@ -2529,22 +2504,25 @@
                     if (holdingsWrap) holdingsWrap.style.display = 'block';
                 } else {
                     holdingsBody.innerHTML = holdings.slice(0, 15).map(h => {
-                        const act = h.action;
-                        const isBuy = act === 'NEW BUY', isAcc = act === 'ACCUMULATED', isTrim = act === 'TRIMMED';
-                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
+                        const act = (h.action || 'HOLD').toUpperCase();
+                        const isBuy = act === 'NEW BUY', isAcc = act === 'ACCUMULATED', isTrim = act === 'TRIMMED' || act === 'PROFIT TAKING' || act === 'SOLD OUT';
+                        const isBase = act === 'BASELINE' || act === 'PRE-IPO';
+                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : isBase ? '#a78bfa' : '#a1a1aa';
                         const chgPct = h.change_pct != null ? h.change_pct : 0;
                         const incCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
-                        const incCol = incCr >= 0 ? '#34d399' : '#f87171';
+                        const incCol = incCr > 0 ? '#34d399' : (incCr < 0 ? '#f87171' : '#71717a');
+                        const incStr = incCr !== 0 ? `${incCr > 0 ? '+' : ''}₹${Number(incCr).toFixed(1)} Cr` : '—';
                         const totCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                                 <td style="padding:0.28rem 0.4rem;font-family:var(--font-mono);font-weight:700;color:#fff;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.fund_name}</td>
                                 <td style="padding:0.28rem 0.35rem;"><span style="font-size:0.58rem;background:#18181b;color:${actCol};border:1px solid rgba(255,255,255,0.1);padding:0.05rem 0.25rem;border-radius:3px;">${h.action}</span></td>
                                 <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;font-weight:700;">${h.stake_pct}%</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${chgPct >= 0 ? '#34d399' : '#f87171'};">${chgPct > 0 ? '+' : ''}${chgPct}%</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${incCol};">${incCr >= 0 ? '+' : ''}₹${Number(incCr).toFixed(1)} Cr</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;font-size:0.62rem;">₹${Number(totCr).toFixed(1)} Cr</td>
-                            </tr>`;
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${chgPct > 0 ? '#34d399' : chgPct < 0 ? '#f87171' : '#a1a1aa'};">${chgPct > 0 ? '+' : ''}${chgPct}%</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${incCol};">${incStr}</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fff;">₹${Number(totCr).toFixed(1)} Cr</td>
+                            </tr>
+                        `;
                     }).join('');
                     if (holdingsWrap) holdingsWrap.style.display = 'block';
                 }

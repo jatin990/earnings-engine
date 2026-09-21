@@ -874,7 +874,7 @@ def fetch_regulatory_shareholding_filings(
                         cum_stake = 0.0
                         prev_stake = 0.0
 
-                        for raw_q in sorted_raw_qtrs:
+                        for idx_rq, raw_q in enumerate(sorted_raw_qtrs):
                             parsed_q = parse_quarter_label(raw_q)
                             stake = float(q_data[raw_q] or 0.0)
                             if stake <= 0.0:
@@ -892,19 +892,34 @@ def fetch_regulatory_shareholding_filings(
                             q_sdate, q_edate = get_quarter_date_range(parsed_q)
 
                             if prev_stake == 0.0:
-                                action = "NEW BUY"
-                                running_avg_price = q_bench_price
-                                running_recent_buy = q_bench_price
-                                running_recent_txn = q_bench_price
-                                running_recent_date = q_sdate
-                                running_recent_type = "BUY"
-                                cum_cost = stake * q_bench_price
-                                cum_stake = stake
+                                if idx_rq == 0:
+                                    # Entity already held shares at initial baseline tracking (e.g. Pre-IPO or founding holding)
+                                    action = "BASELINE"
+                                    running_avg_price = None
+                                    running_recent_buy = None
+                                    running_recent_txn = q_bench_price
+                                    running_recent_date = q_sdate
+                                    running_recent_type = "HOLD"
+                                    cum_cost = 0.0
+                                    cum_stake = 0.0
+                                else:
+                                    action = "NEW BUY"
+                                    running_avg_price = q_bench_price
+                                    running_recent_buy = q_bench_price
+                                    running_recent_txn = q_bench_price
+                                    running_recent_date = q_sdate
+                                    running_recent_type = "BUY"
+                                    cum_cost = stake * q_bench_price
+                                    cum_stake = stake
                             elif stake > prev_stake:
                                 action = "ACCUMULATED"
                                 add_stk = stake - prev_stake
-                                cum_cost += add_stk * q_bench_price
-                                cum_stake += add_stk
+                                if cum_stake > 0:
+                                    cum_cost += add_stk * q_bench_price
+                                    cum_stake += add_stk
+                                else:
+                                    cum_cost = add_stk * q_bench_price
+                                    cum_stake = add_stk
                                 running_avg_price = round(cum_cost / max(0.01, cum_stake), 2)
                                 running_recent_buy = q_bench_price
                                 running_recent_txn = q_bench_price
@@ -917,6 +932,9 @@ def fetch_regulatory_shareholding_filings(
                                 running_recent_type = "SELL"
                             else:
                                 action = "HOLD"
+                                running_recent_txn = q_bench_price
+                                running_recent_date = q_sdate
+                                running_recent_type = "HOLD"
 
                             shares_held = int(total_shares * (stake / 100.0))
                             val_cr = round((shares_held * current_price) / 1e7, 2)
@@ -934,9 +952,9 @@ def fetch_regulatory_shareholding_filings(
                                 "change_shares": int(total_shares * (delta_pct / 100.0)),
                                 "change_pct": delta_pct,
                                 "reported_date": q_edate,
-                                "avg_price": running_avg_price or q_bench_price,
-                                "recent_buy_price": running_recent_buy or q_bench_price,
-                                "recent_txn_price": running_recent_txn or q_bench_price,
+                                "avg_price": round(float(running_avg_price), 2) if (running_avg_price is not None and float(running_avg_price) > 0) else None,
+                                "recent_buy_price": round(float(running_recent_buy), 2) if (action in ("NEW BUY", "ACCUMULATED") and running_recent_buy is not None and float(running_recent_buy) > 0) else None,
+                                "recent_txn_price": round(float(running_recent_txn), 2) if (running_recent_txn is not None and float(running_recent_txn) > 0) else (round(float(q_bench_price), 2) if q_bench_price > 0 else None),
                                 "recent_txn_date": running_recent_date or q_sdate,
                                 "recent_txn_type": running_recent_type,
                             })

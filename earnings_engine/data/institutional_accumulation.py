@@ -680,11 +680,17 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
                     p1y = price_series[idx_1y][1]
                     ret_1y = round(((latest_c - p1y) / p1y) * 100.0, 2) if p1y > 0 else None
 
+            # Patterns pre-sort to determine latest reporting quarter for this ticker
+            p_rows_sorted = sorted(p_rows, key=lambda x: _get_quarter_start_date(x[1]), reverse=True)
+            latest_quarter = p_rows_sorted[0][1] if p_rows_sorted else None
+
             # Holdings processing (using latest active quarter per fund)
             latest_h_by_fund = {}
             for r in sorted(h_rows, key=lambda x: _get_quarter_start_date(x[4])):
                 latest_h_by_fund[r[2]] = r
             active_h_rows = sorted(latest_h_by_fund.values(), key=lambda x: float(x[6] or 0.0), reverse=True)
+            if not latest_quarter and active_h_rows:
+                latest_quarter = active_h_rows[0][4]
 
             holdings = []
             accumulating_count = 0
@@ -694,35 +700,45 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
             gross_outflow_cr = 0.0
 
             for r in active_h_rows:
+                h_quarter = r[4]
                 act = (r[9] or "HOLD").upper()
                 is_buy = act in ("NEW BUY", "ACCUMULATED")
-                is_trim = act in ("TRIMMED", "SOLD OUT")
+                is_trim = act in ("TRIMMED", "SOLD OUT", "PROFIT TAKING")
                 val_cr = round(float(r[7] or 0.0), 2)
                 stk_pct = round(float(r[6] or 0.0), 2)
                 prev_stk = round(float(r[8] or 0.0), 2) if r[8] is not None else None
                 chg_pct = round(float(r[11] or 0.0), 2)
+                is_curr_q = (latest_quarter is None or h_quarter == latest_quarter)
 
                 inc_amt_cr = 0.0
                 if is_buy:
-                    accumulating_count += 1
-                    if act == "NEW BUY":
-                        new_buys_count += 1
-                        inc_amt_cr = val_cr
-                    else:
-                        if prev_stk is not None and prev_stk >= 0 and stk_pct > 0:
-                            delta_stk = max(0.0, stk_pct - prev_stk)
-                            inc_amt_cr = round((delta_stk / stk_pct) * val_cr, 2) if delta_stk > 0 else round((min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)) * val_cr, 2)
+                    if is_curr_q:
+                        accumulating_count += 1
+                        if act == "NEW BUY":
+                            new_buys_count += 1
+                            inc_amt_cr = val_cr
                         else:
-                            inc_amt_cr = round(val_cr * 0.35, 2)
-                    gross_inflow_cr += max(inc_amt_cr, 5.0)
-                elif is_trim:
-                    selling_count += 1
-                    if prev_stk and prev_stk > 0:
-                        delta_stk = abs(prev_stk - stk_pct)
-                        inc_amt_cr = -round((delta_stk / prev_stk) * max(val_cr, 10.0), 2)
+                            if prev_stk is not None and prev_stk >= 0 and stk_pct > 0:
+                                delta_stk = max(0.0, stk_pct - prev_stk)
+                                inc_amt_cr = round((delta_stk / stk_pct) * val_cr, 2) if delta_stk > 0 else round((min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)) * val_cr, 2)
+                            else:
+                                inc_amt_cr = round(val_cr * 0.35, 2)
+                        gross_inflow_cr += max(inc_amt_cr, 5.0)
                     else:
-                        inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
-                    gross_outflow_cr += abs(inc_amt_cr)
+                        inc_amt_cr = 0.0
+                elif is_trim:
+                    if is_curr_q:
+                        selling_count += 1
+                        if prev_stk and prev_stk > 0 and stk_pct > 0:
+                            delta_stk = abs(prev_stk - stk_pct)
+                            inc_amt_cr = -round((delta_stk / stk_pct) * val_cr, 2)
+                        elif prev_stk and prev_stk > 0:
+                            inc_amt_cr = -round((prev_stk / 100.0) * (mcap_cr or 1000.0), 2)
+                        else:
+                            inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
+                        gross_outflow_cr += abs(inc_amt_cr)
+                    else:
+                        inc_amt_cr = 0.0
 
                 raw_avg = r[12]
                 raw_buy = r[13] if is_buy else None
@@ -760,7 +776,6 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
 
             # Patterns processing
             patterns = []
-            p_rows_sorted = sorted(p_rows, key=lambda x: _get_quarter_start_date(x[1]), reverse=True)
             latest_close_p = price_series[0][1] if price_series else None
             latest_close_d = price_series[0][0] if price_series else None
 
@@ -1100,11 +1115,21 @@ def get_stock_institutional_activity(
                 (sym,),
             ).fetchall()
 
+        # Determine latest reporting quarter from shareholding pattern
+        p_latest_row = conn.execute(
+            "SELECT quarter FROM shareholding_patterns WHERE ticker = ? ORDER BY rowid ASC",
+            (sym,),
+        ).fetchall()
+        p_latest_sorted = sorted(p_latest_row, key=lambda x: _get_quarter_start_date(x[0]), reverse=True)
+        latest_quarter = p_latest_sorted[0][0] if p_latest_sorted else None
+
         # Deduplicate to latest reported quarter position per fund
         latest_h_by_fund = {}
         for r in sorted(h_rows, key=lambda x: _get_quarter_start_date(x[4])):
             latest_h_by_fund[r[2]] = r
         active_h_rows = sorted(latest_h_by_fund.values(), key=lambda x: float(x[6] or 0.0), reverse=True)
+        if not latest_quarter and active_h_rows:
+            latest_quarter = active_h_rows[0][4]
 
         holdings: list[dict[str, Any]] = []
         accumulating_count = 0
@@ -1114,10 +1139,12 @@ def get_stock_institutional_activity(
         gross_outflow_cr = 0.0
 
         for r in active_h_rows:
+            h_quarter = r[4]
             act = (r[9] or "HOLD").upper()
             is_buy = act in ("NEW BUY", "ACCUMULATED")
-            is_trim = act in ("TRIMMED", "SOLD OUT")
-            
+            is_trim = act in ("TRIMMED", "SOLD OUT", "PROFIT TAKING")
+            is_curr_q = (latest_quarter is None or h_quarter == latest_quarter)
+
             raw_avg = r[12]
             raw_buy = r[13] if is_buy else None
             raw_txn_p = r[14]
@@ -1135,28 +1162,36 @@ def get_stock_institutional_activity(
 
             inc_amt_cr = 0.0
             if act in ("NEW BUY", "ACCUMULATED"):
-                accumulating_count += 1
-                if act == "NEW BUY":
-                    new_buys_count += 1
-                    inc_amt_cr = val_cr
-                else:
-                    if prev_stk is not None and prev_stk >= 0 and stk_pct > 0:
-                        delta_stk = max(0.0, stk_pct - prev_stk)
-                        if delta_stk > 0:
-                            inc_amt_cr = round((delta_stk / stk_pct) * val_cr, 2)
-                        else:
-                            inc_amt_cr = round((min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)) * val_cr, 2)
+                if is_curr_q:
+                    accumulating_count += 1
+                    if act == "NEW BUY":
+                        new_buys_count += 1
+                        inc_amt_cr = val_cr
                     else:
-                        inc_amt_cr = round(val_cr * 0.35, 2)
-                gross_inflow_cr += max(inc_amt_cr, 5.0)
-            elif act in ("TRIMMED", "SOLD OUT"):
-                selling_count += 1
-                if prev_stk and prev_stk > 0:
-                    delta_stk = abs(prev_stk - stk_pct)
-                    inc_amt_cr = -round((delta_stk / prev_stk) * max(val_cr, 10.0), 2)
+                        if prev_stk is not None and prev_stk >= 0 and stk_pct > 0:
+                            delta_stk = max(0.0, stk_pct - prev_stk)
+                            if delta_stk > 0:
+                                inc_amt_cr = round((delta_stk / stk_pct) * val_cr, 2)
+                            else:
+                                inc_amt_cr = round((min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)) * val_cr, 2)
+                        else:
+                            inc_amt_cr = round(val_cr * 0.35, 2)
+                    gross_inflow_cr += max(inc_amt_cr, 5.0)
                 else:
-                    inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
-                gross_outflow_cr += abs(inc_amt_cr)
+                    inc_amt_cr = 0.0
+            elif act in ("TRIMMED", "SOLD OUT", "PROFIT TAKING"):
+                if is_curr_q:
+                    selling_count += 1
+                    if prev_stk and prev_stk > 0 and stk_pct > 0:
+                        delta_stk = abs(prev_stk - stk_pct)
+                        inc_amt_cr = -round((delta_stk / stk_pct) * val_cr, 2)
+                    elif prev_stk and prev_stk > 0:
+                        inc_amt_cr = -round((prev_stk / 100.0) * (mcap_cr or 1000.0), 2)
+                    else:
+                        inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
+                    gross_outflow_cr += abs(inc_amt_cr)
+                else:
+                    inc_amt_cr = 0.0
             else:
                 inc_amt_cr = 0.0
 
@@ -1235,23 +1270,7 @@ def get_stock_institutional_activity(
         latest_close_price = round(float(latest_p_row[0]), 2) if latest_p_row and latest_p_row[0] else None
         latest_price_date = str(latest_p_row[1]) if latest_p_row and latest_p_row[1] else None
 
-        def _get_quarter_start_date(q_str: str) -> str:
-            m = re.search(r'Q([1-4])\s*FY(\d{2,4})', q_str, re.IGNORECASE)
-            if not m:
-                return "2026-01-01"
-            q_num = int(m.group(1))
-            fy_num = int(m.group(2))
-            if fy_num < 100:
-                fy_num += 2000
-            if q_num == 1:
-                return f"{fy_num - 1}-04-01"
-            elif q_num == 2:
-                return f"{fy_num - 1}-07-01"
-            elif q_num == 3:
-                return f"{fy_num - 1}-10-01"
-            elif q_num == 4:
-                return f"{fy_num}-01-01"
-            return f"{fy_num}-01-01"
+        # (inner _get_quarter_start_date removed, uses module-level function)
 
         def _get_quarter_start_price(q_date: str) -> tuple[float | None, str | None]:
             row = conn.execute(
@@ -1526,6 +1545,8 @@ def get_stock_institutional_activity(
             "total_institutional_amount_cr": total_inst_amount_cr,
             "total_institutional_stake_pct": total_inst_stake_pct,
             "total_institutional_stake": total_inst_stake_pct,
+            "fii_stake_pct": patterns[0]["fii_pct"] if patterns else None,
+            "dii_stake_pct": patterns[0]["dii_mf_pct"] if patterns else None,
             "is_new_fii_entry": is_new_fii_entry,
             "is_new_dii_entry": is_new_dii_entry,
             "fii_always_held": fii_always_held,
@@ -1732,7 +1753,7 @@ def get_top_distributed_stocks(
                 "return_1y_pct": r[25],
                 "funds_selling": [
                     {"fund_name": h["fund_name"], "action": h["action"], "stake_pct": h["stake_pct"], "increase_amount_cr": h.get("increase_amount_cr", 0.0), "total_amount_cr": h.get("total_amount_cr", 0.0)}
-                    for h in holdings_raw if h.get("action") in ("TRIMMED", "SOLD OUT")
+                    for h in holdings_raw if h.get("action") in ("TRIMMED", "SOLD OUT", "PROFIT TAKING")
                 ],
             })
 
@@ -1760,7 +1781,7 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
             """
             SELECT fund_name, fund_type, COUNT(DISTINCT ticker) as total_positions,
                    SUM(CASE WHEN action IN ('NEW BUY', 'ACCUMULATED') THEN 1 ELSE 0 END) as buying_actions,
-                   SUM(CASE WHEN action IN ('TRIMMED', 'SOLD OUT') THEN 1 ELSE 0 END) as selling_actions,
+                   SUM(CASE WHEN action IN ('TRIMMED', 'SOLD OUT', 'PROFIT TAKING') THEN 1 ELSE 0 END) as selling_actions,
                    SUM(holding_value_cr) as total_aum_tracked_cr
             FROM institutional_holdings
             GROUP BY fund_name, fund_type
@@ -1881,7 +1902,7 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             shares = int(r[2] or 0)
             act = (r[5] or "HOLD").upper()
             is_buy = act in ("NEW BUY", "ACCUMULATED")
-            is_trim = act in ("TRIMMED", "SOLD OUT")
+            is_trim = act in ("TRIMMED", "SOLD OUT", "PROFIT TAKING")
 
             est_base_price = round((val_cr * 1e7) / shares, 2) if shares > 0 and val_cr > 0 else 100.0
             avg_p = round(float(r[7]), 2) if r[7] is not None and float(r[7]) > 0 else round(est_base_price * 0.90, 2)
