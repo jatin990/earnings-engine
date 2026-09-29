@@ -555,6 +555,15 @@
             const arrivalBadge = document.getElementById('pulseLiqArrivalBadge');
             const nextUpdatePill = document.getElementById('pulseLiqNextUpdatePill');
 
+            // Enriched Gross & Ratio elements
+            const fiiGrossSub = document.getElementById('pulseFiiGrossSub');
+            const fiiBsPill = document.getElementById('pulseFiiBsRatioPill');
+            const diiGrossSub = document.getElementById('pulseDiiGrossSub');
+            const diiBsPill = document.getElementById('pulseDiiBsRatioPill');
+            const turnoverSub = document.getElementById('pulseTurnoverSub');
+            const flowRegimeBadge = document.getElementById('pulseFlowRegimeBadge');
+            const flowRegimeSub = document.getElementById('pulseFlowRegimeSub');
+
             // Resolve robust flows data from whatever source is available
             if (!flows || Object.keys(flows).length === 0) {
                 flows = this._lastFlowsData
@@ -590,16 +599,97 @@
                 fiiEl.textContent = `${s}₹${flows.fii_net_cr.toLocaleString()} Cr`;
                 fiiEl.style.color = flows.fii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
+            if (fiiGrossSub) {
+                if (flows.fii_buy_cr !== undefined && flows.fii_sell_cr !== undefined) {
+                    fiiGrossSub.textContent = `B: ₹${Math.round(flows.fii_buy_cr).toLocaleString()} | S: ₹${Math.round(flows.fii_sell_cr).toLocaleString()}`;
+                } else {
+                    fiiGrossSub.textContent = 'B: — | S: —';
+                }
+            }
+            if (fiiBsPill) {
+                const ratio = flows.fii_bs_ratio ?? 1.0;
+                fiiBsPill.textContent = `B/S: ${ratio.toFixed(2)}x`;
+                if (ratio >= 1.05) {
+                    fiiBsPill.style.background = 'rgba(52,211,153,0.15)';
+                    fiiBsPill.style.color = '#34d399';
+                } else if (ratio <= 0.95) {
+                    fiiBsPill.style.background = 'rgba(248,113,113,0.15)';
+                    fiiBsPill.style.color = '#f87171';
+                } else {
+                    fiiBsPill.style.background = 'rgba(255,255,255,0.06)';
+                    fiiBsPill.style.color = '#94a3b8';
+                }
+            }
+
             if (diiEl && flows.dii_net_cr !== undefined && flows.dii_net_cr !== null) {
                 const s = flows.dii_net_cr >= 0 ? '+' : '';
                 diiEl.textContent = `${s}₹${flows.dii_net_cr.toLocaleString()} Cr`;
                 diiEl.style.color = flows.dii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
+            if (diiGrossSub) {
+                if (flows.dii_buy_cr !== undefined && flows.dii_sell_cr !== undefined) {
+                    diiGrossSub.textContent = `B: ₹${Math.round(flows.dii_buy_cr).toLocaleString()} | S: ₹${Math.round(flows.dii_sell_cr).toLocaleString()}`;
+                } else {
+                    diiGrossSub.textContent = 'B: — | S: —';
+                }
+            }
+            if (diiBsPill) {
+                const ratio = flows.dii_bs_ratio ?? 1.0;
+                diiBsPill.textContent = `B/S: ${ratio.toFixed(2)}x`;
+                if (ratio >= 1.05) {
+                    diiBsPill.style.background = 'rgba(52,211,153,0.15)';
+                    diiBsPill.style.color = '#34d399';
+                } else if (ratio <= 0.95) {
+                    diiBsPill.style.background = 'rgba(248,113,113,0.15)';
+                    diiBsPill.style.color = '#f87171';
+                } else {
+                    diiBsPill.style.background = 'rgba(255,255,255,0.06)';
+                    diiBsPill.style.color = '#94a3b8';
+                }
+            }
+
             if (totEl && flows.total_net_cr !== undefined && flows.total_net_cr !== null) {
                 const s = flows.total_net_cr >= 0 ? '+' : '';
                 totEl.textContent = `${s}₹${flows.total_net_cr.toLocaleString()} Cr`;
                 totEl.style.color = flows.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
             }
+            if (turnoverSub) {
+                if (flows.gross_turnover_cr) {
+                    turnoverSub.textContent = `Turnover: ₹${Math.round(flows.gross_turnover_cr).toLocaleString()} Cr`;
+                } else {
+                    turnoverSub.textContent = 'Turnover: —';
+                }
+            }
+
+            // Flow Regime & Absorption
+            if (flowRegimeBadge) {
+                const regime = flows.flow_regime || flows.regime_badge || (flows.total_net_cr >= 0 ? '🟢 Inflow Expansion' : '🔴 Outflow Pressure');
+                flowRegimeBadge.textContent = regime;
+                if (regime.includes('🟢') || regime.includes('Accumulation') || regime.includes('Inflow')) {
+                    flowRegimeBadge.style.color = '#34d399';
+                } else if (regime.includes('⚡') || regime.includes('Absorption') || regime.includes('Counter')) {
+                    flowRegimeBadge.style.color = '#38bdf8';
+                } else if (regime.includes('🔴') || regime.includes('Distribution') || regime.includes('Outflow')) {
+                    flowRegimeBadge.style.color = '#f87171';
+                } else {
+                    flowRegimeBadge.style.color = '#fbbf24';
+                }
+            }
+            if (flowRegimeSub) {
+                const totalNet = flows.total_net_cr ?? 0;
+                const fiiNet = flows.fii_net_cr ?? 0;
+                const diiNet = flows.dii_net_cr ?? 0;
+                if (fiiNet < 0 && diiNet > 0 && diiNet >= Math.abs(fiiNet)) {
+                    flowRegimeSub.textContent = 'DII Buying Absorbs FII Outflows';
+                } else if (fiiNet > 0 && diiNet > 0) {
+                    flowRegimeSub.textContent = 'Twin Institutional Buying Expansion';
+                } else if (fiiNet < 0 && diiNet < 0) {
+                    flowRegimeSub.textContent = 'Unified Institutional Liquidation';
+                } else {
+                    flowRegimeSub.textContent = totalNet >= 0 ? 'Net Capital Inflow' : 'Net Capital Distribution';
+                }
+            }
+
             const biasText = flows.bias || flows.regime_badge;
             if (biasEl && biasText) {
                 biasEl.textContent = biasText;
@@ -635,7 +725,7 @@
 
             // Update Header & Controls
             if (titleEl) {
-                titleEl.textContent = isExpanded ? 'Past 30 Days Activity' : 'Past 7 Days Activity';
+                titleEl.textContent = isExpanded ? 'Past 30 Days Cash Activity & Turnovers' : 'Past 7 Days Cash Activity & Turnovers';
             }
             if (countBadge) {
                 countBadge.textContent = `${history.length} Sessions`;
@@ -652,7 +742,7 @@
             // Flow History Table Rows
             if (tbody7d) {
                 if (!history.length) {
-                    tbody7d.innerHTML = '<tr><td colspan="6" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
+                    tbody7d.innerHTML = '<tr><td colspan="7" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
                     return;
                 }
 
@@ -668,10 +758,22 @@
                     const fiiCol = fiiVal >= 0 ? '#34d399' : '#f87171';
                     const diiCol = diiVal >= 0 ? '#34d399' : '#f87171';
                     const totCol = totVal >= 0 ? '#38bdf8' : '#f87171';
-                    const isBull = totVal >= 0;
-                    const badgeCol = isBull ? '#34d399' : '#f87171';
-                    const badgeBg = isBull ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
-                    const badgeText = isBull ? '🟢 Inflow' : '🔴 Outflow';
+
+                    const turnover = row.gross_turnover_cr ? Math.round(row.gross_turnover_cr).toLocaleString() : '—';
+                    const fiiBs = row.fii_bs_ratio ? `${row.fii_bs_ratio.toFixed(2)}x` : '';
+                    const diiBs = row.dii_bs_ratio ? `${row.dii_bs_ratio.toFixed(2)}x` : '';
+
+                    const regime = row.flow_regime || (totVal >= 0 ? '🟢 Inflow' : '🔴 Outflow');
+                    let badgeCol = '#34d399';
+                    let badgeBg = 'rgba(52,211,153,0.12)';
+                    if (regime.includes('🔴') || regime.includes('Outflow') || regime.includes('Distribution')) {
+                        badgeCol = '#f87171';
+                        badgeBg = 'rgba(248,113,113,0.12)';
+                    } else if (regime.includes('⚡') || regime.includes('Absorption')) {
+                        badgeCol = '#38bdf8';
+                        badgeBg = 'rgba(56,189,248,0.12)';
+                    }
+
                     const arrivalStr = row.arrived_at_ist || row.updated_at_ist || '—';
 
                     return `
@@ -680,17 +782,22 @@
                                 ${row.day_label || row.date}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${fiiCol};font-weight:600;">
-                                ${fiiSign}₹${fiiVal.toLocaleString()}
+                                <div>${fiiSign}₹${fiiVal.toLocaleString()}</div>
+                                ${fiiBs ? `<div style="font-size:0.55rem;color:#64748b;">${fiiBs} B/S</div>` : ''}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${diiCol};font-weight:600;">
-                                ${diiSign}₹${diiVal.toLocaleString()}
+                                <div>${diiSign}₹${diiVal.toLocaleString()}</div>
+                                ${diiBs ? `<div style="font-size:0.55rem;color:#64748b;">${diiBs} B/S</div>` : ''}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${totCol};font-weight:700;">
                                 ${totSign}₹${totVal.toLocaleString()}
                             </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                ₹${turnover}
+                            </td>
                             <td style="padding:0.35rem 0.5rem;text-align:center;">
-                                <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);">
-                                    ${badgeText}
+                                <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);white-space:nowrap;">
+                                    ${regime}
                                 </span>
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:center;font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);">
@@ -773,31 +880,36 @@
             this._currentOiView = viewMode;
             if (window.app) window.app._currentOiView = viewMode;
 
-            // Update tab button styles
+            // Update tab button styles for all 5 modes
             const btnIndex = document.getElementById('btnOiViewIndex');
+            const btnStock = document.getElementById('btnOiViewStock');
+            const btnOptions = document.getElementById('btnOiViewOptions');
             const btnConsolidated = document.getElementById('btnOiViewConsolidated');
             const btnHistory = document.getElementById('btnOiViewHistory');
 
-            [btnIndex, btnConsolidated, btnHistory].forEach(btn => {
-                if (btn) {
-                    btn.classList.remove('active');
-                    btn.style.background = 'transparent';
-                    btn.style.color = '#94a3b8';
+            const allButtons = [
+                { id: 'index_futures', btn: btnIndex },
+                { id: 'stock_futures', btn: btnStock },
+                { id: 'options_anatomy', btn: btnOptions },
+                { id: 'consolidated_fo', btn: btnConsolidated },
+                { id: 'history_matrix', btn: btnHistory },
+            ];
+
+            allButtons.forEach(item => {
+                if (item.btn) {
+                    item.btn.classList.remove('active');
+                    item.btn.style.background = 'rgba(255,255,255,0.04)';
+                    item.btn.style.color = '#94a3b8';
+                    item.btn.style.borderColor = 'rgba(255,255,255,0.08)';
                 }
             });
 
-            if (viewMode === 'index_futures' && btnIndex) {
-                btnIndex.classList.add('active');
-                btnIndex.style.background = 'rgba(56,189,248,0.18)';
-                btnIndex.style.color = '#38bdf8';
-            } else if (viewMode === 'consolidated_fo' && btnConsolidated) {
-                btnConsolidated.classList.add('active');
-                btnConsolidated.style.background = 'rgba(56,189,248,0.18)';
-                btnConsolidated.style.color = '#38bdf8';
-            } else if (viewMode === 'history_matrix' && btnHistory) {
-                btnHistory.classList.add('active');
-                btnHistory.style.background = 'rgba(56,189,248,0.18)';
-                btnHistory.style.color = '#38bdf8';
+            const activeItem = allButtons.find(item => item.id === viewMode);
+            if (activeItem && activeItem.btn) {
+                activeItem.btn.classList.add('active');
+                activeItem.btn.style.background = 'rgba(56,189,248,0.18)';
+                activeItem.btn.style.color = '#38bdf8';
+                activeItem.btn.style.borderColor = 'rgba(56,189,248,0.4)';
             }
 
             const snapContainer = document.getElementById('pulseOiSnapshotContainer');
@@ -933,10 +1045,34 @@
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Net Index Contracts</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">Index Long %</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">1D Shift (Δ)</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:left;">Shift &amp; Regime</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Macro Shift &amp; Regime</th>
+                        </tr>
+                    `;
+                } else if (currentView === 'stock_futures') {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Stock Fut Long</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Stock Fut Short</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Net Stock Contracts</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Stock Long %</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">1D Stock Shift (Δ)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Alpha Stance &amp; Regime</th>
+                        </tr>
+                    `;
+                } else if (currentView === 'options_anatomy') {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Calls (Long / Short / Net)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Puts (Long / Short / Net)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Option PCR</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Net Option Delta</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Desk Role &amp; Stance</th>
                         </tr>
                     `;
                 } else {
+                    // Consolidated F&O View
                     tableHead.innerHTML = `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
                             <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
@@ -1041,6 +1177,155 @@
                                 <td style="padding:0.45rem 0.6rem;text-align:left;">
                                     <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
                                         ${shiftRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (currentView === 'stock_futures') {
+                        // Stock Futures (Alpha) View
+                        const fsLong = p.future_stock_long ?? 0;
+                        const fsShort = p.future_stock_short ?? 0;
+                        const fsNet = p.future_stock_net ?? (fsLong - fsShort);
+                        const fsLongPct = p.future_stock_long_pct ?? ((fsLong + fsShort) > 0 ? (fsLong / (fsLong + fsShort)) * 100 : 50);
+
+                        const netCol = fsNet > 0 ? '#34d399' : (fsNet < 0 ? '#f87171' : '#94a3b8');
+                        const netSign = fsNet > 0 ? '+' : '';
+
+                        const deltaVal = p.delta_future_stock_net ?? null;
+                        let deltaStr = '<span style="color:#64748b;">—</span>';
+                        if (deltaVal !== null && deltaVal !== undefined) {
+                            const dSign = deltaVal >= 0 ? '+' : '';
+                            const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
+                            const dArr = deltaVal >= 0 ? '▲' : '▼';
+                            deltaStr = `<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:${dCol}18;color:${dCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${dCol}33;">Δ ${dSign}${deltaVal.toLocaleString()} ${dArr}</span>`;
+                        }
+
+                        let pctCol = '#94a3b8';
+                        let pctBg = 'rgba(255,255,255,0.05)';
+                        if (fsLongPct >= 65) {
+                            pctCol = '#34d399';
+                            pctBg = 'rgba(16,185,129,0.12)';
+                        } else if (fsLongPct <= 35) {
+                            pctCol = '#f87171';
+                            pctBg = 'rgba(239,68,68,0.12)';
+                        }
+
+                        const stockRegime = p.stock_shift_regime || (fsNet >= 0 ? '🟢 Net Long Stock Alpha' : '🔴 Net Short Stock Alpha');
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (stockRegime.includes('🟢') || stockRegime.includes('Long')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
+                            stanceCol = '#34d399';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (stockRegime.includes('🔴') || stockRegime.includes('Short')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
+                            stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (stockRegime.includes('⚡') || stockRegime.includes('Covering')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#34d399;font-weight:600;">
+                                    ${fsLong.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#f87171;font-weight:600;">
+                                    ${fsShort.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                    ${netSign}${fsNet.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${pctBg};color:${pctCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pctCol}33;">
+                                        ${fsLongPct.toFixed(1)}% Long
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    ${deltaStr}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
+                                        ${stockRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (currentView === 'options_anatomy') {
+                        // Options Anatomy (CE / PE) View
+                        const cLong = p.calls_long || 0;
+                        const cShort = p.calls_short || 0;
+                        const cNet = p.calls_net ?? (cLong - cShort);
+                        const cNetSign = cNet >= 0 ? '+' : '';
+                        const cNetCol = cNet >= 0 ? '#34d399' : '#f87171';
+
+                        const pLong = p.puts_long || 0;
+                        const pShort = p.puts_short || 0;
+                        const pNet = p.puts_net ?? (pLong - pShort);
+                        const pNetSign = pNet >= 0 ? '+' : '';
+                        const pNetCol = pNet >= 0 ? '#f87171' : '#34d399'; // Net Long Puts is Bearish/Hedge, Net Short Puts is Bullish Floor
+
+                        const pcr = p.option_pcr ?? ((cLong + cShort) > 0 ? (pLong + pShort) / (cLong + cShort) : 1.0);
+                        let pcrCol = '#fbbf24';
+                        if (pcr >= 1.25) pcrCol = '#38bdf8';
+                        else if (pcr <= 0.80) pcrCol = '#34d399';
+
+                        const netOptDelta = cNet - pNet;
+                        const deltaSign = netOptDelta >= 0 ? '+' : '';
+                        const deltaCol = netOptDelta >= 0 ? '#34d399' : '#f87171';
+
+                        const optStance = p.option_stance || 'Balanced Options Book';
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (optStance.includes('🟢') || optStance.includes('Bullish') || optStance.includes('Support')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
+                            stanceCol = '#34d399';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (optStance.includes('🔴') || optStance.includes('Bearish') || optStance.includes('Resistance')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
+                            stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (optStance.includes('⚡') || optStance.includes('Strangle') || optStance.includes('Writing')) {
+                            stanceBg = 'rgba(168,85,247,0.12)';
+                            stanceCol = '#c084fc';
+                            stanceBorder = 'rgba(168,85,247,0.25)';
+                        } else if (optStance.includes('🛡️') || optStance.includes('Hedge')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);">
+                                    <span style="color:#34d399;">${cLong.toLocaleString()}</span> / <span style="color:#f87171;">${cShort.toLocaleString()}</span>
+                                    <div style="font-size:0.58rem;color:${cNetCol};font-weight:700;">Net: ${cNetSign}${cNet.toLocaleString()}</div>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);">
+                                    <span style="color:#34d399;">${pLong.toLocaleString()}</span> / <span style="color:#f87171;">${pShort.toLocaleString()}</span>
+                                    <div style="font-size:0.58rem;color:${pNetCol};font-weight:700;">Net: ${pNetSign}${pNet.toLocaleString()}</div>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:${pcrCol}18;color:${pcrCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pcrCol}33;">
+                                        ${pcr.toFixed(2)} PCR
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${deltaCol};">
+                                    ${deltaSign}${netOptDelta.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
+                                        ${optStance}
                                     </span>
                                 </td>
                             </tr>
