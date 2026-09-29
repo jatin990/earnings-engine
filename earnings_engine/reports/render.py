@@ -377,9 +377,10 @@ def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
         "<thead>"
         '<tr class="header-group-row" style="background:#07080e;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;">'
         '<th colspan="2" style="text-align:left;color:#94a3b8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🏢 Stock & Catalyst</th>'
-        '<th colspan="5" style="text-align:center;color:#38bdf8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">⚡ Live Market & Momentum</th>'
-        '<th colspan="4" style="text-align:center;color:#34d399;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">📐 Technical Price Structure</th>'
-        '<th colspan="4" style="text-align:center;color:#c084fc;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🎯 Historical Quality & AI</th>'
+        '<th colspan="6" style="text-align:center;color:#38bdf8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">⚡ Live Market & Momentum</th>'
+        '<th colspan="3" style="text-align:center;color:#34d399;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">📐 Technical Price Structure</th>'
+        '<th colspan="4" style="text-align:center;color:#c084fc;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🎯 Historical Beat & Quality</th>'
+        '<th colspan="2" style="text-align:center;color:#818cf8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🤖 AI Intelligence</th>'
         '<th style="text-align:center;color:#fbbf24;padding:0.25rem 0.45rem;">⚡ Controls</th>'
         "</tr>"
         "<tr>"
@@ -390,14 +391,16 @@ def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
         '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by 3-Day Return">3D Ret</th>'
         '<th onclick="app.sortResultsTable(this, 5, \'num\')" title="Sort by 7-Day Return">7D Ret</th>'
         '<th onclick="app.sortResultsTable(this, 6, \'num\')" title="Sort by 30-Day Pre-Event Momentum">30D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 7, \'text\')" title="Price Channel Structure (Support ⟵ Current ⟶ Resistance)">Support / Resistance</th>'
-        '<th onclick="app.sortResultsTable(this, 8, \'num\')" title="Channel Position % (0%=Support, 100%=Resistance)">Range Pos</th>'
-        '<th onclick="app.sortResultsTable(this, 9, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 10, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 11, \'text\')" title="Quality Scores (Q1 | Q2 | Q3)">Quality</th>'
-        '<th onclick="app.sortResultsTable(this, 12, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
-        '<th onclick="app.sortResultsTable(this, 13, \'text\')" title="Kronos 14-Day AI Forecast">Kronos 14D</th>'
-        '<th onclick="app.sortResultsTable(this, 14, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
+        '<th onclick="app.sortResultsTable(this, 7, \'num\')" title="Sort by Relative Volume (5D vs 63D Volume Surge)">Rel Vol</th>'
+        '<th onclick="app.sortResultsTable(this, 8, \'text\')" title="Price Channel Structure (Support ⟵ Current ⟶ Resistance)">Support / Resistance</th>'
+        '<th onclick="app.sortResultsTable(this, 9, \'num\')" title="Channel Position % (0%=Support, 100%=Resistance)">Range Pos</th>'
+        '<th onclick="app.sortResultsTable(this, 10, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 11, \'num\')" title="Historical Earnings Beat Rate %">Beat Rate</th>'
+        '<th onclick="app.sortResultsTable(this, 12, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 13, \'text\')" title="Quality Scores (Q1 | Q2 | Q3)">Quality</th>'
+        '<th onclick="app.sortResultsTable(this, 14, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
+        '<th onclick="app.sortResultsTable(this, 15, \'text\')" title="Kronos 14-Day AI Forecast">Kronos 14D</th>'
+        '<th onclick="app.sortResultsTable(this, 16, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
         '<th style="text-align:center;">Actions</th>'
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
@@ -517,7 +520,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             count = len(data)
             table_rows.append(
                 f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-                f'<td colspan="16">'
+                f'<td colspan="18">'
                 f'<div class="terminal-cap-divider">'
                 f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
                 f'<span class="terminal-divider-meta">{count} stock{"s" if count != 1 else ""}</span>'
@@ -535,7 +538,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
         ind_count_total = len([k for k, v in data.items() if v])
         table_rows.append(
             f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-            f'<td colspan="16">'
+            f'<td colspan="18">'
             f'<div class="terminal-cap-divider">'
             f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
             f'<span class="terminal-divider-meta">{tier_count} stock{"s" if tier_count != 1 else ""} · {ind_count_total} industries</span>'
@@ -551,7 +554,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             icount = len(ind_rows)
             table_rows.append(
                 f'<tr class="table-divider-row industry-subgroup industry-divider-row" data-cap="{cap_tier}" data-ind="{html.escape(ind_name)}">'
-                f'<td colspan="16">'
+                f'<td colspan="18">'
                 f'<div class="terminal-ind-divider">'
                 f'<span class="ind-pill">🏭 Industry: {html.escape(ind_name)}</span>'
                 f'<span class="ind-badge-count">{icount}</span>'
@@ -779,6 +782,50 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         else:
             chan_pos_num = 50.0
             chan_pos_label = "—"
+
+        # Relative Volume (5D vs 63D Volume Surge)
+        rel_vol_val = row.get("rel_vol_5d_vs_63d")
+        if rel_vol_val is not None and not pd.isna(rel_vol_val):
+            rv_num = float(rel_vol_val)
+            if rv_num >= 2.0:
+                rv_style = "color:#38bdf8;font-weight:700;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);padding:0.06rem 0.3rem;border-radius:4px;"
+                rel_vol_html = f'<span style="{rv_style}" title="High Volume Surge: 5D Avg Vol is {rv_num:.1f}x 63D baseline">⚡ {rv_num:.1f}x</span>'
+            elif rv_num >= 1.2:
+                rv_style = "color:#34d399;font-weight:600;"
+                rel_vol_html = f'<span style="{rv_style}" title="Constructive Volume: 5D Avg Vol is {rv_num:.1f}x 63D baseline">{rv_num:.1f}x</span>'
+            elif rv_num <= 0.7:
+                rv_style = "color:#94a3b8;opacity:0.85;"
+                rel_vol_html = f'<span style="{rv_style}" title="Low Volume: 5D Avg Vol is {rv_num:.1f}x baseline">{rv_num:.1f}x</span>'
+            else:
+                rel_vol_html = f'<span style="color:#cbd5e1;" title="Normal Volume ({rv_num:.1f}x)">{rv_num:.1f}x</span>'
+            rel_vol_plain = f"{rv_num:.2f}"
+        else:
+            rel_vol_html = '<span style="color:#64748b;">—</span>'
+            rel_vol_plain = "0"
+
+        # Historical Earnings Beat Rate
+        beat_rate_val = row.get("beat_rate_pct")
+        beat_count = row.get("beat_count", 0)
+        total_hq = row.get("total_historical_quarters", 0)
+        if beat_rate_val is not None and not pd.isna(beat_rate_val) and total_hq > 0:
+            br_num = float(beat_rate_val)
+            if br_num >= 75.0:
+                br_color = "#34d399"
+                br_bg = "rgba(16,185,129,0.12)"
+                br_border = "rgba(16,185,129,0.3)"
+            elif br_num >= 50.0:
+                br_color = "#38bdf8"
+                br_bg = "rgba(56,189,248,0.12)"
+                br_border = "rgba(56,189,248,0.3)"
+            else:
+                br_color = "#f87171"
+                br_bg = "rgba(239,68,68,0.12)"
+                br_border = "rgba(239,68,68,0.3)"
+            beat_rate_html = f'<span class="signal-badge" style="background:{br_bg};color:{br_color};border:1px solid {br_border};font-size:0.7rem;padding:0.06rem 0.35rem;border-radius:4px;font-weight:700;" title="Historical Beat Rate: {beat_count}/{total_hq} declared quarters beat estimates">{br_num:.0f}% <span style="font-size:0.58rem;opacity:0.85;">({beat_count}/{total_hq})</span></span>'
+            beat_rate_plain = f"{br_num:.0f}"
+        else:
+            beat_rate_html = '<span style="color:#64748b;">—</span>'
+            beat_rate_plain = "0"
 
         # Check if stock has results in +-3 days for live visual styling
         is_near_results = False
@@ -1084,6 +1131,10 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "three_day_return": three_day_return,
             "seven_day_return": seven_day_return,
             "thirty_day_return": thirty_day_return,
+            "rel_vol_html": rel_vol_html,
+            "rel_vol_plain": rel_vol_plain,
+            "beat_rate_html": beat_rate_html,
+            "beat_rate_plain": beat_rate_plain,
             "week_change": week_change,
             "range_bar_html": range_bar_html,
             "channel_position": chan_pos_label,
@@ -1104,6 +1155,12 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "kronos_14d": kronos_14d,
             "gbm_prediction": gbm_prediction,
             "consensus_badge": consensus_badge,
+            "raw_mcap": f"{mcap_value:.0f}",
+            "raw_price": f"{_to_float(row.get('current_price')):.2f}",
+            "raw_3d": f"{_to_float(row.get('three_day_return_pct')):.2f}",
+            "raw_7d": f"{_to_float(row.get('seven_day_return_pct')):.2f}",
+            "raw_30d": f"{_to_float(row.get('thirty_day_return_pct')):.2f}",
+            "raw_chan_pos": f"{chan_pos_num:.1f}",
         }
         row_html = _render_template("result_row.html", **row_values)
 

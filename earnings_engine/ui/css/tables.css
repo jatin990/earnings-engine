@@ -143,3 +143,131 @@
     border-radius: var(--radius-md);
     background: var(--bg-surface);
 }
+
+/* ==========================================================================
+   RESULTS TERMINAL & QUANT INSPECTOR GLASSMORPHISM STYLES
+   ========================================================================== */
+
+.results-terminal-wrapper {
+    background: rgba(4, 5, 10, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 0.5rem;
+}
+
+.results-terminal-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.73rem;
+}
+
+.results-terminal-table thead th {
+    background: rgba(10, 12, 20, 0.95);
+    backdrop-filter: blur(8px);
+    color: #94a3b8;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.32rem 0.45rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+}
+
+.results-terminal-table thead th:hover {
+    color: #38bdf8;
+    background: rgba(15, 23, 42, 0.95);
+}
+
+.results-terminal-table td {
+    padding: 0.28rem 0.42rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+
+/* Compact Density (Default) */
+.results-table-compact td {
+    padding: 0.22rem 0.35rem !important;
+    font-size: 0.7rem !important;
+}
+
+/* Standard Density */
+.results-table-standard td {
+    padding: 0.42rem 0.55rem !important;
+    font-size: 0.75rem !important;
+}
+
+.results-row {
+    transition: background-color 0.12s ease, box-shadow 0.12s ease;
+    cursor: pointer;
+}
+
+.results-row:hover {
+    background-color: rgba(56, 189, 248, 0.06) !important;
+}
+
+.results-row.selected-stock-row {
+    background-color: rgba(56, 189, 248, 0.12) !important;
+    box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+.live-near-results {
+    background-color: rgba(16, 185, 129, 0.03);
+}
+
+/* Sticky Quant Inspector Glassmorphism */
+.sticky-inspector {
+    border: 1px solid rgba(56, 189, 248, 0.2) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+}
+
+.inspector-section {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    padding: 0.45rem 0.6rem;
+    margin-bottom: 0.45rem;
+}
+
+.inspector-section-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    margin-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.inspector-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.3rem;
+}
+
+.inspector-metric-card {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 0.25rem 0.4rem;
+}
+
+.inspector-metric-label {
+    font-size: 0.6rem;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.inspector-metric-val {
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #f8fafc;
+}
+
