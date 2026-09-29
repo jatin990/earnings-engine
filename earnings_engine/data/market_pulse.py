@@ -1211,15 +1211,47 @@ def sync_nse_participant_oi_data(
 
 
 def _classify_oi_regime(d_fi_net: int, d_fi_long: int, d_fi_short: int) -> tuple[str, str, str]:
-    """Classify derivatives positioning shift regime based on index futures day-over-day delta."""
-    if d_fi_net > 0 and d_fi_long >= d_fi_short:
+    """Classify derivatives positioning shift regime based on index futures day-over-day delta.
+
+    Follows standard 4-quadrant derivatives mechanics:
+    1. Long Build-up: Fresh long accumulation (ΔLong > 0 and ΔLong >= ΔShort, ΔNet > 0).
+    2. Short Build-up: Fresh short creation (ΔShort > 0 and ΔShort >= ΔLong, ΔNet < 0).
+    3. Short Covering: Shorts closing/covering (ΔShort < 0 and ΔNet > 0, or both dropping with ΔNet > 0).
+    4. Long Unwinding: Longs closing/unwinding (ΔLong < 0 and ΔNet < 0, or both dropping with ΔNet < 0).
+    5. Expiry Rollover: Both legs dropping symmetrically (ΔLong < 0 and ΔShort < 0 with ΔNet == 0).
+    """
+    # Case 1: Both legs dropping (Expiry Rollover / Gross OI contraction)
+    if d_fi_long < 0 and d_fi_short < 0:
+        if d_fi_net > 0:
+            # Shorts closed faster than longs
+            return ("Short Covering", "⚡ Short Covering", "Shorts squaring off / expiry unwinding; short covering momentum.")
+        elif d_fi_net < 0:
+            # Longs closed faster than shorts
+            return ("Long Unwinding", "⚠️ Long Unwinding", "Longs squaring off / expiry unwinding; profit taking / risk trimming.")
+        else:
+            return ("Expiry Rollover", "⚪ Expiry Rollover", "Symmetric expiry rollover / position closure across long and short contracts.")
+
+    # Case 2: Fresh long accumulation dominates
+    if d_fi_long > 0 and d_fi_net > 0 and d_fi_long >= d_fi_short:
         return ("Long Build-up", "🟢 Long Build-up", "Aggressive fresh long accumulation in index futures; bullish continuation bias.")
-    elif d_fi_net > 0 and d_fi_short < 0:
-        return ("Short Covering", "⚡ Short Covering", "Bear capitulation / shorts exiting; short squeeze momentum.")
-    elif d_fi_net < 0 and d_fi_short >= d_fi_long:
+
+    # Case 3: Fresh short accumulation dominates
+    if d_fi_short > 0 and d_fi_net < 0 and d_fi_short >= d_fi_long:
         return ("Short Build-up", "🔴 Short Build-up", "Fresh institutional short hedges added in index futures; overhead resistance.")
-    elif d_fi_net < 0 and d_fi_long < 0:
+
+    # Case 4: Shorts closing while longs flat or adding
+    if d_fi_short < 0 and d_fi_net > 0:
+        return ("Short Covering", "⚡ Short Covering", "Bear capitulation / shorts exiting; short squeeze momentum.")
+
+    # Case 5: Longs closing while shorts flat or adding
+    if d_fi_long < 0 and d_fi_net < 0:
         return ("Long Unwinding", "⚠️ Long Unwinding", "Longs taking profit / trimming risk; lack of aggressive buying.")
+
+    # Case 6: Delta is non-zero but one leg neutral
+    if d_fi_net > 0:
+        return ("Net Long Shift", "🟢 Long Add", "Moderate net long expansion in index futures.")
+    elif d_fi_net < 0:
+        return ("Net Short Shift", "🔴 Short Add", "Moderate net short expansion in index futures.")
     else:
         return ("Neutral / Balanced", "⚪ Neutral", "Balanced positioning shifts with minimal directional skew.")
 
