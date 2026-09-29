@@ -196,5 +196,75 @@ def test_metric_glossary_dedicated_endpoint(client):
     assert "fear_greed" in cat_ids
 
 
+def test_fii_dii_release_schedule_states():
+    """Verify deterministic FII/DII release schedule calculation across all trading day and weekend regimes."""
+    from datetime import datetime, timezone
+    from earnings_engine.data.market_pulse import compute_fii_dii_release_schedule
+
+    # Case 1: Weekday before 18:30 IST (e.g. Wednesday 2026-09-30 06:00 UTC = 11:30 IST)
+    dt_wed_morning = datetime(2026, 9, 30, 6, 0, 0, tzinfo=timezone.utc)
+    sched1 = compute_fii_dii_release_schedule(latest_date_in_db="2026-09-29", now_dt=dt_wed_morning)
+    assert sched1["status"] == "pending_today"
+    assert "Today ~18:30 IST" in sched1["label"]
+    assert sched1["is_today_settled"] is False
+    assert sched1["eta_seconds"] > 0
+
+    # Case 2: Weekday after 18:30 IST awaiting settlement (e.g. Wednesday 2026-09-30 13:45 UTC = 19:15 IST, not yet settled)
+    dt_wed_evening = datetime(2026, 9, 30, 13, 45, 0, tzinfo=timezone.utc)
+    sched2 = compute_fii_dii_release_schedule(latest_date_in_db="2026-09-29", now_dt=dt_wed_evening)
+    assert sched2["status"] == "awaiting_settlement"
+    assert "Awaiting NSE Release" in sched2["label"]
+
+    # Case 3: Weekday after 18:30 IST already settled (Wednesday settled, next is Thursday)
+    sched3 = compute_fii_dii_release_schedule(latest_date_in_db="2026-09-30", now_dt=dt_wed_evening)
+    assert sched3["status"] == "settled"
+    assert "Thursday ~18:30 IST" in sched3["label"]
+    assert sched3["is_today_settled"] is True
+
+    # Case 4: Friday after 18:30 IST settled -> Next is Monday
+    dt_fri_evening = datetime(2026, 10, 2, 14, 0, 0, tzinfo=timezone.utc)
+    sched4 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-02", now_dt=dt_fri_evening)
+    assert sched4["status"] == "settled"
+    assert "Monday ~18:30 IST" in sched4["label"]
+
+    # Case 5: Saturday / Sunday weekend pause -> Next is Monday
+    dt_sat = datetime(2026, 10, 3, 10, 0, 0, tzinfo=timezone.utc)
+    sched5 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-02", now_dt=dt_sat)
+    assert sched5["status"] == "weekend_pause"
+    assert "Monday ~18:30 IST" in sched5["label"]
+
+
+def test_market_pulse_card_timestamps(client):
+    """Verify that liquidity, sentiment, and participant endpoints expose card-level timestamps and arrival metadata."""
+    res_liq = client.get("/api/v1/market-pulse/liquidity")
+    assert res_liq.status_code == 200
+    liq_data = res_liq.json().get("liquidity", {})
+    assert "latest_arrived_at_ist" in liq_data
+    assert "next_release_schedule" in liq_data
+    assert "next_release_countdown" in liq_data
+    assert "history_7d" in liq_data
+    for row in liq_data["history_7d"]:
+        assert "arrived_at_ist" in row
+
+    res_sent = client.get("/api/v1/market-pulse/sentiment?force_refresh=true")
+    assert res_sent.status_code == 200
+    sent_data = res_sent.json().get("sentiment", {})
+    assert "as_of" in sent_data
+    assert "as_of_ist" in sent_data
+    assert "session_date" in sent_data
+    assert "data_freshness" in sent_data
+
+    res_pulse = client.get("/api/v1/market/pulse")
+    assert res_pulse.status_code == 200
+    pulse_data = res_pulse.json()
+    assert "timestamps" in pulse_data
+    ts = pulse_data["timestamps"]
+    assert "sentiment_as_of" in ts
+    assert "sentiment_as_of_ist" in ts
+    assert "fii_dii_latest_arrival_ist" in ts
+    assert "fii_dii_next_release" in ts
+
+
+
 
 

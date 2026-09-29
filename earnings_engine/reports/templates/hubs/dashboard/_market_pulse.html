@@ -145,7 +145,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
                         <span>🧭</span> Fear &amp; Greed 30-Day Wave
                     </div>
-                    <span id="pulseFgBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Greed / Bullish</span>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span id="pulseFgTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
+                        <span id="pulseFgBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Greed / Bullish</span>
+                    </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
                     <span id="pulseFgScore" style="font-size:1.6rem;font-weight:900;color:#34d399;font-family:var(--font-mono);line-height:1;">68.5</span>
@@ -173,7 +176,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
                         <span>⚡</span> India VIX 30-Day Corridor
                     </div>
-                    <span id="pulseVixRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">🔵 Calm Trend</span>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span id="pulseVixTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
+                        <span id="pulseVixRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">🔵 Calm Trend</span>
+                    </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
                     <span id="pulseVixLevel" style="font-size:1.6rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">13.82</span>
@@ -202,7 +208,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
                         <span>📊</span> NIFTY 50 30-Day Trajectory
                     </div>
-                    <span id="pulsePredictionRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">Bullish Expansion</span>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span id="pulseNiftyTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
+                        <span id="pulsePredictionRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">Bullish Expansion</span>
+                    </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
                     <span id="pulseNiftyLevel" style="font-size:1.6rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);line-height:1;">24,850.5</span>
@@ -230,7 +239,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
                         <span>🏛️</span> FII vs Retail Net OI (10D)
                     </div>
-                    <span id="pulseParticipantOiChartBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">FII Net Long</span>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span id="pulseOiChartTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
+                        <span id="pulseParticipantOiChartBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">FII Net Long</span>
+                    </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
                     <span id="pulseFiiNetContractsPill" style="font-size:1.3rem;font-weight:900;color:#34d399;font-family:var(--font-mono);line-height:1;">+24,500</span>
@@ -258,7 +270,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
                         <span>📈</span> FII Long/Short Oscillator
                     </div>
-                    <span id="pulseFiiLsOscBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Normal Bullish</span>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span id="pulseFiiLsTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
+                        <span id="pulseFiiLsOscBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Normal Bullish</span>
+                    </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
                     <span id="pulseFiiLsRatioPill" style="font-size:1.3rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">1.15x</span>
@@ -380,10 +395,16 @@
         <!-- Institutional Net Cash Flows (FII/DII) -->
         <div class="card" style="padding:1rem;background:#09090b;border:1px solid rgba(255,255,255,0.08);">
             <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.4rem;">
-                <div style="display:flex;align-items:center;gap:0.4rem;">
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                     <span>🏦</span> Institutional Net Cash Liquidity (FII + DII)
+                    <span id="pulseLiqArrivalBadge" style="font-size:0.66rem;padding:0.12rem 0.45rem;border-radius:4px;background:rgba(16,185,129,0.12);color:#34d399;font-family:var(--font-mono);border:1px solid rgba(16,185,129,0.25);" title="Official NSE cash market settlement arrival time">
+                        Arrived: —
+                    </span>
                 </div>
-                <div style="display:flex;align-items:center;gap:0.4rem;">
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                    <span id="pulseLiqNextUpdatePill" style="font-size:0.66rem;padding:0.12rem 0.45rem;border-radius:4px;background:rgba(251,191,36,0.12);color:#fbbf24;font-family:var(--font-mono);border:1px solid rgba(251,191,36,0.25);" title="NSE cash market settlement release schedule (typically 17:30–19:30 IST on trading days)">
+                        Next Update: Today ~18:30 IST
+                    </span>
                     <button type="button" onclick="app.openMetricGlossary('institutional_liquidity')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:4px;cursor:pointer;font-size:0.65rem;">
                         Guide ℹ️
                     </button>
@@ -429,6 +450,7 @@
                                 <th style="padding:0.35rem 0.5rem;text-align:right;">DII Net</th>
                                 <th style="padding:0.35rem 0.5rem;text-align:right;">Combined</th>
                                 <th style="padding:0.35rem 0.5rem;text-align:center;">Stance</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:center;">Arrived (IST)</th>
                             </tr>
                         </thead>
                         <tbody id="pulse7dFlowsTableBody">
@@ -456,6 +478,7 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                <span id="pulseOiTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);margin-right:0.2rem;">Updated: —</span>
                 <button type="button" id="btnOiViewIndex" class="btn-micro pulse-oi-view-btn active" style="padding:0.22rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setParticipantOiView('index_futures')">
                     📊 Index Futures (Nifty)
                 </button>
@@ -533,6 +556,7 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:0.35rem;">
+                <span id="pulseSectorsTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);margin-right:0.35rem;">Updated: —</span>
                 <span style="font-size:0.65rem;color:#64748b;font-weight:600;margin-right:0.2rem;">Timeframe:</span>
                 <button type="button" id="btnSectorTf1d" class="btn-micro pulse-sector-tf-btn active" style="padding:0.2rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setSectorTimeframe('1d')">
                     1D

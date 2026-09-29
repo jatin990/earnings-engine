@@ -54,6 +54,107 @@ def is_market_open(ts: float) -> bool:
     return 3.75 <= time_val < 10.0
 
 
+IST_OFFSET = timedelta(hours=5, minutes=30)
+IST_TZ = timezone(IST_OFFSET)
+
+
+def format_iso_to_ist(iso_str: str | None, include_seconds: bool = False) -> str:
+    """Format an ISO timestamp to human-readable IST string (e.g. '26 Sep 2026, 18:42 IST')."""
+    if not iso_str:
+        return "—"
+    try:
+        clean_str = str(iso_str).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        ist_dt = dt.astimezone(IST_TZ)
+        if include_seconds:
+            return ist_dt.strftime("%d %b %Y, %H:%M:%S IST")
+        return ist_dt.strftime("%d %b %Y, %H:%M IST")
+    except Exception:
+        return str(iso_str)
+
+
+def compute_fii_dii_release_schedule(latest_date_in_db: str | None = None, now_dt: datetime | None = None) -> dict[str, Any]:
+    """Calculate the expected next NSE FII/DII cash market settlement release time and countdown.
+
+    NSE publishes daily cash market FII & DII provisional settlement figures on trading days
+    (Monday - Friday) around 17:30 - 19:30 IST, with standard benchmark release target ~18:30 IST.
+    """
+    if now_dt is None:
+        now_dt = datetime.now(timezone.utc)
+
+    # Convert UTC to IST (+5:30)
+    ist_dt = now_dt + IST_OFFSET
+    weekday = ist_dt.weekday()  # 0=Mon, ..., 4=Fri, 5=Sat, 6=Sun
+    time_val = ist_dt.hour + ist_dt.minute / 60.0 + ist_dt.second / 3600.0
+
+    today_str = ist_dt.strftime("%Y-%m-%d")
+    is_today_settled = (latest_date_in_db == today_str)
+
+    # Target release time on trading day is 18:30 IST (18.5)
+    if weekday < 5:  # Monday - Friday
+        if time_val < 18.5:
+            target_date = ist_dt.date()
+            status = "pending_today"
+            label = "Today ~18:30 IST"
+        else:
+            if is_today_settled:
+                if weekday == 4:  # Friday -> Monday
+                    target_date = (ist_dt + timedelta(days=3)).date()
+                    status = "settled"
+                    label = "Monday ~18:30 IST"
+                else:  # Mon-Thu -> Tomorrow
+                    target_date = (ist_dt + timedelta(days=1)).date()
+                    status = "settled"
+                    label = f"{(ist_dt + timedelta(days=1)).strftime('%A')} ~18:30 IST"
+            else:
+                target_date = ist_dt.date()
+                status = "awaiting_settlement"
+                label = "Today (Awaiting NSE Release)"
+    elif weekday == 5:  # Saturday -> Monday
+        target_date = (ist_dt + timedelta(days=2)).date()
+        status = "weekend_pause"
+        label = "Monday ~18:30 IST"
+    else:  # Sunday -> Monday
+        target_date = (ist_dt + timedelta(days=1)).date()
+        status = "weekend_pause"
+        label = "Monday ~18:30 IST"
+
+    target_dt_ist = datetime.combine(target_date, datetime.min.time()).replace(hour=18, minute=30, second=0)
+    target_dt_utc = (target_dt_ist - IST_OFFSET).replace(tzinfo=timezone.utc)
+
+    eta_seconds = max(0, int((target_dt_utc - now_dt).total_seconds()))
+    hours = eta_seconds // 3600
+    minutes = (eta_seconds % 3600) // 60
+
+    if status == "awaiting_settlement":
+        countdown_text = "Awaiting Release (Due ~18:30 IST)"
+    elif eta_seconds == 0:
+        countdown_text = "Release Expected Now"
+    elif hours >= 24:
+        days = hours // 24
+        rem_hours = hours % 24
+        countdown_text = f"in {days}d {rem_hours}h"
+    elif hours > 0:
+        countdown_text = f"in {hours}h {minutes}m"
+    else:
+        countdown_text = f"in {minutes}m"
+
+    return {
+        "expected_release_utc": target_dt_utc.isoformat(),
+        "expected_release_ist": target_dt_ist.strftime("%d %b %Y, 18:30 IST"),
+        "release_label": label,
+        "label": label,
+        "countdown_text": countdown_text,
+        "countdown": countdown_text,
+        "eta_seconds": eta_seconds,
+        "status": status,
+        "is_today_settled": is_today_settled,
+        "latest_settled_date": latest_date_in_db or "",
+    }
+
+
 def get_expected_latest_trading_date(now_dt: datetime | None = None) -> str:
     """Calculate the expected latest trading day (ISO format YYYY-MM-DD) for which
     FII/DII cash market settlement figures should be published.
@@ -693,11 +794,13 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     try:
         rows = conn.execute("SELECT * FROM institutional_net_flows ORDER BY date DESC LIMIT 45").fetchall()
         for r in rows:
+            raw_updated_at = r[10] if (hasattr(r, "__len__") and len(r) > 10) else (r["updated_at"] if hasattr(r, "keys") else None)
             r_dict = dict(r) if hasattr(r, "keys") else {
                 "date": r[0], "day_label": r[1], "fii_buy_cr": r[2], "fii_sell_cr": r[3],
                 "fii_net_cr": r[4], "dii_buy_cr": r[5], "dii_sell_cr": r[6], "dii_net_cr": r[7],
-                "total_net_cr": r[8], "stance": r[9], "updated_at": r[10]
+                "total_net_cr": r[8], "stance": r[9], "updated_at": raw_updated_at
             }
+            r_dict["arrived_at_ist"] = format_iso_to_ist(r_dict.get("updated_at"))
             history_full.append(r_dict)
     except Exception as e:
         logger.warning("[LIQUIDITY] Error loading institutional flows: %s", e)
@@ -718,6 +821,8 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
                 "dii_net_cr": 0.0,
                 "total_net_cr": 0.0,
                 "stance": "BALANCED FLOWS",
+                "updated_at": None,
+                "arrived_at_ist": "—",
             })
 
     history_7d = history_full[:7]
@@ -746,10 +851,23 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
         bias_str = "BALANCED FLOWS"
 
     session_label = history_full[0]["day_label"] if history_full else today_str
+    latest_settled_date = history_full[0]["date"] if history_full else today_str
+    latest_updated_at = history_full[0].get("updated_at") if history_full else None
+    latest_arrived_at_ist = format_iso_to_ist(latest_updated_at)
+    release_schedule = compute_fii_dii_release_schedule(latest_date_in_db=latest_settled_date)
 
     liquidity_data = {
-        "as_of_date": history_full[0]["date"] if history_full else today_str,
+        "as_of_date": latest_settled_date,
         "session_label": session_label,
+        "latest_updated_at": latest_updated_at,
+        "latest_arrived_at_ist": latest_arrived_at_ist,
+        "arrived_at_ist": latest_arrived_at_ist,
+        "next_release_schedule": release_schedule,
+        "next_release_label": release_schedule["release_label"],
+        "next_release_countdown": release_schedule["countdown_text"],
+        "next_release_eta_seconds": release_schedule["eta_seconds"],
+        "next_release_status": release_schedule["status"],
+        "is_today_settled": release_schedule["is_today_settled"],
         "fii_net_cr": fii_net_cr,
         "dii_net_cr": dii_net_cr,
         "total_net_cr": total_net_cr,
@@ -1621,6 +1739,10 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "commentary": commentary,
         "chart_series_10d": chart_series_10d,
         "chart_series_30d": chart_series_30d,
+        "as_of": latest_date_str,
+        "as_of_ist": format_iso_to_ist(next((p.get("updated_at") for p in participants_list if p.get("updated_at")), None)) or f"{session_label} (EOD)",
+        "updated_at": next((p.get("updated_at") for p in participants_list if p.get("updated_at")), None) or datetime.now(timezone.utc).isoformat(),
+        "data_freshness": "EOD_SETTLED",
     }
 
     _PARTICIPANT_OI_CACHE = {"ts": now_ts, "data": oi_payload}
@@ -1634,13 +1756,14 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
 def compute_market_sentiment_matrix(
     settings: Settings | None = None,
     indices_data: list[dict[str, Any]] | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Compute Fear & Greed score, Market Breadth, Volatility Matrix, and 30D macro time-series."""
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
     if indices_data is None:
-        indices_data = compute_indices_quotes(settings)
+        indices_data = compute_indices_quotes(settings=settings, force_refresh=force_refresh)
 
     vix_level = 13.8
     vix_1d_pct = 0.0
@@ -1751,17 +1874,17 @@ def compute_market_sentiment_matrix(
         vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
         bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
 
-        if len(nifty_rows) < 10 or len(vix_rows) < 10:
+        if force_refresh or len(nifty_rows) < 10 or len(vix_rows) < 10:
             try:
                 from earnings_engine.data.prices import fetch_prices
-                if len(nifty_rows) < 10:
-                    fetch_prices("^NSEI", settings, force=False)
+                if force_refresh or len(nifty_rows) < 10:
+                    fetch_prices("^NSEI", settings, force=force_refresh)
                     nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if len(vix_rows) < 10:
-                    fetch_prices("^INDIAVIX", settings, force=False)
+                if force_refresh or len(vix_rows) < 10:
+                    fetch_prices("^INDIAVIX", settings, force=force_refresh)
                     vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if len(bank_rows) < 10:
-                    fetch_prices("^NSEBANK", settings, force=False)
+                if force_refresh or len(bank_rows) < 10:
+                    fetch_prices("^NSEBANK", settings, force=force_refresh)
                     bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
             except Exception as e_fetch:
                 logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
@@ -1838,7 +1961,19 @@ def compute_market_sentiment_matrix(
     except Exception as e:
         logger.debug("[MARKET_PULSE] Macro charts generation issue: %s", e)
 
+    now_utc = datetime.now(timezone.utc)
+    as_of_iso = now_utc.isoformat()
+    as_of_ist = format_iso_to_ist(as_of_iso)
+    session_date = target_dates[-1] if target_dates else now_utc.strftime("%Y-%m-%d")
+    market_open_now = is_market_open(time.time())
+
     return {
+        "as_of": as_of_iso,
+        "as_of_ist": as_of_ist,
+        "session_date": session_date,
+        "data_freshness": "LIVE_INTRADAY" if market_open_now else "EOD_SETTLED",
+        "freshness_badge": "🟢 Live Tick" if market_open_now else "📊 EOD Snapshot",
+        "updated_at": as_of_iso,
         "fear_greed_score": fear_greed_score,
         "fear_greed_label": fear_greed_label,
         "fear_greed_color": fear_greed_color,
@@ -2419,7 +2554,7 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     liquidity = compute_net_cash_liquidity(settings=settings, force_refresh=force_refresh)
 
     # 4. Modular Sentiment, VIX, and Breadth
-    sentiment_data = compute_market_sentiment_matrix(settings=settings, indices_data=indices_data)
+    sentiment_data = compute_market_sentiment_matrix(settings=settings, indices_data=indices_data, force_refresh=force_refresh)
 
     # 5. Modular Participant Derivatives OI & Long/Short Positioning Matrix
     participant_oi = compute_participant_oi_matrix(settings=settings, force_refresh=force_refresh)
@@ -2442,6 +2577,19 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "market_status": "OPEN" if is_market_open(now_ts) else "CLOSED",
         "market_status_label": "🟢 Market Open" if is_market_open(now_ts) else "🔴 Market Closed (EOD Data)",
+        "timestamps": {
+            "sentiment_as_of": sentiment_data.get("as_of"),
+            "sentiment_as_of_ist": sentiment_data.get("as_of_ist"),
+            "session_date": sentiment_data.get("session_date"),
+            "data_freshness": sentiment_data.get("data_freshness"),
+            "freshness_badge": sentiment_data.get("freshness_badge"),
+            "vix_as_of": sentiment_data.get("as_of"),
+            "vix_as_of_ist": sentiment_data.get("as_of_ist"),
+            "fii_dii_latest_arrival_ist": liquidity.get("latest_arrived_at_ist"),
+            "fii_dii_next_release": liquidity.get("next_release_schedule"),
+            "participant_oi_as_of": participant_oi.get("as_of_date"),
+            "participant_oi_as_of_ist": participant_oi.get("as_of_ist"),
+        },
         "indices": indices_data,
         "fear_greed_score": sentiment_data["fear_greed_score"],
         "fear_greed_label": sentiment_data["fear_greed_label"],

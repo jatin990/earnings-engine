@@ -48,6 +48,11 @@
                     .then(data => {
                         const sectors = data.sectors || [];
                         this.renderSectors(sectors);
+                        const secTs = document.getElementById('pulseSectorsTimestamp');
+                        if (secTs) {
+                            const ts = data.as_of_ist || data.as_of || 'Live Tick';
+                            secTs.textContent = `Updated: ${ts}`;
+                        }
                         return { key: 'sectors', val: sectors };
                     })
                     .catch(err => {
@@ -69,7 +74,7 @@
                     }),
 
                 // 4. Macro Sentiment, Breadth & 30D Trend Charts
-                fetch(API_BASE + '/api/v1/market-pulse/sentiment')
+                fetch(API_BASE + '/api/v1/market-pulse/sentiment' + queryParam)
                     .then(r => r.ok ? r.json() : Promise.reject(r.status))
                     .then(data => {
                         const sent = data.sentiment || {};
@@ -82,6 +87,9 @@
                             vix_factor: sent.sub_factors?.vix_factor,
                             breadth_factor: sent.sub_factors?.breadth_factor,
                             change_7d: sent.change_7d || null,
+                            as_of_ist: sent.as_of_ist || sent.as_of,
+                            session_date: sent.session_date,
+                            data_freshness: sent.data_freshness,
                         };
                         this.renderFearAndGreed(fg);
                         this.renderVolatility({
@@ -90,6 +98,8 @@
                             regime: sent.vix_regime?.label || sent.vix_regime?.regime || sent.vix_regime,
                             description: sent.vix_regime?.description,
                             stance: sent.vix_regime?.stance,
+                            as_of_ist: sent.as_of_ist || sent.as_of,
+                            session_date: sent.session_date,
                         });
                         this.renderBreadth(sent.breadth || {});
                         if (sent.prediction) {
@@ -99,9 +109,25 @@
                                 conviction_pct: sent.prediction.conviction_pct,
                                 nifty_support: sent.prediction.support_level,
                                 nifty_resistance: sent.prediction.resistance_level,
+                                as_of_ist: sent.as_of_ist || sent.as_of,
+                                session_date: sent.session_date,
                             });
                         }
                         this.renderMacroCharts(sent.macro_charts || {}, this._lastOiData || {});
+
+                        // Card-level timestamp stamping
+                        const tsLabel = sent.as_of_ist || sent.as_of || (sent.session_date ? `Session ${sent.session_date}` : 'Updated: EOD');
+                        const fgTs = document.getElementById('pulseFgTimestamp');
+                        const vixTs = document.getElementById('pulseVixTimestamp');
+                        const niftyTs = document.getElementById('pulseNiftyTimestamp');
+                        const oiChartTs = document.getElementById('pulseOiChartTimestamp');
+                        const fiiLsTs = document.getElementById('pulseFiiLsTimestamp');
+                        if (fgTs) fgTs.textContent = `Updated: ${tsLabel}`;
+                        if (vixTs) vixTs.textContent = `Updated: ${tsLabel}`;
+                        if (niftyTs) niftyTs.textContent = `Updated: ${tsLabel}`;
+                        if (oiChartTs) oiChartTs.textContent = `Updated: ${tsLabel}`;
+                        if (fiiLsTs) fiiLsTs.textContent = `Updated: ${tsLabel}`;
+
                         return { key: 'sentiment', val: sent };
                     })
                     .catch(err => {
@@ -117,6 +143,11 @@
                         this.renderParticipantOI(oi);
                         if (this.pulseData?.sentiment?.macro_charts) {
                             this.renderMacroCharts(this.pulseData.sentiment.macro_charts, oi);
+                        }
+                        const oiTs = document.getElementById('pulseOiTimestamp');
+                        if (oiTs) {
+                            const ts = oi.as_of_ist || oi.as_of || (oi.session_label ? `Session ${oi.session_label}` : 'EOD');
+                            oiTs.textContent = `Updated: ${ts}`;
                         }
                         return { key: 'participant_oi', val: oi };
                     })
@@ -521,6 +552,8 @@
             const countBadge = document.getElementById('pulseFlowHistoryCountBadge');
             const toggleBtn = document.getElementById('pulseToggleFlowHistoryBtn');
             const containerEl = document.getElementById('pulseFlowsTableContainer');
+            const arrivalBadge = document.getElementById('pulseLiqArrivalBadge');
+            const nextUpdatePill = document.getElementById('pulseLiqNextUpdatePill');
 
             // Resolve robust flows data from whatever source is available
             if (!flows || Object.keys(flows).length === 0) {
@@ -533,6 +566,16 @@
 
             this._lastFlowsData = flows;
             if (window.app) window.app._lastFlowsData = flows;
+
+            // 1. Arrival Timestamp Badge & Schedule
+            if (arrivalBadge) {
+                const arrTime = flows.latest_arrived_at_ist || flows.arrived_at_ist || (flows.session_label ? `Session ${flows.session_label}` : 'Latest EOD');
+                arrivalBadge.textContent = `Arrived: ${arrTime}`;
+                arrivalBadge.title = `NSE Cash settlement finalized: ${arrTime}`;
+            }
+
+            // 2. Next Update Schedule & Countdown
+            this.updateLiquiditySchedulePill(flows);
 
             const sessionLabel = flows.session_label || flows.as_of_date || 'Latest Session';
             const fiiLbl = document.getElementById('pulseSessionFiiLabel');
@@ -609,7 +652,7 @@
             // Flow History Table Rows
             if (tbody7d) {
                 if (!history.length) {
-                    tbody7d.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
+                    tbody7d.innerHTML = '<tr><td colspan="6" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
                     return;
                 }
 
@@ -629,6 +672,7 @@
                     const badgeCol = isBull ? '#34d399' : '#f87171';
                     const badgeBg = isBull ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
                     const badgeText = isBull ? '🟢 Inflow' : '🔴 Outflow';
+                    const arrivalStr = row.arrived_at_ist || row.updated_at_ist || '—';
 
                     return `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg};">
@@ -649,10 +693,66 @@
                                     ${badgeText}
                                 </span>
                             </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:center;font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);">
+                                ${arrivalStr}
+                            </td>
                         </tr>
                     `;
                 }).join('');
             }
+        },
+
+        updateLiquiditySchedulePill(flows) {
+            const nextUpdatePill = document.getElementById('pulseLiqNextUpdatePill');
+            if (!nextUpdatePill) return;
+
+            const sched = flows.next_release_schedule || {};
+            const status = sched.status || flows.next_release_status || 'pending_today';
+            const label = sched.label || flows.next_release_label || 'Today ~18:30 IST';
+            let targetUtc = sched.next_release_target_utc;
+
+            const formatCountdown = (seconds) => {
+                if (seconds <= 0) return '0m';
+                const days = Math.floor(seconds / 86400);
+                const hrs = Math.floor((seconds % 86400) / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                if (days > 0) return `${days}d ${hrs}h`;
+                if (hrs > 0) return `${hrs}h ${mins}m`;
+                return `${mins}m`;
+            };
+
+            const renderPill = () => {
+                let countdownStr = sched.countdown || flows.next_release_countdown || '';
+                if (targetUtc) {
+                    const diffSec = Math.max(0, Math.floor((new Date(targetUtc).getTime() - Date.now()) / 1000));
+                    countdownStr = formatCountdown(diffSec);
+                }
+
+                if (status === 'awaiting_settlement') {
+                    nextUpdatePill.textContent = `Next Update: ${label}`;
+                    nextUpdatePill.style.background = 'rgba(239,68,68,0.12)';
+                    nextUpdatePill.style.color = '#f87171';
+                    nextUpdatePill.style.borderColor = 'rgba(239,68,68,0.25)';
+                } else if (status === 'weekend_pause') {
+                    nextUpdatePill.textContent = `Next Update: ${label} (in ${countdownStr || 'weekend'})`;
+                    nextUpdatePill.style.background = 'rgba(148,163,184,0.12)';
+                    nextUpdatePill.style.color = '#94a3b8';
+                    nextUpdatePill.style.borderColor = 'rgba(148,163,184,0.25)';
+                } else {
+                    const cStr = countdownStr ? ` (in ${countdownStr})` : '';
+                    nextUpdatePill.textContent = `Next Update: ${label}${cStr}`;
+                    nextUpdatePill.style.background = 'rgba(251,191,36,0.12)';
+                    nextUpdatePill.style.color = '#fbbf24';
+                    nextUpdatePill.style.borderColor = 'rgba(251,191,36,0.25)';
+                }
+            };
+
+            renderPill();
+
+            if (this._liquidityCountdownInterval) {
+                clearInterval(this._liquidityCountdownInterval);
+            }
+            this._liquidityCountdownInterval = setInterval(renderPill, 60000);
         },
 
         toggleFlowHistory() {

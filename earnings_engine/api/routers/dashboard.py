@@ -424,11 +424,13 @@ async def api_get_net_cash_liquidity(
 
 @router.get("/api/v1/market-pulse/sentiment")
 @router.get("/api/v1/market_pulse/sentiment")
-async def api_get_market_sentiment_matrix():
+async def api_get_market_sentiment_matrix(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
     """Retrieve Fear & Greed score, Market Breadth, Volatility Matrix, and 30D macro time-series."""
     try:
         from earnings_engine.data.market_pulse import compute_market_sentiment_matrix
-        sentiment = await asyncio.to_thread(compute_market_sentiment_matrix, settings=_settings)
+        sentiment = await asyncio.to_thread(compute_market_sentiment_matrix, settings=_settings, force_refresh=force_refresh)
         return {"success": True, "sentiment": sentiment}
     except Exception as e:
         logger.exception("Error in api_get_market_sentiment_matrix: %s", e)
