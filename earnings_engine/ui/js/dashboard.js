@@ -1281,7 +1281,11 @@ const API_BASE = window.location.origin;
             },
 
             getResultsPresetDetails(preset) {
-                if (preset === 'recent') {
+                if (preset === 'next3') {
+                    return { pastDays: 0, days: 3, label: 'Upcoming 3 Days' };
+                } else if (preset === 'next7') {
+                    return { pastDays: 0, days: 7, label: 'Upcoming 7 Days' };
+                } else if (preset === 'recent') {
                     return { pastDays: 4, days: 7, label: 'Recent (-4D to +7D)' };
                 } else if (preset === 'pm60') {
                     return { pastDays: 60, days: 60, label: '±2 Months' };
@@ -1325,7 +1329,7 @@ const API_BASE = window.location.origin;
             },
 
             async loadResultsReport() {
-                const preset = document.getElementById('resultsRangePreset')?.value || 'recent';
+                const preset = document.getElementById('resultsRangePreset')?.value || 'next3';
                 const details = this.getResultsPresetDetails(preset);
                 const pastDays = details.pastDays;
                 const days = details.days;
