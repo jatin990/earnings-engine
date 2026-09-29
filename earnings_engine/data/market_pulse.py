@@ -1869,22 +1869,34 @@ def compute_market_sentiment_matrix(
     }
 
     change_7d = 0.0
+    target_dates: list[str] = []
     try:
         nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
         vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
         bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
 
-        if force_refresh or len(nifty_rows) < 10 or len(vix_rows) < 10:
+        expected_date = get_expected_latest_trading_date()
+        latest_nifty_date = nifty_rows[0][0] if nifty_rows else ""
+        latest_vix_date = vix_rows[0][0] if vix_rows else ""
+        needs_sync = (
+            force_refresh
+            or len(nifty_rows) < 10
+            or len(vix_rows) < 10
+            or (expected_date and latest_nifty_date < expected_date)
+            or (expected_date and latest_vix_date < expected_date)
+        )
+
+        if needs_sync:
             try:
                 from earnings_engine.data.prices import fetch_prices
-                if force_refresh or len(nifty_rows) < 10:
-                    fetch_prices("^NSEI", settings, force=force_refresh)
+                if force_refresh or len(nifty_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                    fetch_prices("^NSEI", settings, force=True)
                     nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if force_refresh or len(vix_rows) < 10:
-                    fetch_prices("^INDIAVIX", settings, force=force_refresh)
+                if force_refresh or len(vix_rows) < 10 or (expected_date and latest_vix_date < expected_date):
+                    fetch_prices("^INDIAVIX", settings, force=True)
                     vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if force_refresh or len(bank_rows) < 10:
-                    fetch_prices("^NSEBANK", settings, force=force_refresh)
+                if force_refresh or len(bank_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                    fetch_prices("^NSEBANK", settings, force=True)
                     bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
             except Exception as e_fetch:
                 logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
