@@ -1,0 +1,237 @@
+<!-- Zepto Dark Store Attendance & Shift Muster Partial Template -->
+<div class="space-y-4">
+    <!-- Top Action & Filter Toolbar -->
+    <section class="glass-panel p-3.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <!-- Store / Date Range Info -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-lg">
+                📅
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-extrabold text-white" id="attStoreTitle">Zepto Dark Store Attendance</h3>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attDateRangeBadge">
+                        All Records
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400">Daily punch muster, shift adherence, and absenteeism intelligence</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <button
+                type="button"
+                onclick="zeptoApp.syncAttendanceFromGmail()"
+                id="btnSyncAttGmail"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-300 hover:text-emerald-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                title="Search linked Gmail for new attendance Excel attachments"
+            >
+                <span id="btnSyncAttGmailIcon">⚡</span>
+                <span id="btnSyncAttGmailText">Sync from Gmail</span>
+            </button>
+
+            <button
+                type="button"
+                onclick="document.getElementById('attendanceFileInput').click()"
+                class="px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-300 hover:text-blue-200 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+                <span>📤</span> Upload Report (.xlsx)
+            </button>
+            <input
+                type="file"
+                id="attendanceFileInput"
+                accept=".xlsx,.xlsm"
+                style="display: none;"
+                onchange="zeptoApp.handleAttendanceFileUpload(event)"
+            />
+
+            <button
+                type="button"
+                onclick="zeptoApp.exportAttendanceCSV()"
+                class="px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5"
+                title="Export filtered records to CSV"
+            >
+                <span>📥</span> Export CSV
+            </button>
+        </div>
+    </section>
+
+    <!-- KPI Summary Metric Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- 1. Present Rate -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance Rate</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attRateBadge">
+                    --%
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="attRateValue">--%</div>
+                <div class="w-full bg-black rounded-full h-1.5 mt-1.5 overflow-hidden flex border border-white/10">
+                    <div id="attRateBar" class="bg-emerald-400 h-1.5 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Total Present Shifts:</span>
+                <span class="font-mono font-bold text-emerald-400" id="attPresentCount">0</span>
+            </div>
+        </div>
+
+        <!-- 2. Active Staff Headcount & Total Shifts -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Muster Headcount</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono" id="attShiftsBadge">
+                    0 Shifts
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="attHeadcount">--</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate" id="attHeadcountSub">
+                    Unique Staff Tracked
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Scheduled Shifts:</span>
+                <span class="font-mono font-bold text-slate-200" id="attTotalShifts">0</span>
+            </div>
+        </div>
+
+        <!-- 3. Absenteeism Breakdown -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Absenteeism</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="attAbsentBadge">
+                    0 Absences
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-rose-400 tracking-tight" id="attAbsentCount">0</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 flex items-center justify-between">
+                    <span>Half-Day: <strong class="text-amber-400 font-mono" id="attHalfDayCount">0</strong></span>
+                    <span>Week-Off: <strong class="text-slate-400 font-mono" id="attWeekOffCount">0</strong></span>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Dark Store Holidays:</span>
+                <span class="font-mono font-bold text-sky-300" id="attHolidayCount">0</span>
+            </div>
+        </div>
+
+        <!-- 4. Total Man-Hours & Punctuality -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Man-Hours</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono">
+                    Log Hours
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-purple-300 tracking-tight" id="attTotalHours">0 hrs</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate" id="attAvgHoursSub">
+                    Avg ~8.0 hrs / shift
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Roster Compliance:</span>
+                <span class="font-mono font-bold text-emerald-400">Normal</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Role Composition & Distribution -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Role Breakdown & Attendance Adherence</h4>
+            <span class="text-[10px] text-slate-500 font-mono">Real-time breakdown by designation</span>
+        </div>
+        <div id="attRoleDistributionGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <!-- Populated via JavaScript -->
+            <div class="text-xs text-slate-500 py-3 text-center col-span-full">Loading role metrics...</div>
+        </div>
+    </section>
+
+    <!-- Interactive Filter & Attendance Muster Table -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pb-2 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Attendance Muster Ledger</h4>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="attRecordCountBadge">
+                    0 records
+                </span>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Search input -->
+                <div class="relative min-w-[180px]">
+                    <input
+                        type="text"
+                        id="attSearchInput"
+                        placeholder="Search employee / code..."
+                        oninput="zeptoApp.filterAttendance()"
+                        class="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                    />
+                </div>
+
+                <!-- Role Filter -->
+                <select
+                    id="attRoleFilter"
+                    onchange="zeptoApp.filterAttendance()"
+                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+                >
+                    <option value="">All Roles</option>
+                </select>
+
+                <!-- Status Filter -->
+                <select
+                    id="attStatusFilter"
+                    onchange="zeptoApp.filterAttendance()"
+                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+                >
+                    <option value="">All Statuses</option>
+                    <option value="PRESENT">Present (P)</option>
+                    <option value="ABSENT">Absent (A / A-R)</option>
+                    <option value="WEEK_OFF">Week Off (WO)</option>
+                    <option value="HALF_DAY">Half Day (HD)</option>
+                    <option value="HOLIDAY">Holiday (F)</option>
+                </select>
+
+                <!-- Date Filter -->
+                <input
+                    type="date"
+                    id="attDateFilter"
+                    onchange="zeptoApp.filterAttendance()"
+                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+                />
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Date</th>
+                        <th class="py-2.5 px-3">Employee</th>
+                        <th class="py-2.5 px-3">Role</th>
+                        <th class="py-2.5 px-3">Shift Timing</th>
+                        <th class="py-2.5 px-3">Punch In</th>
+                        <th class="py-2.5 px-3">Punch Out</th>
+                        <th class="py-2.5 px-3 text-right">Work Mins</th>
+                        <th class="py-2.5 px-3 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="attTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-slate-500 text-xs">
+                            No attendance records loaded yet. Upload an Excel report or sync via Gmail.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

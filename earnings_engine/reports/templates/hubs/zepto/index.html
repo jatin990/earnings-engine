@@ -315,6 +315,9 @@
             <button type="button" class="nav-tab active" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
                 <span>👥</span> Employees & Salaries
             </button>
+            <button type="button" class="nav-tab" id="tabBtn-attendance" onclick="zeptoApp.switchTab('attendance')">
+                <span>📅</span> Attendance & Shifts
+            </button>
             <button type="button" class="nav-tab" id="tabBtn-income" onclick="zeptoApp.switchTab('income')">
                 <span>💵</span> Store Income & Profit Split
             </button>
@@ -336,6 +339,11 @@
         <!-- ================= TAB 1: EMPLOYEES & SALARIES ================= -->
         <main id="tabContent-employees" class="space-y-4">
             {% include "hubs/zepto/_employees.html" %}
+        </main>
+
+        <!-- ================= TAB: ATTENDANCE & SHIFTS ================= -->
+        <main id="tabContent-attendance" class="space-y-4" style="display: none;">
+            {% include "hubs/zepto/_attendance.html" %}
         </main>
 
         <!-- ================= TAB 2: STORE INCOME & PARTNER SPLIT ================= -->

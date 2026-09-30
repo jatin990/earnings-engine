@@ -11,6 +11,7 @@ const zeptoApp = {
     expenses: [],
     candidates: [],
     security: null,
+    attendance: { summary: null, records: [], filtered: [], roles: [] },
     activeTab: 'employees',
     currentEmpId: null,
 
@@ -20,7 +21,7 @@ const zeptoApp = {
 
         // Tab routing via hash
         const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-        if (['employees', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
+        if (['employees', 'attendance', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
             this.activeTab = rawHash;
         }
         this.switchTab(this.activeTab, false);
@@ -49,6 +50,7 @@ const zeptoApp = {
         await Promise.all([
             this.loadOverview(),
             this.loadEmployees(),
+            this.loadAttendanceData(),
             this.loadIncome(),
             this.loadExpenses(),
             this.loadCandidates(),
@@ -67,7 +69,7 @@ const zeptoApp = {
             window.location.hash = tabId;
         }
 
-        ['employees', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
+        ['employees', 'attendance', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -2118,6 +2120,326 @@ const zeptoApp = {
                 btn.textContent = 'Apply Split Ratio';
             }
         }
+    },
+
+    // -----------------------------------------------------------------------
+    // Tab: Dark Store Attendance & Shift Muster Analytics
+    // -----------------------------------------------------------------------
+
+    async loadAttendanceData() {
+        try {
+            const [sumRes, recRes] = await Promise.all([
+                fetch('/api/v1/zepto/attendance/summary'),
+                fetch('/api/v1/zepto/attendance/records?limit=1000'),
+            ]);
+
+            if (sumRes.ok) {
+                this.attendance.summary = await sumRes.json();
+            }
+            if (recRes.ok) {
+                const recData = await recRes.json();
+                this.attendance.records = recData.records || [];
+                this.attendance.filtered = [...this.attendance.records];
+            }
+
+            this.renderAttendance();
+        } catch (err) {
+            console.error('[ZEPTO-ATTENDANCE] Error loading attendance data:', err);
+        }
+    },
+
+    renderAttendance() {
+        const sum = this.attendance.summary || {};
+        const records = this.attendance.filtered || [];
+
+        // Title and store name
+        const titleEl = document.getElementById('attStoreTitle');
+        if (titleEl) {
+            titleEl.textContent = sum.store_name ? `${sum.store_name} Attendance` : 'Zepto Dark Store Attendance';
+        }
+
+        const dateRangeEl = document.getElementById('attDateRangeBadge');
+        if (dateRangeEl) {
+            if (sum.period && sum.period.start && sum.period.end) {
+                dateRangeEl.textContent = `${sum.period.start} to ${sum.period.end}`;
+            } else {
+                dateRangeEl.textContent = 'All Records';
+            }
+        }
+
+        // 1. Attendance Rate
+        const rateValEl = document.getElementById('attRateValue');
+        const rateBadgeEl = document.getElementById('attRateBadge');
+        const rateBarEl = document.getElementById('attRateBar');
+        const presentCountEl = document.getElementById('attPresentCount');
+
+        const rate = sum.attendance_rate_pct != null ? sum.attendance_rate_pct : 0.0;
+        if (rateValEl) rateValEl.textContent = `${rate.toFixed(1)}%`;
+        if (rateBadgeEl) rateBadgeEl.textContent = `${rate.toFixed(1)}% Rate`;
+        if (rateBarEl) rateBarEl.style.width = `${Math.min(100, rate)}%`;
+        if (presentCountEl) {
+            const pCount = sum.status_distribution?.PRESENT || 0;
+            presentCountEl.textContent = `${pCount} Shifts`;
+        }
+
+        // 2. Active Staff Headcount & Shifts
+        const hcEl = document.getElementById('attHeadcount');
+        const totalShiftsEl = document.getElementById('attTotalShifts');
+        const shiftsBadgeEl = document.getElementById('attShiftsBadge');
+
+        if (hcEl) hcEl.textContent = sum.headcount != null ? sum.headcount : '--';
+        if (totalShiftsEl) totalShiftsEl.textContent = `${sum.total_shifts_scheduled || 0} Shifts`;
+        if (shiftsBadgeEl) shiftsBadgeEl.textContent = `${sum.total_shifts_scheduled || 0} Scheduled`;
+
+        // 3. Absenteeism
+        const absentCountEl = document.getElementById('attAbsentCount');
+        const absentBadgeEl = document.getElementById('attAbsentBadge');
+        const halfDayEl = document.getElementById('attHalfDayCount');
+        const weekOffEl = document.getElementById('attWeekOffCount');
+        const holidayEl = document.getElementById('attHolidayCount');
+
+        const absCount = sum.status_distribution?.ABSENT || 0;
+        if (absCountEl) absCountEl.textContent = absCount;
+        if (absentBadgeEl) absentBadgeEl.textContent = `${absCount} Absences`;
+        if (halfDayEl) halfDayEl.textContent = sum.status_distribution?.HALF_DAY || 0;
+        if (weekOffEl) weekOffEl.textContent = sum.status_distribution?.WEEK_OFF || 0;
+        if (holidayEl) holidayEl.textContent = sum.status_distribution?.HOLIDAY || 0;
+
+        // 4. Man-Hours
+        const totalHoursEl = document.getElementById('attTotalHours');
+        const avgHoursSubEl = document.getElementById('attAvgHoursSub');
+        if (totalHoursEl) {
+            totalHoursEl.textContent = `${sum.total_hours_worked || 0} hrs`;
+        }
+        if (avgHoursSubEl && sum.total_shifts_scheduled > 0) {
+            const avg = ((sum.total_hours_worked || 0) / sum.total_shifts_scheduled).toFixed(1);
+            avgHoursSubEl.textContent = `Avg ~${avg} hrs / shift`;
+        }
+
+        // Role Breakdown Grid & Role Filter Dropdown
+        this.renderAttendanceRoles(sum.role_breakdown || []);
+
+        // Muster Records Table
+        this.renderAttendanceTable();
+    },
+
+    renderAttendanceRoles(roles) {
+        const grid = document.getElementById('attRoleDistributionGrid');
+        const roleFilter = document.getElementById('attRoleFilter');
+
+        if (roleFilter && roleFilter.options.length <= 1) {
+            // Populate filter options
+            roles.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.role;
+                opt.textContent = `${r.role} (${r.headcount})`;
+                roleFilter.appendChild(opt);
+            });
+        }
+
+        if (!grid) return;
+        if (!roles || roles.length === 0) {
+            grid.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center col-span-full">No role data available.</div>`;
+            return;
+        }
+
+        grid.innerHTML = roles.map(r => `
+            <div class="glass-panel-sub p-3 flex flex-col justify-between border border-white/5 hover:border-white/15 transition">
+                <div class="flex items-start justify-between gap-1">
+                    <span class="text-xs font-bold text-white truncate max-w-[150px]" title="${r.role}">${r.role}</span>
+                    <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300">
+                        ${r.headcount} Staff
+                    </span>
+                </div>
+                <div class="my-2 flex items-baseline justify-between">
+                    <span class="text-lg font-black font-mono text-emerald-400">${r.attendance_rate_pct}%</span>
+                    <span class="text-[11px] text-slate-400 font-mono">${r.total_hours_worked} hrs</span>
+                </div>
+                <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1.5 border-t border-white/5">
+                    <span>Present: <strong class="text-emerald-400 font-mono">${r.present_count}</strong></span>
+                    <span>Absent: <strong class="text-rose-400 font-mono">${r.absent_count}</strong></span>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    filterAttendance() {
+        const query = (document.getElementById('attSearchInput')?.value || '').toLowerCase().trim();
+        const role = document.getElementById('attRoleFilter')?.value || '';
+        const status = document.getElementById('attStatusFilter')?.value || '';
+        const date = document.getElementById('attDateFilter')?.value || '';
+
+        this.attendance.filtered = this.attendance.records.filter(r => {
+            if (query) {
+                const name = (r.employee_name || '').toLowerCase();
+                const code = (r.employee_id || '').toLowerCase();
+                if (!name.includes(query) && !code.includes(query)) return false;
+            }
+            if (role && r.designation !== role) return false;
+            if (status && r.status !== status) return false;
+            if (date && r.shift_date !== date) return false;
+            return true;
+        });
+
+        this.renderAttendanceTable();
+    },
+
+    renderAttendanceTable() {
+        const tbody = document.getElementById('attTableBody');
+        const badge = document.getElementById('attRecordCountBadge');
+        const records = this.attendance.filtered || [];
+
+        if (badge) badge.textContent = `${records.length} records`;
+        if (!tbody) return;
+
+        if (records.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-8 text-slate-500 text-xs">
+                        No matching attendance records found.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Limit rendering to first 200 items for snappy DOM responsiveness
+        const visible = records.slice(0, 200);
+
+        tbody.innerHTML = visible.map(r => {
+            let statusBadge = '';
+            if (r.status === 'PRESENT') {
+                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">P · Present</span>';
+            } else if (r.status === 'ABSENT') {
+                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/30">A · Absent</span>';
+            } else if (r.status === 'WEEK_OFF') {
+                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-500/15 text-slate-300 border border-white/10">WO · Week Off</span>';
+            } else if (r.status === 'HALF_DAY') {
+                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">HD · Half Day</span>';
+            } else if (r.status === 'HOLIDAY') {
+                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">F · Holiday</span>';
+            } else {
+                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-white/5 text-slate-300 border border-white/10">${r.status}</span>`;
+            }
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3 font-mono text-slate-300 font-medium whitespace-nowrap">${r.shift_date || '—'}</td>
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-white">${r.employee_name || '—'}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
+                    </td>
+                    <td class="py-2.5 px-3">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300 whitespace-nowrap">
+                            ${r.designation || 'Unassigned'}
+                        </span>
+                    </td>
+                    <td class="py-2.5 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                        ${r.shift_time || r.shift_name || 'Standard Shift'}
+                    </td>
+                    <td class="py-2.5 px-3 font-mono text-[11px] ${r.punch_in ? 'text-emerald-300' : 'text-slate-600'}">
+                        ${r.punch_in || '—'}
+                    </td>
+                    <td class="py-2.5 px-3 font-mono text-[11px] ${r.punch_out ? 'text-emerald-300' : 'text-slate-600'}">
+                        ${r.punch_out || '—'}
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold ${r.work_duration_mins > 0 ? 'text-white' : 'text-slate-600'}">
+                        ${r.work_duration_mins > 0 ? `${(r.work_duration_mins / 60).toFixed(1)}h` : '—'}
+                    </td>
+                    <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                        ${statusBadge}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    async handleAttendanceFileUpload(event) {
+        const file = event.target?.files?.[0];
+        if (!file) return;
+
+        this.showToast('📤 Uploading and parsing attendance spreadsheet...');
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch('/api/v1/zepto/attendance/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+            this.showToast(`✅ Successfully imported ${data.total_records} attendance records for ${data.store_name}!`);
+            await this.loadAttendanceData();
+        } catch (err) {
+            this.showToast('⚠️ Attendance upload failed: ' + err.message, true);
+        } finally {
+            if (event.target) event.target.value = '';
+        }
+    },
+
+    async syncAttendanceFromGmail() {
+        const btn = document.getElementById('btnSyncAttGmail');
+        const icon = document.getElementById('btnSyncAttGmailIcon');
+        const text = document.getElementById('btnSyncAttGmailText');
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.className = 'inline-block animate-spin';
+        if (text) text.textContent = 'Scanning Gmail...';
+
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/sync-attendance', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Gmail sync failed');
+
+            if (data.status === 'no_new_reports') {
+                this.showToast('📧 No new attendance email reports found in Gmail.');
+            } else {
+                this.showToast(`✅ Synced ${data.records_imported} records from ${data.processed_count} email attachments!`);
+                await this.loadAttendanceData();
+            }
+        } catch (err) {
+            this.showToast('⚠️ ' + err.message, true);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) icon.className = '';
+            if (text) text.textContent = 'Sync from Gmail';
+        }
+    },
+
+    exportAttendanceCSV() {
+        const records = this.attendance.filtered || [];
+        if (records.length === 0) {
+            alert('No records to export.');
+            return;
+        }
+
+        const headers = ['Date', 'Employee ID', 'Employee Name', 'Designation', 'Shift Time', 'Punch In', 'Punch Out', 'Work Duration (mins)', 'Status'];
+        const csvRows = [headers.join(',')];
+
+        records.forEach(r => {
+            const row = [
+                `"${r.shift_date || ''}"`,
+                `"${r.employee_id || ''}"`,
+                `"${(r.employee_name || '').replace(/"/g, '""')}"`,
+                `"${(r.designation || '').replace(/"/g, '""')}"`,
+                `"${r.shift_time || ''}"`,
+                `"${r.punch_in || ''}"`,
+                `"${r.punch_out || ''}"`,
+                r.work_duration_mins || 0,
+                `"${r.status || ''}"`,
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `zepto_attendance_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
     },
 
     // -----------------------------------------------------------------------

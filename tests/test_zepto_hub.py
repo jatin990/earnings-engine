@@ -88,6 +88,15 @@ def test_zepto_hub_renders_gmail_tab(client):
     assert "tabContent-gmail" in resp.text
 
 
+def test_zepto_hub_renders_attendance_tab(client):
+    resp = client.get("/zepto")
+    assert resp.status_code == 200
+    assert "tabBtn-attendance" in resp.text
+    assert "tabContent-attendance" in resp.text
+    assert "Attendance & Shifts" in resp.text
+    assert "Attendance Muster Ledger" in resp.text
+
+
 
 def test_store_expenses_and_spend_per_employee():
     settings = Settings()
