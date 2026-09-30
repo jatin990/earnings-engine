@@ -122,6 +122,8 @@ SYNC_TABLES = [
     "zepto_security_capital",
     "zepto_staffing_targets",
     "zepto_gmail_auth",
+    "zepto_attendance_imports",
+    "zepto_attendance_records",
 ]
 
 

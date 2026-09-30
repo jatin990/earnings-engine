@@ -256,6 +256,45 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_attendance_imports (
+                id TEXT PRIMARY KEY,
+                file_name TEXT NOT NULL,
+                store_name TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                total_records INTEGER NOT NULL DEFAULT 0,
+                total_employees INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT 'UPLOAD',
+                imported_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_attendance_records (
+                id TEXT PRIMARY KEY,
+                import_id TEXT NOT NULL,
+                store_name TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                designation TEXT NOT NULL,
+                shift_date TEXT NOT NULL,
+                shift_name TEXT,
+                shift_time TEXT,
+                punch_in TEXT,
+                punch_out TEXT,
+                work_duration_mins INTEGER DEFAULT 0,
+                break_duration_mins INTEGER DEFAULT 0,
+                raw_status TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(import_id) REFERENCES zepto_attendance_imports(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_store_date ON zepto_attendance_records(store_name, shift_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_emp ON zepto_attendance_records(employee_id, shift_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_status ON zepto_attendance_records(status);
+
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
             CREATE INDEX IF NOT EXISTS idx_zepto_sal_emp ON zepto_salaries(employee_id, year_month);
@@ -2082,4 +2121,362 @@ def get_valid_gmail_token(auth_id: str = "primary", settings: Settings | None = 
         logger.error("[GMAIL-AUTH] Exception while refreshing token: %s", exc)
 
     return str(auth_data["access_token"])
+
+
+# ---------------------------------------------------------------------------
+# Attendance Reports & Muster Ingestion DAL
+# ---------------------------------------------------------------------------
+
+def save_attendance_batch(
+    parsed_data: dict[str, Any],
+    source: str = "UPLOAD",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """
+    Persist parsed attendance records and metadata into SQLite cache.
+    Uses MD5 composite ID for records to ensure idempotent upsert.
+    """
+    import hashlib
+
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    file_name = parsed_data.get("file_name") or "attendance_report.xlsx"
+    store_name = parsed_data.get("store_name") or "Zepto Dark Store"
+    start_date = parsed_data.get("start_date") or ""
+    end_date = parsed_data.get("end_date") or ""
+    records = parsed_data.get("records") or []
+    total_records = len(records)
+    total_employees = parsed_data.get("total_employees") or len({r.get("employee_id") for r in records if r.get("employee_id")})
+
+    import_id = f"imp_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    with _connect(settings) as conn:
+        # 1. Insert Import Record
+        conn.execute(
+            """
+            INSERT INTO zepto_attendance_imports (
+                id, file_name, store_name, start_date, end_date,
+                total_records, total_employees, source, imported_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                import_id,
+                file_name,
+                store_name,
+                start_date,
+                end_date,
+                total_records,
+                total_employees,
+                source,
+                now_iso,
+                now_iso,
+                now_iso,
+            ),
+        )
+
+        # 2. Insert granular records
+        insert_rows = []
+        for r in records:
+            emp_id = str(r.get("employee_id") or "").strip()
+            shift_date = str(r.get("shift_date") or "").strip()
+            # Deterministic composite key
+            raw_key = f"{store_name}|{emp_id}|{shift_date}".encode("utf-8")
+            rec_id = f"att_{hashlib.md5(raw_key).hexdigest()[:16]}"
+
+            insert_rows.append((
+                rec_id,
+                import_id,
+                store_name,
+                emp_id,
+                str(r.get("employee_name") or emp_id).strip(),
+                str(r.get("designation") or "").strip(),
+                shift_date,
+                str(r.get("shift_name") or "").strip(),
+                str(r.get("shift_time") or "").strip(),
+                str(r.get("punch_in") or "").strip(),
+                str(r.get("punch_out") or "").strip(),
+                int(r.get("work_duration_mins") or 0),
+                int(r.get("break_duration_mins") or 0),
+                str(r.get("raw_status") or "P").strip(),
+                str(r.get("status") or "PRESENT").strip(),
+                now_iso,
+                now_iso,
+            ))
+
+        if insert_rows:
+            conn.executemany(
+                """
+                INSERT INTO zepto_attendance_records (
+                    id, import_id, store_name, employee_id, employee_name, designation,
+                    shift_date, shift_name, shift_time, punch_in, punch_out,
+                    work_duration_mins, break_duration_mins, raw_status, status,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    import_id = excluded.import_id,
+                    employee_name = excluded.employee_name,
+                    designation = excluded.designation,
+                    shift_name = excluded.shift_name,
+                    shift_time = excluded.shift_time,
+                    punch_in = excluded.punch_in,
+                    punch_out = excluded.punch_out,
+                    work_duration_mins = excluded.work_duration_mins,
+                    break_duration_mins = excluded.break_duration_mins,
+                    raw_status = excluded.raw_status,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at
+                """,
+                insert_rows,
+            )
+
+    return {
+        "status": "success",
+        "import_id": import_id,
+        "store_name": store_name,
+        "imported_records": total_records,
+        "total_employees": total_employees,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+def get_attendance_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Calculate aggregated attendance KPIs, role distribution, and status breakdown."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where_clauses = ["1=1"]
+    params: list[Any] = []
+
+    if store_name:
+        where_clauses.append("store_name = ?")
+        params.append(store_name)
+    if start_date:
+        where_clauses.append("shift_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where_clauses.append("shift_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where_clauses)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # Overall counts & headcount
+        stats_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) as total_shifts,
+                COUNT(DISTINCT employee_id) as headcount,
+                MIN(shift_date) as min_date,
+                MAX(shift_date) as max_date,
+                SUM(work_duration_mins) as total_work_mins,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday_count,
+                SUM(CASE WHEN status = 'LEAVE' THEN 1 ELSE 0 END) as leave_count
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            """,
+            params,
+        ).fetchone()
+
+        total_shifts = stats_row["total_shifts"] if stats_row else 0
+        headcount = stats_row["headcount"] if stats_row else 0
+        present = stats_row["present_count"] or 0 if stats_row else 0
+        absent = stats_row["absent_count"] or 0 if stats_row else 0
+        week_off = stats_row["week_off_count"] or 0 if stats_row else 0
+        half_day = stats_row["half_day_count"] or 0 if stats_row else 0
+        holiday = stats_row["holiday_count"] or 0 if stats_row else 0
+        leave = stats_row["leave_count"] or 0 if stats_row else 0
+        total_work_mins = stats_row["total_work_mins"] or 0 if stats_row else 0
+
+        denominator = present + absent + half_day
+        attendance_rate = (
+            round(((present + 0.5 * half_day) / denominator) * 100.0, 2)
+            if denominator > 0
+            else 0.0
+        )
+
+        # Role breakdown
+        role_rows = conn.execute(
+            f"""
+            SELECT
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as role,
+                COUNT(DISTINCT employee_id) as headcount,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(work_duration_mins) as total_work_mins
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY role
+            ORDER BY total_shifts DESC
+            """,
+            params,
+        ).fetchall()
+
+        role_breakdown = []
+        for r in role_rows:
+            r_denom = (r["present_count"] or 0) + (r["absent_count"] or 0)
+            r_rate = round(((r["present_count"] or 0) / r_denom) * 100.0, 1) if r_denom > 0 else 100.0
+            role_breakdown.append({
+                "role": r["role"],
+                "headcount": r["headcount"],
+                "total_shifts": r["total_shifts"],
+                "present_count": r["present_count"] or 0,
+                "absent_count": r["absent_count"] or 0,
+                "attendance_rate_pct": r_rate,
+                "total_hours_worked": round((r["total_work_mins"] or 0) / 60.0, 1),
+            })
+
+        # Daily trend
+        daily_rows = conn.execute(
+            f"""
+            SELECT
+                shift_date,
+                COUNT(DISTINCT employee_id) as scheduled,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY shift_date
+            ORDER BY shift_date ASC
+            """,
+            params,
+        ).fetchall()
+
+        daily_trend = [
+            {
+                "date": d["shift_date"],
+                "scheduled": d["scheduled"],
+                "present": d["present"],
+                "absent": d["absent"],
+                "week_off": d["week_off"],
+                "half_day": d["half_day"],
+                "holiday": d["holiday"],
+            }
+            for d in daily_rows
+        ]
+
+        return {
+            "store_name": store_name or "All Stores",
+            "period": {
+                "start": stats_row["min_date"] or start_date or "",
+                "end": stats_row["max_date"] or end_date or "",
+            },
+            "headcount": headcount,
+            "total_shifts_scheduled": total_shifts,
+            "attendance_rate_pct": attendance_rate,
+            "total_hours_worked": round(total_work_mins / 60.0, 1),
+            "status_distribution": {
+                "PRESENT": present,
+                "ABSENT": absent,
+                "WEEK_OFF": week_off,
+                "HALF_DAY": half_day,
+                "HOLIDAY": holiday,
+                "LEAVE": leave,
+            },
+            "role_breakdown": role_breakdown,
+            "daily_trend": daily_trend,
+        }
+
+
+def get_attendance_records(
+    store_name: str | None = None,
+    employee_id: str | None = None,
+    designation: str | None = None,
+    status: str | None = None,
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve detailed attendance punch records with filtering and pagination."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where_clauses = ["1=1"]
+    params: list[Any] = []
+
+    if store_name:
+        where_clauses.append("store_name = ?")
+        params.append(store_name)
+    if employee_id:
+        where_clauses.append("(employee_id = ? OR employee_name LIKE ?)")
+        params.extend([employee_id, f"%{employee_id}%"])
+    if designation:
+        where_clauses.append("designation = ?")
+        params.append(designation)
+    if status:
+        where_clauses.append("status = ?")
+        params.append(status.upper())
+    if date:
+        where_clauses.append("shift_date = ?")
+        params.append(date)
+    if start_date:
+        where_clauses.append("shift_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where_clauses.append("shift_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where_clauses)
+    params.extend([limit, offset])
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_attendance_records
+            WHERE {where_sql}
+            ORDER BY shift_date DESC, employee_name ASC
+            LIMIT ? OFFSET ?
+            """,
+            params,
+        ).fetchall()
+
+        return [dict(r) for r in rows]
+
+
+def get_attendance_imports(limit: int = 20, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Fetch history of attendance report imports."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_imports
+            ORDER BY imported_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_attendance_import(import_id: str, settings: Settings | None = None) -> bool:
+    """Delete an attendance import batch and cascade delete its records."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.execute("DELETE FROM zepto_attendance_records WHERE import_id = ?", (import_id,))
+        conn.execute("DELETE FROM zepto_attendance_imports WHERE id = ?", (import_id,))
+    return True
 
