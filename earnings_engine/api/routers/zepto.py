@@ -825,3 +825,225 @@ async def disconnect_gmail_endpoint() -> dict[str, Any]:
     logger.info("[GMAIL-OAUTH] Disconnected Gmail account")
     return {"success": True, "status": "success", "message": "Gmail account disconnected"}
 
+
+# ---------------------------------------------------------------------------
+# Attendance Reports & Analytics Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v1/zepto/attendance/upload", summary="Upload Attendance Report (.xlsx)")
+async def upload_attendance_report_endpoint(
+    file: UploadFile = File(...),
+) -> dict[str, Any]:
+    """Upload and parse an Excel attendance report file and persist to database."""
+    from earnings_engine.data.zepto_attendance_parser import parse_zepto_attendance_excel
+
+    if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Only Excel .xlsx files are supported.")
+
+    try:
+        content = await file.read()
+        parsed = parse_zepto_attendance_excel(content, file_name=file.filename)
+        saved = zepto_db.save_attendance_batch(parsed, source="UPLOAD", settings=_settings)
+
+        return {
+            "success": True,
+            "status": "success",
+            "import_id": saved["import_id"],
+            "store_name": saved["store_name"],
+            "total_records": saved["imported_records"],
+            "total_employees": saved["total_employees"],
+            "date_range": {
+                "start": saved["start_date"],
+                "end": saved["end_date"],
+            },
+            "summary": parsed.get("summary", {}),
+        }
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error parsing attendance file: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Failed to parse attendance file: {str(exc)}")
+
+
+@router.get("/api/v1/zepto/attendance/summary", summary="Get Attendance Summary Metrics & KPIs")
+async def get_attendance_summary_endpoint(
+    store_name: str | None = Query(None, description="Filter by store name"),
+    start_date: str | None = Query(None, description="Start date YYYY-MM-DD"),
+    end_date: str | None = Query(None, description="End date YYYY-MM-DD"),
+) -> dict[str, Any]:
+    """Retrieve aggregated attendance rate, active headcount, role breakdown, and daily trends."""
+    try:
+        summary = zepto_db.get_attendance_summary(
+            store_name=store_name,
+            start_date=start_date,
+            end_date=end_date,
+            settings=_settings,
+        )
+        return {"success": True, **summary}
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error calculating attendance summary: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/attendance/records", summary="List Detailed Attendance Records")
+async def get_attendance_records_endpoint(
+    store_name: str | None = Query(None),
+    employee_id: str | None = Query(None),
+    designation: str | None = Query(None),
+    status: str | None = Query(None),
+    date: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    """Query granular employee punch and attendance status records."""
+    try:
+        records = zepto_db.get_attendance_records(
+            store_name=store_name,
+            employee_id=employee_id,
+            designation=designation,
+            status=status,
+            date=date,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "count": len(records),
+            "records": records,
+        }
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error fetching attendance records: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/attendance/imports", summary="List Attendance Imports History")
+async def get_attendance_imports_endpoint(
+    limit: int = Query(20, ge=1, le=100),
+) -> dict[str, Any]:
+    """List historical attendance report uploads."""
+    try:
+        imports = zepto_db.get_attendance_imports(limit=limit, settings=_settings)
+        return {"success": True, "count": len(imports), "imports": imports}
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error fetching imports: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.delete("/api/v1/zepto/attendance/imports/{import_id}", summary="Delete Attendance Import")
+async def delete_attendance_import_endpoint(import_id: str) -> dict[str, Any]:
+    """Delete an attendance import batch and its records."""
+    try:
+        zepto_db.delete_attendance_import(import_id, settings=_settings)
+        return {"success": True, "status": "success", "deleted_id": import_id}
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error deleting import %s: %s", import_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/api/v1/zepto/gmail/sync-attendance", summary="Auto-Sync Attendance Reports from Linked Gmail")
+async def sync_attendance_from_gmail_endpoint() -> dict[str, Any]:
+    """Search linked dark store Gmail inbox for attendance reports (.xlsx), download attachments, and parse into DB."""
+    import base64
+    import httpx
+    from earnings_engine.data.zepto_attendance_parser import parse_zepto_attendance_excel
+
+    token = zepto_db.get_valid_gmail_token("primary", _settings)
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No active Gmail account connected or Google credentials missing. Please link Gmail in the #gmail tab.",
+        )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    processed_files = []
+    total_imported_records = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # 1. Search for messages with attendance excel attachments
+            # Query: has:attachment filename:xlsx (attendance OR muster OR report)
+            q = "has:attachment filename:xlsx attendance"
+            list_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?q={q}&maxResults=10"
+            resp = await client.get(list_url, headers=headers)
+            if resp.status_code != 200:
+                # Fallback to broader query if needed
+                list_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=has:attachment filename:xlsx&maxResults=10"
+                resp = await client.get(list_url, headers=headers)
+
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+
+            msg_list = resp.json().get("messages", [])
+            if not msg_list:
+                return {
+                    "success": True,
+                    "status": "no_new_reports",
+                    "message": "No new attendance report emails found in Gmail matching 'attendance'.",
+                    "processed_count": 0,
+                    "records_imported": 0,
+                }
+
+            # 2. Inspect messages for XLSX attachments
+            for msg_summary in msg_list[:5]:
+                msg_id = msg_summary["id"]
+                msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}"
+                m_resp = await client.get(msg_url, headers=headers)
+                if m_resp.status_code != 200:
+                    continue
+
+                msg_data = m_resp.json()
+                payload = msg_data.get("payload", {})
+                parts = payload.get("parts", [])
+
+                # Collect all parts recursively
+                all_parts = []
+                def collect_parts(p_list):
+                    for p in p_list:
+                        all_parts.append(p)
+                        if "parts" in p:
+                            collect_parts(p["parts"])
+                collect_parts(parts)
+
+                for part in all_parts:
+                    fname = part.get("filename", "")
+                    if fname.lower().endswith(".xlsx"):
+                        body = part.get("body", {})
+                        att_id = body.get("attachmentId")
+                        raw_data = body.get("data")
+
+                        if att_id:
+                            att_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}/attachments/{att_id}"
+                            a_resp = await client.get(att_url, headers=headers)
+                            if a_resp.status_code == 200:
+                                raw_data = a_resp.json().get("data")
+
+                        if raw_data:
+                            # Decode base64url data
+                            file_bytes = base64.urlsafe_b64decode(raw_data.encode("UTF-8"))
+                            parsed = parse_zepto_attendance_excel(file_bytes, file_name=fname)
+                            saved = zepto_db.save_attendance_batch(parsed, source="GMAIL", settings=_settings)
+
+                            processed_files.append({
+                                "file_name": fname,
+                                "store_name": saved["store_name"],
+                                "records": saved["imported_records"],
+                                "date_range": f"{saved['start_date']} to {saved['end_date']}",
+                            })
+                            total_imported_records += saved["imported_records"]
+
+        return {
+            "success": True,
+            "status": "success",
+            "message": f"Successfully processed {len(processed_files)} attendance reports from Gmail.",
+            "processed_count": len(processed_files),
+            "records_imported": total_imported_records,
+            "files": processed_files,
+        }
+    except Exception as exc:
+        logger.error("[GMAIL-ATTENDANCE] Sync exception: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Gmail sync failed: {str(exc)}")
+
+
