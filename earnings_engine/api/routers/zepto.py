@@ -645,3 +645,183 @@ async def delete_income_endpoint(income_id: str) -> dict[str, Any]:
     """Delete a store income record."""
     zepto_db.delete_store_income(income_id, _settings)
     return {"success": True, "deleted_id": income_id}
+
+
+# ---------------------------------------------------------------------------
+# Gmail OAuth 2.0 Linking & Status Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/zepto/gmail/status", summary="Gmail Integration Status")
+async def get_gmail_status_endpoint() -> dict[str, Any]:
+    """Return whether Gmail OAuth credentials are configured and whether an account is currently linked."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    is_configured = bool(client_id and client_secret and len(client_id.strip()) > 5)
+
+    auth = zepto_db.get_gmail_auth("primary", _settings)
+    is_connected = bool(auth and auth.get("access_token"))
+
+    return {
+        "success": True,
+        "configured": is_configured,
+        "connected": is_connected,
+        "email": auth.get("email") if auth else None,
+        "token_expiry": auth.get("token_expiry") if auth else None,
+        "updated_at": auth.get("updated_at") if auth else None,
+        "scopes": auth.get("scopes") if auth else None,
+    }
+
+
+@router.get("/api/v1/zepto/gmail/auth-url", summary="Generate Google OAuth Authorization URL")
+async def get_gmail_auth_url_endpoint(request: Request) -> dict[str, Any]:
+    """Generate Google OAuth 2.0 authorization URL with anti-CSRF state token."""
+    import secrets
+    import urllib.parse
+
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=400,
+            detail="GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured in environment variables.",
+        )
+
+    # Determine redirect URI: env var or dynamically from request
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    if not redirect_uri:
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/v1/zepto/gmail/callback"
+
+    state = secrets.token_urlsafe(24)
+    scopes = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
+
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(scopes),
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": state,
+    }
+
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    return {
+        "success": True,
+        "auth_url": auth_url,
+        "state": state,
+        "redirect_uri": redirect_uri,
+    }
+
+
+@router.get("/api/v1/zepto/gmail/callback", summary="Google OAuth Callback Handler")
+async def get_gmail_callback_endpoint(
+    request: Request,
+    code: str | None = Query(None),
+    error: str | None = Query(None),
+    state: str | None = Query(None),
+) -> Any:
+    """Exchange authorization code for Google tokens and store in SQLite."""
+    from datetime import datetime, timedelta, timezone
+    from fastapi.responses import RedirectResponse
+    import httpx
+
+    if error:
+        logger.warning("[GMAIL-OAUTH] User denied or error received: %s", error)
+        return RedirectResponse(url="/zepto#gmail?error=access_denied")
+
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code parameter.")
+
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Google client credentials not configured.")
+
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    if not redirect_uri:
+        base_url = str(request.base_url).rstrip("/")
+        redirect_uri = f"{base_url}/api/v1/zepto/gmail/callback"
+
+    token_url = "https://oauth2.googleapis.com/token"
+    token_payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": redirect_uri,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # 1. Exchange code for access & refresh tokens
+            tok_resp = await client.post(token_url, data=token_payload)
+            if tok_resp.status_code != 200:
+                logger.error("[GMAIL-OAUTH] Token exchange failed: %s", tok_resp.text)
+                return RedirectResponse(url="/zepto#gmail?error=token_exchange_failed")
+
+            token_data = tok_resp.json()
+            access_token = token_data.get("access_token")
+            refresh_token = token_data.get("refresh_token")
+            expires_in = token_data.get("expires_in", 3600)
+            token_type = token_data.get("token_type", "Bearer")
+            scope_granted = token_data.get("scope", "")
+
+            # Calculate expiry
+            expiry_dt = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            expiry_iso = expiry_dt.isoformat()
+
+            # 2. Fetch User Profile to get Gmail Address
+            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            user_resp = await client.get(
+                userinfo_url,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            email = "unknown@gmail.com"
+            if user_resp.status_code == 200:
+                u_data = user_resp.json()
+                email = u_data.get("email", email)
+
+            # 3. Save into zepto_db
+            zepto_db.save_gmail_auth(
+                email=email,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                token_expiry=expiry_iso,
+                scopes=scope_granted,
+                token_type=token_type,
+                auth_id="primary",
+                settings=_settings,
+            )
+            logger.info("[GMAIL-OAUTH] Successfully linked Gmail account: %s", email)
+
+        return RedirectResponse(url="/zepto#gmail?status=connected")
+    except Exception as exc:
+        logger.error("[GMAIL-OAUTH] Exception in oauth callback: %s", exc, exc_info=True)
+        return RedirectResponse(url="/zepto#gmail?error=internal_error")
+
+
+@router.post("/api/v1/zepto/gmail/disconnect", summary="Disconnect Linked Gmail Account")
+async def disconnect_gmail_endpoint() -> dict[str, Any]:
+    """Revoke Google OAuth token and clear credentials from local database."""
+    import httpx
+
+    auth = zepto_db.get_gmail_auth("primary", _settings)
+    if auth and auth.get("access_token"):
+        # Best-effort revocation with Google
+        try:
+            revoke_url = f"https://oauth2.googleapis.com/revoke?token={auth['access_token']}"
+            with httpx.Client(timeout=5.0) as client:
+                client.post(revoke_url)
+        except Exception as e:
+            logger.debug("[GMAIL-OAUTH] Revocation notice: %s", e)
+
+    zepto_db.delete_gmail_auth("primary", _settings)
+    logger.info("[GMAIL-OAUTH] Disconnected Gmail account")
+    return {"success": True, "status": "success", "message": "Gmail account disconnected"}
+

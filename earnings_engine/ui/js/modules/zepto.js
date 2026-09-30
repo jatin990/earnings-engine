@@ -19,11 +19,19 @@ const zeptoApp = {
         this.populatePartnerDropdowns();
 
         // Tab routing via hash
-        const hash = (window.location.hash || '#employees').replace('#', '');
-        if (['employees', 'income', 'expenses', 'candidates', 'security'].includes(hash)) {
-            this.activeTab = hash;
+        const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
+        if (['employees', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
+            this.activeTab = rawHash;
         }
         this.switchTab(this.activeTab, false);
+
+        // Check for oauth callback status in URL query or hash
+        const urlParams = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
+        if (urlParams.get('status') === 'connected') {
+            this.showToast('✅ Gmail account successfully linked!');
+        } else if (urlParams.get('error')) {
+            this.showToast('⚠️ Gmail linking cancelled or failed: ' + urlParams.get('error'), true);
+        }
 
         // Status change listener on employee modal
         const empStatusEl = document.getElementById('empFormStatus');
@@ -45,6 +53,7 @@ const zeptoApp = {
             this.loadExpenses(),
             this.loadCandidates(),
             this.loadSecurity(),
+            this.checkGmailStatus(),
         ]);
     },
 
@@ -58,7 +67,7 @@ const zeptoApp = {
             window.location.hash = tabId;
         }
 
-        ['employees', 'income', 'expenses', 'candidates', 'security'].forEach(t => {
+        ['employees', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -2109,6 +2118,134 @@ const zeptoApp = {
                 btn.textContent = 'Apply Split Ratio';
             }
         }
+    },
+
+    // -----------------------------------------------------------------------
+    // Gmail OAuth 2.0 Management
+    // -----------------------------------------------------------------------
+
+    async checkGmailStatus() {
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/status');
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderGmailState(data);
+        } catch (err) {
+            console.error('[ZEPTO-GMAIL] Error checking status:', err);
+        }
+    },
+
+    renderGmailState(status) {
+        const unconfigBox = document.getElementById('gmailUnconfiguredBox');
+        const disconnBox = document.getElementById('gmailDisconnectedBox');
+        const connBox = document.getElementById('gmailConnectedBox');
+        const badge = document.getElementById('gmailStatusBadge');
+        const headerText = document.getElementById('headerGmailStatusText');
+        const headerBtn = document.getElementById('headerGmailStatusBtn');
+
+        if (!status || !status.configured) {
+            if (unconfigBox) unconfigBox.style.display = 'block';
+            if (disconnBox) disconnBox.style.display = 'none';
+            if (connBox) connBox.style.display = 'none';
+            if (badge) {
+                badge.textContent = 'Setup Required';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono';
+            }
+            if (headerText) headerText.textContent = 'Gmail (.env)';
+            if (headerBtn) headerBtn.className = 'px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-xs font-semibold text-amber-300 hover:text-white transition flex items-center gap-1.5 shadow-sm';
+        } else if (status.connected) {
+            if (unconfigBox) unconfigBox.style.display = 'none';
+            if (disconnBox) disconnBox.style.display = 'none';
+            if (connBox) connBox.style.display = 'block';
+            if (badge) {
+                badge.textContent = 'Connected';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono';
+            }
+            const emailEl = document.getElementById('gmailAccountEmail');
+            if (emailEl) emailEl.textContent = status.email || 'Connected Account';
+
+            const lastSyncedEl = document.getElementById('gmailLastSynced');
+            if (lastSyncedEl && status.updated_at) {
+                try {
+                    const d = new Date(status.updated_at);
+                    lastSyncedEl.textContent = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                } catch {
+                    lastSyncedEl.textContent = 'Active';
+                }
+            }
+            if (headerText) headerText.textContent = status.email ? status.email.split('@')[0] : 'Connected';
+            if (headerBtn) headerBtn.className = 'px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-xs font-semibold text-emerald-300 hover:text-white transition flex items-center gap-1.5 shadow-sm';
+        } else {
+            if (unconfigBox) unconfigBox.style.display = 'none';
+            if (disconnBox) disconnBox.style.display = 'block';
+            if (connBox) connBox.style.display = 'none';
+            if (badge) {
+                badge.textContent = 'Ready to Link';
+                badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 font-mono';
+            }
+            if (headerText) headerText.textContent = 'Connect Gmail';
+            if (headerBtn) headerBtn.className = 'px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5 shadow-sm';
+        }
+    },
+
+    async connectGmail() {
+        const btn = document.getElementById('btnConnectGmail');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = 'Connecting to Google...';
+        }
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/auth-url');
+            const data = await res.json();
+            if (!res.ok || !data.auth_url) {
+                throw new Error(data.detail || 'Failed to generate Google OAuth authorization URL');
+            }
+            // Redirect browser to Google Sign-In
+            window.location.href = data.auth_url;
+        } catch (err) {
+            alert('Failed to start Google sign-in: ' + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Sign in with Google';
+            }
+        }
+    },
+
+    async disconnectGmail() {
+        if (!confirm('Are you sure you want to disconnect this Gmail account from the Zepto Hub?')) return;
+        const btn = document.getElementById('btnDisconnectGmail');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Disconnecting...';
+        }
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/disconnect', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to disconnect Gmail account');
+
+            this.showToast('Gmail account disconnected.');
+            await this.checkGmailStatus();
+        } catch (err) {
+            alert('Error disconnecting: ' + err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span>🔌</span> Disconnect Gmail';
+            }
+        }
+    },
+
+    showToast(message, isError = false) {
+        const toast = document.createElement('div');
+        toast.className = `fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg text-xs font-bold border shadow-2xl transition-all duration-300 ${
+            isError ? 'bg-rose-950 text-rose-200 border-rose-500/50' : 'bg-emerald-950 text-emerald-200 border-emerald-500/50'
+        }`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
     }
 };
 

@@ -243,6 +243,19 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_gmail_auth (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT,
+                token_expiry TEXT,
+                token_type TEXT DEFAULT 'Bearer',
+                scopes TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'CONNECTED',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
             CREATE INDEX IF NOT EXISTS idx_zepto_sal_emp ON zepto_salaries(employee_id, year_month);
@@ -1919,3 +1932,154 @@ def delete_store_income(income_id: str, settings: Settings | None = None) -> boo
     with _connect(settings) as conn:
         conn.execute("DELETE FROM zepto_store_income WHERE id = ?", (income_id,))
     return True
+
+
+# ---------------------------------------------------------------------------
+# Gmail OAuth 2.0 Auth State & Token Management DAL
+# ---------------------------------------------------------------------------
+
+def save_gmail_auth(
+    email: str,
+    access_token: str,
+    refresh_token: str | None = None,
+    token_expiry: str | None = None,
+    scopes: str = "https://www.googleapis.com/auth/gmail.readonly",
+    token_type: str = "Bearer",
+    auth_id: str = "primary",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Persist or update Gmail OAuth credentials in SQLite."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute("SELECT * FROM zepto_gmail_auth WHERE id = ?", (auth_id,)).fetchone()
+
+        # If no new refresh_token provided, preserve previous one
+        final_refresh_token = refresh_token
+        if not final_refresh_token and existing and existing["refresh_token"]:
+            final_refresh_token = existing["refresh_token"]
+
+        conn.execute(
+            """
+            INSERT INTO zepto_gmail_auth (
+                id, email, access_token, refresh_token, token_expiry,
+                token_type, scopes, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'CONNECTED', ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                email = excluded.email,
+                access_token = excluded.access_token,
+                refresh_token = COALESCE(excluded.refresh_token, zepto_gmail_auth.refresh_token),
+                token_expiry = excluded.token_expiry,
+                token_type = excluded.token_type,
+                scopes = excluded.scopes,
+                status = 'CONNECTED',
+                updated_at = excluded.updated_at
+            """,
+            (
+                auth_id, email.strip(), access_token.strip(), final_refresh_token,
+                token_expiry, token_type, scopes, now_iso, now_iso
+            )
+        )
+    return get_gmail_auth(auth_id, settings) or {
+        "id": auth_id,
+        "email": email,
+        "access_token": access_token,
+        "refresh_token": final_refresh_token,
+        "token_expiry": token_expiry,
+        "status": "CONNECTED",
+    }
+
+
+def get_gmail_auth(auth_id: str = "primary", settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve current Gmail OAuth connection credentials."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_gmail_auth WHERE id = ?", (auth_id,)).fetchone()
+        if not row:
+            return None
+        return dict(row)
+
+
+def delete_gmail_auth(auth_id: str = "primary", settings: Settings | None = None) -> bool:
+    """Delete Gmail OAuth credentials upon user disconnect."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.execute("DELETE FROM zepto_gmail_auth WHERE id = ?", (auth_id,))
+    return True
+
+
+def get_valid_gmail_token(auth_id: str = "primary", settings: Settings | None = None) -> str | None:
+    """Return a valid access token, auto-refreshing via refresh_token if expired or close to expiry."""
+    import httpx
+
+    auth_data = get_gmail_auth(auth_id, settings)
+    if not auth_data or not auth_data.get("access_token"):
+        return None
+
+    # Check expiration
+    token_expiry = auth_data.get("token_expiry")
+    needs_refresh = False
+
+    if token_expiry:
+        try:
+            exp_dt = datetime.fromisoformat(token_expiry.replace("Z", "+00:00"))
+            # If token expires within next 300 seconds (5 min), refresh it
+            now_utc = datetime.now(timezone.utc)
+            if (exp_dt - now_utc).total_seconds() < 300:
+                needs_refresh = True
+        except Exception:
+            needs_refresh = True
+
+    if not needs_refresh:
+        return str(auth_data["access_token"])
+
+    # Attempt refresh
+    refresh_token = auth_data.get("refresh_token")
+    if not refresh_token:
+        return str(auth_data["access_token"])
+
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return str(auth_data["access_token"])
+
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(token_url, data=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                new_access_token = data.get("access_token")
+                expires_in = data.get("expires_in", 3600)
+                from datetime import timedelta
+                new_expiry = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+
+                save_gmail_auth(
+                    email=auth_data["email"],
+                    access_token=new_access_token,
+                    refresh_token=data.get("refresh_token") or refresh_token,
+                    token_expiry=new_expiry,
+                    scopes=auth_data.get("scopes", ""),
+                    auth_id=auth_id,
+                    settings=settings,
+                )
+                return str(new_access_token)
+            else:
+                logger.warning("[GMAIL-AUTH] Failed to refresh token: %s %s", resp.status_code, resp.text)
+    except Exception as exc:
+        logger.error("[GMAIL-AUTH] Exception while refreshing token: %s", exc)
+
+    return str(auth_data["access_token"])
+

@@ -81,6 +81,14 @@ def test_employee_crud_and_bonus():
     zepto_db.delete_employee(emp["id"], settings)
 
 
+def test_zepto_hub_renders_gmail_tab(client):
+    resp = client.get("/zepto")
+    assert resp.status_code == 200
+    assert "tabBtn-gmail" in resp.text
+    assert "tabContent-gmail" in resp.text
+
+
+
 def test_store_expenses_and_spend_per_employee():
     settings = Settings()
     # 1. Claimable expense (Pending)
