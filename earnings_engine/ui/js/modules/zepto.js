@@ -2291,14 +2291,29 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadAttendanceData() {
+        const monthInput = document.getElementById('attMonthFilter');
+        let ym = monthInput ? monthInput.value : '';
+        if (!ym && !this.attendance.year_month_initialized) {
+            // Default to current year-month
+            const now = new Date();
+            ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            if (monthInput) monthInput.value = ym;
+            this.attendance.year_month_initialized = true;
+        }
+
         try {
+            const summaryParams = new URLSearchParams();
+            if (ym) summaryParams.append('year_month', ym);
+
             const [sumRes, recRes] = await Promise.all([
-                fetch('/api/v1/zepto/attendance/summary'),
-                fetch('/api/v1/zepto/attendance/records?limit=1000'),
+                fetch(`/api/v1/zepto/attendance/summary?${summaryParams.toString()}`),
+                fetch(`/api/v1/zepto/attendance/records?limit=1000`),
             ]);
 
             if (sumRes.ok) {
                 this.attendance.summary = await sumRes.json();
+                this.attendance.staff_roster = this.attendance.summary.staff_roster || [];
+                this.attendance.filtered_staff = [...this.attendance.staff_roster];
             }
             if (recRes.ok) {
                 const recData = await recRes.json();
@@ -2624,18 +2639,17 @@ const zeptoApp = {
     filterAttendance() {
         const query = (document.getElementById('attSearchInput')?.value || '').toLowerCase().trim();
         const role = document.getElementById('attRoleFilter')?.value || '';
-        const status = document.getElementById('attStatusFilter')?.value || '';
-        const date = document.getElementById('attDateFilter')?.value || '';
+        const risk = document.getElementById('attRiskFilter')?.value || '';
 
-        this.attendance.filtered = this.attendance.records.filter(r => {
+        const roster = this.attendance.staff_roster || [];
+        this.attendance.filtered_staff = roster.filter(s => {
             if (query) {
-                const name = (r.employee_name || '').toLowerCase();
-                const code = (r.employee_id || '').toLowerCase();
+                const name = (s.employee_name || '').toLowerCase();
+                const code = (s.employee_id || '').toLowerCase();
                 if (!name.includes(query) && !code.includes(query)) return false;
             }
-            if (role && r.designation !== role) return false;
-            if (status && r.status !== status) return false;
-            if (date && r.shift_date !== date) return false;
+            if (role && s.designation !== role) return false;
+            if (risk && s.risk_tier !== risk) return false;
             return true;
         });
 
@@ -2645,70 +2659,79 @@ const zeptoApp = {
     renderAttendanceTable() {
         const tbody = document.getElementById('attTableBody');
         const badge = document.getElementById('attRecordCountBadge');
-        const records = this.attendance.filtered || [];
+        const staffList = this.attendance.filtered_staff || [];
 
-        if (badge) badge.textContent = `${records.length} records`;
+        if (badge) badge.textContent = `${staffList.length} Active Employees`;
         if (!tbody) return;
 
-        if (records.length === 0) {
+        if (staffList.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center py-8 text-slate-500 text-xs">
-                        No matching attendance records found.
+                    <td colspan="9" class="text-center py-8 text-slate-500 text-xs">
+                        No active employees match the selected criteria for this period.
                     </td>
                 </tr>
             `;
             return;
         }
 
-        // Limit rendering to first 200 items for snappy DOM responsiveness
-        const visible = records.slice(0, 200);
-
-        tbody.innerHTML = visible.map(r => {
-            let statusBadge = '';
-            if (r.status === 'PRESENT') {
-                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">P · Present</span>';
-            } else if (r.status === 'ABSENT') {
-                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/30">A · Absent</span>';
-            } else if (r.status === 'WEEK_OFF') {
-                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-500/15 text-slate-300 border border-white/10">WO · Week Off</span>';
-            } else if (r.status === 'HALF_DAY') {
-                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">HD · Half Day</span>';
-            } else if (r.status === 'HOLIDAY') {
-                statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">F · Holiday</span>';
+        tbody.innerHTML = staffList.map(s => {
+            let riskBadge = '';
+            if (s.risk_tier === 'CRITICAL') {
+                riskBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">CRITICAL</span>';
+            } else if (s.risk_tier === 'HIGH') {
+                riskBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40">HIGH RISK</span>';
+            } else if (s.risk_tier === 'MODERATE') {
+                riskBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">MODERATE</span>';
             } else {
-                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-white/5 text-slate-300 border border-white/10">${r.status}</span>`;
+                riskBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">OPTIMAL</span>';
             }
 
+            const attRate = parseFloat(s.attendance_rate_pct || 0);
+            const rateColor = attRate >= 90 ? 'text-emerald-400' : (attRate >= 75 ? 'text-amber-300' : 'text-rose-400');
+
             return `
-                <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view 30-day shift & punctuality history">
-                    <td class="py-2.5 px-3 font-mono text-slate-300 font-medium whitespace-nowrap">${r.shift_date || '—'}</td>
+                <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${s.employee_id}')" title="Click to view full shift punches & work duration ledger for ${s.employee_name}">
                     <td class="py-2.5 px-3">
                         <div class="font-bold text-white flex items-center gap-1.5">
-                            <span>${r.employee_name || '—'}</span>
+                            <span>${s.employee_name || '—'}</span>
                             <span class="text-[10px] text-emerald-400 opacity-60">↗</span>
                         </div>
-                        <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${s.employee_id || ''}</div>
                     </td>
                     <td class="py-2.5 px-3">
                         <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300 whitespace-nowrap">
-                            ${r.designation || 'Unassigned'}
+                            ${s.designation || 'Unassigned'}
                         </span>
                     </td>
-                    <td class="py-2.5 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
-                        ${r.shift_time || r.shift_name || 'Standard Shift'}
+                    <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
+                        ${s.total_shifts} shifts
                     </td>
-                    <td class="py-2.5 px-3 font-mono text-[11px] ${r.punch_in ? 'text-emerald-300' : 'text-slate-600'}">
-                        ${r.punch_in || '—'}
+                    <td class="py-2.5 px-3 text-center font-mono">
+                        <span class="text-emerald-400 font-bold">${s.present_count} P</span>
+                        <span class="text-slate-600">/</span>
+                        <span class="${s.absent_count > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}">${s.absent_count} A</span>
                     </td>
-                    <td class="py-2.5 px-3 font-mono text-[11px] ${r.punch_out ? 'text-emerald-300' : 'text-slate-600'}">
-                        ${r.punch_out || '—'}
+                    <td class="py-2.5 px-3 text-center font-mono font-extrabold ${rateColor}">
+                        ${attRate.toFixed(1)}%
                     </td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold ${r.work_duration_mins > 0 ? 'text-white' : 'text-slate-600'}">
-                        ${r.work_duration_mins > 0 ? `${(r.work_duration_mins / 60).toFixed(1)}h` : '—'}
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">
+                        ${s.total_hours_worked}h
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-300">
+                        ${s.avg_daily_hours}h
                     </td>
                     <td class="py-2.5 px-3 text-center whitespace-nowrap">
-                        ${statusBadge}
+                        ${riskBadge}
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button
+                            type="button"
+                            onclick="event.stopPropagation(); zeptoApp.openEmployeeDrawer('${s.employee_id}')"
+                            class="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition"
+                        >
+                            <span>🔍</span> Punches & Times
+                        </button>
                     </td>
                 </tr>
             `;

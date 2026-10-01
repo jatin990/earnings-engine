@@ -1072,6 +1072,7 @@ async def get_attendance_summary_endpoint(
     store_name: str | None = Query(None, description="Filter by store name"),
     start_date: str | None = Query(None, description="Start date YYYY-MM-DD"),
     end_date: str | None = Query(None, description="End date YYYY-MM-DD"),
+    year_month: str | None = Query(None, description="Filter by year-month YYYY-MM"),
 ) -> dict[str, Any]:
     """Retrieve aggregated attendance rate, active headcount, role breakdown, and daily trends."""
     try:
@@ -1079,6 +1080,7 @@ async def get_attendance_summary_endpoint(
             store_name=store_name,
             start_date=start_date,
             end_date=end_date,
+            year_month=year_month,
             settings=_settings,
         )
         return {"success": True, **summary}

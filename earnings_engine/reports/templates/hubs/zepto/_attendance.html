@@ -18,8 +18,19 @@
             </div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- Action Buttons & Month Picker -->
         <div class="flex items-center gap-2 flex-wrap">
+            <!-- Month-Wise Selector -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1">
+                <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Month:</span>
+                <input
+                    type="month"
+                    id="attMonthFilter"
+                    onchange="zeptoApp.loadAttendanceData()"
+                    class="bg-transparent text-xs text-emerald-300 font-mono font-bold focus:outline-none cursor-pointer"
+                />
+            </div>
+
             <button
                 type="button"
                 onclick="zeptoApp.syncAttendanceFromGmail()"
@@ -303,20 +314,23 @@
         </div>
     </section>
 
-    <!-- Interactive Filter & Attendance Muster Table -->
+    <!-- Active Staff Monthly Attendance & Time Inspector Table -->
     <section class="glass-panel p-4 space-y-3">
         <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pb-2 border-b border-white/5">
-            <div class="flex items-center gap-2">
-                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Attendance Muster Ledger</h4>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="attRecordCountBadge">
-                    0 records
-                </span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Attendance & Work Log</h4>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attRecordCountBadge">
+                        0 Active Employees
+                    </span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-0.5">Click any employee row to open the side drawer for full daily punch timestamps, shifts & work durations.</p>
             </div>
 
             <!-- Filters -->
             <div class="flex items-center gap-2 flex-wrap">
                 <!-- Search input -->
-                <div class="relative min-w-[180px]">
+                <div class="relative min-w-[200px]">
                     <input
                         type="text"
                         id="attSearchInput"
@@ -335,27 +349,18 @@
                     <option value="">All Roles</option>
                 </select>
 
-                <!-- Status Filter -->
+                <!-- Risk Filter -->
                 <select
-                    id="attStatusFilter"
+                    id="attRiskFilter"
                     onchange="zeptoApp.filterAttendance()"
                     class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
                 >
-                    <option value="">All Statuses</option>
-                    <option value="PRESENT">Present (P)</option>
-                    <option value="ABSENT">Absent (A / A-R)</option>
-                    <option value="WEEK_OFF">Week Off (WO)</option>
-                    <option value="HALF_DAY">Half Day (HD)</option>
-                    <option value="HOLIDAY">Holiday (F)</option>
+                    <option value="">All Risk Tiers</option>
+                    <option value="LOW">Low Risk</option>
+                    <option value="MODERATE">Moderate Risk</option>
+                    <option value="HIGH">High Risk</option>
+                    <option value="CRITICAL">Critical Risk</option>
                 </select>
-
-                <!-- Date Filter -->
-                <input
-                    type="date"
-                    id="attDateFilter"
-                    onchange="zeptoApp.filterAttendance()"
-                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
-                />
             </div>
         </div>
 
@@ -364,20 +369,21 @@
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
                     <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
-                        <th class="py-2.5 px-3">Date</th>
-                        <th class="py-2.5 px-3">Employee</th>
-                        <th class="py-2.5 px-3">Role</th>
-                        <th class="py-2.5 px-3">Shift Timing</th>
-                        <th class="py-2.5 px-3">Punch In</th>
-                        <th class="py-2.5 px-3">Punch Out</th>
-                        <th class="py-2.5 px-3 text-right">Work Mins</th>
-                        <th class="py-2.5 px-3 text-center">Status</th>
+                        <th class="py-2.5 px-3">Employee Name</th>
+                        <th class="py-2.5 px-3">Role Profile</th>
+                        <th class="py-2.5 px-3 text-center">Scheduled Shifts</th>
+                        <th class="py-2.5 px-3 text-center">Present / Absent</th>
+                        <th class="py-2.5 px-3 text-center">Attendance %</th>
+                        <th class="py-2.5 px-3 text-right">Total Hours</th>
+                        <th class="py-2.5 px-3 text-right">Avg Daily Hrs</th>
+                        <th class="py-2.5 px-3 text-center">Reliability Tier</th>
+                        <th class="py-2.5 px-3 text-center">Punch Drilldown</th>
                     </tr>
                 </thead>
                 <tbody id="attTableBody" class="divide-y divide-white/5 font-sans">
                     <tr>
-                        <td colspan="8" class="text-center py-8 text-slate-500 text-xs">
-                            No attendance records loaded yet. Upload an Excel report or sync via Gmail.
+                        <td colspan="9" class="text-center py-8 text-slate-500 text-xs">
+                            Loading monthly staff attendance...
                         </td>
                     </tr>
                 </tbody>
