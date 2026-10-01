@@ -977,7 +977,6 @@ const zeptoApp = {
         await this.toggleEmployeeVisibility(this.currentStaffDrawerEmpId);
         await this.openStaffDrawer(this.currentStaffDrawerEmpId, this.currentStaffDrawerMonth);
     },
-    },
 
     // -----------------------------------------------------------------------
     // Employee Modal & MoM Salary Drilldown
