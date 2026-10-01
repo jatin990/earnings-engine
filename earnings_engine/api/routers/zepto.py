@@ -195,6 +195,24 @@ async def create_employee_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/api/v1/zepto/employees/{emp_id}/profile-analytics", summary="Get Full Employee Profile Analytics & Monthly Drawer Drilldown")
+async def get_employee_profile_analytics_endpoint(
+    emp_id: str,
+    year_month: str | None = Query(None),
+) -> dict[str, Any]:
+    """Retrieve individual employee bio, month-wise attendance scorecard, punch timeline, IPP productivity, and MoM salary/rating history."""
+    try:
+        profile = zepto_db.get_employee_profile_analytics(emp_id, year_month=year_month, settings=_settings)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Employee '{emp_id}' not found.")
+        return {"success": True, **profile}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ZEPTO-EMPLOYEE] Error fetching profile analytics for %s: %s", emp_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/api/v1/zepto/employees/{emp_id}", summary="Get Employee Details")
 async def get_employee_endpoint(emp_id: str) -> dict[str, Any]:
     """Get single employee record by ID."""

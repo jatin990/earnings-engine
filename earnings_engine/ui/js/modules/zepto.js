@@ -24,6 +24,8 @@ const zeptoApp = {
     },
     activeTab: 'employees',
     currentEmpId: null,
+    currentStaffDrawerEmpId: null,
+    currentStaffDrawerMonth: null,
 
     async init() {
         // Hydrate partner dropdowns immediately with defaults
@@ -57,6 +59,7 @@ const zeptoApp = {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeEmployeeDrawer();
+                this.closeStaffDrawer();
             }
         });
 
@@ -655,10 +658,11 @@ const zeptoApp = {
             const isHidden = emp.is_hidden === 1;
 
             return `
-                <tr class="hover:bg-white/[0.02] transition ${isHidden ? 'opacity-50 bg-white/[0.01]' : ''}">
+                <tr class="hover:bg-white/[0.04] transition cursor-pointer ${isHidden ? 'opacity-50 bg-white/[0.01]' : ''}" onclick="zeptoApp.openStaffDrawer('${emp.id}')" title="Click row to open employee performance, attendance & IPP drawer">
                     <td class="p-3.5 pl-4">
                         <div class="font-bold text-white text-sm flex items-center gap-1.5">
                             <span>${emp.name}</span>
+                            <span class="text-[10px] text-purple-400 opacity-60">↗</span>
                             ${isHidden ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">HIDDEN</span>' : ''}
                         </div>
                         <div class="text-[11px] text-slate-400 font-mono">${emp.phone || 'No phone'} ${emp.email ? '· ' + emp.email : ''}</div>
@@ -674,19 +678,22 @@ const zeptoApp = {
                         <div>Joined: <span class="font-mono text-slate-400">${emp.joining_date}</span></div>
                         ${emp.resignation_date ? `<div class="text-rose-400">Resigned: <span class="font-mono">${emp.resignation_date}</span></div>` : ''}
                     </td>
-                    <td class="p-3.5 text-center">${docsHtml}</td>
+                    <td class="p-3.5 text-center" onclick="event.stopPropagation()">${docsHtml}</td>
                     <td class="p-3.5 pr-4 text-center">
                         <div class="flex items-center justify-center gap-1.5">
-                            <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition" title="MoM Salary History">
+                            <button type="button" onclick="event.stopPropagation(); zeptoApp.openStaffDrawer('${emp.id}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 transition" title="Open Full Employee Profile & Analytics Drawer">
+                                📊 Details
+                            </button>
+                            <button type="button" onclick="event.stopPropagation(); zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition" title="MoM Salary History">
                                 💵 Salary
                             </button>
-                            <button type="button" onclick="zeptoApp.toggleEmployeeVisibility('${emp.id}')" class="p-1 rounded ${isHidden ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-white/5 text-slate-300 hover:bg-white/10'} text-xs" title="${isHidden ? 'Unhide / Restore Staff' : 'Hide Inactive Staff'}">
+                            <button type="button" onclick="event.stopPropagation(); zeptoApp.toggleEmployeeVisibility('${emp.id}')" class="p-1 rounded ${isHidden ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-white/5 text-slate-300 hover:bg-white/10'} text-xs" title="${isHidden ? 'Unhide / Restore Staff' : 'Hide Inactive Staff'}">
                                 ${isHidden ? '👁️' : '🙈'}
                             </button>
-                            <button type="button" onclick="zeptoApp.openEditEmployeeModal('${emp.id}')" class="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-xs" title="Edit Staff Details">
+                            <button type="button" onclick="event.stopPropagation(); zeptoApp.openEditEmployeeModal('${emp.id}')" class="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-xs" title="Edit Staff Details">
                                 ✏️
                             </button>
-                            <button type="button" onclick="zeptoApp.deleteEmployee('${emp.id}')" class="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs" title="Delete Staff">
+                            <button type="button" onclick="event.stopPropagation(); zeptoApp.deleteEmployee('${emp.id}')" class="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs" title="Delete Staff">
                                 🗑️
                             </button>
                         </div>
@@ -694,6 +701,282 @@ const zeptoApp = {
                 </tr>
             `;
         }).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Staff & Payroll Slide-Out Inspector Drawer (sumi:desktop-app-design)
+    // -----------------------------------------------------------------------
+
+    async openStaffDrawer(empId, yearMonth = null) {
+        if (!empId) return;
+        this.currentStaffDrawerEmpId = empId;
+        this.currentStaffDrawerMonth = yearMonth;
+
+        const drawer = document.getElementById('staffEmployeeDrawer');
+        const backdrop = document.getElementById('staffEmployeeDrawerBackdrop');
+        if (drawer) {
+            drawer.classList.remove('translate-x-full');
+            drawer.classList.add('translate-x-0');
+        }
+        if (backdrop) {
+            backdrop.classList.remove('opacity-0', 'pointer-events-none');
+            backdrop.classList.add('opacity-100');
+        }
+
+        try {
+            const url = `/api/v1/zepto/employees/${encodeURIComponent(empId)}/profile-analytics${yearMonth ? '?year_month=' + encodeURIComponent(yearMonth) : ''}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to fetch staff analytics');
+
+            const emp = data.employee || {};
+            const att = data.attendance || {};
+            const prod = data.productivity || {};
+            const salaries = data.salaries || [];
+            const ratings = data.ratings || [];
+            const availMonths = data.available_months || [data.selected_month];
+            const selMonth = data.selected_month;
+            this.currentStaffDrawerMonth = selMonth;
+
+            // 1. Header Elements
+            const nameEl = document.getElementById('staffDrawerName');
+            const idEl = document.getElementById('staffDrawerId');
+            const roleEl = document.getElementById('staffDrawerRole');
+            const statusEl = document.getElementById('staffDrawerStatus');
+            const joinedEl = document.getElementById('staffDrawerJoined');
+            const avatarEl = document.getElementById('staffDrawerAvatar');
+
+            if (nameEl) nameEl.textContent = emp.name || 'Staff Profile';
+            if (idEl) idEl.textContent = emp.id || empId;
+            if (roleEl) roleEl.innerHTML = this.getRoleBadge(emp.role || 'PICKER');
+            if (statusEl) statusEl.innerHTML = this.getStatusBadge(emp.status || 'ACTIVE');
+            if (joinedEl) joinedEl.textContent = `Joined ${emp.joining_date || '—'}`;
+            if (avatarEl) {
+                const initials = (emp.name || 'EM').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'EM';
+                avatarEl.textContent = initials;
+            }
+
+            // 2. Month Selector
+            const monthSelect = document.getElementById('staffDrawerMonthSelect');
+            if (monthSelect) {
+                monthSelect.innerHTML = availMonths.map(m => `<option value="${m}" ${m === selMonth ? 'selected' : ''}>${m}</option>`).join('');
+            }
+
+            // 3. Risk Tier Indicator
+            const riskEl = document.getElementById('staffDrawerRiskBadge');
+            if (riskEl) {
+                const rTier = att.risk_tier || 'LOW';
+                if (rTier === 'CRITICAL') {
+                    riskEl.textContent = 'CRITICAL RISK';
+                    riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse font-mono';
+                } else if (rTier === 'HIGH') {
+                    riskEl.textContent = 'HIGH RISK';
+                    riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono';
+                } else if (rTier === 'MODERATE') {
+                    riskEl.textContent = 'MODERATE';
+                    riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono';
+                } else {
+                    riskEl.textContent = 'OPTIMAL';
+                    riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono';
+                }
+            }
+
+            // 4. Top 4 Metric KPI Cards
+            const attRateEl = document.getElementById('staffDrawerAttRate');
+            const attSubEl = document.getElementById('staffDrawerAttSub');
+            const hoursEl = document.getElementById('staffDrawerHours');
+            const avgDailyEl = document.getElementById('staffDrawerAvgShiftHours');
+            const ippEl = document.getElementById('staffDrawerIPP');
+            const ippSubEl = document.getElementById('staffDrawerIPPSub');
+            const payEl = document.getElementById('staffDrawerPay');
+            const bonusSubEl = document.getElementById('staffDrawerBonusSub');
+
+            if (attRateEl) attRateEl.textContent = `${parseFloat(att.attendance_rate_pct || 0).toFixed(1)}%`;
+            if (attSubEl) attSubEl.textContent = `${att.present_count || 0} / ${att.total_shifts || 0} shifts present`;
+            if (hoursEl) hoursEl.textContent = `${att.total_hours_worked || 0}h`;
+            if (avgDailyEl) avgDailyEl.textContent = `${att.avg_shift_hours || 0}h / day avg`;
+            if (ippEl) ippEl.textContent = prod.avg_ipp > 0 ? `${prod.avg_ipp} IPP` : '—';
+            if (ippSubEl) ippSubEl.textContent = `${(prod.total_items_picked || 0).toLocaleString()} items picked`;
+            if (payEl) payEl.textContent = this.formatCurrency(emp.base_salary_monthly);
+            if (bonusSubEl) bonusSubEl.textContent = emp.current_month_bonus > 0 ? `+${this.formatCurrency(emp.current_month_bonus)} Bonus` : '+₹0 Bonus';
+
+            // 5. Monthly Attendance Segmented Bar
+            const totShifts = att.total_shifts || 1;
+            const pPct = ((att.present_count || 0) / totShifts) * 100;
+            const hPct = ((att.half_day_count || 0) / totShifts) * 100;
+            const aPct = ((att.absent_count || 0) / totShifts) * 100;
+            const oPct = ((att.week_off_count || 0) / totShifts) * 100;
+
+            const barP = document.getElementById('staffDrawerBarPres');
+            const barH = document.getElementById('staffDrawerBarHalf');
+            const barA = document.getElementById('staffDrawerBarAbs');
+            const barO = document.getElementById('staffDrawerBarOff');
+            if (barP) barP.style.width = `${pPct}%`;
+            if (barH) barH.style.width = `${hPct}%`;
+            if (barA) barA.style.width = `${aPct}%`;
+            if (barO) barO.style.width = `${oPct}%`;
+
+            const cntP = document.getElementById('staffDrawerCountPres');
+            const cntH = document.getElementById('staffDrawerCountHalf');
+            const cntA = document.getElementById('staffDrawerCountAbs');
+            const cntO = document.getElementById('staffDrawerCountOff');
+            if (cntP) cntP.textContent = att.present_count || 0;
+            if (cntH) cntH.textContent = att.half_day_count || 0;
+            if (cntA) cntA.textContent = att.absent_count || 0;
+            if (cntO) cntO.textContent = att.week_off_count || 0;
+
+            const barTitle = document.getElementById('staffDrawerAttBarTitle');
+            if (barTitle) barTitle.textContent = `${selMonth} (${att.total_shifts || 0} Shifts Total)`;
+
+            // 6. MoM Performance Ratings Container
+            const ratContainer = document.getElementById('staffDrawerRatingsContainer');
+            const ratBadge = document.getElementById('staffDrawerLatestRatingBadge');
+            if (ratBadge) ratBadge.textContent = `${parseFloat(emp.rating || 5.0).toFixed(1)} / 5.0 ⭐`;
+            if (ratContainer) {
+                if (ratings.length === 0) {
+                    ratContainer.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-3">No monthly reviews logged yet. Click "Rate Staff" to add.</div>`;
+                } else {
+                    ratContainer.innerHTML = ratings.map(r => `
+                        <div class="p-2 rounded bg-black/40 border border-white/5 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white font-mono">${r.year_month}</span>
+                                <span class="text-amber-300 font-bold font-mono">⭐ ${parseFloat(r.rating).toFixed(1)}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 italic truncate max-w-[140px]">${r.feedback ? `"${r.feedback}"` : 'No remarks'}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // 7. MoM Attendance Trend Container
+            const momAttContainer = document.getElementById('staffDrawerMomAttContainer');
+            if (momAttContainer) {
+                const momTrends = att.mom_trend || [];
+                if (momTrends.length === 0) {
+                    momAttContainer.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-3">No historical attendance data found.</div>`;
+                } else {
+                    momAttContainer.innerHTML = momTrends.map(m => `
+                        <div class="p-2 rounded bg-black/40 border border-white/5 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-white font-mono">${m.month}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">${m.present_count}/${m.total_shifts} present</span>
+                            </div>
+                            <span class="font-mono font-bold ${m.attendance_rate_pct >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${m.attendance_rate_pct}%</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // 8. Granular Shift & Punch Ledger (Selected Month)
+            const punchTbody = document.getElementById('staffDrawerPunchTableBody');
+            const punchCountEl = document.getElementById('staffDrawerPunchCount');
+            const punches = att.punch_history || [];
+            if (punchCountEl) punchCountEl.textContent = `${punches.length} Punches`;
+
+            if (punchTbody) {
+                if (punches.length === 0) {
+                    punchTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 text-xs">No punch records found for ${selMonth}.</td></tr>`;
+                } else {
+                    punchTbody.innerHTML = punches.map(p => {
+                        let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">PRESENT</span>';
+                        if (p.status === 'ABSENT') stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">ABSENT</span>';
+                        else if (p.status === 'HALF_DAY') stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">HALF DAY</span>';
+                        else if (p.status === 'WEEK_OFF') stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-400 border border-white/10">WEEK OFF</span>';
+                        else if (p.status === 'HOLIDAY') stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">HOLIDAY</span>';
+
+                        const durMins = p.work_duration_mins || 0;
+                        const durHours = (durMins / 60).toFixed(1);
+
+                        return `
+                            <tr class="hover:bg-white/[0.02] transition">
+                                <td class="py-2 px-2.5 font-bold text-white">${p.shift_date}</td>
+                                <td class="py-2 px-2.5 text-slate-300 text-[10px]">${p.shift_name || p.shift_time || 'General Shift'}</td>
+                                <td class="py-2 px-2.5 text-emerald-400 font-mono">${p.punch_in || '—'}</td>
+                                <td class="py-2 px-2.5 text-sky-300 font-mono">${p.punch_out || '—'}</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-purple-300">${durMins > 0 ? `${durHours}h (${durMins}m)` : '—'}</td>
+                                <td class="py-2 px-2.5 text-center">${stBadge}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 9. MoM Salary History Table
+            const salTbody = document.getElementById('staffDrawerSalaryTableBody');
+            if (salTbody) {
+                if (salaries.length === 0) {
+                    salTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 text-xs">No compensation slips recorded yet.</td></tr>`;
+                } else {
+                    salTbody.innerHTML = salaries.map(s => `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2 px-2.5 font-bold text-white">${s.year_month}</td>
+                            <td class="py-2 px-2.5 text-right font-mono text-slate-300">${this.formatCurrency(s.base_amount)}</td>
+                            <td class="py-2 px-2.5 text-right font-mono text-purple-400">${s.bonus_amount > 0 ? '+' + this.formatCurrency(s.bonus_amount) : '₹0'}</td>
+                            <td class="py-2 px-2.5 text-right font-mono font-bold text-emerald-400">${this.formatCurrency(s.net_paid)}</td>
+                            <td class="py-2 px-2.5 text-center font-mono font-bold text-amber-300">⭐ ${parseFloat(s.performance_rating || 5.0).toFixed(1)}</td>
+                            <td class="py-2 px-2.5 text-center">
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">${s.payment_status || 'PAID'}</span>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+        } catch (err) {
+            console.error('Error loading staff drawer:', err);
+            this.showToast(`⚠️ ${err.message}`);
+        }
+    },
+
+    closeStaffDrawer() {
+        const drawer = document.getElementById('staffEmployeeDrawer');
+        const backdrop = document.getElementById('staffEmployeeDrawerBackdrop');
+        if (drawer) {
+            drawer.classList.remove('translate-x-0');
+            drawer.classList.add('translate-x-full');
+        }
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            backdrop.classList.add('opacity-0', 'pointer-events-none');
+        }
+    },
+
+    onStaffDrawerMonthChange(val) {
+        if (this.currentStaffDrawerEmpId) {
+            this.openStaffDrawer(this.currentStaffDrawerEmpId, val);
+        }
+    },
+
+    openStaffDrawerBonusModal() {
+        if (!this.currentStaffDrawerEmpId) return;
+        this.openSalaryDrilldown(this.currentStaffDrawerEmpId);
+    },
+
+    openStaffDrawerSalaryModal() {
+        if (!this.currentStaffDrawerEmpId) return;
+        this.openSalaryDrilldown(this.currentStaffDrawerEmpId);
+        if (this.currentStaffDrawerMonth) {
+            const mInput = document.getElementById('salSlipMonth');
+            if (mInput) mInput.value = this.currentStaffDrawerMonth;
+        }
+    },
+
+    openStaffDrawerRatingModal() {
+        if (!this.currentStaffDrawerEmpId) return;
+        const ym = this.currentStaffDrawerMonth || new Date().toISOString().slice(0, 7);
+        this.openMonthlyRatingModal(this.currentStaffDrawerEmpId, ym);
+    },
+
+    openStaffDrawerEditModal() {
+        if (!this.currentStaffDrawerEmpId) return;
+        this.openEditEmployeeModal(this.currentStaffDrawerEmpId);
+    },
+
+    async toggleStaffDrawerVisibility() {
+        if (!this.currentStaffDrawerEmpId) return;
+        await this.toggleEmployeeVisibility(this.currentStaffDrawerEmpId);
+        await this.openStaffDrawer(this.currentStaffDrawerEmpId, this.currentStaffDrawerMonth);
+    },
     },
 
     // -----------------------------------------------------------------------

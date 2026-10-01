@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -768,6 +769,125 @@ def test_zepto_employee_visibility_and_sync_roster_api(client):
         assert purge_res.json()["success"] is True
     finally:
         zepto_db.delete_employee(emp_id, settings)
+
+
+def test_staff_employee_profile_analytics_drawer(client):
+    settings = Settings()
+    test_tag = uuid.uuid4().hex[:6]
+    emp_name = f"Vikram Rathore {test_tag}"
+    # 1. Create a test employee
+    emp = zepto_db.create_employee({
+        "name": emp_name,
+        "role": "PICKER",
+        "base_salary_monthly": 18500.0,
+        "rating": 4.95,
+        "status": "ACTIVE",
+    }, settings)
+    emp_id = emp["id"]
+
+    # 2. Add attendance batch for Vikram
+    mock_batch = {
+        "store_name": "JMU-Sainik Colony",
+        "file_name": f"vikram_att_{test_tag}.xlsx",
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-02",
+        "total_records": 2,
+        "total_employees": 1,
+        "records": [
+            {
+                "employee_id": emp_id,
+                "employee_name": emp_name,
+                "designation": "PICKER",
+                "shift_date": "2026-09-01",
+                "shift_name": "Morning Shift",
+                "shift_time": "06:00 - 15:00",
+                "punch_in": "06:01:00",
+                "punch_out": "15:03:00",
+                "work_duration_mins": 542,
+                "break_duration_mins": 30,
+                "raw_status": "P",
+                "status": "PRESENT",
+            },
+            {
+                "employee_id": emp_id,
+                "employee_name": emp_name,
+                "designation": "PICKER",
+                "shift_date": "2026-09-02",
+                "shift_name": "Morning Shift",
+                "shift_time": "06:00 - 15:00",
+                "punch_in": "06:00:00",
+                "punch_out": "15:00:00",
+                "work_duration_mins": 540,
+                "break_duration_mins": 30,
+                "raw_status": "P",
+                "status": "PRESENT",
+            },
+        ],
+        "summary": {"present_count": 2, "absent_count": 0, "attendance_rate_pct": 100.0},
+    }
+    saved_batch = zepto_db.save_attendance_batch(mock_batch, source="TEST", settings=settings)
+
+    # 3. Add IPP utilization record for Vikram
+    zepto_db.save_manpower_utilization({
+        "store_name": "JMU-Sainik Colony",
+        "util_date": "2026-09-01",
+        "employee_id": emp_id,
+        "employee_name": emp_name,
+        "role": "Picker",
+        "items_picked": 840,
+        "active_pick_hours": 7.0,
+        "idle_hours": 0.5,
+        "ipp": 120.0,
+    }, settings=settings)
+
+    # 4. Add salary slip & rating
+    zepto_db.record_employee_monthly_rating(emp_id, "2026-09", 5.0, "Outstanding warehouse picking", settings)
+    zepto_db.record_employee_salary(emp_id, {
+        "year_month": "2026-09",
+        "base_amount": 18500.0,
+        "bonus_amount": 1500.0,
+        "deductions": 0.0,
+        "performance_rating": 5.0,
+    }, settings)
+
+    try:
+        # 5. Test Python DAL
+        profile = zepto_db.get_employee_profile_analytics(emp_id, year_month="2026-09", settings=settings)
+        assert profile is not None
+        assert profile["employee"]["name"] == emp_name
+        assert profile["selected_month"] == "2026-09"
+        assert profile["attendance"]["total_shifts"] == 2
+        assert profile["attendance"]["present_count"] == 2
+        assert profile["attendance"]["attendance_rate_pct"] == 100.0
+        assert profile["attendance"]["total_hours_worked"] == 18.0
+        assert profile["productivity"]["avg_ipp"] == 120.0
+        assert profile["productivity"]["total_items_picked"] == 840
+        assert len(profile["salaries"]) >= 1
+        assert len(profile["ratings"]) >= 1
+
+        # 6. Test API Router Endpoint
+        api_res = client.get(f"/api/v1/zepto/employees/{emp_id}/profile-analytics?year_month=2026-09")
+        assert api_res.status_code == 200
+        data = api_res.json()
+        assert data["success"] is True
+        assert data["employee"]["name"] == emp_name
+        assert data["attendance"]["attendance_rate_pct"] == 100.0
+        assert data["productivity"]["avg_ipp"] == 120.0
+
+        # 7. Test Hub UI Template Rendering
+        hub_res = client.get("/zepto")
+        assert hub_res.status_code == 200
+        assert "staffEmployeeDrawer" in hub_res.text
+        assert "staffEmployeeDrawerBackdrop" in hub_res.text
+        assert "staffDrawerMonthSelect" in hub_res.text
+        assert "staffDrawerAttRate" in hub_res.text
+        assert "staffDrawerIPP" in hub_res.text
+        assert "staffDrawerPunchTableBody" in hub_res.text
+        assert "staffDrawerSalaryTableBody" in hub_res.text
+    finally:
+        zepto_db.delete_attendance_import(saved_batch["import_id"], settings=settings)
+        zepto_db.delete_employee(emp_id, settings)
+
 
 
 

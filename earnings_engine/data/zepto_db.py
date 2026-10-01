@@ -1272,11 +1272,12 @@ def record_employee_salary(emp_id: str, salary_data: dict[str, Any], settings: S
 
 
 def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
-    """Delete an employee and their associated salary history."""
+    """Delete an employee and their associated salary history, ratings, and utilization."""
     settings = settings or Settings()
     with _connect(settings) as conn:
         conn.execute("DELETE FROM zepto_salaries WHERE employee_id = ?", (emp_id,))
         conn.execute("DELETE FROM zepto_monthly_ratings WHERE employee_id = ?", (emp_id,))
+        conn.execute("DELETE FROM zepto_manpower_utilization WHERE employee_id = ?", (emp_id,))
         conn.execute("DELETE FROM zepto_employees WHERE id = ?", (emp_id,))
     return True
 
@@ -2923,6 +2924,200 @@ def get_employee_attendance_detail(
             "avg_break_mins": round(total_break_mins / present, 0) if present > 0 else 0,
             "risk_tier": risk_tier,
             "punch_history": records_list,
+        }
+
+
+def get_employee_profile_analytics(
+    emp_id: str,
+    year_month: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve comprehensive employee profile analytics for the Staff & Payroll side drawer:
+    Employee bio, month-wise attendance scorecard, punch timeline, IPP productivity metrics,
+    MoM performance ratings, and salary payouts.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        emp_row = conn.execute(
+            "SELECT * FROM zepto_employees WHERE id = ? OR name = ?",
+            (emp_id, emp_id),
+        ).fetchone()
+
+        if not emp_row:
+            first_att = conn.execute(
+                "SELECT * FROM zepto_attendance_records WHERE employee_id = ? OR employee_name = ? LIMIT 1",
+                (emp_id, emp_id),
+            ).fetchone()
+            if not first_att:
+                return None
+            employee = {
+                "id": first_att["employee_id"],
+                "name": first_att["employee_name"],
+                "role": first_att["designation"] or "PICKER",
+                "phone": "",
+                "email": "",
+                "joining_date": first_att["shift_date"],
+                "resignation_date": None,
+                "resignation_reason": None,
+                "status": "ACTIVE",
+                "rating": 5.0,
+                "base_salary_monthly": 18000.0,
+                "current_month_bonus": 0.0,
+                "is_hidden": 0,
+                "aadhar_doc_url": None,
+                "resume_doc_url": None,
+                "photo_url": None,
+                "notes": "",
+            }
+        else:
+            employee = dict(emp_row)
+
+        emp_db_id = employee["id"]
+        emp_name = employee["name"]
+
+        # Available months from attendance records and salaries
+        months_rows = conn.execute(
+            """
+            SELECT DISTINCT SUBSTR(shift_date, 1, 7) as ym
+            FROM zepto_attendance_records
+            WHERE employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?
+            UNION
+            SELECT DISTINCT year_month as ym FROM zepto_salaries WHERE employee_id = ?
+            UNION
+            SELECT DISTINCT year_month as ym FROM zepto_monthly_ratings WHERE employee_id = ?
+            ORDER BY ym DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, emp_db_id, emp_db_id),
+        ).fetchall()
+
+        available_months = [r["ym"] for r in months_rows if r["ym"]]
+        if not available_months:
+            available_months = [datetime.now().strftime("%Y-%m")]
+
+        selected_month = year_month if (year_month and year_month in available_months) else available_months[0]
+
+        # Attendance punch history for selected month
+        att_records = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND shift_date LIKE ?
+            ORDER BY shift_date DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, f"{selected_month}%"),
+        ).fetchall()
+
+        records_list = [dict(r) for r in att_records]
+        total_shifts = len(records_list)
+        present = sum(1 for r in records_list if r["status"] == "PRESENT")
+        absent = sum(1 for r in records_list if r["status"] == "ABSENT")
+        week_off = sum(1 for r in records_list if r["status"] == "WEEK_OFF")
+        half_day = sum(1 for r in records_list if r["status"] == "HALF_DAY")
+        holiday = sum(1 for r in records_list if r["status"] == "HOLIDAY")
+        total_work_mins = sum(r.get("work_duration_mins", 0) or 0 for r in records_list)
+        total_break_mins = sum(r.get("break_duration_mins", 0) or 0 for r in records_list)
+
+        denominator = present + absent + half_day
+        att_rate = round(((present + 0.5 * half_day) / denominator) * 100.0, 1) if denominator > 0 else 0.0
+        avg_shift_hours = round((total_work_mins / 60.0) / present, 1) if present > 0 else 0.0
+        avg_break_mins = round(total_break_mins / present, 0) if present > 0 else 0
+
+        risk_tier = "LOW"
+        if absent >= 4 or (denominator >= 5 and att_rate < 70.0):
+            risk_tier = "CRITICAL"
+        elif absent >= 2 or (denominator >= 5 and att_rate < 85.0):
+            risk_tier = "HIGH"
+        elif absent >= 1:
+            risk_tier = "MODERATE"
+
+        # Month-on-Month attendance trends (for sparkline / bar charts)
+        mom_att_rows = conn.execute(
+            """
+            SELECT
+                SUBSTR(shift_date, 1, 7) as ym,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(work_duration_mins) as work_mins
+            FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+            GROUP BY ym
+            ORDER BY ym ASC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id),
+        ).fetchall()
+
+        mom_attendance = []
+        for ma in mom_att_rows:
+            ma_pres = ma["present_count"] or 0
+            ma_abs = ma["absent_count"] or 0
+            ma_half = ma["half_day_count"] or 0
+            ma_denom = ma_pres + ma_abs + ma_half
+            ma_rate = round(((ma_pres + 0.5 * ma_half) / ma_denom) * 100.0, 1) if ma_denom > 0 else 0.0
+            mom_attendance.append({
+                "month": ma["ym"],
+                "total_shifts": ma["total_shifts"],
+                "present_count": ma_pres,
+                "absent_count": ma_abs,
+                "attendance_rate_pct": ma_rate,
+                "hours_worked": round((ma["work_mins"] or 0) / 60.0, 1),
+            })
+
+        # IPP / Manpower Utilization metrics for selected month
+        ipp_rows = conn.execute(
+            """
+            SELECT * FROM zepto_manpower_utilization
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND util_date LIKE ?
+            ORDER BY util_date DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, f"{selected_month}%"),
+        ).fetchall()
+
+        ipp_list = [dict(r) for r in ipp_rows]
+        total_items = sum(r.get("items_picked", 0) or 0 for r in ipp_list)
+        total_active_hrs = sum(r.get("active_pick_hours", 0.0) or 0.0 for r in ipp_list)
+        total_idle_hrs = sum(r.get("idle_hours", 0.0) or 0.0 for r in ipp_list)
+        avg_ipp = round(total_items / total_active_hrs, 1) if total_active_hrs > 0 else 0.0
+
+        # Salary history & ratings
+        salaries = get_employee_salaries(emp_db_id, settings)
+        ratings = get_employee_monthly_ratings(emp_db_id, settings)
+
+        return {
+            "employee": employee,
+            "selected_month": selected_month,
+            "available_months": available_months,
+            "attendance": {
+                "total_shifts": total_shifts,
+                "present_count": present,
+                "absent_count": absent,
+                "half_day_count": half_day,
+                "week_off_count": week_off,
+                "holiday_count": holiday,
+                "attendance_rate_pct": att_rate,
+                "total_hours_worked": round(total_work_mins / 60.0, 1),
+                "avg_shift_hours": avg_shift_hours,
+                "avg_break_mins": avg_break_mins,
+                "risk_tier": risk_tier,
+                "punch_history": records_list,
+                "mom_trend": mom_attendance,
+            },
+            "productivity": {
+                "avg_ipp": avg_ipp,
+                "total_items_picked": total_items,
+                "total_active_hours": round(total_active_hrs, 1),
+                "total_idle_hours": round(total_idle_hrs, 1),
+                "daily_ipp_logs": ipp_list,
+            },
+            "salaries": salaries,
+            "ratings": ratings,
         }
 
 
