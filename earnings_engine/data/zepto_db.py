@@ -1282,18 +1282,30 @@ def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
 
 
 def toggle_employee_visibility(emp_id: str, is_hidden: bool | None = None, settings: Settings | None = None) -> dict[str, Any] | None:
-    """Toggle or set the hidden status of an employee."""
+    """Toggle or set the hidden status of an employee. Hiding aligns status to RESIGNED, restoring resets to ACTIVE."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     now_iso = datetime.now(timezone.utc).isoformat()
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
-        emp = conn.execute("SELECT id, is_hidden FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
+        emp = conn.execute("SELECT id, is_hidden, status FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
         if not emp:
             return None
         current_hidden = bool(emp["is_hidden"]) if emp["is_hidden"] is not None else False
         new_hidden = int(is_hidden) if is_hidden is not None else int(not current_hidden)
-        conn.execute("UPDATE zepto_employees SET is_hidden = ?, updated_at = ? WHERE id = ?", (new_hidden, now_iso, emp_id))
+
+        # When hidden (is_hidden = 1), automatically align status to RESIGNED
+        # When unhidden/restored (is_hidden = 0), reset status back to ACTIVE if previously RESIGNED
+        if new_hidden == 1:
+            conn.execute(
+                "UPDATE zepto_employees SET is_hidden = 1, status = 'RESIGNED', updated_at = ? WHERE id = ?",
+                (now_iso, emp_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE zepto_employees SET is_hidden = 0, status = 'ACTIVE', updated_at = ? WHERE id = ?",
+                (now_iso, emp_id),
+            )
     return get_employee_by_id(emp_id, settings)
 
 
@@ -2468,9 +2480,10 @@ def get_attendance_summary(
     store_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    year_month: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Calculate aggregated attendance KPIs, role distribution, and status breakdown."""
+    """Calculate aggregated attendance KPIs, role distribution, status breakdown, and active staff monthly metrics."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
@@ -2480,12 +2493,16 @@ def get_attendance_summary(
     if store_name:
         where_clauses.append("store_name = ?")
         params.append(store_name)
-    if start_date:
-        where_clauses.append("shift_date >= ?")
-        params.append(start_date)
-    if end_date:
-        where_clauses.append("shift_date <= ?")
-        params.append(end_date)
+    if year_month and year_month.upper() != "ALL":
+        where_clauses.append("shift_date LIKE ?")
+        params.append(f"{year_month.strip()}%")
+    else:
+        if start_date:
+            where_clauses.append("shift_date >= ?")
+            params.append(start_date)
+        if end_date:
+            where_clauses.append("shift_date <= ?")
+            params.append(end_date)
 
     where_sql = " AND ".join(where_clauses)
 
@@ -2667,6 +2684,64 @@ def get_attendance_summary(
             else:
                 b["health"] = "OPTIMAL"
 
+        # Active Staff Roster Summary for the Selected Period
+        staff_summary_rows = conn.execute(
+            f"""
+            SELECT
+                employee_id,
+                employee_name,
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as designation,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday_count,
+                SUM(work_duration_mins) as total_work_mins,
+                SUM(break_duration_mins) as total_break_mins,
+                MAX(shift_date) as last_shift_date
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY employee_id, employee_name, designation
+            ORDER BY present_count DESC, total_shifts DESC, employee_name ASC
+            """,
+            params,
+        ).fetchall()
+
+        staff_roster = []
+        for s in staff_summary_rows:
+            s_denom = (s["present_count"] or 0) + (s["absent_count"] or 0) + (s["half_day_count"] or 0)
+            s_rate = round((((s["present_count"] or 0) + 0.5 * (s["half_day_count"] or 0)) / s_denom) * 100.0, 1) if s_denom > 0 else 0.0
+            s_pres = s["present_count"] or 0
+            s_abs = s["absent_count"] or 0
+            s_mins = s["total_work_mins"] or 0
+            avg_daily_hrs = round((s_mins / 60.0) / s_pres, 1) if s_pres > 0 else 0.0
+
+            risk_tier = "LOW"
+            if s_abs >= 4 or (s_denom >= 5 and s_rate < 70.0):
+                risk_tier = "CRITICAL"
+            elif s_abs >= 2 or (s_denom >= 5 and s_rate < 85.0):
+                risk_tier = "HIGH"
+            elif s_abs >= 1:
+                risk_tier = "MODERATE"
+
+            staff_roster.append({
+                "employee_id": s["employee_id"],
+                "employee_name": s["employee_name"],
+                "designation": s["designation"],
+                "total_shifts": s["total_shifts"],
+                "present_count": s_pres,
+                "absent_count": s_abs,
+                "half_day_count": s["half_day_count"] or 0,
+                "week_off_count": s["week_off_count"] or 0,
+                "holiday_count": s["holiday_count"] or 0,
+                "attendance_rate_pct": s_rate,
+                "total_hours_worked": round(s_mins / 60.0, 1),
+                "avg_daily_hours": avg_daily_hrs,
+                "risk_tier": risk_tier,
+                "last_shift_date": s["last_shift_date"],
+            })
+
         return {
             "store_name": store_name or "All Stores",
             "period": {
@@ -2689,6 +2764,7 @@ def get_attendance_summary(
             "daily_trend": daily_trend,
             "absenteeism_watchlist": absenteeism_watchlist,
             "role_capacity_summary": capacity_summary,
+            "staff_roster": staff_roster,
         }
 
 

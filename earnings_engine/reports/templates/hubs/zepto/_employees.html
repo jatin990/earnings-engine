@@ -198,16 +198,30 @@
     <!-- Employees Table View -->
     <div class="glass-panel overflow-hidden border-white/10">
         <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
-            <table class="w-full text-left text-xs border-collapse">
+            <table class="w-full text-left text-xs border-collapse select-none">
                 <thead>
                     <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                        <th class="p-2.5 pl-3.5">Staff Member</th>
-                        <th class="p-2.5">Role Profile</th>
-                        <th class="p-2.5 text-center">Status</th>
-                        <th class="p-2.5 text-center">Rating</th>
-                        <th class="p-2.5 text-right">Base Salary</th>
-                        <th class="p-2.5 text-right">Bonus (Month)</th>
-                        <th class="p-2.5">Joining / Timeline</th>
+                        <th class="p-2.5 pl-3.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('name')">
+                            <span class="inline-flex items-center gap-1">Staff Member <span id="sortIcon-name" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('role')">
+                            <span class="inline-flex items-center gap-1">Role Profile <span id="sortIcon-role" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 text-center cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('status')">
+                            <span class="inline-flex items-center gap-1 justify-center">Status <span id="sortIcon-status" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 text-center cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('rating')">
+                            <span class="inline-flex items-center gap-1 justify-center">Rating <span id="sortIcon-rating" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 text-right cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('base_salary_monthly')">
+                            <span class="inline-flex items-center gap-1 justify-end">Base Salary <span id="sortIcon-base_salary_monthly" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 text-right cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('current_month_bonus')">
+                            <span class="inline-flex items-center gap-1 justify-end">Bonus (Month) <span id="sortIcon-current_month_bonus" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
+                        <th class="p-2.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('joining_date')">
+                            <span class="inline-flex items-center gap-1">Joining / Timeline <span id="sortIcon-joining_date" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
+                        </th>
                         <th class="p-2.5 text-center">Documents</th>
                         <th class="p-2.5 pr-3.5 text-center">Actions</th>
                     </tr>

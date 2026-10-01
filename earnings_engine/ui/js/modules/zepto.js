@@ -8,6 +8,8 @@ const zeptoApp = {
     overview: null,
     employees: [],
     includeHiddenEmployees: false,
+    empSortColumn: 'name',
+    empSortDirection: 'asc',
     income: [],
     expenses: [],
     candidates: [],
@@ -584,6 +586,32 @@ const zeptoApp = {
         this.loadEmployees();
     },
 
+    sortEmployees(column) {
+        if (this.empSortColumn === column) {
+            this.empSortDirection = this.empSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.empSortColumn = column;
+            this.empSortDirection = (column === 'rating' || column === 'base_salary_monthly' || column === 'current_month_bonus') ? 'desc' : 'asc';
+        }
+        this.updateEmpSortIcons();
+        this.renderEmployees(this.employees);
+    },
+
+    updateEmpSortIcons() {
+        const columns = ['name', 'role', 'status', 'rating', 'base_salary_monthly', 'current_month_bonus', 'joining_date'];
+        columns.forEach(col => {
+            const el = document.getElementById(`sortIcon-${col}`);
+            if (!el) return;
+            if (this.empSortColumn === col) {
+                el.textContent = this.empSortDirection === 'asc' ? '▲' : '▼';
+                el.className = 'text-white font-mono text-[9px] font-bold';
+            } else {
+                el.textContent = '⇅';
+                el.className = 'text-slate-500 font-mono text-[9px]';
+            }
+        });
+    },
+
     renderEmployees(items) {
         const tbody = document.getElementById('employeesTableBody');
         const countBadge = document.getElementById('empTableCountBadge');
@@ -601,7 +629,25 @@ const zeptoApp = {
             return;
         }
 
-        tbody.innerHTML = items.map(emp => {
+        // Apply in-memory sort based on selected column and direction
+        const sortedItems = [...items].sort((a, b) => {
+            const col = this.empSortColumn;
+            let valA = a[col];
+            let valB = b[col];
+
+            if (col === 'base_salary_monthly' || col === 'current_month_bonus' || col === 'rating') {
+                valA = parseFloat(valA || 0);
+                valB = parseFloat(valB || 0);
+                return this.empSortDirection === 'asc' ? valA - valB : valB - valA;
+            }
+
+            valA = (valA || '').toString().toLowerCase();
+            valB = (valB || '').toString().toLowerCase();
+            const cmp = valA.localeCompare(valB);
+            return this.empSortDirection === 'asc' ? cmp : -cmp;
+        });
+
+        tbody.innerHTML = sortedItems.map(emp => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
             const ratingStars = this.getRatingStars(emp.rating);
@@ -3564,6 +3610,56 @@ const zeptoApp = {
                 <td class="py-2 px-2.5 text-slate-400 text-[11px] truncate max-w-xs">${r.notes || '—'}</td>
             </tr>
         `).join('');
+    },
+
+    async handleScorecardFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            this.showToast('⏳ Uploading and parsing store scorecard report...');
+            const res = await fetch('/api/v1/zepto/metrics/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to parse store metrics');
+
+            this.showToast(`✅ Imported ${data.saved_count || data.total_records || 0} store scorecard records for ${data.store_name || 'Dark Store'}`);
+            await this.loadScorecard();
+        } catch (err) {
+            this.showToast('⚠️ Scorecard upload error: ' + err.message, true);
+        } finally {
+            e.target.value = '';
+        }
+    },
+
+    async handleLossFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            this.showToast('⏳ Uploading and parsing DQ loss & shrinkage report...');
+            const res = await fetch('/api/v1/zepto/loss/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to parse loss report');
+
+            this.showToast(`✅ Imported ${data.saved_count || data.total_records || 0} loss / defect incident records for ${data.store_name || 'Dark Store'}`);
+            await this.loadLoss();
+        } catch (err) {
+            this.showToast('⚠️ Loss report upload error: ' + err.message, true);
+        } finally {
+            e.target.value = '';
+        }
     },
 
     // -----------------------------------------------------------------------

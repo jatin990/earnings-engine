@@ -25,6 +25,21 @@
             />
             <button
                 type="button"
+                onclick="document.getElementById('lossFileInput').click()"
+                class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+                title="Upload DQ loss / spoilage / shrinkage Excel report (.xlsx)"
+            >
+                <span>📤</span> Upload Report (.xlsx)
+            </button>
+            <input
+                type="file"
+                id="lossFileInput"
+                accept=".xlsx,.xlsm"
+                style="display: none;"
+                onchange="zeptoApp.handleLossFileUpload(event)"
+            />
+            <button
+                type="button"
                 onclick="zeptoApp.loadLoss()"
                 class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
             >
