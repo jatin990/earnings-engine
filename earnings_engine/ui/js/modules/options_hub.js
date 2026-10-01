@@ -2,7 +2,8 @@
  * Option Chain & Derivatives Hub Module
  *
  * Provides interactive strike trees, ATM call/put walls, Max Pain, PCR metrics,
- * and multi-day positioning snapshots from NSE Option Chains.
+ * multi-day positioning snapshots, and full-featured TradingView Lightweight Charts
+ * with VWAP, 15m ORB, Order Blocks (SMC), and Tactical Buy/Sell Trade Plans.
  */
 (function (window) {
     'use strict';
@@ -13,16 +14,35 @@
     app._optionsSymbol = 'NIFTY';
     app._optionsExpiry = '';
     app._optionsStrikeRange = 20;
-    app._optionsChart = null;
+    app._optionsTimeframe = '5m';
+    app._optionsLayers = {
+        vwap: true,
+        ob: true,
+        derivatives: true,
+        orb: true,
+        trendlines: true,
+    };
+
+    app._optionsChart = null; // Chart.js instance for OI distribution
+    app._smartChart = null;   // TradingView Lightweight Charts instance
+    app._candleSeries = null;
+    app._volumeSeries = null;
+    app._vwapSeries = null;
+    app._vwapUpperSeries = null;
+    app._vwapLowerSeries = null;
+    app._trendlineSeries = [];
+    app._chartPriceLines = [];
+    app._smartChartData = null;
+    app._optionsPollTimer = null;
 
     /**
-     * Switch active symbol and refresh data
+     * Switch active symbol and refresh both option chain & chart intelligence
      */
     app.switchOptionSymbol = function (symbol) {
         if (!symbol) return;
         const clean = symbol.trim().toUpperCase().replace('.NS', '');
         app._optionsSymbol = clean;
-        app._optionsExpiry = ''; // Reset expiry to default to nearest active for new symbol
+        app._optionsExpiry = ''; // Reset expiry to default to nearest active
 
         // Update active class on quick pills
         document.querySelectorAll('.option-sym-pill').forEach(pill => {
@@ -33,6 +53,7 @@
         if (input) input.value = clean;
 
         app.loadOptionChain(false);
+        app.loadOptionsChartIntelligence(false);
     };
 
     /**
@@ -49,6 +70,50 @@
     app.onOptionStrikeRangeChange = function (range) {
         app._optionsStrikeRange = parseInt(range, 10) || 20;
         app.loadOptionChain(false);
+    };
+
+    /**
+     * Timeframe switcher for smart chart
+     */
+    app.setOptionTimeframe = function (tf) {
+        if (!tf) return;
+        app._optionsTimeframe = tf;
+
+        document.querySelectorAll('.opt-tf-btn').forEach(btn => {
+            const isActive = btn.getAttribute('data-tf') === tf;
+            btn.classList.toggle('active', isActive);
+            btn.style.background = isActive ? '#38bdf8' : 'transparent';
+            btn.style.color = isActive ? '#000000' : '#94a3b8';
+        });
+
+        app.loadOptionsChartIntelligence(false);
+    };
+
+    /**
+     * Layer visibility toggle for smart chart
+     */
+    app.toggleOptionLayer = function (layer) {
+        if (!(layer in app._optionsLayers)) return;
+        app._optionsLayers[layer] = !app._optionsLayers[layer];
+
+        const btnIdMap = {
+            vwap: 'optToggleVwap',
+            ob: 'optToggleOb',
+            derivatives: 'optToggleDeriv',
+            orb: 'optToggleOrb',
+            trendlines: 'optToggleTrendlines',
+        };
+
+        const btn = document.getElementById(btnIdMap[layer]);
+        if (btn) {
+            const active = app._optionsLayers[layer];
+            btn.classList.toggle('active', active);
+            btn.style.opacity = active ? '1' : '0.4';
+        }
+
+        if (app._smartChartData) {
+            app.renderSmartChart(app._smartChartData);
+        }
     };
 
     /**
@@ -138,6 +203,393 @@
                 refreshBtn.innerHTML = '<span>🔄</span> Refresh';
             }
             if (chartLoading) chartLoading.style.display = 'none';
+        }
+    };
+
+    /**
+     * Initialize the TradingView Lightweight Charts instance
+     */
+    app.initOptionsSmartChart = function () {
+        const container = document.getElementById('optionsSmartChartCanvas');
+        if (!container || !window.LightweightCharts) return;
+
+        if (app._smartChart) {
+            try {
+                app._smartChart.remove();
+            } catch (e) {
+                console.debug('Error disposing smart chart instance:', e);
+            }
+            app._smartChart = null;
+        }
+
+        const chart = window.LightweightCharts.createChart(container, {
+            width: container.clientWidth || 800,
+            height: 460,
+            layout: {
+                background: { type: 'solid', color: '#090a0f' },
+                textColor: '#94a3b8',
+                fontSize: 11,
+                fontFamily: "var(--font-mono, monospace)",
+            },
+            grid: {
+                vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+            },
+            crosshair: {
+                mode: window.LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(255, 255, 255, 0.08)',
+                scaleMargins: { top: 0.08, bottom: 0.15 },
+            },
+            timeScale: {
+                borderColor: 'rgba(255, 255, 255, 0.08)',
+                timeVisible: true,
+                secondsVisible: false,
+            },
+        });
+
+        // Candlestick series
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+
+        // Volume sub-series
+        const volumeSeries = chart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: '', // overlay
+            scaleMargins: { top: 0.82, bottom: 0 },
+        });
+
+        // VWAP line series
+        const vwapSeries = chart.addLineSeries({
+            color: '#38bdf8',
+            lineWidth: 2,
+            title: 'VWAP',
+        });
+
+        // VWAP Upper Band
+        const vwapUpperSeries = chart.addLineSeries({
+            color: 'rgba(56, 189, 248, 0.5)',
+            lineWidth: 1,
+            lineStyle: window.LightweightCharts.LineStyle.Dotted,
+            title: 'VWAP +1.5σ',
+        });
+
+        // VWAP Lower Band
+        const vwapLowerSeries = chart.addLineSeries({
+            color: 'rgba(56, 189, 248, 0.5)',
+            lineWidth: 1,
+            lineStyle: window.LightweightCharts.LineStyle.Dotted,
+            title: 'VWAP -1.5σ',
+        });
+
+        app._smartChart = chart;
+        app._candleSeries = candleSeries;
+        app._volumeSeries = volumeSeries;
+        app._vwapSeries = vwapSeries;
+        app._vwapUpperSeries = vwapUpperSeries;
+        app._vwapLowerSeries = vwapLowerSeries;
+
+        // Responsive ResizeObserver
+        const ro = new ResizeObserver(entries => {
+            if (!entries || entries.length === 0 || !app._smartChart) return;
+            const { width, height } = entries[0].contentRect;
+            if (width > 0 && height > 0) {
+                app._smartChart.applyOptions({ width, height });
+            }
+        });
+        ro.observe(container);
+    };
+
+    /**
+     * Load full candlestick & quant intelligence from backend API
+     */
+    app.loadOptionsChartIntelligence = async function (forceRefresh = false) {
+        const symbol = app._optionsSymbol || 'NIFTY';
+        const tf = app._optionsTimeframe || '5m';
+        const loadingEl = document.getElementById('optionsSmartChartLoading');
+
+        if (loadingEl) loadingEl.style.display = 'flex';
+
+        try {
+            const url = `/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(symbol)}&interval=${tf}&force_refresh=${forceRefresh}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            app._smartChartData = data;
+
+            // Render chart & Tactical HUD
+            app.renderSmartChart(data);
+            app.updateTacticalHUD(data);
+
+        } catch (err) {
+            console.error('Failed to load chart intelligence:', err);
+        } finally {
+            if (loadingEl) loadingEl.style.display = 'none';
+        }
+    };
+
+    /**
+     * Render Candlesticks, Indicators, Order Blocks & Structural Lines on Lightweight Chart
+     */
+    app.renderSmartChart = function (data) {
+        if (!app._smartChart) {
+            app.initOptionsSmartChart();
+        }
+        if (!app._smartChart || !app._candleSeries) return;
+
+        const candles = data.candles || [];
+        if (candles.length === 0) {
+            app._candleSeries.setData([]);
+            if (app._volumeSeries) app._volumeSeries.setData([]);
+            return;
+        }
+
+        // Set Candlestick data
+        app._candleSeries.setData(candles.map(c => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+        })));
+
+        // Set Volume data
+        if (app._volumeSeries) {
+            app._volumeSeries.setData(candles.map(c => ({
+                time: c.time,
+                value: c.volume,
+                color: c.close >= c.open ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+            })));
+        }
+
+        // Clear existing price lines & trendlines
+        app._chartPriceLines.forEach(line => {
+            try {
+                app._candleSeries.removePriceLine(line);
+            } catch (e) {}
+        });
+        app._chartPriceLines = [];
+
+        app._trendlineSeries.forEach(s => {
+            try {
+                app._smartChart.removeSeries(s);
+            } catch (e) {}
+        });
+        app._trendlineSeries = [];
+
+        const indicators = data.indicators || {};
+        const smartMoney = data.smart_money || {};
+        const derivLevels = data.derivatives_levels || {};
+
+        // 1. VWAP & Bands
+        if (app._optionsLayers.vwap && indicators.vwap && indicators.vwap.length > 0) {
+            app._vwapSeries.setData(indicators.vwap);
+            app._vwapUpperSeries.setData(indicators.vwap_upper_1 || []);
+            app._vwapLowerSeries.setData(indicators.vwap_lower_1 || []);
+        } else {
+            app._vwapSeries.setData([]);
+            app._vwapUpperSeries.setData([]);
+            app._vwapLowerSeries.setData([]);
+        }
+
+        // 2. Derivatives Levels (Horizontal Lines)
+        if (app._optionsLayers.derivatives && derivLevels) {
+            // Max Pain (Amber Dashed)
+            if (derivLevels.max_pain) {
+                const mpLine = app._candleSeries.createPriceLine({
+                    price: parseFloat(derivLevels.max_pain),
+                    color: '#fbbf24',
+                    lineWidth: 2,
+                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Max Pain: ₹${derivLevels.max_pain}`,
+                });
+                app._chartPriceLines.push(mpLine);
+            }
+
+            // Call Wall / Major Resistance (Red Solid)
+            if (derivLevels.call_wall) {
+                const cwLine = app._candleSeries.createPriceLine({
+                    price: parseFloat(derivLevels.call_wall),
+                    color: '#f87171',
+                    lineWidth: 2,
+                    lineStyle: window.LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Call Wall: ₹${derivLevels.call_wall}`,
+                });
+                app._chartPriceLines.push(cwLine);
+            }
+
+            // Put Wall / Major Support (Green Solid)
+            if (derivLevels.put_wall) {
+                const pwLine = app._candleSeries.createPriceLine({
+                    price: parseFloat(derivLevels.put_wall),
+                    color: '#34d399',
+                    lineWidth: 2,
+                    lineStyle: window.LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Put Wall: ₹${derivLevels.put_wall}`,
+                });
+                app._chartPriceLines.push(pwLine);
+            }
+        }
+
+        // 3. Opening Range Breakout (ORB-15) Range Lines
+        if (app._optionsLayers.orb && indicators.orb && indicators.orb.active) {
+            const orbHigh = app._candleSeries.createPriceLine({
+                price: parseFloat(indicators.orb.high),
+                color: '#c084fc',
+                lineWidth: 1,
+                lineStyle: window.LightweightCharts.LineStyle.Dotted,
+                axisLabelVisible: true,
+                title: `ORB High: ₹${indicators.orb.high}`,
+            });
+            const orbLow = app._candleSeries.createPriceLine({
+                price: parseFloat(indicators.orb.low),
+                color: '#c084fc',
+                lineWidth: 1,
+                lineStyle: window.LightweightCharts.LineStyle.Dotted,
+                axisLabelVisible: true,
+                title: `ORB Low: ₹${indicators.orb.low}`,
+            });
+            app._chartPriceLines.push(orbHigh, orbLow);
+        }
+
+        // 4. Smart Money Order Blocks (OB) & FVGs as Markers
+        if (app._optionsLayers.ob) {
+            const markers = [];
+            const obs = smartMoney.order_blocks || [];
+            const fvgs = smartMoney.fvg_gaps || [];
+
+            obs.forEach(ob => {
+                markers.push({
+                    time: ob.start_time,
+                    position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
+                    color: ob.type === 'BULLISH_OB' ? '#10b981' : '#ef4444',
+                    shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
+                    text: `${ob.type === 'BULLISH_OB' ? 'Demand OB' : 'Supply OB'} [₹${ob.bottom}-${ob.top}]`,
+                });
+            });
+
+            fvgs.forEach(fvg => {
+                markers.push({
+                    time: fvg.time,
+                    position: fvg.type === 'BULLISH_FVG' ? 'belowBar' : 'aboveBar',
+                    color: fvg.type === 'BULLISH_FVG' ? '#38bdf8' : '#fb7185',
+                    shape: 'circle',
+                    text: `FVG [₹${fvg.bottom}-${fvg.top}]`,
+                });
+            });
+
+            // Sort markers chronologically
+            markers.sort((a, b) => a.time - b.time);
+            app._candleSeries.setMarkers(markers);
+        } else {
+            app._candleSeries.setMarkers([]);
+        }
+
+        // 5. Dynamic Support/Resistance Trendlines
+        if (app._optionsLayers.trendlines && smartMoney.trendlines) {
+            smartMoney.trendlines.forEach(tl => {
+                const s = app._smartChart.addLineSeries({
+                    color: tl.type === 'SUPPORT' ? '#34d399' : '#f87171',
+                    lineWidth: 1,
+                    lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                    title: tl.label || tl.type,
+                });
+                s.setData([
+                    { time: tl.p1.time, value: tl.p1.price },
+                    { time: tl.p2.time, value: tl.p2.price },
+                ]);
+                app._trendlineSeries.push(s);
+            });
+        }
+
+        // Fit Content
+        app._smartChart.timeScale().fitContent();
+    };
+
+    /**
+     * Update the Tactical "Where to Buy & Where to Sell" HUD Deck
+     */
+    app.updateTacticalHUD = function (data) {
+        const tactical = data.tactical_signals || {};
+        const deriv = data.derivatives_levels || {};
+        const ind = data.indicators || {};
+        const orb = ind.orb || {};
+
+        // Top Badges
+        const regimeBadge = document.getElementById('optChartRegimeBadge');
+        if (regimeBadge && tactical.regime) {
+            regimeBadge.textContent = tactical.regime;
+        }
+
+        const confBadge = document.getElementById('optChartConfidenceBadge');
+        if (confBadge && tactical.confidence_score) {
+            confBadge.textContent = `${tactical.confidence_score}% Confluence`;
+        }
+
+        // 1. Where to Buy Setup
+        const buy = tactical.where_to_buy || {};
+        const buyEntryEl = document.getElementById('optBuyEntryZone');
+        const buySLEl = document.getElementById('optBuyStopLoss');
+        const buyT1El = document.getElementById('optBuyTarget1');
+        const buyT2El = document.getElementById('optBuyTarget2');
+        const buyRREl = document.getElementById('optBuyRRBadge');
+        const buyTrigEl = document.getElementById('optBuyTriggerText');
+
+        if (buyEntryEl) buyEntryEl.textContent = buy.entry_low ? `₹${buy.entry_low.toLocaleString()} – ₹${buy.entry_high.toLocaleString()}` : '--';
+        if (buySLEl) buySLEl.textContent = buy.stop_loss ? `₹${buy.stop_loss.toLocaleString()}` : '--';
+        if (buyT1El) buyT1El.textContent = buy.target_1 ? `₹${buy.target_1.toLocaleString()}` : '--';
+        if (buyT2El) buyT2El.textContent = buy.target_2 ? `₹${buy.target_2.toLocaleString()}` : '--';
+        if (buyRREl && buy.risk_reward) buyRREl.textContent = `R:R ${buy.risk_reward}`;
+        if (buyTrigEl && buy.trigger) buyTrigEl.textContent = buy.trigger;
+
+        // 2. Where to Sell Setup
+        const sell = tactical.where_to_sell || {};
+        const sellEntryEl = document.getElementById('optSellEntryZone');
+        const sellSLEl = document.getElementById('optSellStopLoss');
+        const sellT1El = document.getElementById('optSellTarget1');
+        const sellT2El = document.getElementById('optSellTarget2');
+        const sellRREl = document.getElementById('optSellRRBadge');
+        const sellTrigEl = document.getElementById('optSellTriggerText');
+
+        if (sellEntryEl) sellEntryEl.textContent = sell.entry_low ? `₹${sell.entry_low.toLocaleString()} – ₹${sell.entry_high.toLocaleString()}` : '--';
+        if (sellSLEl) sellSLEl.textContent = sell.stop_loss ? `₹${sell.stop_loss.toLocaleString()}` : '--';
+        if (sellT1El) sellT1El.textContent = sell.target_1 ? `₹${sell.target_1.toLocaleString()}` : '--';
+        if (sellT2El) sellT2El.textContent = sell.target_2 ? `₹${sell.target_2.toLocaleString()}` : '--';
+        if (sellRREl && sell.risk_reward) sellRREl.textContent = `R:R ${sell.risk_reward}`;
+        if (sellTrigEl && sell.trigger) sellTrigEl.textContent = sell.trigger;
+
+        // 3. Micro-Structure & Market Regime
+        const regimeTextEl = document.getElementById('optStructureRegimeText');
+        const orbTextEl = document.getElementById('optStructureOrbText');
+        const straddleTextEl = document.getElementById('optStructureStraddleText');
+        const pivotTextEl = document.getElementById('optStructurePivotText');
+        const flowTextEl = document.getElementById('optStructureFlowText');
+
+        if (regimeTextEl) regimeTextEl.textContent = tactical.regime || '--';
+        if (orbTextEl) {
+            const orbStatus = orb.status === 'BREAKOUT_BULLISH' ? `Bullish > ₹${orb.high}` :
+                              orb.status === 'BREAKDOWN_BEARISH' ? `Bearish < ₹${orb.low}` : `Inside [₹${orb.low} - ₹${orb.high}]`;
+            orbTextEl.textContent = orbStatus;
+        }
+        if (straddleTextEl) {
+            straddleTextEl.textContent = (deriv.straddle_expected_low && deriv.straddle_expected_high) ?
+                `₹${deriv.straddle_expected_low.toLocaleString()} – ₹${deriv.straddle_expected_high.toLocaleString()}` : '--';
+        }
+        if (pivotTextEl) {
+            pivotTextEl.textContent = deriv.max_pain ? `Max Pain: ₹${deriv.max_pain.toLocaleString()}` : '--';
+        }
+        if (flowTextEl) {
+            flowTextEl.textContent = `${tactical.primary_bias || 'NEUTRAL'} (PCR ${deriv.pcr_oi || '--'})`;
         }
     };
 
@@ -557,6 +1009,16 @@
     // Auto-initialize when loaded
     if (document.getElementById('tab-options')) {
         app.loadOptionChain(false);
+        app.loadOptionsChartIntelligence(false);
+
+        // Auto-refresh timer every 15 seconds during active usage
+        if (app._optionsPollTimer) clearInterval(app._optionsPollTimer);
+        app._optionsPollTimer = setInterval(() => {
+            const tab = document.getElementById('tab-options');
+            if (tab && !tab.classList.contains('hidden') && tab.style.display !== 'none') {
+                app.loadOptionsChartIntelligence(false);
+            }
+        }, 15000);
     }
 
 })(window);
