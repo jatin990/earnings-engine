@@ -246,10 +246,11 @@ const API_BASE = window.location.origin;
                 const safeSym = sym.replace(/'/g, "\\'");
                 const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
 
-                if (pred && pred.consensus_direction) {
-                    const dir = (pred.consensus_direction || 'NEUTRAL').toUpperCase();
-                    const isBull = dir.includes('BULL');
-                    const isBear = dir.includes('BEAR');
+                if (pred && (pred.consensus_direction || pred.direction || typeof pred === 'string')) {
+                    const rawDir = typeof pred === 'string' ? pred : (pred.consensus_direction || pred.direction);
+                    const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
+                    const isBull = dir.includes('BULL') || dir.includes('BUY');
+                    const isBear = dir.includes('BEAR') || dir.includes('SELL');
                     const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
                     const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
                     const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';

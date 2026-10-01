@@ -2199,7 +2199,7 @@ const zeptoApp = {
         const holidayEl = document.getElementById('attHolidayCount');
 
         const absCount = sum.status_distribution?.ABSENT || 0;
-        if (absCountEl) absCountEl.textContent = absCount;
+        if (absentCountEl) absentCountEl.textContent = absCount;
         if (absentBadgeEl) absentBadgeEl.textContent = `${absCount} Absences`;
         if (halfDayEl) halfDayEl.textContent = sum.status_distribution?.HALF_DAY || 0;
         if (weekOffEl) weekOffEl.textContent = sum.status_distribution?.WEEK_OFF || 0;

@@ -417,7 +417,8 @@
                     const kpTrend = kp.trend || '—';
                     const kpRet = (kp.return_pct != null) ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
                     const pConsensus = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
-                    const cDir = pConsensus.consensus_direction || 'NEUTRAL';
+                    const rawCDir = typeof pConsensus === 'string' ? pConsensus : (pConsensus && typeof pConsensus === 'object' ? (pConsensus.consensus_direction || pConsensus.direction) : null);
+                    const cDir = (typeof rawCDir === 'string' ? rawCDir : (rawCDir && typeof rawCDir === 'object' && rawCDir.direction ? rawCDir.direction : (rawCDir != null ? String(rawCDir) : 'NEUTRAL'))).toUpperCase();
                     const isCBull = cDir.includes('BUY') || cDir.includes('BULL');
                     const isCBear = cDir.includes('SELL') || cDir.includes('BEAR');
                     const cColor = isCBull ? '#34d399' : isCBear ? '#f87171' : '#fbbf24';
@@ -796,9 +797,10 @@
             const bodyEl = document.getElementById('swingAiModalBody');
             if (!bodyEl) return;
 
-            const models = consensus.model_predictions || {};
-            const dir = consensus.consensus_direction || 'NEUTRAL';
-            const str = consensus.consensus_strength != null ? consensus.consensus_strength : 50;
+            const models = (consensus && consensus.model_predictions) || {};
+            const rawDir = typeof consensus === 'string' ? consensus : (consensus && typeof consensus === 'object' ? (consensus.consensus_direction || consensus.direction) : null);
+            const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
+            const str = consensus && consensus.consensus_strength != null ? consensus.consensus_strength : 50;
             const isBull = dir.includes('BUY') || dir.includes('BULL');
             const isBear = dir.includes('SELL') || dir.includes('BEAR');
             const badgeBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)';
@@ -845,8 +847,9 @@
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;">
                             ${['deepseek-r1', 'llama-3.3-70b', 'qwen-2.5-72b', 'mistral-large'].map(mKey => {
                                 const m = models[mKey] || {};
-                                const mDir = m.direction || 'PENDING';
-                                const mConf = m.confidence != null ? `${m.confidence}%` : '—';
+                                const rawMDir = typeof m === 'string' ? m : (m && typeof m === 'object' ? (m.direction || m.consensus_direction) : null);
+                                const mDir = (typeof rawMDir === 'string' ? rawMDir : (rawMDir != null ? String(rawMDir) : 'PENDING')).toUpperCase();
+                                const mConf = m && m.confidence != null ? `${m.confidence}%` : '—';
                                 const mIsBuy = mDir.includes('BUY') || mDir.includes('BULL');
                                 const mIsSell = mDir.includes('SELL') || mDir.includes('BEAR');
                                 const mClr = mIsBuy ? '#34d399' : mIsSell ? '#f87171' : '#94a3b8';
