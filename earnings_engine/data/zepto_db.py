@@ -995,28 +995,35 @@ def get_employees(
     include_hidden: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve employees with optional role, status, and name/phone search."""
+    """Retrieve employees with optional role, status, and name/phone search, enriched with last present shift date."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
-        query = "SELECT * FROM zepto_employees WHERE 1=1"
+        query = """
+            SELECT e.*, MAX(a.shift_date) as last_present_date
+            FROM zepto_employees e
+            LEFT JOIN zepto_attendance_records a
+                ON (e.id = a.employee_id OR e.name = a.employee_name)
+                AND a.status = 'PRESENT'
+            WHERE 1=1
+        """
         params: list[Any] = []
 
         if not include_hidden:
-            query += " AND (is_hidden = 0 OR is_hidden IS NULL)"
+            query += " AND (e.is_hidden = 0 OR e.is_hidden IS NULL)"
         if role and role.upper() != "ALL":
-            query += " AND role = ?"
+            query += " AND e.role = ?"
             params.append(role.upper())
         if status and status.upper() != "ALL":
-            query += " AND status = ?"
+            query += " AND e.status = ?"
             params.append(status.upper())
         if search:
-            query += " AND (name LIKE ? OR phone LIKE ? OR email LIKE ? OR id LIKE ?)"
+            query += " AND (e.name LIKE ? OR e.phone LIKE ? OR e.email LIKE ? OR e.id LIKE ?)"
             term = f"%{search.strip()}%"
             params.extend([term, term, term, term])
 
-        query += " ORDER BY is_hidden ASC, status ASC, role ASC, name ASC"
+        query += " GROUP BY e.id ORDER BY e.is_hidden ASC, e.status ASC, e.role ASC, e.name ASC"
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
@@ -3085,6 +3092,18 @@ def get_employee_profile_analytics(
         total_active_hrs = sum(r.get("active_pick_hours", 0.0) or 0.0 for r in ipp_list)
         total_idle_hrs = sum(r.get("idle_hours", 0.0) or 0.0 for r in ipp_list)
         avg_ipp = round(total_items / total_active_hrs, 1) if total_active_hrs > 0 else 0.0
+
+        # Latest physical presence across all shifts
+        last_pres_row = conn.execute(
+            """
+            SELECT MAX(shift_date) as last_present_date
+            FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND status = 'PRESENT'
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id),
+        ).fetchone()
+        employee["last_present_date"] = last_pres_row["last_present_date"] if last_pres_row else None
 
         # Salary history & ratings
         salaries = get_employee_salaries(emp_db_id, settings)

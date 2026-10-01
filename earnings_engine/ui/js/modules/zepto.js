@@ -589,6 +589,57 @@ const zeptoApp = {
         this.loadEmployees();
     },
 
+    // Helper to format relative presence text (e.g. "Today", "1 day ago", "7 days ago", "Never / No record")
+    formatRelativeLastPresent(dateStr) {
+        if (!dateStr) {
+            return {
+                text: 'Never / No record',
+                badgeClass: 'bg-rose-500/10 text-rose-300 border-rose-500/20',
+                days: Infinity,
+            };
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const shiftDate = new Date(y, m - 1, d);
+        shiftDate.setHours(0, 0, 0, 0);
+
+        const diffTime = today.getTime() - shiftDate.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0) {
+            return {
+                text: 'Today',
+                badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+                days: 0,
+            };
+        } else if (diffDays === 1) {
+            return {
+                text: '1 day ago',
+                badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+                days: 1,
+            };
+        } else if (diffDays <= 3) {
+            return {
+                text: `${diffDays} days ago`,
+                badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+                days: diffDays,
+            };
+        } else if (diffDays <= 6) {
+            return {
+                text: `${diffDays} days ago`,
+                badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                days: diffDays,
+            };
+        } else {
+            return {
+                text: `${diffDays} days ago`,
+                badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+                days: diffDays,
+            };
+        }
+    },
+
     sortEmployees(column) {
         if (this.empSortColumn === column) {
             this.empSortDirection = this.empSortDirection === 'asc' ? 'desc' : 'asc';
@@ -656,16 +707,23 @@ const zeptoApp = {
             const ratingStars = this.getRatingStars(emp.rating);
             const docsHtml = this.getDocsPill(emp.aadhar_doc_url, emp.resume_doc_url);
             const isHidden = emp.is_hidden === 1;
+            const lastPres = this.formatRelativeLastPresent(emp.last_present_date);
 
             return `
                 <tr class="hover:bg-white/[0.04] transition cursor-pointer ${isHidden ? 'opacity-50 bg-white/[0.01]' : ''}" onclick="zeptoApp.openStaffDrawer('${emp.id}')" title="Click row to open employee performance, attendance & IPP drawer">
                     <td class="p-3.5 pl-4">
-                        <div class="font-bold text-white text-sm flex items-center gap-1.5">
+                        <div class="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
                             <span>${emp.name}</span>
                             <span class="text-[10px] text-purple-400 opacity-60">↗</span>
                             ${isHidden ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">HIDDEN</span>' : ''}
                         </div>
                         <div class="text-[11px] text-slate-400 font-mono">${emp.phone || 'No phone'} ${emp.email ? '· ' + emp.email : ''}</div>
+                        <div class="mt-1 flex items-center gap-1.5">
+                            <span class="text-[10px] text-slate-400">Last Present:</span>
+                            <span class="text-[10px] font-bold font-mono px-1.5 py-0.2 rounded border ${lastPres.badgeClass}" title="${emp.last_present_date ? 'Shift Date: ' + emp.last_present_date : 'No present attendance records'}">
+                                ${lastPres.text}
+                            </span>
+                        </div>
                     </td>
                     <td class="p-3.5">${roleBadge}</td>
                     <td class="p-3.5 text-center">${statusBadge}</td>
@@ -751,6 +809,11 @@ const zeptoApp = {
             if (roleEl) roleEl.innerHTML = this.getRoleBadge(emp.role || 'PICKER');
             if (statusEl) statusEl.innerHTML = this.getStatusBadge(emp.status || 'ACTIVE');
             if (joinedEl) joinedEl.textContent = `Joined ${emp.joining_date || '—'}`;
+            const lastPresEl = document.getElementById('staffDrawerLastPresent');
+            if (lastPresEl) {
+                const lp = this.formatRelativeLastPresent(emp.last_present_date);
+                lastPresEl.innerHTML = `Last Present: <span class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono border ${lp.badgeClass}" title="${emp.last_present_date ? 'Shift Date: ' + emp.last_present_date : 'No present attendance records'}">${lp.text}</span>`;
+            }
             if (avatarEl) {
                 const initials = (emp.name || 'EM').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'EM';
                 avatarEl.textContent = initials;
