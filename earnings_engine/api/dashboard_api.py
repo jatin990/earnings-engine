@@ -815,6 +815,26 @@ def calculate_trading_range_api(
     return res
 
 
+def get_top_swingers_api(
+    market: str | None = None,
+    min_cycles: int = 1,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Return top-ranked swingers sorted by oscillation regularity, cycle time, and profit spread."""
+    settings = _settings()
+    try:
+        from earnings_engine.data import swing_scanner as swing_scanner_mod
+        return swing_scanner_mod.get_top_swingers(
+            universe=market,
+            min_cycles=min_cycles,
+            limit=limit,
+            settings=settings,
+        )
+    except Exception as e:
+        logger.exception("Error in get_top_swingers_api: %s", e)
+        return []
+
+
 def get_market_live_status(settings: Settings | None = None) -> dict[str, Any]:
     """Return live NSE market status (Open / Closed / Pre-Market / Post-Market / Weekend)."""
     from datetime import timedelta, timezone

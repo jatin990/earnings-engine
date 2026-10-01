@@ -827,6 +827,38 @@ def get_cached_swing_results(
         candidates = [e.result for e in _pool["hot"].values()]
     elif tier_filter == "WARM":
         candidates = [e.result for e in _pool["warm"].values()]
+    elif tier_filter == "COLD":
+        candidates = [c for c in _pool.get("candidates", []) if (c.get("tier") or "").upper() == "COLD"]
+        if not candidates:
+            # Fallback to DB query for cold candidates if in-memory pool filtered them
+            try:
+                conn = get_db_connection(settings)
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM swing_radar WHERE tier = 'COLD' ORDER BY composite_score DESC LIMIT 100")
+                rows = cursor.fetchall()
+                cols = [col[0] for col in cursor.description]
+                for r in rows:
+                    d = dict(zip(cols, r))
+                    candidates.append({
+                        "ticker": d.get("ticker"),
+                        "tier": "COLD",
+                        "company_name": d.get("company_name"),
+                        "industry": d.get("industry"),
+                        "composite_score": d.get("composite_score", 0),
+                        "current_price": d.get("current_price"),
+                        "current_support": d.get("support_level"),
+                        "next_resistance": d.get("resistance_level"),
+                        "spread_pct": d.get("spread_pct"),
+                        "dist_to_support_pct": d.get("dist_to_support_pct"),
+                        "channel_position_pct": d.get("channel_position_pct"),
+                        "swing_signal": d.get("signal", "Neutral"),
+                        "source": d.get("source", "auto"),
+                        "cycles": d.get("cycles", 0),
+                        "avg_cycle_days": d.get("avg_cycle_days", 0),
+                        "thirty_day_return_pct": d.get("thirty_day_return_pct"),
+                    })
+            except Exception:
+                pass
     else:
         candidates = list(_pool["candidates"])
 
@@ -859,6 +891,114 @@ def get_cached_swing_results(
         logger.debug("[SWING] Error filtering by universe %s: %s", universe, e)
 
     return candidates
+
+
+def get_top_swingers(
+    universe: str | None = None,
+    min_cycles: int = 1,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Return top-ranked swing setups in the market sorted by cycle regularity and profit potential.
+
+    Scoring formula prioritizes:
+    - Cycle Count (proven oscillation rhythm)
+    - Cycle Velocity & Duration (healthy 10-45 day swing sweet spot)
+    - Channel Spread (10-40% harmonic channel width)
+    - Support Floor Proximity (closeness to 0-3% active buy zone)
+    - Composite Score & Fundamental Quality
+    """
+    settings = settings or Settings()
+    all_setups = get_cached_swing_results(universe=universe, tier="ALL", settings=settings)
+    if not all_setups:
+        load_swing_pool_from_db(settings)
+        all_setups = get_cached_swing_results(universe=universe, tier="ALL", settings=settings)
+
+    ranked: list[dict[str, Any]] = []
+
+    for item in all_setups:
+        ticker = item.get("ticker")
+        if not ticker:
+            continue
+
+        cycles = int(item.get("cycles") or 0)
+        avg_days = float(item.get("avg_cycle_days") or 0.0)
+        spread_pct = float(item.get("spread_pct") or 0.0)
+        dist_pct = float(item.get("dist_to_support_pct", 99.0) if item.get("dist_to_support_pct") is not None else 99.0)
+        comp_score = float(item.get("composite_score") or 0.0)
+
+        if cycles < min_cycles and comp_score < 40.0:
+            continue
+
+        # Cycle Quality Points (0-40)
+        cycle_pts = 0.0
+        if cycles >= 4:
+            cycle_pts += 25.0
+        elif cycles >= 3:
+            cycle_pts += 20.0
+        elif cycles >= 2:
+            cycle_pts += 15.0
+        elif cycles == 1:
+            cycle_pts += 8.0
+
+        # Cycle Velocity Score (10-45 days is peak swing rhythm)
+        if 10.0 <= avg_days <= 30.0:
+            cycle_pts += 15.0
+        elif 5.0 <= avg_days <= 60.0:
+            cycle_pts += 10.0
+        elif avg_days > 0:
+            cycle_pts += 5.0
+
+        # Spread Score (0-25)
+        spread_pts = 0.0
+        if 12.0 <= spread_pct <= 35.0:
+            spread_pts = 25.0
+        elif 8.0 <= spread_pct <= 50.0:
+            spread_pts = 18.0
+        elif spread_pct > 0:
+            spread_pts = 10.0
+
+        # Buy Zone Proximity Score (0-20)
+        prox_pts = 0.0
+        if 0.0 <= dist_pct <= 3.0:
+            prox_pts = 20.0  # Immediate buy zone floor
+        elif 3.0 < dist_pct <= 7.0:
+            prox_pts = 14.0
+        elif dist_pct <= 12.0:
+            prox_pts = 8.0
+
+        # Composite / Quality contribution (0-15)
+        comp_pts = (comp_score / 100.0) * 15.0
+
+        total_rank_score = round(cycle_pts + spread_pts + prox_pts + comp_pts, 1)
+
+        # Build clean cycle health and timeframe metadata
+        cycle_health = "High Frequency" if cycles >= 4 else ("Established" if cycles >= 2 else "Emerging")
+        cycle_time_display = f"~{avg_days:.1f}d / cycle" if avg_days > 0 else "—"
+        cycle_count_display = f"{cycles} Cycle{'s' if cycles != 1 else ''}"
+
+        ranked.append({
+            **item,
+            "swing_rank_score": total_rank_score,
+            "cycles": cycles,
+            "avg_cycle_days": avg_days,
+            "cycle_time_display": cycle_time_display,
+            "cycle_count_display": cycle_count_display,
+            "cycle_health": cycle_health,
+            "timeframe_baseline": "90D Channel Rhythm",
+        })
+
+    # Sort descending by swing_rank_score, then composite_score, then cycles
+    ranked.sort(
+        key=lambda x: (
+            x.get("swing_rank_score", 0),
+            x.get("composite_score", 0),
+            x.get("cycles", 0),
+        ),
+        reverse=True,
+    )
+
+    return ranked[:limit]
 
 
 def get_scan_status(universe: str | None = None) -> dict[str, Any]:

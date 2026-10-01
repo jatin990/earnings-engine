@@ -248,11 +248,33 @@ async def run_swing_scan_endpoint(request: dict | None = None):
         raise HTTPException(status_code=500, detail=f"Swing scan failed: {str(e)}")
 
 
+@router.get("/api/v1/dashboard/swing/top-swingers")
+@router.get("/api/v1/swing/top-swingers")
+async def get_top_swingers_endpoint(
+    market: str | None = Query(None, description="Market universe filter"),
+    min_cycles: int = Query(1, ge=0, description="Minimum completed cycles threshold"),
+    limit: int = Query(50, ge=1, le=200, description="Max swingers to return"),
+):
+    """Retrieve top-ranked swing candidates with historical cycle times, frequency counts, and profit potential."""
+    try:
+        top = await asyncio.to_thread(
+            swing_scanner_mod.get_top_swingers,
+            universe=market,
+            min_cycles=min_cycles,
+            limit=limit,
+            settings=_get_settings(),
+        )
+        return top
+    except Exception as e:
+        logger.exception("Error in get_top_swingers_endpoint: %s", e)
+        return []
+
+
 @router.get("/api/v1/dashboard/swing")
 @router.get("/api/v1/dashboard/swing/setups")
 async def get_swing_setups_endpoint(
     market: str | None = Query(None, description="Market universe filter"),
-    tier: str = Query("ALL", description="Tier filter: HOT, WARM, or ALL"),
+    tier: str = Query("ALL", description="Tier filter: HOT, WARM, COLD, or ALL"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve active swing setups with channel bounds, risk/reward, and cycle indicators."""
@@ -268,11 +290,15 @@ async def get_swing_setups_endpoint(
             return cached[:limit]
 
         # Fallback to dashboard_api calculation if scanner cache is cold
-        setups = await asyncio.to_thread(dashboard_api.get_swing_setups, market=market, limit=limit)
-        return setups
+        try:
+            setups = await asyncio.to_thread(dashboard_api.get_swing_setups, market=market, limit=limit)
+            return setups
+        except Exception as fallback_err:
+            logger.warning("Dynamic get_swing_setups fallback failed: %s; returning empty setups", fallback_err)
+            return []
     except Exception as e:
         logger.exception("Error in get_swing_setups: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        return []
 
 
 @router.get("/api/v1/swing-range/cycles")

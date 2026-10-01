@@ -154,6 +154,26 @@ const API_BASE = window.location.origin;
                     return app.loadSwing(e);
                 }
             },
+            async setSwingSubTab(tabName) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.setSwingSubTab === 'function') {
+                    return app.setSwingSubTab(tabName);
+                }
+            },
+            async loadTopSwingers(e) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.loadTopSwingers === 'function') {
+                    return app.loadTopSwingers(e);
+                }
+            },
+            async setSwingTierFilter(tier) {
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.setSwingTierFilter === 'function') {
+                    return app.setSwingTierFilter(tier);
+                }
+            },
             async filterSwingTable(query) {
                 await this.loadScript('/static/js/modules/swing.js');
                 if (typeof app.filterSwingTable === 'function') {
