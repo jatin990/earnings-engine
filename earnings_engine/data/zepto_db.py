@@ -3612,22 +3612,47 @@ def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> 
             ),
         )
     return {"id": rec_id, "amount": data.get("amount", 0.0)}
-    return {"id": rec_id, "amount": data.get("amount", 0.0)}
 
 
 def get_loss_summary(
+    month: str | None = None,
     store_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    loss_type: str | None = None,
+    category: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Retrieve total store loss, category-wise breakdown, and shrinkage log."""
+    """Retrieve total store loss, category-wise DQ vs Shrinkage breakdown, email-vs-excel verification, and monthly index."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
+    # 1. Discover distinct available months
+    available_months: set[str] = set()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        m_rows = conn.execute(
+            """
+            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL AND length(record_date) >= 7
+            UNION
+            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL AND category IN ('DQ_LOSS', 'SHRINKAGE')
+            """
+        ).fetchall()
+        for mr in m_rows:
+            ym_val = str(mr["ym"] or "").strip()
+            if ym_val and len(ym_val) == 7 and ym_val.count("-") == 1:
+                available_months.add(ym_val)
+
+    sorted_months = sorted(list(available_months), reverse=True)
+
+    # 2. Build filter conditions for loss records
     where = ["1=1"]
     params: list[Any] = []
-    if store_name:
+
+    if month and month != "ALL":
+        where.append("substr(record_date, 1, 7) = ?")
+        params.append(month)
+    if store_name and store_name != "ALL":
         where.append("store_name = ?")
         params.append(store_name)
     if start_date:
@@ -3636,6 +3661,12 @@ def get_loss_summary(
     if end_date:
         where.append("record_date <= ?")
         params.append(end_date)
+    if loss_type and loss_type != "ALL":
+        where.append("loss_type = ?")
+        params.append(loss_type)
+    if category and category != "ALL":
+        where.append("category = ?")
+        params.append(category)
 
     where_sql = " AND ".join(where)
 
@@ -3650,28 +3681,275 @@ def get_loss_summary(
             params,
         ).fetchall()
 
-        items = [dict(r) for r in rows]
-        total_loss = sum(i.get("amount", 0.0) for i in items)
-        dq_total = sum(i.get("amount", 0.0) for i in items if i.get("loss_type") == "DQ_LOSS")
-        shrinkage_total = sum(i.get("amount", 0.0) for i in items if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"))
+        all_items = [dict(r) for r in rows]
 
-        # Category breakdown
+        # Deduplication against generic EMAIL_INGESTED rollups when itemized Excel records exist for the same source_email_id
+        email_ids_with_itemized = {
+            it["source_email_id"] for it in all_items
+            if it.get("source_email_id") and it.get("category") != "EMAIL_INGESTED"
+        }
+
+        active_items = []
+        for it in all_items:
+            # Skip email-ingested rollup row if granular Excel rows exist for this email
+            if it.get("category") == "EMAIL_INGESTED" and it.get("source_email_id") in email_ids_with_itemized:
+                continue
+            active_items.append(it)
+
+        # Core metric calculations
+        total_loss = sum(float(i.get("amount") or 0.0) for i in active_items)
+        dq_total = sum(float(i.get("amount") or 0.0) for i in active_items if i.get("loss_type") == "DQ_LOSS")
+        shrinkage_total = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
+        )
+        spoilage_total = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
+        )
+        total_skus = sum(int(i.get("sku_count") or 0) for i in active_items)
+
+        # Category Matrix Breakdown (DQ vs Shrinkage vs Spoilage by Department)
         cat_map: dict[str, dict[str, Any]] = {}
-        for it in items:
-            cat = it.get("category") or "GENERAL"
-            if cat not in cat_map:
-                cat_map[cat] = {"category": cat, "amount": 0.0, "count": 0}
-            cat_map[cat]["amount"] += it.get("amount", 0.0)
-            cat_map[cat]["count"] += 1
+        for it in active_items:
+            cat = (it.get("category") or "GENERAL").strip().upper()
+            l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
+            amt = float(it.get("amount") or 0.0)
+            sku_cnt = int(it.get("sku_count") or 0)
 
-        cat_list = sorted(cat_map.values(), key=lambda x: x["amount"], reverse=True)
+            if cat not in cat_map:
+                cat_map[cat] = {
+                    "category": cat,
+                    "total_amount": 0.0,
+                    "dq_loss_amount": 0.0,
+                    "shrinkage_amount": 0.0,
+                    "spoilage_amount": 0.0,
+                    "total_skus": 0,
+                    "incident_count": 0,
+                    "pct_of_total": 0.0,
+                }
+
+            cat_map[cat]["total_amount"] += amt
+            cat_map[cat]["total_skus"] += sku_cnt
+            cat_map[cat]["incident_count"] += 1
+
+            if l_type == "DQ_LOSS":
+                cat_map[cat]["dq_loss_amount"] += amt
+            elif l_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
+                cat_map[cat]["shrinkage_amount"] += amt
+            else:
+                cat_map[cat]["spoilage_amount"] += amt
+
+        # Format and calculate percentage share
+        cat_list = []
+        for c_data in cat_map.values():
+            c_data["total_amount"] = round(c_data["total_amount"], 2)
+            c_data["dq_loss_amount"] = round(c_data["dq_loss_amount"], 2)
+            c_data["shrinkage_amount"] = round(c_data["shrinkage_amount"], 2)
+            c_data["spoilage_amount"] = round(c_data["spoilage_amount"], 2)
+            c_data["pct_of_total"] = round((c_data["total_amount"] / total_loss * 100), 1) if total_loss > 0 else 0.0
+            cat_list.append(c_data)
+
+        cat_list.sort(key=lambda x: x["total_amount"], reverse=True)
+
+        # 3. Email Body vs. Excel Verification / Reconciliation Ledger
+        recon_where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
+        recon_params: list[Any] = []
+        if month and month != "ALL":
+            recon_where.append("month_ym = ?")
+            recon_params.append(month)
+        if store_name and store_name != "ALL":
+            recon_where.append("(store_name = ? OR store_name = '')")
+            recon_params.append(store_name)
+        if start_date:
+            recon_where.append("iso_date >= ?")
+            recon_params.append(start_date)
+        if end_date:
+            recon_where.append("iso_date <= ?")
+            recon_params.append(end_date)
+
+        recon_where_sql = " AND ".join(recon_where)
+        email_rows = conn.execute(
+            f"""
+            SELECT id, subject, sender, iso_date, month_ym, store_name, snippet, extracted_metrics, attachments, parsed_status, parsed_records_count
+            FROM zepto_gmail_messages
+            WHERE {recon_where_sql}
+            ORDER BY iso_date DESC, id DESC
+            """,
+            recon_params,
+        ).fetchall()
+
+        recon_items = []
+        matched_count = 0
+        variance_count = 0
+
+        for er in email_rows:
+            e_dict = dict(er)
+            try:
+                metrics_obj = json.loads(e_dict.get("extracted_metrics") or "{}")
+            except Exception:
+                metrics_obj = {}
+            try:
+                attachments_list = json.loads(e_dict.get("attachments") or "[]")
+            except Exception:
+                attachments_list = []
+
+            email_stated_amount = float(metrics_obj.get("loss_amount") or 0.0)
+            msg_id = e_dict["id"]
+            msg_date = e_dict["iso_date"]
+            msg_store = e_dict["store_name"] or "JMU-Sainik Colony"
+
+            # Query all linked Excel items for this message
+            linked_excel_rows = conn.execute(
+                """
+                SELECT amount, sku_count, category, loss_type FROM zepto_loss_records
+                WHERE (source_email_id = ? OR (record_date = ? AND store_name = ?))
+                  AND category != 'EMAIL_INGESTED'
+                """,
+                (msg_id, msg_date, msg_store),
+            ).fetchall()
+
+            excel_sum = round(sum(float(lr["amount"] or 0.0) for lr in linked_excel_rows), 2)
+            excel_sku_count = sum(int(lr["sku_count"] or 0) for lr in linked_excel_rows)
+            excel_item_count = len(linked_excel_rows)
+
+            variance = round(excel_sum - email_stated_amount, 2)
+            status = "PENDING"
+
+            if excel_sum > 0 and email_stated_amount > 0:
+                if abs(variance) <= 1.0:
+                    status = "MATCHED"
+                    matched_count += 1
+                else:
+                    status = "VARIANCE"
+                    variance_count += 1
+            elif excel_sum > 0 and email_stated_amount == 0:
+                status = "EXCEL_ONLY"
+            elif excel_sum == 0 and email_stated_amount > 0:
+                status = "EMAIL_ONLY"
+
+            recon_items.append({
+                "email_id": msg_id,
+                "date": msg_date,
+                "store_name": msg_store,
+                "subject": e_dict["subject"],
+                "sender": e_dict["sender"],
+                "email_stated_amount": email_stated_amount,
+                "excel_parsed_sum": excel_sum,
+                "excel_item_count": excel_item_count,
+                "excel_sku_count": excel_sku_count,
+                "variance": variance,
+                "status": status,
+                "attachment_filename": attachments_list[0]["filename"] if attachments_list else None,
+            })
+
+        total_audits = len(recon_items)
+        match_rate_pct = round((matched_count / (matched_count + variance_count) * 100), 1) if (matched_count + variance_count) > 0 else 100.0
+
+        # 4. Monthly Trend aggregation
+        month_trend_rows = conn.execute(
+            """
+            SELECT substr(record_date, 1, 7) AS ym,
+                   SUM(amount) AS monthly_total,
+                   SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END) AS dq_total,
+                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END) AS shrink_total,
+                   SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN amount ELSE 0 END) AS spoil_total,
+                   COUNT(*) AS item_count,
+                   SUM(sku_count) AS sku_count
+            FROM zepto_loss_records
+            WHERE category != 'EMAIL_INGESTED' AND record_date IS NOT NULL AND length(record_date) >= 7
+            GROUP BY substr(record_date, 1, 7)
+            ORDER BY ym DESC
+            """
+        ).fetchall()
+
+        monthly_trends = [
+            {
+                "month_ym": mtr["ym"],
+                "total_loss": round(float(mtr["monthly_total"] or 0.0), 2),
+                "dq_loss": round(float(mtr["dq_total"] or 0.0), 2),
+                "shrinkage": round(float(mtr["shrink_total"] or 0.0), 2),
+                "spoilage": round(float(mtr["spoil_total"] or 0.0), 2),
+                "item_count": int(mtr["item_count"] or 0),
+                "sku_count": int(mtr["sku_count"] or 0),
+            }
+            for mtr in month_trend_rows
+        ]
 
         return {
+            "selected_month": month or "ALL",
+            "available_months": sorted_months,
             "total_loss_amount": round(total_loss, 2),
             "dq_loss_total": round(dq_total, 2),
             "shrinkage_total": round(shrinkage_total, 2),
+            "spoilage_total": round(spoilage_total, 2),
+            "total_skus_affected": total_skus,
+            "total_loss_records": len(active_items),
             "category_breakdown": cat_list,
-            "records": items,
+            "reconciliation": {
+                "items": recon_items,
+                "total_audits": total_audits,
+                "matched_count": matched_count,
+                "variance_count": variance_count,
+                "match_rate_pct": match_rate_pct,
+            },
+            "monthly_trends": monthly_trends,
+            "records": active_items,
+        }
+
+
+def get_loss_records(
+    month: str | None = None,
+    store_name: str | None = None,
+    category: str | None = None,
+    loss_type: str | None = None,
+    search: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve paginated and searchable itemized stored Excel entries."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+
+    if month and month != "ALL":
+        where.append("substr(record_date, 1, 7) = ?")
+        params.append(month)
+    if store_name and store_name != "ALL":
+        where.append("store_name = ?")
+        params.append(store_name)
+    if category and category != "ALL":
+        where.append("category = ?")
+        params.append(category)
+    if loss_type and loss_type != "ALL":
+        where.append("loss_type = ?")
+        params.append(loss_type)
+    if search:
+        s_pat = f"%{search.strip().lower()}%"
+        where.append("(LOWER(notes) LIKE ? OR LOWER(category) LIKE ? OR LOWER(loss_type) LIKE ? OR LOWER(store_name) LIKE ?)")
+        params.extend([s_pat, s_pat, s_pat, s_pat])
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        total_count = conn.execute(f"SELECT COUNT(*) AS cnt FROM zepto_loss_records WHERE {where_sql}", params).fetchone()["cnt"]
+
+        query = f"""
+            SELECT * FROM zepto_loss_records
+            WHERE {where_sql}
+            ORDER BY record_date DESC, created_at DESC
+            LIMIT ? OFFSET ?
+        """
+        rows = conn.execute(query, params + [limit, offset]).fetchall()
+        return {
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+            "records": [dict(r) for r in rows],
         }
 
 

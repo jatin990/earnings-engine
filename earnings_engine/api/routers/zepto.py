@@ -1753,21 +1753,55 @@ async def create_store_metrics_endpoint(record: dict[str, Any] = Body(...)) -> d
 
 @router.get("/api/v1/zepto/loss/summary", summary="Get DQ Loss, Shrinkage & Waste Breakdown")
 async def get_loss_summary_endpoint(
+    month: str | None = Query(None),
     store_name: str | None = Query(None),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    loss_type: str | None = Query(None),
+    category: str | None = Query(None),
 ) -> dict[str, Any]:
-    """Retrieve aggregated quality loss, shrinkage, and damage categorization."""
+    """Retrieve aggregated quality loss, shrinkage, and damage categorization with email-vs-excel reconciliation."""
     try:
         summary = zepto_db.get_loss_summary(
+            month=month,
             store_name=store_name,
             start_date=start_date,
             end_date=end_date,
+            loss_type=loss_type,
+            category=category,
             settings=_settings,
         )
         return {"success": True, **summary}
     except Exception as exc:
         logger.error("[ZEPTO-LOSS] Error fetching loss summary: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/loss/records", summary="Get Stored Itemized Loss & Excel Records")
+async def get_loss_records_endpoint(
+    month: str | None = Query(None),
+    store_name: str | None = Query(None),
+    category: str | None = Query(None),
+    loss_type: str | None = Query(None),
+    search: str | None = Query(None),
+    limit: int = Query(500, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    """Retrieve paginated and searchable itemized stored Excel loss and defect records."""
+    try:
+        data = zepto_db.get_loss_records(
+            month=month,
+            store_name=store_name,
+            category=category,
+            loss_type=loss_type,
+            search=search,
+            limit=limit,
+            offset=offset,
+            settings=_settings,
+        )
+        return {"success": True, **data}
+    except Exception as exc:
+        logger.error("[ZEPTO-LOSS-RECORDS] Error fetching loss records: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

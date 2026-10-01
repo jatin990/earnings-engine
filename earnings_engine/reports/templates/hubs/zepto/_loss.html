@@ -1,28 +1,57 @@
-<!-- Loss, Quality & Shrinkage Subtab Partial -->
+<!-- Loss, Quality & Shrinkage Subtab Partial (Redesigned) -->
 <div class="space-y-4">
-    <!-- Header Banner -->
+    <!-- Header Banner & Filter Toolbar -->
     <div class="glass-panel p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div>
             <div class="flex items-center gap-2">
                 <span class="text-xl">📉</span>
-                <h3 class="text-sm font-bold text-white uppercase tracking-wider">DQ Loss, Shrinkage & Waste</h3>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">DQ Loss, Shrinkage & Spoilage Intelligence</h3>
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
-                    Inventory Protection
+                    Audit & Variance Ledger
                 </span>
             </div>
             <p class="text-xs text-slate-400 mt-1">
-                Monitor Dispatch Quality (DQ) defects, transit damage, spoilage waste, and unexplained shrinkage.
+                Granular dispatch quality defects, department-level shrinkage, spoilage waste, and email body vs. Excel reconciliation.
             </p>
         </div>
 
-        <!-- Filter Controls -->
+        <!-- Filter Controls Toolbar -->
         <div class="flex items-center gap-2 flex-wrap">
-            <input
-                type="date"
-                id="lossDateFilter"
+            <!-- Dynamic Month Selector -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-lg px-2 py-1">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Month:</span>
+                <select
+                    id="lossMonthFilter"
+                    onchange="zeptoApp.loadLoss()"
+                    class="bg-transparent text-xs text-slate-200 font-medium focus:outline-none cursor-pointer"
+                >
+                    <option value="ALL" class="bg-slate-900 text-slate-200">All Months</option>
+                </select>
+            </div>
+
+            <!-- Loss Classification Filter -->
+            <select
+                id="lossTypeFilter"
                 onchange="zeptoApp.loadLoss()"
-                class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
-            />
+                class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-rose-500/50"
+            >
+                <option value="ALL">All Loss Types</option>
+                <option value="DQ_LOSS">DQ Loss (Packing/Picking)</option>
+                <option value="SHRINKAGE">Shrinkage & Variance</option>
+                <option value="SPOILAGE">Spoilage & Decay</option>
+                <option value="TRANSIT_DAMAGE">Transit Damage</option>
+            </select>
+
+            <!-- Category Filter -->
+            <select
+                id="lossCategoryFilter"
+                onchange="zeptoApp.loadLoss()"
+                class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-rose-500/50"
+            >
+                <option value="ALL">All Categories</option>
+            </select>
+
+            <!-- Upload Excel Action -->
             <button
                 type="button"
                 onclick="document.getElementById('lossFileInput').click()"
@@ -38,6 +67,8 @@
                 style="display: none;"
                 onchange="zeptoApp.handleLossFileUpload(event)"
             />
+
+            <!-- Refresh Button -->
             <button
                 type="button"
                 onclick="zeptoApp.loadLoss()"
@@ -48,61 +79,231 @@
         </div>
     </div>
 
-    <!-- KPI Metric Cards Grid -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <!-- Total Loss Value -->
+    <!-- KPI Metric Cards Grid (5 High-Density Cards) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <!-- 1. Total Loss Value -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-start">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Total Loss Value</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Total Store Loss</span>
                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="lossTotalCountBadge">-- Incidents</span>
             </div>
             <div class="my-1.5">
                 <div class="text-2xl font-black font-mono text-rose-400 tracking-tight" id="lossTotalAmount">₹--</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Gross Spoilage & Damages</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Deduplicated Net Loss</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
-                <span>Total Impacted SKUs:</span>
+                <span>Impacted SKUs:</span>
                 <span class="font-mono font-bold text-slate-300" id="lossTotalSkuCount">--</span>
             </div>
         </div>
 
-        <!-- DQ Loss Rate -->
+        <!-- 2. Dispatch Quality Loss -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Dispatch Quality Loss</span>
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Dispatch Quality (DQ)</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono" id="lossDqShareBadge">--%</span>
+            </div>
             <div class="my-1.5">
                 <div class="text-2xl font-black font-mono text-amber-300 tracking-tight" id="lossDqAmount">₹--</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Packer / Picker Packing Defects</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Packing & Picking Defects</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
-                <span>Loss Classification:</span>
+                <span>Loss Type:</span>
                 <span class="font-mono font-bold text-amber-300">DQ_LOSS</span>
             </div>
         </div>
 
-        <!-- Fruits & Vegetables Spoilage -->
+        <!-- 3. Shrinkage & Inventory Variance -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">F&V Fresh Spoilage</span>
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">Shrinkage & Variance</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono" id="lossShrinkageShareBadge">--%</span>
+            </div>
             <div class="my-1.5">
-                <div class="text-2xl font-black font-mono text-emerald-300 tracking-tight" id="lossFvAmount">₹--</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Perishable Decay & Grade-Out</div>
+                <div class="text-2xl font-black font-mono text-purple-300 tracking-tight" id="lossShrinkageAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Cycle Count & Inventory Gaps</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
-                <span>Category Exposure:</span>
-                <span class="font-mono font-bold text-emerald-300">FRUITS_VEG</span>
+                <span>Classification:</span>
+                <span class="font-mono font-bold text-purple-300">SHRINKAGE</span>
             </div>
         </div>
 
-        <!-- Shrinkage & Inventory Variance -->
+        <!-- 4. Spoilage & Perishable Decay -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">Shrinkage & Variance</span>
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Perishables & Spoilage</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="lossSpoilageShareBadge">--%</span>
+            </div>
             <div class="my-1.5">
-                <div class="text-2xl font-black font-mono text-purple-300 tracking-tight" id="lossShrinkageAmount">₹--</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Stock Count Reconciliations</div>
+                <div class="text-2xl font-black font-mono text-emerald-300 tracking-tight" id="lossFvAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Fresh Decay & Transit Damage</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
-                <span>Variance Threshold:</span>
-                <span class="font-mono font-bold text-purple-300">&lt; 0.15% GMV</span>
+                <span>Category Focus:</span>
+                <span class="font-mono font-bold text-emerald-300">SPOILAGE</span>
             </div>
+        </div>
+
+        <!-- 5. Email vs Excel Audit Reconciliation -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400">Audit Verification</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono" id="lossReconStatusBadge">100% Match</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-sky-300 tracking-tight" id="lossReconMatchRate">--%</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Email Body vs Excel Sum</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Discrepancies:</span>
+                <span class="font-mono font-bold text-slate-300" id="lossReconVarianceCount">0 variances</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Category-Wise Breakdown Matrix (Dual DQ vs Shrinkage vs Spoilage) -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Department & Category Loss Matrix</h4>
+                <p class="text-[10px] text-slate-400">Complete cross-category analysis with distinct DQ Loss, Shrinkage, Spoilage, and percentage contribution.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossCategoryTotalCountBadge">
+                0 Categories
+            </span>
+        </div>
+
+        <!-- Category Breakdown Table -->
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Department / Category</th>
+                        <th class="py-2.5 px-3 text-right text-amber-300">DQ Loss (₹)</th>
+                        <th class="py-2.5 px-3 text-right text-purple-300">Shrinkage (₹)</th>
+                        <th class="py-2.5 px-3 text-right text-emerald-300">Spoilage / Transit (₹)</th>
+                        <th class="py-2.5 px-3 text-right text-rose-400 font-bold">Total Loss (₹)</th>
+                        <th class="py-2.5 px-3 text-center" style="min-width: 140px;">% Share</th>
+                        <th class="py-2.5 px-3 text-right">SKUs</th>
+                        <th class="py-2.5 px-3 text-right">Incidents</th>
+                        <th class="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="lossCategoryMatrixTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="9" class="text-center py-6 text-slate-500 text-xs">
+                            Loading category loss matrix...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Email Body vs Excel Attachment Verification & Reconciliation Ledger -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">🔍</span>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Email Body vs. Excel Attachment Verification</h4>
+                </div>
+                <p class="text-[10px] text-slate-400">Automated audit verification matching the daily loss declared in Gmail body text with the itemized Excel row total.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="lossReconMatchedBadge">
+                    0 Matched
+                </span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="lossReconMismatchBadge">
+                    0 Variance
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-72">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2 px-3 whitespace-nowrap">Audit Date</th>
+                        <th class="py-2 px-3">Store</th>
+                        <th class="py-2 px-3">Email Subject / Source</th>
+                        <th class="py-2 px-3 text-right">Email Body (₹)</th>
+                        <th class="py-2 px-3 text-right">Excel Parsed Sum (₹)</th>
+                        <th class="py-2 px-3 text-right">Variance (₹)</th>
+                        <th class="py-2 px-3 text-center">Status</th>
+                        <th class="py-2 px-3">Attachment</th>
+                    </tr>
+                </thead>
+                <tbody id="lossReconciliationTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading email vs Excel reconciliation ledger...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Itemized Stored Excel Entries Ledger -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Itemized Stored Excel Entries</h4>
+                <p class="text-[10px] text-slate-400">All granular SKU defect, damage, and shrinkage rows stored in the database.</p>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <!-- Search Input -->
+                <div class="relative w-full sm:w-64">
+                    <input
+                        type="text"
+                        id="lossSearchInput"
+                        placeholder="Search SKU, notes, category..."
+                        oninput="zeptoApp.filterLossRecords()"
+                        class="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-rose-500/50"
+                    />
+                </div>
+
+                <!-- Export CSV -->
+                <button
+                    type="button"
+                    onclick="zeptoApp.exportLossCsv()"
+                    class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-medium flex items-center gap-1 transition whitespace-nowrap"
+                    title="Export filtered records to CSV"
+                >
+                    <span>📥</span> CSV
+                </button>
+
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono whitespace-nowrap" id="lossRecordCountBadge">
+                    0 entries
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-96">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02] sticky top-0 bg-slate-900/90 backdrop-blur z-10">
+                        <th class="py-2 px-2.5">Date</th>
+                        <th class="py-2 px-2.5">Store</th>
+                        <th class="py-2 px-2.5">Loss Type</th>
+                        <th class="py-2 px-2.5">Category</th>
+                        <th class="py-2 px-2.5 text-right">SKU Qty</th>
+                        <th class="py-2 px-2.5 text-right">Amount (₹)</th>
+                        <th class="py-2 px-2.5">Notes / Description</th>
+                        <th class="py-2 px-2.5">Source Email</th>
+                    </tr>
+                </thead>
+                <tbody id="lossTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading stored Excel records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </section>
 
@@ -140,52 +341,6 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
-    </section>
-
-    <!-- Category Breakdown and Incident Log -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-        <!-- Category Breakdown -->
-        <div class="glass-panel p-4 space-y-3 lg:col-span-5">
-            <div class="flex items-center justify-between">
-                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Loss by Category</h4>
-                <span class="text-[10px] text-slate-500 font-mono">Top Impacted Categories</span>
-            </div>
-            <div id="lossCategoryDistributionGrid" class="space-y-2">
-                <div class="text-xs text-slate-500 py-4 text-center">Loading category breakdown...</div>
-            </div>
-        </div>
-
-        <!-- Granular Incident Log -->
-        <div class="glass-panel p-4 space-y-3 lg:col-span-7">
-            <div class="flex items-center justify-between pb-2 border-b border-white/5">
-                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Incident Breakdown & SKU Log</h4>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossRecordCountBadge">
-                    0 incidents
-                </span>
-            </div>
-
-            <div class="overflow-x-auto custom-scrollbar max-h-72">
-                <table class="w-full text-left text-xs border-collapse">
-                    <thead>
-                        <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
-                            <th class="py-2 px-2.5">Date</th>
-                            <th class="py-2 px-2.5">Type</th>
-                            <th class="py-2 px-2.5">Category</th>
-                            <th class="py-2 px-2.5 text-right">SKUs</th>
-                            <th class="py-2 px-2.5 text-right">Amount</th>
-                            <th class="py-2 px-2.5">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody id="lossTableBody" class="divide-y divide-white/5 font-sans">
-                        <tr>
-                            <td colspan="6" class="text-center py-6 text-slate-500 text-xs">
-                                Loading loss records...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
         </div>
     </section>
 </div>

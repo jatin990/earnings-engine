@@ -760,11 +760,21 @@ def test_zepto_drawer_and_operations_endpoints(client):
     assert l_post.status_code == 200
     assert l_post.json()["success"] is True
 
-    l_get = client.get("/api/v1/zepto/loss/summary?store_name=JMU-Sainik Colony")
+    l_get = client.get("/api/v1/zepto/loss/summary?store_name=JMU-Sainik Colony&month=2026-09")
     assert l_get.status_code == 200
     l_json = l_get.json()
     assert l_json["success"] is True
     assert l_json["total_loss_amount"] >= 890.0
+    assert "available_months" in l_json
+    assert "reconciliation" in l_json
+
+    # Test Loss Records search endpoint
+    rec_get = client.get("/api/v1/zepto/loss/records?store_name=JMU-Sainik Colony&search=Milk")
+    assert rec_get.status_code == 200
+    rec_json = rec_get.json()
+    assert rec_json["success"] is True
+    assert rec_json["total_count"] >= 1
+    assert any("Milk" in r.get("notes", "") for r in rec_json["records"])
 
     # 4. Manpower Utilization API
     u_post = client.post(

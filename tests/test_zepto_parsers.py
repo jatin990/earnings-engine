@@ -94,3 +94,85 @@ def test_extract_metrics_from_email_body_cr_and_damages():
 def test_extract_metrics_empty_text():
     assert extract_metrics_from_email_body("") == {}
     assert extract_metrics_from_email_body(None) == {}
+
+
+def test_loss_summary_monthly_and_category_matrix_calculations():
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    test_email_id = f"test_recon_email_{uuid.uuid4().hex[:8]}"
+
+    # 1. Save an audit email with body stated loss = 2500.0
+    zepto_db.save_gmail_messages([{
+        "id": test_email_id,
+        "thread_id": "thread_recon_1",
+        "store_name": "JMU-Sainik Colony",
+        "subject": "Store JMU-Sainik Colony - Daily Shift Summary & DQ Loss Audit - 2026-09-18",
+        "from": "audit@zepto.com",
+        "date": "Fri, 18 Sep 2026 18:00:00 +0530",
+        "iso_date": "2026-09-18",
+        "month_ym": "2026-09",
+        "snippet": "DQ Loss: ₹2,500 across departments.",
+        "category": "DQ_LOSS",
+        "category_label": "DQ Loss & Expiry",
+        "badge_color": "rose",
+        "icon": "⚠️",
+        "extracted_metrics": {"loss_amount": 2500.0},
+        "attachments": [{"filename": "loss_audit_20260918.xlsx", "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "size_bytes": 2048}],
+        "has_attachments": True,
+        "parsed_status": "PARSED",
+        "parsed_records_count": 2,
+    }], settings=settings)
+
+    # 2. Save itemized Excel rows linking to this email (Total sum = 1500 + 1000 = 2500 => MATCHED)
+    zepto_db.save_loss_record({
+        "id": f"rec_{uuid.uuid4().hex[:8]}",
+        "store_name": "JMU-Sainik Colony",
+        "record_date": "2026-09-18",
+        "loss_type": "DQ_LOSS",
+        "category": "FRUITS_VEG",
+        "amount": 1500.0,
+        "sku_count": 5,
+        "notes": "Damaged tomatoes",
+        "source_email_id": test_email_id,
+    }, settings=settings)
+
+    zepto_db.save_loss_record({
+        "id": f"rec_{uuid.uuid4().hex[:8]}",
+        "store_name": "JMU-Sainik Colony",
+        "record_date": "2026-09-18",
+        "loss_type": "SHRINKAGE",
+        "category": "FRUITS_VEG",
+        "amount": 1000.0,
+        "sku_count": 2,
+        "notes": "Apples cycle count variance",
+        "source_email_id": test_email_id,
+    }, settings=settings)
+
+    # 3. Query loss summary for 2026-09
+    summary = zepto_db.get_loss_summary(month="2026-09", settings=settings)
+
+    assert "2026-09" in summary["available_months"]
+    assert summary["total_loss_amount"] >= 2500.0
+    assert summary["dq_loss_total"] >= 1500.0
+    assert summary["shrinkage_total"] >= 1000.0
+
+    # Verify category matrix contains FRUITS_VEG with both DQ Loss and Shrinkage
+    fv_cat = next((c for c in summary["category_breakdown"] if c["category"] == "FRUITS_VEG"), None)
+    assert fv_cat is not None
+    assert fv_cat["total_amount"] >= 2500.0
+    assert fv_cat["dq_loss_amount"] >= 1500.0
+    assert fv_cat["shrinkage_amount"] >= 1000.0
+    assert fv_cat["total_amount"] == round(fv_cat["dq_loss_amount"] + fv_cat["shrinkage_amount"] + fv_cat["spoilage_amount"], 2)
+
+    # Verify email reconciliation matched status
+    recon = summary["reconciliation"]
+    recon_item = next((it for it in recon["items"] if it["email_id"] == test_email_id), None)
+    assert recon_item is not None
+    assert recon_item["email_stated_amount"] == 2500.0
+    assert recon_item["excel_parsed_sum"] == 2500.0
+    assert recon_item["variance"] == 0.0
+    assert recon_item["status"] == "MATCHED"
+

@@ -4002,13 +4002,18 @@ const zeptoApp = {
     },
 
     // -----------------------------------------------------------------------
-    // Loss, Quality & Shrinkage Tab Logic
+    // Loss, Quality & Shrinkage Tab Logic (Redesigned)
     // -----------------------------------------------------------------------
 
     async loadLoss() {
-        const date = document.getElementById('lossDateFilter')?.value || '';
+        const month = document.getElementById('lossMonthFilter')?.value || 'ALL';
+        const lossType = document.getElementById('lossTypeFilter')?.value || 'ALL';
+        const category = document.getElementById('lossCategoryFilter')?.value || 'ALL';
+
         const params = new URLSearchParams();
-        if (date) params.append('start_date', date);
+        if (month && month !== 'ALL') params.append('month', month);
+        if (lossType && lossType !== 'ALL') params.append('loss_type', lossType);
+        if (category && category !== 'ALL') params.append('category', category);
 
         try {
             const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
@@ -4023,69 +4028,296 @@ const zeptoApp = {
     renderLoss(data) {
         if (!data) return;
 
+        // 1. Synchronize Month Filter Options
+        const monthSelect = document.getElementById('lossMonthFilter');
+        if (monthSelect && data.available_months && data.available_months.length > 0) {
+            const currentVal = monthSelect.value || 'ALL';
+            const months = data.available_months;
+            const existingOptions = Array.from(monthSelect.options).map(o => o.value);
+            const needsUpdate = months.some(m => !existingOptions.includes(m)) || existingOptions.length <= 1;
+
+            if (needsUpdate) {
+                let html = '<option value="ALL" class="bg-slate-900 text-slate-200">All Months</option>';
+                months.forEach(m => {
+                    const [yr, mo] = m.split('-');
+                    const dateObj = new Date(parseInt(yr, 10), parseInt(mo, 10) - 1, 1);
+                    const label = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    html += `<option value="${m}" class="bg-slate-900 text-slate-200">${label} (${m})</option>`;
+                });
+                monthSelect.innerHTML = html;
+                monthSelect.value = currentVal;
+            }
+        }
+
+        // 2. Synchronize Category Filter Options
+        const catSelect = document.getElementById('lossCategoryFilter');
+        if (catSelect && data.category_breakdown) {
+            const currentCat = catSelect.value || 'ALL';
+            const cats = data.category_breakdown.map(c => c.category);
+            const existingCats = Array.from(catSelect.options).map(o => o.value);
+            const needsCatUpdate = cats.some(c => !existingCats.includes(c)) || existingCats.length <= 1;
+
+            if (needsCatUpdate) {
+                let catHtml = '<option value="ALL">All Categories</option>';
+                cats.forEach(c => {
+                    catHtml += `<option value="${c}">${c.replace(/_/g, ' ')}</option>`;
+                });
+                catSelect.innerHTML = catHtml;
+                catSelect.value = currentCat;
+            }
+        }
+
+        // 3. Update 5 KPI Metric Cards
         const totAmtEl = document.getElementById('lossTotalAmount');
         const countBadge = document.getElementById('lossTotalCountBadge');
         const skuCountEl = document.getElementById('lossTotalSkuCount');
         const dqAmtEl = document.getElementById('lossDqAmount');
-        const fvAmtEl = document.getElementById('lossFvAmount');
+        const dqShareEl = document.getElementById('lossDqShareBadge');
         const shrinkAmtEl = document.getElementById('lossShrinkageAmount');
-        const catGrid = document.getElementById('lossCategoryDistributionGrid');
-        const countBadgeTable = document.getElementById('lossRecordCountBadge');
-        const tbody = document.getElementById('lossTableBody');
+        const shrinkShareEl = document.getElementById('lossShrinkageShareBadge');
+        const fvAmtEl = document.getElementById('lossFvAmount');
+        const spoilShareEl = document.getElementById('lossSpoilageShareBadge');
 
-        const records = data.records || [];
-        const cats = data.category_breakdown || [];
+        const totalLoss = data.total_loss_amount || 0;
+        const dqLoss = data.dq_loss_total || 0;
+        const shrinkLoss = data.shrinkage_total || 0;
+        const spoilLoss = data.spoilage_total || 0;
 
-        if (totAmtEl) totAmtEl.textContent = this.formatCurrency(data.total_loss_amount || 0);
-        if (countBadge) countBadge.textContent = `${data.total_loss_records || 0} Incidents`;
-        if (skuCountEl) skuCountEl.textContent = `${data.total_skus_affected || 0} SKUs`;
-
-        const dqLoss = cats.filter(c => c.loss_type === 'DQ_LOSS').reduce((s, c) => s + c.total_amount, 0);
-        const fvLoss = cats.filter(c => c.category === 'FRUITS_VEG').reduce((s, c) => s + c.total_amount, 0);
-        const shrinkLoss = cats.filter(c => c.loss_type === 'SHRINKAGE').reduce((s, c) => s + c.total_amount, 0);
+        if (totAmtEl) totAmtEl.textContent = this.formatCurrency(totalLoss);
+        if (countBadge) countBadge.textContent = `${(data.total_loss_records || 0).toLocaleString('en-IN')} Incidents`;
+        if (skuCountEl) skuCountEl.textContent = `${(data.total_skus_affected || 0).toLocaleString('en-IN')}`;
 
         if (dqAmtEl) dqAmtEl.textContent = this.formatCurrency(dqLoss);
-        if (fvAmtEl) fvAmtEl.textContent = this.formatCurrency(fvLoss);
-        if (shrinkAmtEl) shrinkAmtEl.textContent = this.formatCurrency(shrinkLoss);
+        if (dqShareEl) dqShareEl.textContent = totalLoss > 0 ? `${((dqLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
 
-        if (catGrid) {
+        if (shrinkAmtEl) shrinkAmtEl.textContent = this.formatCurrency(shrinkLoss);
+        if (shrinkShareEl) shrinkShareEl.textContent = totalLoss > 0 ? `${((shrinkLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
+
+        if (fvAmtEl) fvAmtEl.textContent = this.formatCurrency(spoilLoss);
+        if (spoilShareEl) spoilShareEl.textContent = totalLoss > 0 ? `${((spoilLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
+
+        // Reconciliation KPI Card
+        const recon = data.reconciliation || {};
+        const reconRateEl = document.getElementById('lossReconMatchRate');
+        const reconStatusBadge = document.getElementById('lossReconStatusBadge');
+        const reconVarCountEl = document.getElementById('lossReconVarianceCount');
+        const reconMatchedBadge = document.getElementById('lossReconMatchedBadge');
+        const reconMismatchBadge = document.getElementById('lossReconMismatchBadge');
+
+        if (reconRateEl) reconRateEl.textContent = `${recon.match_rate_pct || 100}%`;
+        if (reconStatusBadge) reconStatusBadge.textContent = `${recon.matched_count || 0} / ${recon.total_audits || 0} Audits`;
+        if (reconVarCountEl) reconVarCountEl.textContent = `${recon.variance_count || 0} variances`;
+        if (reconMatchedBadge) reconMatchedBadge.textContent = `${recon.matched_count || 0} Matched`;
+        if (reconMismatchBadge) reconMismatchBadge.textContent = `${recon.variance_count || 0} Variance`;
+
+        // 4. Render Category Loss Matrix
+        const catTableBody = document.getElementById('lossCategoryMatrixTableBody');
+        const catTotalCountBadge = document.getElementById('lossCategoryTotalCountBadge');
+        const cats = data.category_breakdown || [];
+
+        if (catTotalCountBadge) catTotalCountBadge.textContent = `${cats.length} Categories`;
+
+        if (catTableBody) {
             if (cats.length === 0) {
-                catGrid.innerHTML = `<div class="text-xs text-slate-500 py-4 text-center">No loss incidents categorized.</div>`;
+                catTableBody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No loss categorized for the selected criteria.</td></tr>`;
             } else {
-                catGrid.innerHTML = cats.map(c => `
-                    <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between text-xs">
-                        <div>
-                            <span class="font-bold text-white">${c.category}</span>
-                            <span class="text-[10px] text-slate-400 font-mono ml-2">(${c.incident_count} events · ${c.total_skus} SKUs)</span>
-                        </div>
-                        <span class="font-mono font-bold text-rose-400">${this.formatCurrency(c.total_amount)}</span>
-                    </div>
-                `).join('');
+                catTableBody.innerHTML = cats.map(c => {
+                    const pct = c.pct_of_total || 0;
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2.5 px-3">
+                                <div class="font-bold text-white">${c.category.replace(/_/g, ' ')}</div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">
+                                ${c.dq_loss_amount > 0 ? this.formatCurrency(c.dq_loss_amount) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">
+                                ${c.shrinkage_amount > 0 ? this.formatCurrency(c.shrinkage_amount) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-300">
+                                ${c.spoilage_amount > 0 ? this.formatCurrency(c.spoilage_amount) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-black text-rose-400">
+                                ${this.formatCurrency(c.total_amount)}
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div class="h-full bg-gradient-to-r from-amber-500 via-rose-500 to-purple-500 rounded-full" style="width: ${Math.min(pct, 100)}%;"></div>
+                                    </div>
+                                    <span class="text-[10px] font-mono text-slate-400 w-10 text-right">${pct}%</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${(c.total_skus || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(c.incident_count || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-center">
+                                <button
+                                    type="button"
+                                    onclick="zeptoApp.selectLossCategory('${c.category}')"
+                                    class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[10px] transition"
+                                >
+                                    Filter
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
         }
 
-        if (countBadgeTable) countBadgeTable.textContent = `${records.length} incidents`;
+        // 5. Render Email Body vs Excel Reconciliation Ledger
+        const reconTableBody = document.getElementById('lossReconciliationTableBody');
+        const reconItems = recon.items || [];
+
+        if (reconTableBody) {
+            if (reconItems.length === 0) {
+                reconTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No audit verification emails logged for this period.</td></tr>`;
+            } else {
+                reconTableBody.innerHTML = reconItems.map(item => {
+                    let badgeClass = 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+                    let statusLabel = item.status;
+
+                    if (item.status === 'MATCHED') {
+                        badgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                        statusLabel = '✅ Matched';
+                    } else if (item.status === 'VARIANCE') {
+                        badgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                        statusLabel = `⚠️ Δ ${this.formatCurrency(Math.abs(item.variance))}`;
+                    } else if (item.status === 'EXCEL_ONLY') {
+                        badgeClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+                        statusLabel = '📊 Excel Only';
+                    } else if (item.status === 'EMAIL_ONLY') {
+                        badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                        statusLabel = '📧 Email Only';
+                    }
+
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">${item.date || '—'}</td>
+                            <td class="py-2 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">${item.store_name}</td>
+                            <td class="py-2 px-3 text-white max-w-xs truncate" title="${item.subject}">
+                                ${item.subject}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold text-slate-300">
+                                ${item.email_stated_amount > 0 ? this.formatCurrency(item.email_stated_amount) : '—'}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold text-emerald-300">
+                                ${item.excel_parsed_sum > 0 ? this.formatCurrency(item.excel_parsed_sum) : '—'}
+                                ${item.excel_item_count > 0 ? `<div class="text-[9px] text-slate-500 font-normal">(${item.excel_item_count} items)</div>` : ''}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold ${item.variance !== 0 ? 'text-rose-400' : 'text-slate-500'}">
+                                ${item.variance !== 0 ? (item.variance > 0 ? `+${this.formatCurrency(item.variance)}` : this.formatCurrency(item.variance)) : '₹0'}
+                            </td>
+                            <td class="py-2 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${badgeClass}">
+                                    ${statusLabel}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 text-slate-400 text-[11px] max-w-xs truncate" title="${item.attachment_filename || 'No attachment'}">
+                                ${item.attachment_filename ? `📎 ${item.attachment_filename}` : '<span class="text-slate-600">None</span>'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 6. Cache records and filter/render itemized Excel entries table
+        this._currentLossRecords = data.records || [];
+        this.filterLossRecords();
+    },
+
+    selectLossCategory(cat) {
+        const catSelect = document.getElementById('lossCategoryFilter');
+        if (catSelect) {
+            catSelect.value = cat;
+            this.loadLoss();
+        }
+    },
+
+    filterLossRecords() {
+        const records = this._currentLossRecords || [];
+        const search = (document.getElementById('lossSearchInput')?.value || '').trim().toLowerCase();
+        const tbody = document.getElementById('lossTableBody');
+        const countBadge = document.getElementById('lossRecordCountBadge');
+
+        const filtered = search
+            ? records.filter(r => {
+                const notes = (r.notes || '').toLowerCase();
+                const cat = (r.category || '').toLowerCase();
+                const type = (r.loss_type || '').toLowerCase();
+                const store = (r.store_name || '').toLowerCase();
+                const date = (r.record_date || '').toLowerCase();
+                return notes.includes(search) || cat.includes(search) || type.includes(search) || store.includes(search) || date.includes(search);
+            })
+            : records;
+
+        if (countBadge) countBadge.textContent = `${filtered.length.toLocaleString('en-IN')} entries`;
         if (!tbody) return;
 
-        if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No loss records logged for this period.</td></tr>`;
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No matching stored Excel records found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = records.map(r => `
-            <tr class="hover:bg-white/[0.02] transition">
-                <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">${r.record_date}</td>
-                <td class="py-2 px-2.5">
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${r.loss_type === 'DQ_LOSS' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
-                        ${r.loss_type}
-                    </span>
-                </td>
-                <td class="py-2 px-2.5 text-slate-300">${r.category}</td>
-                <td class="py-2 px-2.5 text-right font-mono text-slate-300">${r.sku_count || 0}</td>
-                <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(r.amount || 0)}</td>
-                <td class="py-2 px-2.5 text-slate-400 text-[11px] truncate max-w-xs">${r.notes || '—'}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = filtered.map(r => {
+            let typeBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+            if (r.loss_type === 'DQ_LOSS') typeBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            else if (r.loss_type === 'SHRINKAGE') typeBadgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+            else if (r.loss_type === 'SPOILAGE') typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">${r.record_date}</td>
+                    <td class="py-2 px-2.5 text-slate-400 font-mono text-[11px] whitespace-nowrap">${r.store_name}</td>
+                    <td class="py-2 px-2.5">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border font-mono ${typeBadgeClass}">
+                            ${r.loss_type}
+                        </span>
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-300 font-medium">${(r.category || 'GENERAL').replace(/_/g, ' ')}</td>
+                    <td class="py-2 px-2.5 text-right font-mono text-slate-300">${(r.sku_count || 0).toLocaleString('en-IN')}</td>
+                    <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(r.amount || 0)}</td>
+                    <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-sm truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
+                    <td class="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">${r.source_email_id ? r.source_email_id.substring(0, 12) + '...' : 'Direct Upload'}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    exportLossCsv() {
+        const records = this._currentLossRecords || [];
+        if (records.length === 0) {
+            this.showToast('⚠️ No loss records available to export', true);
+            return;
+        }
+
+        const headers = ['Record Date', 'Store Name', 'Loss Type', 'Category', 'SKU Count', 'Loss Amount (INR)', 'Notes', 'Source Email ID'];
+        const csvRows = [headers.join(',')];
+
+        records.forEach(r => {
+            const row = [
+                `"${r.record_date || ''}"`,
+                `"${r.store_name || ''}"`,
+                `"${r.loss_type || ''}"`,
+                `"${(r.category || '').replace(/"/g, '""')}"`,
+                r.sku_count || 0,
+                r.amount || 0,
+                `"${(r.notes || '').replace(/"/g, '""')}"`,
+                `"${r.source_email_id || ''}"`,
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `zepto_loss_records_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showToast(`✅ Exported ${records.length} loss records to CSV`);
     },
 
     async handleScorecardFileUpload(e) {
