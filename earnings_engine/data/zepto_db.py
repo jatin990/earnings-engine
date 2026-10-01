@@ -2372,6 +2372,79 @@ def get_attendance_summary(
             for d in daily_rows
         ]
 
+        # Absenteeism Watchlist (employees with absences >= 2 or high absence rate)
+        emp_absent_rows = conn.execute(
+            f"""
+            SELECT
+                employee_id,
+                employee_name,
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as designation,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(work_duration_mins) as work_mins
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY employee_id, employee_name, designation
+            HAVING absent_count >= 1
+            ORDER BY absent_count DESC, total_shifts DESC
+            """,
+            params,
+        ).fetchall()
+
+        absenteeism_watchlist = []
+        for ea in emp_absent_rows:
+            e_denom = (ea["present_count"] or 0) + (ea["absent_count"] or 0) + (ea["half_day_count"] or 0)
+            e_rate = round((((ea["present_count"] or 0) + 0.5 * (ea["half_day_count"] or 0)) / e_denom) * 100.0, 1) if e_denom > 0 else 0.0
+            abs_count = ea["absent_count"] or 0
+            risk_tier = "CRITICAL" if abs_count >= 5 or e_rate < 50.0 else ("HIGH" if abs_count >= 3 else "MODERATE")
+            absenteeism_watchlist.append({
+                "employee_id": ea["employee_id"],
+                "employee_name": ea["employee_name"],
+                "designation": ea["designation"],
+                "total_shifts": ea["total_shifts"],
+                "present_count": ea["present_count"] or 0,
+                "absent_count": abs_count,
+                "half_day_count": ea["half_day_count"] or 0,
+                "week_off_count": ea["week_off_count"] or 0,
+                "attendance_rate_pct": e_rate,
+                "risk_tier": risk_tier,
+                "total_hours_worked": round((ea["work_mins"] or 0) / 60.0, 1),
+            })
+
+        # Operational Capacity Summary Buckets (Packers, Leadership, Inbound/Quality/NSO)
+        capacity_summary = {
+            "packers": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+            "leadership": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+            "inbound_quality_nso": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+        }
+
+        for r in role_breakdown:
+            role_lower = r["role"].lower()
+            if "packer" in role_lower or "picker" in role_lower:
+                bucket = capacity_summary["packers"]
+            elif "incharge" in role_lower or "lead" in role_lower or "technician" in role_lower:
+                bucket = capacity_summary["leadership"]
+            else:
+                bucket = capacity_summary["inbound_quality_nso"]
+
+            bucket["scheduled"] += r["total_shifts"]
+            bucket["present"] += r["present_count"]
+            bucket["absent"] += r["absent_count"]
+            bucket["headcount"] += r["headcount"]
+
+        for key, b in capacity_summary.items():
+            denom = b["present"] + b["absent"]
+            b["rate"] = round((b["present"] / denom) * 100.0, 1) if denom > 0 else 100.0
+            if b["rate"] < 70.0:
+                b["health"] = "ALERT"
+            elif b["rate"] < 88.0:
+                b["health"] = "WARNING"
+            else:
+                b["health"] = "OPTIMAL"
+
         return {
             "store_name": store_name or "All Stores",
             "period": {
@@ -2392,6 +2465,8 @@ def get_attendance_summary(
             },
             "role_breakdown": role_breakdown,
             "daily_trend": daily_trend,
+            "absenteeism_watchlist": absenteeism_watchlist,
+            "role_capacity_summary": capacity_summary,
         }
 
 

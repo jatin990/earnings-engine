@@ -73,6 +73,11 @@ def test_attendance_db_lifecycle():
     assert summary["status_distribution"]["PRESENT"] >= 1
     assert summary["status_distribution"]["ABSENT"] >= 1
     assert any(r["role"] == "FR_Packer" for r in summary["role_breakdown"])
+    assert "absenteeism_watchlist" in summary
+    assert "role_capacity_summary" in summary
+    assert "packers" in summary["role_capacity_summary"]
+    assert "leadership" in summary["role_capacity_summary"]
+    assert "inbound_quality_nso" in summary["role_capacity_summary"]
 
     # Test records query with filtering
     records = get_attendance_records(employee_id="EMP_TEST_101")
