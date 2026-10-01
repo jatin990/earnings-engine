@@ -427,10 +427,23 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
     if ipp_match:
         metrics["packer_ipp"] = float(ipp_match.group(1))
 
-    # 6. Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages ₹1,200")
-    loss_match = re.search(r"(?:loss|dq loss|damage|spoilage|shrinkage)[:\s\-]+(?:rs\.?|inr|₹)?\s*([\d\.]+)", clean_text, re.I)
+    # 6. Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages: Rs. 1,200", "Shrinkage: 1450")
+    # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture
+    sanitized_text = re.sub(r"\b202\d[-/]\d{2}[-/]\d{2}\b", " ", clean_text)
+    sanitized_text = re.sub(r"\b\d{2}[-/]\d{2}[-/]202\d\b", " ", sanitized_text)
+    loss_match = re.search(r"(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\s*[:=]\s*(?:rs\.?|inr|₹)?\s*([\d\.]+)", sanitized_text, re.I)
+    if not loss_match:
+        loss_match = re.search(r"(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\s*(?:of)?\s*(?:rs\.?|inr|₹)\s*([\d\.]+)", sanitized_text, re.I)
+    if not loss_match:
+        # Check for trailing monetary indicator e.g. "₹4,500 in DQ Loss" or "Rs. 1,200 damage"
+        loss_match = re.search(r"(?:rs\.?|inr|₹)\s*([\d\.]+)\s*(?:in\s+|of\s+)?(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)", sanitized_text, re.I)
     if loss_match:
-        metrics["loss_amount"] = float(loss_match.group(1))
+        amt = float(loss_match.group(1))
+        # Ensure it is not a stray 4-digit calendar year unless explicit currency was matched
+        matched_str = loss_match.group(0).lower()
+        has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
+        if not (2020 <= amt <= 2035 and not has_curr):
+            metrics["loss_amount"] = amt
 
     return metrics
 
