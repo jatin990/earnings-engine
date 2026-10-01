@@ -2691,6 +2691,9 @@ const zeptoApp = {
             }
             if (headerText) headerText.textContent = status.email ? status.email.split('@')[0] : 'Connected';
             if (headerBtn) headerBtn.className = 'px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-xs font-semibold text-emerald-300 hover:text-white transition flex items-center gap-1.5 shadow-sm';
+
+            // Automatically load recent emails feed
+            this.loadRecentEmails();
         } else {
             if (unconfigBox) unconfigBox.style.display = 'none';
             if (disconnBox) disconnBox.style.display = 'block';
@@ -2749,6 +2752,124 @@ const zeptoApp = {
                 btn.innerHTML = '<span>🔌</span> Disconnect Gmail';
             }
         }
+    },
+
+    async loadRecentEmails() {
+        const loadingEl = document.getElementById('gmailEmailsLoading');
+        const listEl = document.getElementById('gmailEmailsList');
+        const emptyEl = document.getElementById('gmailEmailsEmpty');
+        const badgeEl = document.getElementById('gmailFeedCountBadge');
+        const refreshIcon = document.getElementById('btnRefreshGmailFeedIcon');
+
+        if (loadingEl) loadingEl.style.display = 'flex';
+        if (listEl) listEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (refreshIcon) refreshIcon.className = 'inline-block animate-spin';
+
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/recent-emails?limit=10');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to fetch emails');
+            }
+
+            const data = await res.json();
+            const emails = data.emails || [];
+
+            if (badgeEl) badgeEl.textContent = `${emails.length} Emails`;
+
+            if (emails.length === 0) {
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = 'block';
+                return;
+            }
+
+            this.renderRecentEmails(emails);
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (listEl) listEl.style.display = 'block';
+        } catch (err) {
+            console.error('[ZEPTO-GMAIL] Error loading recent emails:', err);
+            if (loadingEl) {
+                loadingEl.innerHTML = `<span class="text-rose-400">⚠️ Failed to load emails: ${err.message}</span>`;
+            }
+        } finally {
+            if (refreshIcon) refreshIcon.className = '';
+        }
+    },
+
+    renderRecentEmails(emails) {
+        const listEl = document.getElementById('gmailEmailsList');
+        if (!listEl) return;
+
+        listEl.innerHTML = emails.map(m => {
+            const dateStr = m.date ? new Date(m.date).toLocaleString('en-IN', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            }) : 'Recent';
+
+            // Clean sender display
+            let senderDisplay = m.from || 'Unknown Sender';
+            if (senderDisplay.includes('<')) {
+                senderDisplay = senderDisplay.split('<')[0].replace(/"/g, '').trim();
+            }
+
+            let badgeClass = 'bg-slate-500/15 text-slate-300 border-white/10';
+            if (m.badge_color === 'emerald') {
+                badgeClass = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+            } else if (m.badge_color === 'sky') {
+                badgeClass = 'bg-sky-500/15 text-sky-400 border-sky-500/30';
+            } else if (m.badge_color === 'purple') {
+                badgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+            } else if (m.badge_color === 'rose') {
+                badgeClass = 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+            } else if (m.badge_color === 'amber') {
+                badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+            } else if (m.badge_color === 'indigo') {
+                badgeClass = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+            }
+
+            // Attachment badges
+            let attHtml = '';
+            if (m.attachments && m.attachments.length > 0) {
+                attHtml = `
+                    <div class="flex flex-wrap gap-1.5 pt-2 mt-2 border-t border-white/5">
+                        ${m.attachments.map(a => `
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-mono">
+                                <span>📎</span>
+                                <span class="truncate max-w-[200px]">${a.filename}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="glass-panel p-3.5 hover:border-white/20 transition group">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">${m.icon || '📧'}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass} uppercase tracking-wider">
+                                ${m.category_label || m.category}
+                            </span>
+                            <span class="text-xs font-bold text-white group-hover:text-emerald-300 transition">
+                                ${m.subject}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono shrink-0">
+                            <span class="text-slate-300 font-medium">${senderDisplay}</span>
+                            <span>•</span>
+                            <span>${dateStr}</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 line-clamp-2 leading-relaxed pl-6">
+                        ${m.snippet || 'No plain text snippet available.'}
+                    </p>
+                    ${attHtml ? `<div class="pl-6">${attHtml}</div>` : ''}
+                </div>
+            `;
+        }).join('');
     },
 
     showToast(message, isError = false) {

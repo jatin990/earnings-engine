@@ -86,6 +86,47 @@ def test_zepto_hub_renders_gmail_tab(client):
     assert resp.status_code == 200
     assert "tabBtn-gmail" in resp.text
     assert "tabContent-gmail" in resp.text
+    assert "Store Mailbox Intelligence & Reports Feed" in resp.text
+    assert "gmailEmailsList" in resp.text
+
+
+def test_classify_zepto_email_categories():
+    from earnings_engine.api.routers.zepto import _classify_zepto_email
+
+    # 1. Store Metrics
+    c1 = _classify_zepto_email("Store Metric Summary - JMU-Sainik Colony - 2026-09-29", "bot@zepto.com")
+    assert c1["category"] == "STORE_METRICS"
+    assert c1["badge_color"] == "emerald"
+
+    # 2. Attendance
+    c2 = _classify_zepto_email("JMU-Sainik_Colony-Attendance-report-8165178.xlsx", "reports@zepto.com")
+    assert c2["category"] == "ATTENDANCE"
+    assert c2["badge_color"] == "sky"
+
+    # 3. Manpower Utilization
+    c3 = _classify_zepto_email("Daily Manpower Utilization and Picker IPP Report", "ops@zepto.com")
+    assert c3["category"] == "MANPOWER_UTILIZATION"
+    assert c3["badge_color"] == "purple"
+
+    # 4. DQ Loss
+    c4 = _classify_zepto_email("Store DQ Loss & Expiry Summary - JMU", "qa@zepto.com")
+    assert c4["category"] == "DQ_LOSS"
+    assert c4["badge_color"] == "rose"
+
+    # 5. Shrinkage
+    c5 = _classify_zepto_email("Weekly Store Shrinkage & Cycle Count Variance", "audit@zepto.com")
+    assert c5["category"] == "SHRINKAGE"
+    assert c5["badge_color"] == "amber"
+
+    # 6. Manpower Plan
+    c6 = _classify_zepto_email("Monthly Manpower Plan & Target HC Quotas", "hr@zepto.com")
+    assert c6["category"] == "MANPOWER_PLAN"
+    assert c6["badge_color"] == "indigo"
+
+    # 7. Security Alert
+    c7 = _classify_zepto_email("Security alert for linked Google account", "no-reply@accounts.google.com")
+    assert c7["category"] == "SECURITY_ALERT"
+
 
 
 def test_zepto_hub_renders_attendance_tab(client):

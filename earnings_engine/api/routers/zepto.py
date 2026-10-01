@@ -651,6 +651,166 @@ async def delete_income_endpoint(income_id: str) -> dict[str, Any]:
 # Gmail OAuth 2.0 Linking & Status Endpoints
 # ---------------------------------------------------------------------------
 
+def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[str, str]:
+    """Categorize dark store operational email based on subject line and sender."""
+    sub_lower = (subject or "").lower()
+    from_lower = (sender or "").lower()
+    snip_lower = (snippet or "").lower()
+
+    if "store metric summary" in sub_lower or "store metric" in sub_lower:
+        return {
+            "category": "STORE_METRICS",
+            "category_label": "Store Metric Summary",
+            "badge_color": "emerald",
+            "icon": "📊",
+        }
+    elif "attendance" in sub_lower or "muster" in sub_lower or "shift report" in sub_lower:
+        return {
+            "category": "ATTENDANCE",
+            "category_label": "Attendance & Shifts",
+            "badge_color": "sky",
+            "icon": "👥",
+        }
+    elif "manpower utilization" in sub_lower or "utilization" in sub_lower or "picker ipp" in sub_lower:
+        return {
+            "category": "MANPOWER_UTILIZATION",
+            "category_label": "Manpower Utilization",
+            "badge_color": "purple",
+            "icon": "⚡",
+        }
+    elif "dq loss" in sub_lower or "damage" in sub_lower or "expiry" in sub_lower:
+        return {
+            "category": "DQ_LOSS",
+            "category_label": "DQ Loss & Expiry",
+            "badge_color": "rose",
+            "icon": "⚠️",
+        }
+    elif "shrinkage" in sub_lower or "cycle count" in sub_lower or "fcc" in sub_lower or "short-pick" in sub_lower:
+        return {
+            "category": "SHRINKAGE",
+            "category_label": "Shrinkage & Variance",
+            "badge_color": "amber",
+            "icon": "📉",
+        }
+    elif "manpower plan" in sub_lower or "headcount" in sub_lower or "target hc" in sub_lower:
+        return {
+            "category": "MANPOWER_PLAN",
+            "category_label": "Monthly Manpower Plan",
+            "badge_color": "indigo",
+            "icon": "📋",
+        }
+    elif "security alert" in sub_lower or "critical security" in sub_lower or "google" in from_lower:
+        return {
+            "category": "SECURITY_ALERT",
+            "category_label": "Security Alert",
+            "badge_color": "slate",
+            "icon": "🔒",
+        }
+    else:
+        return {
+            "category": "OPERATIONAL",
+            "category_label": "Operational Update",
+            "badge_color": "slate",
+            "icon": "📧",
+        }
+
+
+@router.get("/api/v1/zepto/gmail/recent-emails", summary="Get Recent Categorized Dark Store Emails")
+async def get_recent_emails_endpoint(
+    limit: int = Query(10, ge=1, le=50, description="Max emails to fetch"),
+) -> dict[str, Any]:
+    """Fetch recent dark store emails from linked Gmail, categorize by operational topic, and extract summary."""
+    import httpx
+
+    token = zepto_db.get_valid_gmail_token("primary", _settings)
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
+        )
+
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            list_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults={limit}"
+            resp = await client.get(list_url, headers=headers)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+
+            msg_list = resp.json().get("messages", [])
+            emails = []
+
+            for msg_summary in msg_list:
+                msg_id = msg_summary["id"]
+                msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
+                m_resp = await client.get(msg_url, headers=headers)
+                if m_resp.status_code != 200:
+                    continue
+
+                msg_data = m_resp.json()
+                payload = msg_data.get("payload", {})
+                headers_list = payload.get("headers", [])
+
+                subject = ""
+                sender = ""
+                date_str = ""
+                for h in headers_list:
+                    h_name = h.get("name", "").lower()
+                    if h_name == "subject":
+                        subject = h.get("value", "")
+                    elif h_name == "from":
+                        sender = h.get("value", "")
+                    elif h_name == "date":
+                        date_str = h.get("value", "")
+
+                snippet = msg_data.get("snippet", "")
+
+                # Collect attachment filenames
+                attachments = []
+                def extract_attachments(part_node):
+                    fname = part_node.get("filename")
+                    if fname:
+                        attachments.append({
+                            "filename": fname,
+                            "mime_type": part_node.get("mimeType", ""),
+                            "size_bytes": part_node.get("body", {}).get("size", 0),
+                        })
+                    for sub in part_node.get("parts", []):
+                        extract_attachments(sub)
+
+                extract_attachments(payload)
+
+                cat_info = _classify_zepto_email(subject, sender, snippet)
+
+                emails.append({
+                    "id": msg_id,
+                    "thread_id": msg_data.get("threadId"),
+                    "subject": subject or "(No Subject)",
+                    "from": sender,
+                    "date": date_str,
+                    "snippet": snippet,
+                    "category": cat_info["category"],
+                    "category_label": cat_info["category_label"],
+                    "badge_color": cat_info["badge_color"],
+                    "icon": cat_info["icon"],
+                    "attachments": attachments,
+                    "has_attachments": len(attachments) > 0,
+                    "internal_date": msg_data.get("internalDate"),
+                })
+
+            return {
+                "success": True,
+                "count": len(emails),
+                "emails": emails,
+            }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[GMAIL-API] Error fetching recent emails: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/api/v1/zepto/gmail/status", summary="Gmail Integration Status")
 async def get_gmail_status_endpoint() -> dict[str, Any]:
     """Return whether Gmail OAuth credentials are configured and whether an account is currently linked."""
