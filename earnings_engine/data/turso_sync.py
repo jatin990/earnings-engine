@@ -127,6 +127,7 @@ SYNC_TABLES = [
     "zepto_store_metrics",
     "zepto_loss_records",
     "zepto_manpower_utilization",
+    "zepto_gmail_messages",
 ]
 
 
@@ -199,6 +200,8 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "metric_date",
     "record_date",
     "util_date",
+    "synced_at",
+    "iso_date",
     "date",
     "timestamp",
 ]
@@ -218,6 +221,7 @@ DATE_ONLY_COLUMNS = {
     "metric_date",
     "record_date",
     "util_date",
+    "iso_date",
     "date",
 }
 

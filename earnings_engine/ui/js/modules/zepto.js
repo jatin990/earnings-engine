@@ -316,6 +316,21 @@ const zeptoApp = {
             incMonthSelect.innerHTML = opts;
             if (currentVal) incMonthSelect.value = currentVal;
         }
+
+        const gmailMonthSelect = document.getElementById('gmailMonthFilter');
+        if (gmailMonthSelect) {
+            const currentVal = gmailMonthSelect.value || 'CURRENT';
+            const now = new Date();
+            let opts = '<option value="CURRENT">Current Month</option><option value="ALL">All Months</option>';
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                opts += `<option value="${ym}">${label}</option>`;
+            }
+            gmailMonthSelect.innerHTML = opts;
+            if (currentVal) gmailMonthSelect.value = currentVal;
+        }
     },
 
     // -----------------------------------------------------------------------
@@ -3473,7 +3488,7 @@ const zeptoApp = {
         }
     },
 
-    async loadRecentEmails() {
+    async loadRecentEmails(selectedMonth) {
         const loadingEl = document.getElementById('gmailEmailsLoading');
         const tableContainer = document.getElementById('gmailTableContainer');
         const emptyEl = document.getElementById('gmailEmailsEmpty');
@@ -3486,7 +3501,9 @@ const zeptoApp = {
         if (refreshIcon) refreshIcon.className = 'inline-block animate-spin';
 
         try {
-            const res = await fetch('/api/v1/zepto/gmail/recent-emails?limit=30');
+            const monthFilter = selectedMonth || document.getElementById('gmailMonthFilter')?.value || 'CURRENT';
+            const queryMonth = monthFilter === 'CURRENT' ? new Date().toISOString().slice(0, 7) : monthFilter;
+            const res = await fetch(`/api/v1/zepto/gmail/recent-emails?month=${encodeURIComponent(queryMonth)}`);
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.detail || 'Failed to fetch emails');
@@ -3499,7 +3516,7 @@ const zeptoApp = {
             this.updateGmailCategoryCounts(emails);
             this.filterGmailEmails();
 
-            if (badgeEl) badgeEl.textContent = `${emails.length} Emails`;
+            if (badgeEl) badgeEl.textContent = `${emails.length} Emails (${data.month || queryMonth})`;
             if (loadingEl) loadingEl.style.display = 'none';
         } catch (err) {
             console.error('[ZEPTO-GMAIL] Error loading recent emails:', err);
@@ -3521,7 +3538,9 @@ const zeptoApp = {
         if (text) text.textContent = 'Ingesting Emails...';
 
         try {
-            const res = await fetch('/api/v1/zepto/gmail/ingest-all-emails?limit=50', {
+            const monthFilter = document.getElementById('gmailMonthFilter')?.value || 'CURRENT';
+            const queryMonth = monthFilter === 'CURRENT' ? new Date().toISOString().slice(0, 7) : monthFilter;
+            const res = await fetch(`/api/v1/zepto/gmail/ingest-all-emails?month=${encodeURIComponent(queryMonth)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });

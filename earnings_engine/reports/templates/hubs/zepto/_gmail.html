@@ -247,6 +247,16 @@
                         >
                     </div>
 
+                    <!-- Month Filter Dropdown -->
+                    <select
+                        id="gmailMonthFilter"
+                        onchange="zeptoApp.loadRecentEmails()"
+                        class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    >
+                        <option value="CURRENT" selected>Current Month</option>
+                        <option value="ALL">All Months</option>
+                    </select>
+
                     <!-- Category Filter Dropdown -->
                     <select
                         id="gmailCategoryFilter"

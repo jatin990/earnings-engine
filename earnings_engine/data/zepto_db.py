@@ -6,6 +6,7 @@ spend-per-person metrics, hiring pipeline conversions, and 50-50 partner equity 
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -337,6 +338,28 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_gmail_messages (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT,
+                subject TEXT,
+                sender TEXT,
+                date_str TEXT,
+                iso_date TEXT,
+                month_ym TEXT,
+                snippet TEXT,
+                category TEXT NOT NULL DEFAULT 'OPERATIONAL',
+                category_label TEXT,
+                badge_color TEXT,
+                icon TEXT,
+                extracted_metrics TEXT,
+                attachments TEXT,
+                has_attachments INTEGER DEFAULT 0,
+                internal_date TEXT,
+                synced_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_zepto_att_store_date ON zepto_attendance_records(store_name, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_emp ON zepto_attendance_records(employee_id, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_status ON zepto_attendance_records(status);
@@ -344,6 +367,9 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_met_store_date ON zepto_store_metrics(store_name, metric_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_loss_store_date ON zepto_loss_records(store_name, record_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_util_store_date ON zepto_manpower_utilization(store_name, util_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_month ON zepto_gmail_messages(month_ym);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_date ON zepto_gmail_messages(iso_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_cat ON zepto_gmail_messages(category);
 
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
@@ -385,6 +411,44 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             try:
                 conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
                 conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
+            except Exception:
+                pass
+
+        # Migration: Ensure zepto_gmail_messages columns exist
+        gmail_cols = _get_table_columns(conn, "zepto_gmail_messages")
+        if gmail_cols:
+            for col_name, col_type in [
+                ("store_name", "TEXT DEFAULT ''"),
+                ("body_text", "TEXT DEFAULT ''"),
+                ("body_html", "TEXT DEFAULT ''"),
+                ("parsed_status", "TEXT DEFAULT 'PENDING'"),
+                ("parsed_records_count", "INTEGER DEFAULT 0"),
+            ]:
+                if col_name not in gmail_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE zepto_gmail_messages ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
+
+        # Migration: Ensure source_email_id exists on domain tables
+        loss_cols = _get_table_columns(conn, "zepto_loss_records")
+        if loss_cols and "source_email_id" not in loss_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_loss_records ADD COLUMN source_email_id TEXT")
+            except Exception:
+                pass
+
+        met_cols = _get_table_columns(conn, "zepto_store_metrics")
+        if met_cols and "source_email_id" not in met_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_store_metrics ADD COLUMN source_email_id TEXT")
+            except Exception:
+                pass
+
+        att_imp_cols = _get_table_columns(conn, "zepto_attendance_imports")
+        if att_imp_cols and "source_email_id" not in att_imp_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_attendance_imports ADD COLUMN source_email_id TEXT")
             except Exception:
                 pass
 
@@ -2373,6 +2437,167 @@ def get_valid_gmail_token(auth_id: str = "primary", settings: Settings | None = 
         logger.error("[GMAIL-AUTH] Exception while refreshing token: %s", exc)
 
     return str(auth_data["access_token"])
+
+
+def save_gmail_messages(
+    messages: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> int:
+    """Save or update parsed Gmail message records in SQLite for persistent caching and queries."""
+    if not messages:
+        return 0
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    rows = []
+    for msg in messages:
+        msg_id = str(msg.get("id") or "").strip()
+        if not msg_id:
+            continue
+
+        iso_date = msg.get("iso_date") or ""
+        if not iso_date:
+            date_str = msg.get("date") or msg.get("date_str") or ""
+            if date_str:
+                if len(date_str) >= 10 and date_str[4] == "-" and date_str[7] == "-":
+                    iso_date = date_str[:10]
+                else:
+                    try:
+                        from email.utils import parsedate_to_datetime
+                        dt = parsedate_to_datetime(date_str)
+                        iso_date = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        try:
+                            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                            iso_date = dt.strftime("%Y-%m-%d")
+                        except Exception:
+                            iso_date = datetime.now().strftime("%Y-%m-%d")
+            else:
+                iso_date = datetime.now().strftime("%Y-%m-%d")
+
+        month_ym = msg.get("month_ym") or iso_date[:7]
+
+        extracted_metrics = msg.get("extracted_metrics")
+        if isinstance(extracted_metrics, (dict, list)):
+            extracted_metrics_json = json.dumps(extracted_metrics)
+        else:
+            extracted_metrics_json = str(extracted_metrics or "{}")
+
+        attachments = msg.get("attachments")
+        if isinstance(attachments, (dict, list)):
+            attachments_json = json.dumps(attachments)
+        else:
+            attachments_json = str(attachments or "[]")
+
+        has_attachments = 1 if (msg.get("has_attachments") or (isinstance(attachments, list) and len(attachments) > 0)) else 0
+
+        rows.append((
+            msg_id,
+            msg.get("thread_id") or "",
+            msg.get("subject") or "(No Subject)",
+            msg.get("from") or msg.get("sender") or "",
+            msg.get("date") or msg.get("date_str") or "",
+            iso_date,
+            month_ym,
+            msg.get("snippet") or "",
+            msg.get("category") or "OPERATIONAL",
+            msg.get("category_label") or "",
+            msg.get("badge_color") or "",
+            msg.get("icon") or "",
+            extracted_metrics_json,
+            attachments_json,
+            has_attachments,
+            str(msg.get("internal_date") or ""),
+            now_iso,
+            now_iso,
+            now_iso,
+        ))
+
+    if not rows:
+        return 0
+
+    with _connect(settings) as conn:
+        conn.executemany(
+            """
+            INSERT INTO zepto_gmail_messages (
+                id, thread_id, subject, sender, date_str,
+                iso_date, month_ym, snippet, category, category_label,
+                badge_color, icon, extracted_metrics, attachments,
+                has_attachments, internal_date, synced_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                thread_id = excluded.thread_id,
+                subject = excluded.subject,
+                sender = excluded.sender,
+                date_str = excluded.date_str,
+                iso_date = excluded.iso_date,
+                month_ym = excluded.month_ym,
+                snippet = excluded.snippet,
+                category = excluded.category,
+                category_label = excluded.category_label,
+                badge_color = excluded.badge_color,
+                icon = excluded.icon,
+                extracted_metrics = excluded.extracted_metrics,
+                attachments = excluded.attachments,
+                has_attachments = excluded.has_attachments,
+                internal_date = excluded.internal_date,
+                synced_at = excluded.synced_at,
+                updated_at = excluded.updated_at
+            """,
+            rows,
+        )
+    return len(rows)
+
+
+def get_saved_gmail_messages(
+    month: str | None = None,
+    category: str | None = None,
+    search: str | None = None,
+    limit: int = 1000,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve saved Gmail messages from SQLite database filtered by month or category."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    query = "SELECT * FROM zepto_gmail_messages WHERE 1=1"
+    params: list[Any] = []
+
+    if month and month != "ALL":
+        query += " AND month_ym = ?"
+        params.append(month)
+
+    if category and category != "ALL":
+        query += " AND category = ?"
+        params.append(category)
+
+    if search:
+        s_pat = f"%{search.strip().lower()}%"
+        query += " AND (LOWER(subject) LIKE ? OR LOWER(sender) LIKE ? OR LOWER(snippet) LIKE ?)"
+        params.extend([s_pat, s_pat, s_pat])
+
+    query += " ORDER BY CASE WHEN internal_date != '' THEN CAST(internal_date AS INTEGER) ELSE 0 END DESC, iso_date DESC LIMIT ?"
+    params.append(limit)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, params).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["from"] = d.get("sender", "")
+            d["date"] = d.get("date_str", "")
+            try:
+                d["extracted_metrics"] = json.loads(d.get("extracted_metrics") or "{}")
+            except Exception:
+                d["extracted_metrics"] = {}
+            try:
+                d["attachments"] = json.loads(d.get("attachments") or "[]")
+            except Exception:
+                d["attachments"] = []
+            result.append(d)
+        return result
 
 
 # ---------------------------------------------------------------------------

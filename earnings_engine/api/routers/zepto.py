@@ -775,33 +775,98 @@ def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[
         }
 
 
-@router.get("/api/v1/zepto/gmail/recent-emails", summary="Get Recent Categorized Dark Store Emails")
+def _build_gmail_month_query(month: str | None) -> tuple[str, str]:
+    """
+    Given a month string (e.g. '2026-08' or 'ALL' or None),
+    returns (clean_month_ym, gmail_q_str).
+    Defaults to current month if None or empty.
+    """
+    if not month or month.upper() in ("CURRENT", "NOW"):
+        clean_month = datetime.now().strftime("%Y-%m")
+    elif month.upper() == "ALL":
+        return ("ALL", "")
+    else:
+        clean_month = month.strip()
+
+    try:
+        parts = clean_month.split("-")
+        y = int(parts[0])
+        m = int(parts[1])
+        start_date = f"{y:04d}/{m:02d}/01"
+        if m == 12:
+            next_y, next_m = y + 1, 1
+        else:
+            next_y, next_m = y, m + 1
+        end_date = f"{next_y:04d}/{next_m:02d}/01"
+        return (clean_month, f"after:{start_date} before:{end_date}")
+    except Exception:
+        return (clean_month, "")
+
+
+@router.get("/api/v1/zepto/gmail/recent-emails", summary="Get Categorized Dark Store Emails by Month")
 async def get_recent_emails_endpoint(
-    limit: int = Query(10, ge=1, le=50, description="Max emails to fetch"),
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    refresh: bool = Query(True, description="Whether to query live Gmail API or load directly from database"),
 ) -> dict[str, Any]:
-    """Fetch recent dark store emails from linked Gmail, categorize by operational topic, and extract summary."""
+    """
+    Fetch dark store emails from linked Gmail partitioned by month (fetching all messages for that month),
+    categorize by operational topic, persist into SQLite database (zepto_gmail_messages), and return structured records.
+    """
+    import urllib.parse
     import httpx
 
+    clean_month, gmail_q = _build_gmail_month_query(month)
     token = zepto_db.get_valid_gmail_token("primary", _settings)
-    if not token:
-        raise HTTPException(
-            status_code=400,
-            detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
-        )
+
+    # Fallback to local DB if not connected or refresh is False
+    if not token or not refresh:
+        saved_emails = zepto_db.get_saved_gmail_messages(month=clean_month, settings=_settings)
+        if not token and not saved_emails:
+            raise HTTPException(
+                status_code=400,
+                detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
+            )
+        return {
+            "success": True,
+            "month": clean_month,
+            "count": len(saved_emails),
+            "emails": saved_emails,
+            "source": "DATABASE",
+        }
 
     headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            list_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults={limit}"
-            resp = await client.get(list_url, headers=headers)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            all_msg_summaries = []
+            page_token = None
+            max_pages = 10  # Paginate to fetch all emails for the month (up to 500)
 
-            msg_list = resp.json().get("messages", [])
+            for _ in range(max_pages):
+                list_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50"
+                if gmail_q:
+                    list_url += f"&q={urllib.parse.quote(gmail_q)}"
+                if page_token:
+                    list_url += f"&pageToken={page_token}"
+
+                resp = await client.get(list_url, headers=headers)
+                if resp.status_code != 200:
+                    if all_msg_summaries:
+                        break
+                    raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+
+                page_data = resp.json()
+                msgs = page_data.get("messages", [])
+                if not msgs:
+                    break
+                all_msg_summaries.extend(msgs)
+                page_token = page_data.get("nextPageToken")
+                if not page_token:
+                    break
+
             emails = []
 
-            for msg_summary in msg_list:
+            for msg_summary in all_msg_summaries:
                 msg_id = msg_summary["id"]
                 msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
                 m_resp = await client.get(msg_url, headers=headers)
@@ -845,12 +910,26 @@ async def get_recent_emails_endpoint(
                 from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
                 extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet}")
 
+                # Format ISO date
+                iso_date = datetime.now().strftime("%Y-%m-%d")
+                if date_str:
+                    try:
+                        from email.utils import parsedate_to_datetime
+                        dt = parsedate_to_datetime(date_str)
+                        iso_date = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        pass
+
+                month_ym = iso_date[:7]
+
                 emails.append({
                     "id": msg_id,
                     "thread_id": msg_data.get("threadId"),
                     "subject": subject or "(No Subject)",
                     "from": sender,
                     "date": date_str,
+                    "iso_date": iso_date,
+                    "month_ym": month_ym,
                     "snippet": snippet,
                     "category": cat_info["category"],
                     "category_label": cat_info["category_label"],
@@ -862,30 +941,50 @@ async def get_recent_emails_endpoint(
                     "internal_date": msg_data.get("internalDate"),
                 })
 
+            # Save all parsed emails to SQLite DB for persistent caching
+            if emails:
+                zepto_db.save_gmail_messages(emails, settings=_settings)
+
+            # Query database to return full consolidated list for that month
+            all_month_emails = zepto_db.get_saved_gmail_messages(month=clean_month, settings=_settings)
+
             return {
                 "success": True,
-                "count": len(emails),
-                "emails": emails,
+                "month": clean_month,
+                "count": len(all_month_emails) if all_month_emails else len(emails),
+                "emails": all_month_emails if all_month_emails else emails,
+                "source": "GMAIL_SYNCED_AND_DB_SAVED",
             }
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("[GMAIL-API] Error fetching recent emails: %s", exc, exc_info=True)
+        logger.error("[GMAIL-API] Error fetching emails: %s", exc, exc_info=True)
+        # Attempt fallback to DB
+        saved_emails = zepto_db.get_saved_gmail_messages(month=clean_month, settings=_settings)
+        if saved_emails:
+            return {
+                "success": True,
+                "month": clean_month,
+                "count": len(saved_emails),
+                "emails": saved_emails,
+                "source": "DATABASE_FALLBACK",
+            }
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/api/v1/zepto/gmail/ingest-all-emails", summary="Ingest All Operational Emails & Parse Metrics into Database")
 async def ingest_all_emails_endpoint(
-    limit: int = Query(50, ge=1, le=100, description="Max emails to inspect and ingest"),
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
 ) -> dict[str, Any]:
     """
-    Ingest all operational emails from linked Gmail inbox:
-    1. Fetches and categorizes recent emails across all 8 operational categories.
+    Ingest all operational emails from linked Gmail inbox for the specified month (or all):
+    1. Fetches all messages for the month across operational categories and saves them into zepto_gmail_messages.
     2. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, and DQ Loss.
     3. Extracts structured body metrics (GMV, Orders, AOV, SLA, IPP, Loss) and updates persistent tables.
     4. Returns updated category counters and ingested payload details.
     """
     import base64
+    import urllib.parse
     import httpx
     from earnings_engine.data.zepto_attendance_parser import parse_zepto_attendance_excel
     from earnings_engine.data.zepto_parsers import (
@@ -901,6 +1000,7 @@ async def ingest_all_emails_endpoint(
             detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
         )
 
+    clean_month, gmail_q = _build_gmail_month_query(month)
     headers = {"Authorization": f"Bearer {token}"}
     ingested_counts = {
         "STORE_METRICS": 0,
@@ -918,19 +1018,41 @@ async def ingest_all_emails_endpoint(
         "store_metrics_records": 0,
         "loss_records": 0,
         "emails_scanned": 0,
+        "month": clean_month,
     }
 
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            list_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults={limit}"
-            resp = await client.get(list_url, headers=headers)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            all_msg_summaries = []
+            page_token = None
+            max_pages = 10  # Fetch all messages in the month
 
-            msg_list = resp.json().get("messages", [])
-            processed_details["emails_scanned"] = len(msg_list)
+            for _ in range(max_pages):
+                list_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50"
+                if gmail_q:
+                    list_url += f"&q={urllib.parse.quote(gmail_q)}"
+                if page_token:
+                    list_url += f"&pageToken={page_token}"
 
-            for msg_summary in msg_list:
+                resp = await client.get(list_url, headers=headers)
+                if resp.status_code != 200:
+                    if all_msg_summaries:
+                        break
+                    raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+
+                page_data = resp.json()
+                msgs = page_data.get("messages", [])
+                if not msgs:
+                    break
+                all_msg_summaries.extend(msgs)
+                page_token = page_data.get("nextPageToken")
+                if not page_token:
+                    break
+
+            processed_details["emails_scanned"] = len(all_msg_summaries)
+            emails_to_save = []
+
+            for msg_summary in all_msg_summaries:
                 msg_id = msg_summary["id"]
                 msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
                 m_resp = await client.get(msg_url, headers=headers)
@@ -1010,6 +1132,36 @@ async def ingest_all_emails_endpoint(
                             collect_parts(p["parts"])
                 collect_parts(payload.get("parts", []))
 
+                # Collect attachment metadata for email object
+                attachments = []
+                for p in all_parts:
+                    fname = p.get("filename")
+                    if fname:
+                        attachments.append({
+                            "filename": fname,
+                            "mime_type": p.get("mimeType", ""),
+                            "size_bytes": p.get("body", {}).get("size", 0),
+                        })
+
+                emails_to_save.append({
+                    "id": msg_id,
+                    "thread_id": msg_data.get("threadId"),
+                    "subject": subject or "(No Subject)",
+                    "from": sender,
+                    "date": date_str,
+                    "iso_date": iso_date,
+                    "month_ym": iso_date[:7],
+                    "snippet": snippet,
+                    "category": category,
+                    "category_label": cat_info.get("category_label", "Operational Update"),
+                    "badge_color": cat_info.get("badge_color", "slate"),
+                    "icon": cat_info.get("icon", "📧"),
+                    "extracted_metrics": body_metrics,
+                    "attachments": attachments,
+                    "has_attachments": len(attachments) > 0,
+                    "internal_date": msg_data.get("internalDate"),
+                })
+
                 for part in all_parts:
                     fname = part.get("filename", "")
                     if fname.lower().endswith((".xlsx", ".xlsm")):
@@ -1053,10 +1205,14 @@ async def ingest_all_emails_endpoint(
                                 except Exception as e:
                                     logger.warning("[GMAIL-INGEST] Error parsing loss attachment %s: %s", fname, e)
 
+            # Persist all ingested emails into zepto_gmail_messages
+            if emails_to_save:
+                zepto_db.save_gmail_messages(emails_to_save, settings=_settings)
+
             return {
                 "success": True,
                 "status": "success",
-                "message": f"Successfully ingested {processed_details['emails_scanned']} emails and synchronized metrics.",
+                "message": f"Successfully ingested {processed_details['emails_scanned']} emails for {clean_month} and synchronized metrics to database.",
                 "category_counts": ingested_counts,
                 "processed_details": processed_details,
             }

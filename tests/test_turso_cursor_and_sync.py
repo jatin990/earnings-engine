@@ -120,10 +120,13 @@ def test_automation_schedules_init_and_fetch_performance(tmp_path):
 
 def test_sync_tables_and_watermark_configuration():
     """Verify SYNC_TABLES contains all registered tables and watermarks correctly prioritize."""
-    assert len(SYNC_TABLES) == 76
-    assert len(set(SYNC_TABLES)) == 76  # No duplicate table names
+    assert len(SYNC_TABLES) == 89
+    assert len(set(SYNC_TABLES)) == 89  # No duplicate table names
 
-    # Essential missing tables now confirmed in list
+    # Essential tables confirmed in list
+    assert "zepto_gmail_messages" in SYNC_TABLES
+    assert "zepto_gmail_auth" in SYNC_TABLES
+    assert "zepto_attendance_records" in SYNC_TABLES
     assert "automation_schedules" in SYNC_TABLES
     assert "automation_schedule_logs" in SYNC_TABLES
     assert "option_chain_history" in SYNC_TABLES
