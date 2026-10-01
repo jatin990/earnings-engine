@@ -3324,7 +3324,6 @@ const zeptoApp = {
             `;
         }).join('');
     },
-    },
 
     showToast(message, isError = false) {
         const toast = document.createElement('div');
