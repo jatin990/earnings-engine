@@ -8,7 +8,57 @@ from earnings_engine.data.zepto_parsers import (
     extract_metrics_from_email_body,
     parse_zepto_store_metrics_excel,
     parse_zepto_loss_shrinkage_excel,
+    match_zepto_subject_pattern,
+    build_targeted_gmail_query,
 )
+
+
+def test_match_zepto_subject_pattern_dq_loss():
+    subject = "Store JMU-Sainik Colony - Daily Shift Summary & DQ Loss Audit - 2026-09-15"
+    match = match_zepto_subject_pattern(subject)
+
+    assert match["is_pattern_matched"] is True
+    assert match["category"] == "DQ_LOSS"
+    assert match["store_name"] == "JMU-Sainik Colony"
+    assert match["record_date"] == "2026-09-15"
+    assert match["badge_color"] == "rose"
+
+
+def test_match_zepto_subject_pattern_attendance():
+    subject = "JMU-Sainik_Colony-Attendance-report-8165178"
+    match = match_zepto_subject_pattern(subject)
+
+    assert match["is_pattern_matched"] is True
+    assert match["category"] == "ATTENDANCE"
+    assert match["store_name"] == "JMU-Sainik Colony"
+    assert match["report_id"] == "8165178"
+    assert match["badge_color"] == "sky"
+
+
+def test_match_zepto_subject_pattern_store_metrics():
+    subject = "Store DEL-South Ex - Daily Store Metrics Summary - 2026-08-20"
+    match = match_zepto_subject_pattern(subject)
+
+    assert match["is_pattern_matched"] is True
+    assert match["category"] == "STORE_METRICS"
+    assert match["store_name"] == "DEL-South Ex"
+    assert match["record_date"] == "2026-08-20"
+    assert match["badge_color"] == "emerald"
+
+
+def test_build_targeted_gmail_query():
+    clean_m, query_month = build_targeted_gmail_query("2026-09")
+    assert clean_m == "2026-09"
+    assert "after:2026/09/01" in query_month
+    assert "before:2026/10/01" in query_month
+    assert 'subject:(' in query_month
+    assert '"DQ Loss"' in query_month
+    assert '"Attendance-report"' in query_month
+
+    clean_all, query_all = build_targeted_gmail_query("ALL")
+    assert clean_all == "ALL"
+    assert "after:" not in query_all
+    assert 'subject:(' in query_all
 
 
 def test_extract_metrics_from_email_body_sales_and_orders():

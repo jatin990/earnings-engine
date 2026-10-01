@@ -108,7 +108,7 @@ def test_gmail_messages_storage_and_month_query():
 
     all_month, all_query = _build_gmail_month_query("ALL")
     assert all_month == "ALL"
-    assert all_query == ""
+    assert "subject:" in all_query
 
     # Test DB storage & retrieval
     mock_msgs = [

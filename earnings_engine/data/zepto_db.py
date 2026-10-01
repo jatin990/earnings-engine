@@ -2644,11 +2644,13 @@ def get_saved_gmail_message_by_id(
 def get_saved_gmail_messages(
     month: str | None = None,
     category: str | None = None,
+    store_name: str | None = None,
     search: str | None = None,
     limit: int = 1000,
+    offset: int = 0,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve saved Gmail messages from SQLite database filtered by month or category."""
+    """Retrieve saved Gmail messages from SQLite database filtered by month, category, store, or search keyword."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
@@ -2663,13 +2665,17 @@ def get_saved_gmail_messages(
         query += " AND category = ?"
         params.append(category)
 
+    if store_name and store_name != "ALL":
+        query += " AND (store_name = ? OR store_name = '')"
+        params.append(store_name)
+
     if search:
         s_pat = f"%{search.strip().lower()}%"
-        query += " AND (LOWER(subject) LIKE ? OR LOWER(sender) LIKE ? OR LOWER(snippet) LIKE ?)"
-        params.extend([s_pat, s_pat, s_pat])
+        query += " AND (LOWER(subject) LIKE ? OR LOWER(sender) LIKE ? OR LOWER(snippet) LIKE ? OR LOWER(store_name) LIKE ?)"
+        params.extend([s_pat, s_pat, s_pat, s_pat])
 
-    query += " ORDER BY CASE WHEN internal_date != '' THEN CAST(internal_date AS INTEGER) ELSE 0 END DESC, iso_date DESC LIMIT ?"
-    params.append(limit)
+    query += " ORDER BY CASE WHEN internal_date != '' THEN CAST(internal_date AS INTEGER) ELSE 0 END DESC, iso_date DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
 
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
@@ -3113,6 +3119,7 @@ def get_attendance_records(
     date: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    year_month: str | None = None,
     limit: int = 100,
     offset: int = 0,
     settings: Settings | None = None,
@@ -3139,12 +3146,16 @@ def get_attendance_records(
     if date:
         where_clauses.append("shift_date = ?")
         params.append(date)
-    if start_date:
-        where_clauses.append("shift_date >= ?")
-        params.append(start_date)
-    if end_date:
-        where_clauses.append("shift_date <= ?")
-        params.append(end_date)
+    if year_month and year_month.upper() != "ALL":
+        where_clauses.append("shift_date LIKE ?")
+        params.append(f"{year_month.strip()}%")
+    else:
+        if start_date:
+            where_clauses.append("shift_date >= ?")
+            params.append(start_date)
+        if end_date:
+            where_clauses.append("shift_date <= ?")
+            params.append(end_date)
 
     where_sql = " AND ".join(where_clauses)
     params.extend([limit, offset])
@@ -3480,6 +3491,7 @@ def save_store_metrics(data: dict[str, Any], settings: Settings | None = None) -
     store = data.get("store_name", "JMU-Sainik Colony").strip()
     date_str = data.get("metric_date", datetime.now().strftime("%Y-%m-%d")).strip()
     rec_id = data.get("id") or f"met_{store}_{date_str}"
+    source_email_id = data.get("source_email_id")
     now_iso = datetime.now(timezone.utc).isoformat()
 
     with _connect(settings) as conn:
@@ -3488,8 +3500,8 @@ def save_store_metrics(data: dict[str, Any], settings: Settings | None = None) -
             INSERT OR REPLACE INTO zepto_store_metrics (
                 id, store_name, metric_date, sales_gmv, order_count, aov,
                 inbound_hours, outbound_hours, packer_ipp, sla_adherence_pct,
-                raw_source, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                raw_source, source_email_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 rec_id,
@@ -3503,6 +3515,7 @@ def save_store_metrics(data: dict[str, Any], settings: Settings | None = None) -
                 float(data.get("packer_ipp", 0.0)),
                 float(data.get("sla_adherence_pct", 100.0)),
                 data.get("raw_source", "MANUAL"),
+                source_email_id,
                 now_iso,
                 now_iso,
             ),
@@ -3573,6 +3586,7 @@ def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> 
     rec_id = data.get("id") or f"loss_{uuid.uuid4().hex[:12]}"
     store = data.get("store_name", "JMU-Sainik Colony").strip()
     date_str = data.get("record_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    source_email_id = data.get("source_email_id")
     now_iso = datetime.now(timezone.utc).isoformat()
 
     with _connect(settings) as conn:
@@ -3580,8 +3594,8 @@ def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> 
             """
             INSERT OR REPLACE INTO zepto_loss_records (
                 id, store_name, record_date, loss_type, category, amount,
-                sku_count, notes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sku_count, notes, source_email_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 rec_id,
@@ -3592,10 +3606,12 @@ def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> 
                 float(data.get("amount", 0.0)),
                 int(data.get("sku_count", 0)),
                 data.get("notes", ""),
+                source_email_id,
                 now_iso,
                 now_iso,
             ),
         )
+    return {"id": rec_id, "amount": data.get("amount", 0.0)}
     return {"id": rec_id, "amount": data.get("amount", 0.0)}
 
 

@@ -708,71 +708,80 @@ async def delete_income_endpoint(income_id: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Local Email Serving & Detail Endpoints (Zero-Latency / Offline)
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/zepto/gmail/emails", summary="Get Persisted Emails from Local Database")
+async def get_persisted_emails_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format or 'ALL'"),
+    category: str | None = Query(None, description="Filter by category (DQ_LOSS, SHRINKAGE, ATTENDANCE, etc.)"),
+    store_name: str | None = Query(None, description="Store name filter"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
+    """
+    Serve operational emails directly from the local SQLite database for zero-latency UI rendering,
+    with filtering by month, operational category, and store.
+    """
+    try:
+        clean_month = None
+        if month and month.upper() not in ("ALL", ""):
+            clean_month = month.strip()
+
+        emails = zepto_db.get_saved_gmail_messages(
+            month=clean_month,
+            category=category,
+            store_name=store_name,
+            limit=limit,
+            offset=offset,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "count": len(emails),
+            "month": clean_month or "ALL",
+            "category": category,
+            "emails": emails,
+            "source": "LOCAL_DATABASE",
+        }
+    except Exception as exc:
+        logger.error("[ZEPTO-EMAILS] Error fetching local emails: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/gmail/emails/{email_id}", summary="Get Single Persisted Email with Linked DB Records")
+async def get_persisted_email_detail_endpoint(email_id: str) -> dict[str, Any]:
+    """
+    Retrieve full email details (subject, sender, body HTML/text, metadata)
+    along with any linked records created from it in zepto_loss_records,
+    zepto_store_metrics, or zepto_attendance_imports.
+    """
+    try:
+        email_data = zepto_db.get_saved_gmail_message_by_id(email_id, settings=_settings)
+        if not email_data:
+            raise HTTPException(status_code=404, detail=f"Email '{email_id}' not found in local database")
+        return {
+            "success": True,
+            "email": email_data,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ZEPTO-EMAILS] Error retrieving email %s: %s", email_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
 # Gmail OAuth 2.0 Linking & Status Endpoints
 # ---------------------------------------------------------------------------
 
-def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[str, str]:
-    """Categorize dark store operational email based on subject line and sender."""
-    sub_lower = (subject or "").lower()
-    from_lower = (sender or "").lower()
-    snip_lower = (snippet or "").lower()
-
-    if "store metric summary" in sub_lower or "store metric" in sub_lower:
-        return {
-            "category": "STORE_METRICS",
-            "category_label": "Store Metric Summary",
-            "badge_color": "emerald",
-            "icon": "📊",
-        }
-    elif "attendance" in sub_lower or "muster" in sub_lower or "shift report" in sub_lower:
-        return {
-            "category": "ATTENDANCE",
-            "category_label": "Attendance & Shifts",
-            "badge_color": "sky",
-            "icon": "👥",
-        }
-    elif "manpower utilization" in sub_lower or "utilization" in sub_lower or "picker ipp" in sub_lower:
-        return {
-            "category": "MANPOWER_UTILIZATION",
-            "category_label": "Manpower Utilization",
-            "badge_color": "purple",
-            "icon": "⚡",
-        }
-    elif "dq loss" in sub_lower or "damage" in sub_lower or "expiry" in sub_lower:
-        return {
-            "category": "DQ_LOSS",
-            "category_label": "DQ Loss & Expiry",
-            "badge_color": "rose",
-            "icon": "⚠️",
-        }
-    elif "shrinkage" in sub_lower or "cycle count" in sub_lower or "fcc" in sub_lower or "short-pick" in sub_lower:
-        return {
-            "category": "SHRINKAGE",
-            "category_label": "Shrinkage & Variance",
-            "badge_color": "amber",
-            "icon": "📉",
-        }
-    elif "manpower plan" in sub_lower or "headcount" in sub_lower or "target hc" in sub_lower:
-        return {
-            "category": "MANPOWER_PLAN",
-            "category_label": "Monthly Manpower Plan",
-            "badge_color": "indigo",
-            "icon": "📋",
-        }
-    elif "security alert" in sub_lower or "critical security" in sub_lower or "google" in from_lower:
-        return {
-            "category": "SECURITY_ALERT",
-            "category_label": "Security Alert",
-            "badge_color": "slate",
-            "icon": "🔒",
-        }
-    else:
-        return {
-            "category": "OPERATIONAL",
-            "category_label": "Operational Update",
-            "badge_color": "slate",
-            "icon": "📧",
-        }
+def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[str, Any]:
+    """
+    Categorize dark store operational email based on subject line and sender
+    using deterministic regex pattern matching first, falling back to keywords.
+    """
+    from earnings_engine.data.zepto_parsers import match_zepto_subject_pattern
+    return match_zepto_subject_pattern(subject=subject, sender=sender, snippet=snippet)
 
 
 def _build_gmail_month_query(month: str | None) -> tuple[str, str]:
@@ -780,27 +789,10 @@ def _build_gmail_month_query(month: str | None) -> tuple[str, str]:
     Given a month string (e.g. '2026-08' or 'ALL' or None),
     returns (clean_month_ym, gmail_q_str).
     Defaults to current month if None or empty.
+    Uses targeted operational keywords to avoid fetching unrelated emails.
     """
-    if not month or month.upper() in ("CURRENT", "NOW"):
-        clean_month = datetime.now().strftime("%Y-%m")
-    elif month.upper() == "ALL":
-        return ("ALL", "")
-    else:
-        clean_month = month.strip()
-
-    try:
-        parts = clean_month.split("-")
-        y = int(parts[0])
-        m = int(parts[1])
-        start_date = f"{y:04d}/{m:02d}/01"
-        if m == 12:
-            next_y, next_m = y + 1, 1
-        else:
-            next_y, next_m = y, m + 1
-        end_date = f"{next_y:04d}/{next_m:02d}/01"
-        return (clean_month, f"after:{start_date} before:{end_date}")
-    except Exception:
-        return (clean_month, "")
+    from earnings_engine.data.zepto_parsers import build_targeted_gmail_query
+    return build_targeted_gmail_query(month)
 
 
 @router.get("/api/v1/zepto/gmail/recent-emails", summary="Get Categorized Dark Store Emails by Month")
@@ -891,6 +883,29 @@ async def get_recent_emails_endpoint(
 
                 snippet = msg_data.get("snippet", "")
 
+                # Extract plain text & HTML bodies from MIME parts
+                body_text = ""
+                body_html = ""
+                def extract_bodies(part_node):
+                    nonlocal body_text, body_html
+                    m_type = part_node.get("mimeType", "")
+                    b_data = part_node.get("body", {}).get("data")
+                    if b_data:
+                        try:
+                            decoded = base64.urlsafe_b64decode(b_data.encode("UTF-8")).decode("utf-8", errors="replace")
+                            if m_type == "text/plain" and not body_text:
+                                body_text = decoded
+                            elif m_type == "text/html" and not body_html:
+                                body_html = decoded
+                        except Exception:
+                            pass
+                    for sub in part_node.get("parts", []):
+                        extract_bodies(sub)
+
+                extract_bodies(payload)
+                if not body_text and snippet:
+                    body_text = snippet
+
                 # Collect attachment filenames
                 attachments = []
                 def extract_attachments(part_node):
@@ -908,11 +923,11 @@ async def get_recent_emails_endpoint(
 
                 cat_info = _classify_zepto_email(subject, sender, snippet)
                 from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
-                extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet}")
+                extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text[:1000]}")
 
                 # Format ISO date
-                iso_date = datetime.now().strftime("%Y-%m-%d")
-                if date_str:
+                iso_date = cat_info.get("record_date") or datetime.now().strftime("%Y-%m-%d")
+                if not cat_info.get("record_date") and date_str:
                     try:
                         from email.utils import parsedate_to_datetime
                         dt = parsedate_to_datetime(date_str)
@@ -921,16 +936,20 @@ async def get_recent_emails_endpoint(
                         pass
 
                 month_ym = iso_date[:7]
+                store_name = cat_info.get("store_name") or "JMU-Sainik Colony"
 
                 emails.append({
                     "id": msg_id,
                     "thread_id": msg_data.get("threadId"),
+                    "store_name": store_name,
                     "subject": subject or "(No Subject)",
                     "from": sender,
                     "date": date_str,
                     "iso_date": iso_date,
                     "month_ym": month_ym,
                     "snippet": snippet,
+                    "body_text": body_text,
+                    "body_html": body_html,
                     "category": cat_info["category"],
                     "category_label": cat_info["category_label"],
                     "badge_color": cat_info["badge_color"],
@@ -1076,6 +1095,30 @@ async def ingest_all_emails_endpoint(
                         date_str = h.get("value", "")
 
                 snippet = msg_data.get("snippet", "")
+
+                # Extract plain text & HTML bodies from MIME parts
+                body_text = ""
+                body_html = ""
+                def extract_bodies(part_node):
+                    nonlocal body_text, body_html
+                    m_type = part_node.get("mimeType", "")
+                    b_data = part_node.get("body", {}).get("data")
+                    if b_data:
+                        try:
+                            decoded = base64.urlsafe_b64decode(b_data.encode("UTF-8")).decode("utf-8", errors="replace")
+                            if m_type == "text/plain" and not body_text:
+                                body_text = decoded
+                            elif m_type == "text/html" and not body_html:
+                                body_html = decoded
+                        except Exception:
+                            pass
+                    for sub in part_node.get("parts", []):
+                        extract_bodies(sub)
+
+                extract_bodies(payload)
+                if not body_text and snippet:
+                    body_text = snippet
+
                 cat_info = _classify_zepto_email(subject, sender, snippet)
                 category = cat_info["category"]
                 if category in ingested_counts:
@@ -1084,11 +1127,11 @@ async def ingest_all_emails_endpoint(
                     ingested_counts["OPERATIONAL"] += 1
 
                 # Parse body text metrics
-                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet}")
+                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text[:1000]}")
 
-                # Format ISO date from date_str
-                iso_date = datetime.now().strftime("%Y-%m-%d")
-                if date_str:
+                # Format ISO date from subject regex or date header
+                iso_date = cat_info.get("record_date") or datetime.now().strftime("%Y-%m-%d")
+                if not cat_info.get("record_date") and date_str:
                     try:
                         from email.utils import parsedate_to_datetime
                         dt = parsedate_to_datetime(date_str)
@@ -1096,10 +1139,14 @@ async def ingest_all_emails_endpoint(
                     except Exception:
                         pass
 
+                store_name = cat_info.get("store_name") or "JMU-Sainik Colony"
+                email_parsed_status = "PENDING"
+                email_parsed_count = 0
+
                 # If email contains store metrics text numbers, persist them
                 if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count")):
                     zepto_db.save_store_metrics({
-                        "store_name": "JMU-Sainik Colony",
+                        "store_name": store_name,
                         "metric_date": iso_date,
                         "sales_gmv": body_metrics.get("sales_gmv", 0.0),
                         "order_count": body_metrics.get("order_count", 0),
@@ -1107,21 +1154,27 @@ async def ingest_all_emails_endpoint(
                         "sla_adherence_pct": body_metrics.get("sla_adherence_pct", 100.0),
                         "packer_ipp": body_metrics.get("packer_ipp", 0.0),
                         "raw_source": "GMAIL_BODY",
+                        "source_email_id": msg_id,
                     }, settings=_settings)
                     processed_details["store_metrics_records"] += 1
+                    email_parsed_status = "PARSED"
+                    email_parsed_count += 1
 
                 # If email contains DQ loss / shrinkage text numbers, persist them
                 if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount"):
                     zepto_db.save_loss_record({
-                        "store_name": "JMU-Sainik Colony",
+                        "store_name": store_name,
                         "record_date": iso_date,
                         "loss_type": category,
                         "category": "EMAIL_INGESTED",
                         "amount": body_metrics.get("loss_amount", 0.0),
                         "sku_count": 1,
                         "notes": f"Ingested from email: {subject[:60]}",
+                        "source_email_id": msg_id,
                     }, settings=_settings)
                     processed_details["loss_records"] += 1
+                    email_parsed_status = "PARSED"
+                    email_parsed_count += 1
 
                 # Inspect and download attachments (.xlsx)
                 all_parts = []
@@ -1143,25 +1196,6 @@ async def ingest_all_emails_endpoint(
                             "size_bytes": p.get("body", {}).get("size", 0),
                         })
 
-                emails_to_save.append({
-                    "id": msg_id,
-                    "thread_id": msg_data.get("threadId"),
-                    "subject": subject or "(No Subject)",
-                    "from": sender,
-                    "date": date_str,
-                    "iso_date": iso_date,
-                    "month_ym": iso_date[:7],
-                    "snippet": snippet,
-                    "category": category,
-                    "category_label": cat_info.get("category_label", "Operational Update"),
-                    "badge_color": cat_info.get("badge_color", "slate"),
-                    "icon": cat_info.get("icon", "📧"),
-                    "extracted_metrics": body_metrics,
-                    "attachments": attachments,
-                    "has_attachments": len(attachments) > 0,
-                    "internal_date": msg_data.get("internalDate"),
-                })
-
                 for part in all_parts:
                     fname = part.get("filename", "")
                     if fname.lower().endswith((".xlsx", ".xlsm")):
@@ -1182,28 +1216,72 @@ async def ingest_all_emails_endpoint(
                             if "attendance" in fname.lower() or category == "ATTENDANCE":
                                 try:
                                     parsed_att = parse_zepto_attendance_excel(file_bytes, file_name=fname)
-                                    saved_att = zepto_db.save_attendance_batch(parsed_att, source="GMAIL", settings=_settings)
-                                    processed_details["attendance_records"] += saved_att.get("imported_records", 0)
+                                    saved_att = zepto_db.save_attendance_batch(
+                                        parsed_att,
+                                        source="GMAIL",
+                                        source_email_id=msg_id,
+                                        settings=_settings,
+                                    )
+                                    att_recs = saved_att.get("imported_records", 0)
+                                    processed_details["attendance_records"] += att_recs
+                                    email_parsed_status = "PARSED"
+                                    email_parsed_count += att_recs
                                 except Exception as e:
                                     logger.warning("[GMAIL-INGEST] Error parsing attendance attachment %s: %s", fname, e)
+                                    if email_parsed_status != "PARSED":
+                                        email_parsed_status = "FAILED"
 
                             elif "metric" in fname.lower() or category == "STORE_METRICS":
                                 try:
                                     parsed_met = parse_zepto_store_metrics_excel(file_bytes, file_name=fname)
                                     for r in parsed_met.get("records", []):
+                                        r["source_email_id"] = msg_id
                                         zepto_db.save_store_metrics(r, settings=_settings)
                                         processed_details["store_metrics_records"] += 1
+                                        email_parsed_count += 1
+                                    email_parsed_status = "PARSED"
                                 except Exception as e:
                                     logger.warning("[GMAIL-INGEST] Error parsing store metrics attachment %s: %s", fname, e)
+                                    if email_parsed_status != "PARSED":
+                                        email_parsed_status = "FAILED"
 
                             elif "loss" in fname.lower() or "shrinkage" in fname.lower() or category in ("DQ_LOSS", "SHRINKAGE"):
                                 try:
                                     parsed_loss = parse_zepto_loss_shrinkage_excel(file_bytes, file_name=fname)
                                     for r in parsed_loss.get("records", []):
+                                        r["source_email_id"] = msg_id
                                         zepto_db.save_loss_record(r, settings=_settings)
                                         processed_details["loss_records"] += 1
+                                        email_parsed_count += 1
+                                    email_parsed_status = "PARSED"
                                 except Exception as e:
                                     logger.warning("[GMAIL-INGEST] Error parsing loss attachment %s: %s", fname, e)
+                                    if email_parsed_status != "PARSED":
+                                        email_parsed_status = "FAILED"
+
+                emails_to_save.append({
+                    "id": msg_id,
+                    "thread_id": msg_data.get("threadId"),
+                    "store_name": store_name,
+                    "subject": subject or "(No Subject)",
+                    "from": sender,
+                    "date": date_str,
+                    "iso_date": iso_date,
+                    "month_ym": iso_date[:7],
+                    "snippet": snippet,
+                    "body_text": body_text,
+                    "body_html": body_html,
+                    "category": category,
+                    "category_label": cat_info.get("category_label", "Operational Update"),
+                    "badge_color": cat_info.get("badge_color", "slate"),
+                    "icon": cat_info.get("icon", "📧"),
+                    "extracted_metrics": body_metrics,
+                    "attachments": attachments,
+                    "has_attachments": len(attachments) > 0,
+                    "parsed_status": email_parsed_status,
+                    "parsed_records_count": email_parsed_count,
+                    "internal_date": msg_data.get("internalDate"),
+                })
 
             # Persist all ingested emails into zepto_gmail_messages
             if emails_to_save:
@@ -1466,6 +1544,7 @@ async def get_attendance_records_endpoint(
     date: str | None = Query(None),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    year_month: str | None = Query(None, description="Filter by year-month YYYY-MM"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
@@ -1479,6 +1558,7 @@ async def get_attendance_records_endpoint(
             date=date,
             start_date=start_date,
             end_date=end_date,
+            year_month=year_month,
             limit=limit,
             offset=offset,
             settings=_settings,

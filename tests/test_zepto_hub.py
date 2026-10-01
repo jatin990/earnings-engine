@@ -96,24 +96,30 @@ def test_classify_zepto_email_categories():
     from earnings_engine.api.routers.zepto import _classify_zepto_email
 
     # 1. Store Metrics
-    c1 = _classify_zepto_email("Store Metric Summary - JMU-Sainik Colony - 2026-09-29", "bot@zepto.com")
+    c1 = _classify_zepto_email("Store JMU-Sainik Colony - Daily Store Metrics Summary - 2026-09-29", "bot@zepto.com")
     assert c1["category"] == "STORE_METRICS"
     assert c1["badge_color"] == "emerald"
+    assert c1["store_name"] == "JMU-Sainik Colony"
+    assert c1["record_date"] == "2026-09-29"
 
     # 2. Attendance
-    c2 = _classify_zepto_email("JMU-Sainik_Colony-Attendance-report-8165178.xlsx", "reports@zepto.com")
+    c2 = _classify_zepto_email("JMU-Sainik_Colony-Attendance-report-8165178", "reports@zepto.com")
     assert c2["category"] == "ATTENDANCE"
     assert c2["badge_color"] == "sky"
+    assert c2["store_name"] == "JMU-Sainik Colony"
+    assert c2["report_id"] == "8165178"
 
     # 3. Manpower Utilization
-    c3 = _classify_zepto_email("Daily Manpower Utilization and Picker IPP Report", "ops@zepto.com")
+    c3 = _classify_zepto_email("Store JMU-Sainik Colony - Picker IPP - 2026-09-28", "ops@zepto.com")
     assert c3["category"] == "MANPOWER_UTILIZATION"
     assert c3["badge_color"] == "purple"
 
     # 4. DQ Loss
-    c4 = _classify_zepto_email("Store DQ Loss & Expiry Summary - JMU", "qa@zepto.com")
+    c4 = _classify_zepto_email("Store JMU-Sainik Colony - Daily Shift Summary & DQ Loss Audit - 2026-09-27", "audit@zepto.com")
     assert c4["category"] == "DQ_LOSS"
     assert c4["badge_color"] == "rose"
+    assert c4["store_name"] == "JMU-Sainik Colony"
+    assert c4["record_date"] == "2026-09-27"
 
     # 5. Shrinkage
     c5 = _classify_zepto_email("Weekly Store Shrinkage & Cycle Count Variance", "audit@zepto.com")
@@ -128,6 +134,72 @@ def test_classify_zepto_email_categories():
     # 7. Security Alert
     c7 = _classify_zepto_email("Security alert for linked Google account", "no-reply@accounts.google.com")
     assert c7["category"] == "SECURITY_ALERT"
+
+
+def test_persisted_emails_local_crud_and_lineage(client):
+    settings = Settings()
+    # Save a test email with full body and metadata
+    test_msg_id = f"test_msg_{uuid.uuid4().hex[:8]}"
+    email_entry = {
+        "id": test_msg_id,
+        "thread_id": "thread_123",
+        "store_name": "JMU-Sainik Colony",
+        "subject": "Store JMU-Sainik Colony - Daily Shift Summary & DQ Loss Audit - 2026-09-15",
+        "from": "audit@zepto.com",
+        "date": "Tue, 15 Sep 2026 18:30:00 +0530",
+        "iso_date": "2026-09-15",
+        "month_ym": "2026-09",
+        "snippet": "DQ Loss recorded: Rs 1450 for damaged dairy items.",
+        "body_text": "DQ Loss recorded: Rs 1450 for damaged dairy items. Total SKU Count: 3.",
+        "body_html": "<p>DQ Loss recorded: Rs 1450 for damaged dairy items.</p>",
+        "category": "DQ_LOSS",
+        "category_label": "DQ Loss & Expiry",
+        "badge_color": "rose",
+        "icon": "⚠️",
+        "extracted_metrics": {"loss_amount": 1450.0},
+        "attachments": [{"filename": "loss_audit_20260915.xlsx", "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "size_bytes": 1024}],
+        "has_attachments": True,
+        "parsed_status": "PARSED",
+        "parsed_records_count": 1,
+    }
+    zepto_db.save_gmail_messages([email_entry], settings=settings)
+
+    # Persist a linked loss record with source_email_id
+    loss_rec = {
+        "id": f"loss_{test_msg_id}",
+        "store_name": "JMU-Sainik Colony",
+        "record_date": "2026-09-15",
+        "loss_type": "DQ_LOSS",
+        "category": "DAIRY",
+        "amount": 1450.0,
+        "sku_count": 3,
+        "notes": "Damaged milk pouches on dispatch conveyor",
+        "source_email_id": test_msg_id,
+    }
+    zepto_db.save_loss_record(loss_rec, settings=settings)
+
+    # Query single email via DAL
+    saved = zepto_db.get_saved_gmail_message_by_id(test_msg_id, settings=settings)
+    assert saved is not None
+    assert saved["id"] == test_msg_id
+    assert saved["store_name"] == "JMU-Sainik Colony"
+    assert saved["parsed_status"] == "PARSED"
+    assert len(saved["linked_loss_records"]) == 1
+    assert saved["linked_loss_records"][0]["amount"] == 1450.0
+
+    # Query via REST API
+    res = client.get(f"/api/v1/zepto/gmail/emails?month=2026-09&category=DQ_LOSS")
+    assert res.status_code == 200
+    res_data = res.json()
+    assert res_data["success"] is True
+    assert any(e["id"] == test_msg_id for e in res_data["emails"])
+
+    # Query detail endpoint
+    res_detail = client.get(f"/api/v1/zepto/gmail/emails/{test_msg_id}")
+    assert res_detail.status_code == 200
+    detail_data = res_detail.json()
+    assert detail_data["email"]["id"] == test_msg_id
+    assert len(detail_data["email"]["linked_loss_records"]) >= 1
 
 
 

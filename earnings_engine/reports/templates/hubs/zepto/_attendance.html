@@ -23,12 +23,14 @@
             <!-- Month-Wise Selector -->
             <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1">
                 <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Month:</span>
-                <input
-                    type="month"
+                <select
                     id="attMonthFilter"
                     onchange="zeptoApp.loadAttendanceData()"
                     class="bg-transparent text-xs text-emerald-300 font-mono font-bold focus:outline-none cursor-pointer"
-                />
+                >
+                    <option value="CURRENT" selected class="bg-slate-900 text-white">Current Month</option>
+                    <option value="ALL" class="bg-slate-900 text-white">All Records</option>
+                </select>
             </div>
 
             <button

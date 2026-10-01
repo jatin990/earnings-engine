@@ -331,6 +331,21 @@ const zeptoApp = {
             gmailMonthSelect.innerHTML = opts;
             if (currentVal) gmailMonthSelect.value = currentVal;
         }
+
+        const attMonthSelect = document.getElementById('attMonthFilter');
+        if (attMonthSelect) {
+            const currentVal = attMonthSelect.value || 'CURRENT';
+            const now = new Date();
+            let opts = '<option value="CURRENT">Current Month</option><option value="ALL">All Records</option>';
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                opts += `<option value="${ym}">${label}</option>`;
+            }
+            attMonthSelect.innerHTML = opts;
+            if (currentVal) attMonthSelect.value = currentVal;
+        }
     },
 
     // -----------------------------------------------------------------------
@@ -2669,23 +2684,26 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadAttendanceData() {
-        const monthInput = document.getElementById('attMonthFilter');
-        let ym = monthInput ? monthInput.value : '';
-        if (!ym && !this.attendance.year_month_initialized) {
-            // Default to current year-month
+        const monthFilter = document.getElementById('attMonthFilter')?.value || 'CURRENT';
+        let ym = '';
+        if (monthFilter === 'CURRENT') {
             const now = new Date();
             ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            if (monthInput) monthInput.value = ym;
-            this.attendance.year_month_initialized = true;
+        } else if (monthFilter !== 'ALL') {
+            ym = monthFilter;
         }
 
         try {
             const summaryParams = new URLSearchParams();
             if (ym) summaryParams.append('year_month', ym);
 
+            const recParams = new URLSearchParams();
+            if (ym) recParams.append('year_month', ym);
+            recParams.append('limit', '1000');
+
             const [sumRes, recRes] = await Promise.all([
                 fetch(`/api/v1/zepto/attendance/summary?${summaryParams.toString()}`),
-                fetch(`/api/v1/zepto/attendance/records?limit=1000`),
+                fetch(`/api/v1/zepto/attendance/records?${recParams.toString()}`),
             ]);
 
             if (sumRes.ok) {
@@ -3783,6 +3801,14 @@ const zeptoApp = {
                 badgeClass = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
             }
 
+            // Ingestion / Parsed status badge
+            let parseBadge = '';
+            if (m.parsed_status === 'PARSED') {
+                parseBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[9px] font-bold" title="${m.parsed_records_count || 0} relational records translated to DB">💾 ${m.parsed_records_count || 0} DB Records</span>`;
+            } else if (m.parsed_status === 'FAILED') {
+                parseBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono text-[9px] font-bold">⚠️ Parse Failed</span>`;
+            }
+
             // Key Metrics Pill tags
             const met = m.extracted_metrics || {};
             const metricPills = [];
@@ -3823,10 +3849,13 @@ const zeptoApp = {
 
                     <!-- Category -->
                     <td class="p-2.5 whitespace-nowrap align-top">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass} uppercase tracking-wider">
-                            <span>${m.icon || '📧'}</span>
-                            <span>${m.category_label || m.category}</span>
-                        </span>
+                        <div class="space-y-1">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass} uppercase tracking-wider">
+                                <span>${m.icon || '📧'}</span>
+                                <span>${m.category_label || m.category}</span>
+                            </span>
+                            ${parseBadge ? `<div>${parseBadge}</div>` : ''}
+                        </div>
                     </td>
 
                     <!-- Subject & Sender -->
