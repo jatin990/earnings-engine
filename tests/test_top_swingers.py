@@ -125,3 +125,30 @@ def test_swing_endpoint_fail_safe_recovery(monkeypatch):
     resp = client.get("/api/v1/dashboard/swing?limit=50")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_min_cycles_strict_filtering(monkeypatch):
+    """Verify min_cycles filter strictly filters candidates regardless of composite score."""
+    mock_candidates = [
+        {"ticker": "C1.NS", "cycles": 1, "avg_cycle_days": 15.0, "composite_score": 95.0},
+        {"ticker": "C2.NS", "cycles": 2, "avg_cycle_days": 20.0, "composite_score": 70.0},
+        {"ticker": "C3.NS", "cycles": 3, "avg_cycle_days": 25.0, "composite_score": 50.0},
+        {"ticker": "C4.NS", "cycles": 4, "avg_cycle_days": 30.0, "composite_score": 80.0},
+    ]
+    monkeypatch.setattr(swing_scanner_mod, "get_cached_swing_results", lambda **kw: mock_candidates)
+
+    res1 = swing_scanner_mod.get_top_swingers(min_cycles=1)
+    assert len(res1) == 4
+
+    res2 = swing_scanner_mod.get_top_swingers(min_cycles=2)
+    assert len(res2) == 3
+    assert all(r["cycles"] >= 2 for r in res2)
+    assert not any(r["ticker"] == "C1.NS" for r in res2)
+
+    res3 = swing_scanner_mod.get_top_swingers(min_cycles=3)
+    assert len(res3) == 2
+    assert all(r["cycles"] >= 3 for r in res3)
+
+    res4 = swing_scanner_mod.get_top_swingers(min_cycles=4)
+    assert len(res4) == 1
+    assert res4[0]["ticker"] == "C4.NS"

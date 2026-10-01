@@ -512,30 +512,6 @@
                     const signalBadge = `<span class="signal-badge" style="${sigBadgeStyle}font-size:0.62rem;padding:0.06rem 0.35rem;">${sigBadgeText}</span>`;
 
                     // AI & Kronos Column Data
-                    const kp = r.kronos_prediction || {};
-                    const kpTrend = kp.trend || '—';
-                    const kpRet = kp.return_pct != null ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
-                    const kpCls = kpTrend === 'Bullish' ? '#34d399' : (kpTrend === 'Bearish' ? '#f87171' : '#94a3b8');
-
-                    const consensusData = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
-                    const rawDir = typeof consensusData === 'string' ? consensusData : (consensusData && typeof consensusData === 'object' ? (consensusData.consensus_direction || consensusData.direction) : null);
-                    const consensusDir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
-                    const consensusStrength = consensusData.consensus_strength != null ? Math.round(consensusData.consensus_strength) + '%' : '';
-                    const isConsensusBull = consensusDir.includes('BUY') || consensusDir.includes('BULL');
-                    const isConsensusBear = consensusDir.includes('SELL') || consensusDir.includes('BEAR');
-                    const cBg = 'rgba(255,255,255,0.03)';
-                    const cClr = isConsensusBull ? '#34d399' : (isConsensusBear ? '#f87171' : '#cbd5e1');
-                    const cBrd = 'rgba(255,255,255,0.07)';
-
-                    const aiColHtml = `
-                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                            <span class="signal-badge" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="background:${cBg};color:${cClr};border:1px solid ${cBrd};font-size:0.62rem;padding:0.06rem 0.35rem;cursor:pointer;" title="4-Model AI Consensus (Click for thesis)">
-                                🤖 ${consensusDir} ${consensusStrength ? '(' + consensusStrength + ')' : ''}
-                            </span>
-                            ${kpTrend !== '—' ? `<span style="font-size:0.62rem;color:${kpCls};font-weight:600;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.06rem 0.3rem;border-radius:3px;border:1px solid rgba(255,255,255,0.06);">14D: ${kpRet}</span>` : ''}
-                        </div>
-                    `;
-
                     // Position bar color
                     const posColor = posPct <= 25 ? '#34d399' : (posPct <= 60 ? '#38bdf8' : '#fb923c');
 
@@ -634,8 +610,8 @@
                                 <div class="metric"><span>Quality</span><strong>${r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : 'N/A'}</strong></div>
                             </div>
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">
-                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos('${(r.ticker || '').replace(/'/g, "\\'")}', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">🔮 Kronos</button>
-                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">🧠 AI Thesis</button>
+                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('ALL', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">✎ Range</button>
+                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;text-align:center;">📊 Chart</a>
                             </div>
                         </div>
                     `;
@@ -649,7 +625,9 @@
         async loadTopSwingers(e) {
             const marketEl = document.getElementById('swingMarket');
             const market = marketEl ? marketEl.value : 'ALL';
-            const minCycles = this.topSwingersMinCycles || 1;
+            const minCyclesEl = document.getElementById('swingTopMinCycles');
+            const minCycles = minCyclesEl ? (parseInt(minCyclesEl.value, 10) || 1) : (this.topSwingersMinCycles || 1);
+            this.topSwingersMinCycles = minCycles;
             const url = API_BASE + `/api/v1/dashboard/swing/top-swingers?min_cycles=${minCycles}&limit=100` + (market ? `&market=${encodeURIComponent(market)}` : '');
 
             const btn = (e && e.target) ? e.target : null;
@@ -678,7 +656,7 @@
                 console.error('Error loading top swingers:', err);
                 const tbody = document.getElementById('swingTopSwingersTableBody');
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--red);">Error loading Top Swingers matrix. Please check server logs.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--red);">Error loading Top Swingers matrix. Please check server logs.</td></tr>';
                 }
             } finally {
                 if (btn && btn.tagName === 'BUTTON') {
@@ -713,11 +691,12 @@
 
             const marketEl = document.getElementById('swingMarket');
             const currentMarket = marketEl ? marketEl.value : 'ALL';
+            const minCycles = this.topSwingersMinCycles || 1;
 
             if (!this.topSwingersData || !this.topSwingersData.length) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="10" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
+                        <td colspan="9" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
                             <div style="font-size:2rem;margin-bottom:0.5rem;">🏆</div>
                             <h4 style="margin:0 0 0.3rem 0;color:#facc15;font-size:1.05rem;">No Top Swing Candidates Match Criteria</h4>
                             <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Try lowering the minimum cycle filter or selecting another market universe.</p>
@@ -729,6 +708,9 @@
             }
 
             let list = [...this.topSwingersData];
+
+            // Strict client-side filter by minimum cycles
+            list = list.filter(r => (parseInt(r.cycles, 10) || 0) >= minCycles);
 
             // Filter by search text
             const searchInp = document.getElementById('swingTopSearchInput');
@@ -782,7 +764,7 @@
             });
 
             if (!list.length) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">No swingers match your search filter.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">No swingers match your search filter.</td></tr>';
                 return;
             }
 
@@ -836,23 +818,8 @@
                 const rankScore = r.swing_rank_score != null ? Number(r.swing_rank_score).toFixed(1) : '—';
                 const scoreColor = rankScore >= 75 ? '#ffffff' : (rankScore >= 55 ? '#cbd5e1' : '#94a3b8');
 
-                // AI Consensus & Kronos
-                const consensusData = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
-                const rawDir = typeof consensusData === 'string' ? consensusData : (consensusData && typeof consensusData === 'object' ? (consensusData.consensus_direction || consensusData.direction) : null);
-                const consensusDir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
-                const isConsensusBull = consensusDir.includes('BUY') || consensusDir.includes('BULL');
-                const isConsensusBear = consensusDir.includes('SELL') || consensusDir.includes('BEAR');
-                const cBg = 'rgba(255,255,255,0.03)';
-                const cClr = isConsensusBull ? '#34d399' : (isConsensusBear ? '#f87171' : '#cbd5e1');
-                const cBrd = 'rgba(255,255,255,0.07)';
-
-                const kp = r.kronos_prediction || {};
-                const kpTrend = kp.trend || '—';
-                const kpRet = kp.return_pct != null ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
-                const kpCls = kpTrend === 'Bullish' ? '#34d399' : (kpTrend === 'Bearish' ? '#f87171' : '#94a3b8');
-
                 return `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(234,179,8,0.04)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
                         <!-- Col 1: Rank -->
                         <td style="padding:0.55rem 0.65rem;">${rankBadge}</td>
 
@@ -875,7 +842,7 @@
                         <!-- Col 4: Cycles & Frequency -->
                         <td style="padding:0.55rem 0.65rem;">
                             <div style="display:flex;align-items:center;gap:0.35rem;">
-                                <span style="font-size:0.90rem;font-weight:800;color:#facc15;font-family:var(--font-mono);">${cycles} Cycle${cycles !== 1 ? 's' : ''}</span>
+                                <span style="font-size:0.90rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${cycles} Cycle${cycles !== 1 ? 's' : ''}</span>
                             </div>
                             <div style="margin-top:0.15rem;">
                                 <span class="signal-badge" style="background:${cycleHealthBg};color:${cycleHealthClr};font-size:0.60rem;padding:0.05rem 0.35rem;">${cycleHealth}</span>
@@ -908,22 +875,11 @@
                             </div>
                         </td>
 
-                        <!-- Col 9: AI & Kronos -->
-                        <td style="padding:0.55rem 0.65rem;">
-                            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                                <span class="signal-badge" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="background:${cBg};color:${cClr};border:1px solid ${cBrd};font-size:0.62rem;padding:0.1rem 0.4rem;cursor:pointer;" title="4-Model AI Consensus">
-                                    🤖 ${consensusDir}
-                                </span>
-                                ${kpTrend !== '—' ? `<span style="font-size:0.62rem;color:${kpCls};font-weight:700;font-family:var(--font-mono);">🔮 14D: ${kpRet}</span>` : ''}
-                            </div>
-                        </td>
-
-                        <!-- Col 10: Actions -->
+                        <!-- Col 9: Actions -->
                         <td style="padding:0.55rem 0.65rem;text-align:right;">
-                            <div style="display:flex;justify-content:flex-end;gap:0.25rem;align-items:center;">
-                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Edit Support & Resistance bounds">✎ Range</button>
-                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View unified AI Thesis">🧠 AI</button>
-                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;">📊 Chart</a>
+                            <div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">
+                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Edit Support & Resistance bounds">✎ Range</button>
+                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;">📊 Chart</a>
                             </div>
                         </td>
                     </tr>
