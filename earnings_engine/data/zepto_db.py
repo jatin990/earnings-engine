@@ -3768,7 +3768,37 @@ def get_loss_summary(
             c_data["pct_of_total"] = round((c_data["total_amount"] / total_loss * 100), 1) if total_loss > 0 else 0.0
             cat_list.append(c_data)
 
-        cat_list.sort(key=lambda x: x["total_amount"], reverse=True)
+        # Filter categories to only those where loss has occurred (total_amount > 0)
+        positive_cats = [c for c in cat_list if c["total_amount"] > 0]
+        positive_cats.sort(key=lambda x: x["total_amount"], reverse=True)
+
+        # Group categories below Top 10 as "OTHERS"
+        if len(positive_cats) > 10:
+            top_10_cats = positive_cats[:10]
+            tail_cats = positive_cats[10:]
+            others_total = round(sum(c["total_amount"] for c in tail_cats), 2)
+            others_dq = round(sum(c["dq_loss_amount"] for c in tail_cats), 2)
+            others_shrink = round(sum(c["shrinkage_amount"] for c in tail_cats), 2)
+            others_spoil = round(sum(c["spoilage_amount"] for c in tail_cats), 2)
+            others_skus = sum(c["total_skus"] for c in tail_cats)
+            others_incidents = sum(c["incident_count"] for c in tail_cats)
+            others_pct = round((others_total / total_loss * 100), 1) if total_loss > 0 else 0.0
+
+            grouped_category_breakdown = top_10_cats + [
+                {
+                    "category": "OTHERS",
+                    "total_amount": others_total,
+                    "dq_loss_amount": others_dq,
+                    "shrinkage_amount": others_shrink,
+                    "spoilage_amount": others_spoil,
+                    "total_skus": others_skus,
+                    "incident_count": others_incidents,
+                    "pct_of_total": others_pct,
+                    "is_composite": True,
+                }
+            ]
+        else:
+            grouped_category_breakdown = positive_cats
 
         # 3. Email Body vs. Excel Verification / Reconciliation Ledger
         recon_where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
@@ -3877,7 +3907,7 @@ def get_loss_summary(
             FROM zepto_loss_records
             WHERE category != 'EMAIL_INGESTED' AND record_date IS NOT NULL AND length(record_date) >= 7
             GROUP BY substr(record_date, 1, 7)
-            ORDER BY ym DESC
+            ORDER BY ym ASC
             """
         ).fetchall()
 
@@ -3894,6 +3924,52 @@ def get_loss_summary(
             for mtr in month_trend_rows
         ]
 
+        # 5. Day-wise Trend aggregation (for the active filtered records)
+        daily_map: dict[str, dict[str, Any]] = {}
+        for it in active_items:
+            dt = str(it.get("record_date") or "").strip()
+            if not dt or len(dt) < 10:
+                continue
+            l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
+            amt = float(it.get("amount") or 0.0)
+            sku_cnt = int(it.get("sku_count") or 0)
+
+            if dt not in daily_map:
+                daily_map[dt] = {
+                    "date": dt,
+                    "total_loss": 0.0,
+                    "dq_loss": 0.0,
+                    "shrinkage": 0.0,
+                    "spoilage": 0.0,
+                    "item_count": 0,
+                    "sku_count": 0,
+                }
+            daily_map[dt]["total_loss"] += amt
+            daily_map[dt]["sku_count"] += sku_cnt
+            daily_map[dt]["item_count"] += 1
+            if l_type == "DQ_LOSS":
+                daily_map[dt]["dq_loss"] += amt
+            elif l_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
+                daily_map[dt]["shrinkage"] += amt
+            else:
+                daily_map[dt]["spoilage"] += amt
+
+        daily_trends = sorted(
+            [
+                {
+                    "date": d["date"],
+                    "total_loss": round(d["total_loss"], 2),
+                    "dq_loss": round(d["dq_loss"], 2),
+                    "shrinkage": round(d["shrinkage"], 2),
+                    "spoilage": round(d["spoilage"], 2),
+                    "item_count": d["item_count"],
+                    "sku_count": d["sku_count"],
+                }
+                for d in daily_map.values()
+            ],
+            key=lambda x: x["date"],
+        )
+
         return {
             "selected_month": month or "ALL",
             "available_months": sorted_months,
@@ -3905,7 +3981,8 @@ def get_loss_summary(
             "total_sku_count": total_skus,
             "total_loss_records": len(active_items),
             "total_records": len(active_items),
-            "category_breakdown": cat_list,
+            "category_breakdown": grouped_category_breakdown,
+            "all_categories": positive_cats,
             "reconciliation": {
                 "items": recon_items,
                 "total_audits": total_audits,
@@ -3914,6 +3991,7 @@ def get_loss_summary(
                 "match_rate_pct": match_rate_pct,
             },
             "monthly_trends": monthly_trends,
+            "daily_trends": daily_trends,
             "records": active_items,
         }
 

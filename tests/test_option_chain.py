@@ -90,3 +90,23 @@ def test_calculate_option_metrics_from_nested_records():
     assert res["resistance_strike"] == 1300.0
     assert res["support_strike"] == 1250.0
 
+
+def test_calculate_option_metrics_straddle_pin_and_direction_aware():
+    """Verify that when peak Call OI and peak Put OI occur at the same strike (short straddle),
+    resistance is selected from overhead (>= spot) strikes, support from underfoot (<= spot),
+    and pin_strike is explicitly flagged."""
+    records = [
+        {"strikePrice": 1700, "CE_openInterest": 500, "PE_openInterest": 1200},
+        {"strikePrice": 1800, "CE_openInterest": 3000, "PE_openInterest": 3000},  # Straddle peak
+        {"strikePrice": 1900, "CE_openInterest": 2500, "PE_openInterest": 400},
+        {"strikePrice": 2000, "CE_openInterest": 1500, "PE_openInterest": 100},
+    ]
+    # Spot is 1820 -> Spot > 1800
+    res = _calculate_option_metrics_from_records("COFORGE", records, spot_price=1820.0)
+    assert res["pin_strike"] == 1800.0
+    # Resistance should pick from strikes >= 1820 -> 1900 (2500 OI), not collapse to 1800
+    assert res["resistance_strike"] == 1900.0
+    # Support should pick from strikes <= 1820 -> 1800 (3000 OI)
+    assert res["support_strike"] == 1800.0
+
+

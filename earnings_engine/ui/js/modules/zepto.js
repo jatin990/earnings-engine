@@ -34,10 +34,20 @@ const zeptoApp = {
 
         // Tab routing via hash
         const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-        if (['employees', 'attendance', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
+        if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
             this.activeTab = rawHash;
         }
         this.switchTab(this.activeTab, false);
+
+        // Listen for browser back/forward and anchor hash changes
+        window.addEventListener('hashchange', () => {
+            const newHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
+            if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(newHash)) {
+                if (this.activeTab !== newHash) {
+                    this.switchTab(newHash, false);
+                }
+            }
+        });
 
         // Check for oauth callback status in URL query or hash
         const urlParams = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
@@ -3727,12 +3737,27 @@ const zeptoApp = {
             SECURITY_ALERT: 0,
         };
 
+        const sums = {
+            gmv: 0,
+            loss: 0,
+            ipp: 0,
+            ippCount: 0,
+        };
+
         (emails || []).forEach(m => {
             const cat = m.category || 'OPERATIONAL';
             if (counts[cat] !== undefined) {
                 counts[cat]++;
             } else {
                 counts['OPERATIONAL']++;
+            }
+
+            const met = m.extracted_metrics || {};
+            if (met.sales_gmv && !isNaN(met.sales_gmv)) sums.gmv += Number(met.sales_gmv);
+            if (met.loss_amount && !isNaN(met.loss_amount)) sums.loss += Number(met.loss_amount);
+            if (met.packer_ipp && !isNaN(met.packer_ipp)) {
+                sums.ipp += Number(met.packer_ipp);
+                sums.ippCount++;
             }
         });
 
@@ -3742,6 +3767,178 @@ const zeptoApp = {
                 countEl.textContent = counts[cat];
             }
         });
+
+        // Set rich aggregate subtext on category cards
+        const subGmv = document.getElementById('gmailCatSub-STORE_METRICS');
+        if (subGmv) {
+            subGmv.textContent = sums.gmv > 0 ? `₹${Math.round(sums.gmv / 1000)}k GMV` : 'GMV & Orders';
+        }
+        const subLoss = document.getElementById('gmailCatSub-DQ_LOSS');
+        if (subLoss) {
+            subLoss.textContent = sums.loss > 0 ? `₹${sums.loss.toLocaleString('en-IN')} Loss` : 'Defects & Waste';
+        }
+        const subIpp = document.getElementById('gmailCatSub-MANPOWER_UTILIZATION');
+        if (subIpp) {
+            const avgIpp = sums.ippCount > 0 ? (sums.ipp / sums.ippCount).toFixed(0) : 0;
+            subIpp.textContent = avgIpp > 0 ? `Avg ${avgIpp} IPP` : 'Picker IPP';
+        }
+    },
+
+    computeGmailAggregates(emails) {
+        let totalGmv = 0;
+        let gmvCount = 0;
+        let totalOrders = 0;
+        let ordersCount = 0;
+        let totalAov = 0;
+        let aovCount = 0;
+        let totalSla = 0;
+        let slaCount = 0;
+        let totalIpp = 0;
+        let ippCount = 0;
+        let totalLoss = 0;
+        let lossCount = 0;
+        let totalAttachments = 0;
+        let totalParsedRecords = 0;
+        const categoriesSeen = new Set();
+
+        (emails || []).forEach(m => {
+            if (m.category) categoriesSeen.add(m.category);
+            if (m.attachments && Array.isArray(m.attachments)) {
+                totalAttachments += m.attachments.length;
+            }
+            totalParsedRecords += (m.parsed_records_count || 0);
+
+            const met = m.extracted_metrics || {};
+            if (met.sales_gmv && !isNaN(met.sales_gmv) && Number(met.sales_gmv) > 0) {
+                totalGmv += Number(met.sales_gmv);
+                gmvCount++;
+            }
+            if (met.order_count && !isNaN(met.order_count) && Number(met.order_count) > 0) {
+                totalOrders += Number(met.order_count);
+                ordersCount++;
+            }
+            if (met.aov && !isNaN(met.aov) && Number(met.aov) > 0) {
+                totalAov += Number(met.aov);
+                aovCount++;
+            }
+            if (met.sla_adherence_pct && !isNaN(met.sla_adherence_pct) && Number(met.sla_adherence_pct) > 0) {
+                totalSla += Number(met.sla_adherence_pct);
+                slaCount++;
+            }
+            if (met.packer_ipp && !isNaN(met.packer_ipp) && Number(met.packer_ipp) > 0) {
+                totalIpp += Number(met.packer_ipp);
+                ippCount++;
+            }
+            if (met.loss_amount && !isNaN(met.loss_amount) && Number(met.loss_amount) > 0) {
+                totalLoss += Number(met.loss_amount);
+                lossCount++;
+            }
+        });
+
+        const avgAov = aovCount > 0 ? (totalAov / aovCount) : (totalOrders > 0 ? Math.round(totalGmv / totalOrders) : 0);
+        const avgSla = slaCount > 0 ? (totalSla / slaCount) : 0;
+        const avgIpp = ippCount > 0 ? (totalIpp / ippCount) : 0;
+
+        return {
+            totalGmv,
+            gmvCount,
+            totalOrders,
+            ordersCount,
+            avgAov: Math.round(avgAov),
+            avgSla: Number(avgSla.toFixed(1)),
+            slaCount,
+            avgIpp: Number(avgIpp.toFixed(1)),
+            ippCount,
+            totalLoss,
+            lossCount,
+            totalAttachments,
+            totalParsedRecords,
+            categoriesCount: categoriesSeen.size,
+            emailCount: (emails || []).length,
+        };
+    },
+
+    updateGmailAggregatesDeck(agg, emails) {
+        const deck = document.getElementById('gmailAggregatesDeck');
+        if (!deck) return;
+
+        if (!emails || emails.length === 0) {
+            deck.style.display = 'none';
+            return;
+        }
+        deck.style.display = 'block';
+
+        const gmvEl = document.getElementById('gmailAggTotalGmv');
+        const gmvCountEl = document.getElementById('gmailAggGmvCount');
+        const ordersEl = document.getElementById('gmailAggTotalOrders');
+        const ordersCountEl = document.getElementById('gmailAggOrdersCount');
+        const aovEl = document.getElementById('gmailAggAvgAov');
+        const slaEl = document.getElementById('gmailAggAvgSla');
+        const ippEl = document.getElementById('gmailAggAvgIpp');
+        const lossEl = document.getElementById('gmailAggTotalLoss');
+        const lossCountEl = document.getElementById('gmailAggLossCount');
+        const emailsAnalyzedEl = document.getElementById('gmailAggEmailsAnalyzed');
+        const filterLabelEl = document.getElementById('gmailAggFilterLabel');
+
+        if (gmvEl) gmvEl.textContent = `₹${agg.totalGmv.toLocaleString('en-IN')}`;
+        if (gmvCountEl) gmvCountEl.textContent = `${agg.gmvCount} GMV Reports`;
+        if (ordersEl) ordersEl.textContent = agg.totalOrders.toLocaleString('en-IN');
+        if (ordersCountEl) ordersCountEl.textContent = `${agg.ordersCount} Dispatch Reports`;
+        if (aovEl) aovEl.textContent = `₹${agg.avgAov.toLocaleString('en-IN')}`;
+        if (slaEl) slaEl.textContent = `${agg.avgSla}%`;
+        if (ippEl) ippEl.textContent = agg.avgIpp;
+        if (lossEl) lossEl.textContent = `₹${agg.totalLoss.toLocaleString('en-IN')}`;
+        if (lossCountEl) lossCountEl.textContent = `${agg.lossCount} Loss Audits`;
+        if (emailsAnalyzedEl) emailsAnalyzedEl.textContent = `${agg.emailCount} Emails In View`;
+
+        if (filterLabelEl) {
+            const monthSel = document.getElementById('gmailMonthFilter');
+            const catSel = document.getElementById('gmailCategoryFilter');
+            const monthText = monthSel?.options[monthSel.selectedIndex]?.text || 'Current Month';
+            const catText = catSel?.options[catSel.selectedIndex]?.text || 'All Categories';
+            filterLabelEl.textContent = `${monthText} · ${catText}`;
+        }
+    },
+
+    updateGmailTableFooter(agg) {
+        const footCats = document.getElementById('gmailFootCats');
+        const footMsgCount = document.getElementById('gmailFootMsgCount');
+        const footMetrics = document.getElementById('gmailFootMetricsAggregates');
+        const footAttCount = document.getElementById('gmailFootAttCount');
+        const footParsedCount = document.getElementById('gmailFootParsedCount');
+
+        if (footCats) footCats.textContent = `${agg.categoriesCount} categories`;
+        if (footMsgCount) footMsgCount.textContent = `${agg.emailCount} emails total`;
+        if (footAttCount) footAttCount.textContent = `${agg.totalAttachments} files`;
+        if (footParsedCount) footParsedCount.textContent = `💾 ${agg.totalParsedRecords} synced`;
+
+        if (footMetrics) {
+            const pills = [];
+            if (agg.totalGmv > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold">₹${agg.totalGmv.toLocaleString('en-IN')} Total GMV</span>`);
+            }
+            if (agg.totalOrders > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono text-[10px] font-bold">${agg.totalOrders.toLocaleString('en-IN')} Orders</span>`);
+            }
+            if (agg.avgAov > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono text-[10px]">₹${agg.avgAov} Avg AOV</span>`);
+            }
+            if (agg.avgSla > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono text-[10px]">${agg.avgSla}% Avg SLA</span>`);
+            }
+            if (agg.avgIpp > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono text-[10px]">${agg.avgIpp} Avg IPP</span>`);
+            }
+            if (agg.totalLoss > 0) {
+                pills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono text-[10px] font-bold">₹${agg.totalLoss.toLocaleString('en-IN')} Total Loss</span>`);
+            }
+
+            if (pills.length > 0) {
+                footMetrics.innerHTML = `<div class="flex flex-wrap gap-1">${pills.join('')}</div>`;
+            } else {
+                footMetrics.innerHTML = `<span class="text-[10px] text-slate-500 font-mono">No metric values in active filter</span>`;
+            }
+        }
     },
 
     updateGmailHideCountBadge() {
@@ -3757,12 +3954,19 @@ const zeptoApp = {
         const emptyEl = document.getElementById('gmailEmailsEmpty');
         const tbody = document.getElementById('gmailEmailsTableBody');
         const badgeEl = document.getElementById('gmailFeedCountBadge');
+        const deck = document.getElementById('gmailAggregatesDeck');
 
         if (badgeEl) badgeEl.textContent = `${emails.length} of ${this.gmail.emails.length} Emails`;
+
+        // Calculate and update Key Metrics & Intelligence aggregates
+        const agg = this.computeGmailAggregates(emails);
+        this.updateGmailAggregatesDeck(agg, emails);
+        this.updateGmailTableFooter(agg);
 
         if (!emails || emails.length === 0) {
             if (tableContainer) tableContainer.style.display = 'none';
             if (emptyEl) emptyEl.style.display = 'block';
+            if (deck) deck.style.display = 'none';
             return;
         }
 
@@ -3810,15 +4014,27 @@ const zeptoApp = {
             const met = m.extracted_metrics || {};
             const metricPills = [];
             if (met.sales_gmv) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 font-mono text-[10px] font-bold">₹${met.sales_gmv.toLocaleString('en-IN')} GMV</span>`);
-            if (met.order_count) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono text-[10px]">${met.order_count} Orders</span>`);
+            if (met.order_count) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono text-[10px] font-semibold">${met.order_count} Orders</span>`);
             if (met.aov) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono text-[10px]">₹${met.aov} AOV</span>`);
             if (met.sla_adherence_pct) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono text-[10px]">${met.sla_adherence_pct}% SLA</span>`);
             if (met.packer_ipp) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 font-mono text-[10px]">${met.packer_ipp} IPP</span>`);
-            if (met.loss_amount) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono text-[10px]">₹${met.loss_amount} Loss</span>`);
+            if (met.loss_amount) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono text-[10px] font-bold">₹${met.loss_amount} Loss</span>`);
 
-            let metricsHtml = metricPills.length > 0
-                ? `<div class="flex flex-wrap gap-1 mb-1">${metricPills.join('')}</div>`
-                : '';
+            if (metricPills.length >= 2) {
+                metricPills.unshift('<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 text-slate-200 border border-white/20 font-mono text-[9px] font-extrabold uppercase tracking-wider">📊 Aggregate</span>');
+            } else if (metricPills.length === 0) {
+                if (m.category === 'ATTENDANCE') {
+                    metricPills.push('<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono text-[10px]">👥 Shift Muster Audit</span>');
+                } else if (m.category === 'MANPOWER_PLAN') {
+                    metricPills.push('<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/25 font-mono text-[10px]">📋 Headcount Plan</span>');
+                } else if (m.category === 'SECURITY_ALERT') {
+                    metricPills.push('<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-300 border border-slate-500/25 font-mono text-[10px]">🔒 Security Notice</span>');
+                } else {
+                    metricPills.push('<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400 border border-white/5 font-mono text-[10px]">📧 Operations Memo</span>');
+                }
+            }
+
+            let metricsHtml = `<div class="flex flex-wrap gap-1 mb-1">${metricPills.join('')}</div>`;
 
             // Attachments
             let attHtml = '—';
@@ -3871,7 +4087,6 @@ const zeptoApp = {
                     <!-- Key Metrics -->
                     <td class="p-2.5 align-top">
                         ${metricsHtml}
-                        ${metricPills.length === 0 ? '<span class="text-[10px] text-slate-500 font-mono">Informational Report</span>' : ''}
                     </td>
 
                     <!-- Attachments -->
@@ -4120,10 +4335,13 @@ const zeptoApp = {
             } else {
                 catTableBody.innerHTML = cats.map(c => {
                     const pct = c.pct_of_total || 0;
+                    const isOthers = c.category === 'OTHERS' || c.is_composite;
                     return `
-                        <tr class="hover:bg-white/[0.02] transition">
+                        <tr class="hover:bg-white/[0.02] transition ${isOthers ? 'bg-white/[0.015] border-t border-white/10 font-medium' : ''}">
                             <td class="py-2.5 px-3">
-                                <div class="font-bold text-white">${c.category.replace(/_/g, ' ')}</div>
+                                <div class="font-bold ${isOthers ? 'text-slate-300 flex items-center gap-1.5' : 'text-white'}">
+                                    ${isOthers ? '<span class="text-slate-400">📦</span> Others (Below Top 10)' : c.category.replace(/_/g, ' ')}
+                                </div>
                             </td>
                             <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">
                                 ${c.dq_loss_amount > 0 ? this.formatCurrency(c.dq_loss_amount) : '—'}
@@ -4148,13 +4366,15 @@ const zeptoApp = {
                             <td class="py-2.5 px-3 text-right font-mono text-slate-300">${(c.total_skus || 0).toLocaleString('en-IN')}</td>
                             <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(c.incident_count || 0).toLocaleString('en-IN')}</td>
                             <td class="py-2.5 px-3 text-center">
-                                <button
-                                    type="button"
-                                    onclick="zeptoApp.selectLossCategory('${c.category}')"
-                                    class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[10px] transition"
-                                >
-                                    Filter
-                                </button>
+                                ${!isOthers ? `
+                                    <button
+                                        type="button"
+                                        onclick="zeptoApp.selectLossCategory('${c.category}')"
+                                        class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[10px] transition"
+                                    >
+                                        Filter
+                                    </button>
+                                ` : '<span class="text-slate-600 text-[10px]">—</span>'}
                             </td>
                         </tr>
                     `;
@@ -4162,7 +4382,10 @@ const zeptoApp = {
             }
         }
 
-        // 5. Render Email Body vs Excel Reconciliation Ledger
+        // 5. Render Month-Wise and Day-Wise Trend Graphs
+        this.renderLossCharts(data);
+
+        // 6. Render Email Body vs Excel Reconciliation Ledger
         const reconTableBody = document.getElementById('lossReconciliationTableBody');
         const reconItems = recon.items || [];
 
@@ -4315,6 +4538,130 @@ const zeptoApp = {
         link.click();
         document.body.removeChild(link);
         this.showToast(`✅ Exported ${records.length} loss records to CSV`);
+    },
+
+    renderLossCharts(data) {
+        // 1. Month-Wise Loss Timeline Graph
+        const monthContainer = document.getElementById('lossMonthlyGraphContainer');
+        const monthBadge = document.getElementById('lossMonthlyGraphBadge');
+        const monthlyData = data.monthly_trends || [];
+
+        if (monthBadge) monthBadge.textContent = `${monthlyData.length} Month${monthlyData.length === 1 ? '' : 's'}`;
+
+        if (monthContainer) {
+            if (monthlyData.length === 0) {
+                monthContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No monthly historical loss data available.</div>';
+            } else {
+                const maxLoss = Math.max(...monthlyData.map(m => m.total_loss || 0), 100);
+                monthContainer.innerHTML = `
+                    <div class="w-full space-y-2.5 py-1">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-white/5">
+                            <span>Month & Composition</span>
+                            <span class="text-right">Total Net Loss</span>
+                        </div>
+                        <div class="space-y-2">
+                            ${monthlyData.map(m => {
+                                const tot = m.total_loss || 0;
+                                const dq = m.dq_loss || 0;
+                                const shrink = m.shrinkage || 0;
+                                const spoil = m.spoilage || 0;
+                                const widthPct = Math.max(4, Math.min(100, Math.round((tot / maxLoss) * 100)));
+                                const dqPct = tot > 0 ? (dq / tot) * 100 : 0;
+                                const shrinkPct = tot > 0 ? (shrink / tot) * 100 : 0;
+                                const spoilPct = tot > 0 ? (spoil / tot) * 100 : 0;
+
+                                return `
+                                    <div class="space-y-1">
+                                        <div class="flex items-center justify-between text-xs">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="font-mono font-bold text-white">${m.month_ym}</span>
+                                                <span class="text-[10px] text-slate-400 font-mono">(${m.item_count} items)</span>
+                                            </div>
+                                            <span class="font-mono font-black text-rose-400">${this.formatCurrency(tot)}</span>
+                                        </div>
+                                        <div class="w-full bg-white/5 h-2.5 rounded-full overflow-hidden flex" title="DQ: ${this.formatCurrency(dq)} | Shrinkage: ${this.formatCurrency(shrink)} | Spoilage: ${this.formatCurrency(spoil)}">
+                                            <div style="width: ${widthPct}%;" class="h-full flex rounded-full overflow-hidden">
+                                                <div style="width: ${dqPct}%;" class="h-full bg-amber-400" title="DQ Loss: ${this.formatCurrency(dq)}"></div>
+                                                <div style="width: ${shrinkPct}%;" class="h-full bg-purple-400" title="Shrinkage: ${this.formatCurrency(shrink)}"></div>
+                                                <div style="width: ${spoilPct}%;" class="h-full bg-emerald-400" title="Spoilage: ${this.formatCurrency(spoil)}"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div class="flex items-center justify-end gap-3 pt-2 text-[10px] font-mono text-slate-400 border-t border-white/5">
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> DQ Loss</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Shrinkage</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Spoilage</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // 2. Day-Wise Loss Timeline Graph
+        const dayContainer = document.getElementById('lossDailyGraphContainer');
+        const dayBadge = document.getElementById('lossDailyGraphBadge');
+        const dailyData = data.daily_trends || [];
+
+        if (dayBadge) dayBadge.textContent = `${dailyData.length} Day${dailyData.length === 1 ? '' : 's'}`;
+
+        if (dayContainer) {
+            if (dailyData.length === 0) {
+                dayContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No daily timeline records for the selected filters.</div>';
+            } else {
+                const maxDayLoss = Math.max(...dailyData.map(d => d.total_loss || 0), 50);
+                dayContainer.innerHTML = `
+                    <div class="w-full flex flex-col justify-between py-1">
+                        <div class="flex items-end gap-1.5 h-28 pt-2 px-1 border-b border-white/10 overflow-x-auto custom-scrollbar">
+                            ${dailyData.map(d => {
+                                const tot = d.total_loss || 0;
+                                const barHeight = Math.max(6, Math.min(100, Math.round((tot / maxDayLoss) * 100)));
+                                const dateLabel = d.date.slice(8); // e.g. "14" from "2026-09-14"
+                                const isPeak = tot === maxDayLoss && tot > 0;
+
+                                return `
+                                    <div class="flex-1 min-w-[20px] max-w-[36px] flex flex-col items-center justify-end h-full group relative cursor-pointer" title="${d.date}: ${this.formatCurrency(tot)} (${d.item_count} records)">
+                                        <!-- Hover Tooltip -->
+                                        <div class="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
+                                            <div class="px-2 py-1 bg-slate-900 border border-white/20 rounded shadow-xl text-[10px] whitespace-nowrap font-mono text-center">
+                                                <div class="font-bold text-white">${d.date}</div>
+                                                <div class="text-rose-400 font-extrabold">${this.formatCurrency(tot)}</div>
+                                                <div class="text-slate-400 text-[9px]">${d.item_count} incidents</div>
+                                            </div>
+                                            <div class="w-1.5 h-1.5 bg-slate-900 border-r border-b border-white/20 rotate-45 -mt-1"></div>
+                                        </div>
+
+                                        <!-- Bar Element -->
+                                        <div
+                                            style="height: ${barHeight}%;"
+                                            class="w-full rounded-t transition-all duration-300 group-hover:brightness-125 ${
+                                                tot === 0
+                                                    ? 'bg-slate-700/40'
+                                                    : isPeak
+                                                        ? 'bg-gradient-to-t from-rose-600 to-amber-400 animate-pulse'
+                                                        : 'bg-gradient-to-t from-rose-500/80 to-amber-400/80'
+                                            }"
+                                        ></div>
+
+                                        <!-- Date Label -->
+                                        <span class="text-[9px] font-mono text-slate-400 mt-1 group-hover:text-white transition">
+                                            ${dateLabel}
+                                        </span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1.5 px-1">
+                            <span>← ${dailyData[0]?.date || ''}</span>
+                            <span>Peak: ${this.formatCurrency(maxDayLoss)}</span>
+                            <span>${dailyData[dailyData.length - 1]?.date || ''} →</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
     },
 
     async handleScorecardFileUpload(e) {

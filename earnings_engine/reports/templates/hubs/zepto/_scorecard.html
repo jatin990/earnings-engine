@@ -21,15 +21,15 @@
                 type="date"
                 id="scorecardDateFilter"
                 onchange="zeptoApp.loadScorecard()"
-                class="bg-black/60 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-white/40 transition"
+                class="bg-black/60 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-white/40 transition"
             />
             <button
                 type="button"
                 onclick="document.getElementById('scorecardFileInput').click()"
-                class="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
                 title="Upload daily store performance Excel report (.xlsx)"
             >
-                <span>📤</span> Upload Report (.xlsx)
+                <span>📤</span> Upload (.xlsx)
             </button>
             <input
                 type="file"
@@ -41,7 +41,7 @@
             <button
                 type="button"
                 onclick="zeptoApp.loadScorecard()"
-                class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 border border-white/15 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
             >
                 <span>🔄</span> Refresh
             </button>
@@ -49,26 +49,26 @@
     </div>
 
     <!-- KPI Metric Cards Grid -->
-    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         <!-- Total GMV -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-start">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Total Store GMV</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="scorecardGmvBadge">₹ Sales</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Store GMV</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="scorecardGmvBadge">₹ Sales</span>
             </div>
             <div class="my-1.5">
-                <div class="text-2xl font-black font-mono text-emerald-300 tracking-tight" id="scorecardTotalGmv">₹--</div>
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="scorecardTotalGmv">₹--</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">Gross Merchandise Volume</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Average Order Value (AOV):</span>
-                <span class="font-mono font-bold text-emerald-300" id="scorecardAvgAov">₹--</span>
+                <span class="font-mono font-bold text-slate-300" id="scorecardAvgAov">₹--</span>
             </div>
         </div>
 
         <!-- Total Orders Dispatched -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400">Orders Dispatched</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Orders Dispatched</span>
             <div class="my-1.5">
                 <div class="text-2xl font-black font-mono text-white tracking-tight" id="scorecardTotalOrders">--</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">Fulfilled Deliveries</div>
@@ -82,41 +82,41 @@
         <!-- SLA Adherence -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-start">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">SLA Adherence</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono">10-Min SLA</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">SLA Adherence</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">10-Min SLA</span>
             </div>
             <div class="my-1.5">
-                <div class="text-2xl font-black font-mono text-purple-300 tracking-tight" id="scorecardAvgSla">--%</div>
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="scorecardAvgSla">--%</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">On-Time Outbound Dispatch</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Operational Health:</span>
-                <span class="font-mono font-bold text-emerald-300">EXCELLENT</span>
+                <span class="font-mono font-bold text-emerald-400">EXCELLENT</span>
             </div>
         </div>
 
         <!-- Packer IPP Productivity -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Packer IPP Throughput</span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Packer IPP Throughput</span>
             <div class="my-1.5">
-                <div class="text-2xl font-black font-mono text-amber-300 tracking-tight" id="scorecardAvgIpp">--</div>
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="scorecardAvgIpp">--</div>
                 <div class="text-[10px] text-slate-400 mt-0.5">Items Packed / Hour</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Target Throughput:</span>
-                <span class="font-mono font-bold text-amber-300">125+ IPP</span>
+                <span class="font-mono font-bold text-slate-300">125+ IPP</span>
             </div>
         </div>
     </section>
 
     <!-- Active Staff Operational Contribution & Performance Matrix -->
-    <section class="glass-panel p-4 space-y-3">
+    <section class="glass-panel p-3.5 space-y-2.5">
         <div class="flex items-center justify-between pb-2 border-b border-white/5">
             <div>
                 <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Operational Scorecard</h4>
                 <p class="text-[10px] text-slate-400">Shift fulfillment, 10-minute SLA reliability, and performance rating distribution across store staff.</p>
             </div>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/25 font-mono" id="scorecardActiveStaffBadge">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="scorecardActiveStaffBadge">
                 0 Active Staff
             </span>
         </div>

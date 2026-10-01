@@ -90,6 +90,10 @@ def test_zepto_hub_renders_gmail_tab(client):
     assert "Store Mailbox Intelligence & Reports Feed" in resp.text
     assert "gmailTableContainer" in resp.text
     assert "gmailEmailsTableBody" in resp.text
+    assert "gmailAggregatesDeck" in resp.text
+    assert "gmailAggTotalGmv" in resp.text
+    assert "gmailTableFooter" in resp.text
+    assert "gmailFootMetricsAggregates" in resp.text
 
 
 def test_classify_zepto_email_categories():
