@@ -124,6 +124,9 @@ SYNC_TABLES = [
     "zepto_gmail_auth",
     "zepto_attendance_imports",
     "zepto_attendance_records",
+    "zepto_store_metrics",
+    "zepto_loss_records",
+    "zepto_manpower_utilization",
 ]
 
 
@@ -193,6 +196,9 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "last_seen_date",
     "fetch_date",
     "period_end_date",
+    "metric_date",
+    "record_date",
+    "util_date",
     "date",
     "timestamp",
 ]
@@ -209,6 +215,9 @@ DATE_ONLY_COLUMNS = {
     "period_end_date",
     "cycle_start",
     "cycle_end",
+    "metric_date",
+    "record_date",
+    "util_date",
     "date",
 }
 

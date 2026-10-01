@@ -291,9 +291,58 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 FOREIGN KEY(import_id) REFERENCES zepto_attendance_imports(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_store_metrics (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                metric_date TEXT NOT NULL,
+                sales_gmv REAL DEFAULT 0.0,
+                order_count INTEGER DEFAULT 0,
+                aov REAL DEFAULT 0.0,
+                inbound_hours REAL DEFAULT 0.0,
+                outbound_hours REAL DEFAULT 0.0,
+                packer_ipp REAL DEFAULT 0.0,
+                sla_adherence_pct REAL DEFAULT 100.0,
+                raw_source TEXT DEFAULT 'MANUAL',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_loss_records (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                record_date TEXT NOT NULL,
+                loss_type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL DEFAULT 0.0,
+                sku_count INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_manpower_utilization (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                util_date TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                role TEXT,
+                items_picked INTEGER DEFAULT 0,
+                active_pick_hours REAL DEFAULT 0.0,
+                idle_hours REAL DEFAULT 0.0,
+                ipp REAL DEFAULT 0.0,
+                flex_labor_cost REAL DEFAULT 0.0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_zepto_att_store_date ON zepto_attendance_records(store_name, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_emp ON zepto_attendance_records(employee_id, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_status ON zepto_attendance_records(status);
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_met_store_date ON zepto_store_metrics(store_name, metric_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_loss_store_date ON zepto_loss_records(store_name, record_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_util_store_date ON zepto_manpower_utilization(store_name, util_date);
 
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
@@ -2554,4 +2603,364 @@ def delete_attendance_import(import_id: str, settings: Settings | None = None) -
         conn.execute("DELETE FROM zepto_attendance_records WHERE import_id = ?", (import_id,))
         conn.execute("DELETE FROM zepto_attendance_imports WHERE id = ?", (import_id,))
     return True
+
+
+# ---------------------------------------------------------------------------
+# Employee Attendance Detail (Slide Drawer DAL)
+# ---------------------------------------------------------------------------
+
+def get_employee_attendance_detail(
+    employee_id: str,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve 30-day comprehensive punch history, hours worked, and adherence scorecard for a single employee."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        records = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_records
+            WHERE employee_id = ? OR employee_name = ?
+            ORDER BY shift_date DESC
+            """,
+            (employee_id, employee_id),
+        ).fetchall()
+
+        if not records:
+            return None
+
+        records_list = [dict(r) for r in records]
+        first = records_list[0]
+
+        total_shifts = len(records_list)
+        present = sum(1 for r in records_list if r["status"] == "PRESENT")
+        absent = sum(1 for r in records_list if r["status"] == "ABSENT")
+        week_off = sum(1 for r in records_list if r["status"] == "WEEK_OFF")
+        half_day = sum(1 for r in records_list if r["status"] == "HALF_DAY")
+        holiday = sum(1 for r in records_list if r["status"] == "HOLIDAY")
+        total_work_mins = sum(r.get("work_duration_mins", 0) or 0 for r in records_list)
+        total_break_mins = sum(r.get("break_duration_mins", 0) or 0 for r in records_list)
+
+        denominator = present + absent + half_day
+        att_rate = round(((present + 0.5 * half_day) / denominator) * 100.0, 1) if denominator > 0 else 0.0
+
+        avg_shift_hours = round((total_work_mins / 60.0) / present, 1) if present > 0 else 0.0
+
+        risk_tier = "LOW"
+        if absent >= 4 or (denominator >= 5 and att_rate < 70.0):
+            risk_tier = "CRITICAL"
+        elif absent >= 2 or (denominator >= 5 and att_rate < 85.0):
+            risk_tier = "HIGH"
+        elif absent >= 1:
+            risk_tier = "MODERATE"
+
+        return {
+            "employee_id": first["employee_id"],
+            "employee_name": first["employee_name"],
+            "designation": first["designation"] or "Unassigned",
+            "store_name": first["store_name"],
+            "total_shifts": total_shifts,
+            "present_count": present,
+            "absent_count": absent,
+            "week_off_count": week_off,
+            "half_day_count": half_day,
+            "holiday_count": holiday,
+            "attendance_rate_pct": att_rate,
+            "total_hours_worked": round(total_work_mins / 60.0, 1),
+            "avg_shift_hours": avg_shift_hours,
+            "avg_break_mins": round(total_break_mins / present, 0) if present > 0 else 0,
+            "risk_tier": risk_tier,
+            "punch_history": records_list,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Store Metrics Scorecard DAL
+# ---------------------------------------------------------------------------
+
+def save_store_metrics(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist or replace a daily store metric record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("metric_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    rec_id = data.get("id") or f"met_{store}_{date_str}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_store_metrics (
+                id, store_name, metric_date, sales_gmv, order_count, aov,
+                inbound_hours, outbound_hours, packer_ipp, sla_adherence_pct,
+                raw_source, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                float(data.get("sales_gmv", 0.0)),
+                int(data.get("order_count", 0)),
+                float(data.get("aov", 0.0)),
+                float(data.get("inbound_hours", 0.0)),
+                float(data.get("outbound_hours", 0.0)),
+                float(data.get("packer_ipp", 0.0)),
+                float(data.get("sla_adherence_pct", 100.0)),
+                data.get("raw_source", "MANUAL"),
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "store_name": store, "metric_date": date_str}
+
+
+def get_store_metrics_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve aggregated store metrics, daily trends, and SLA performance."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+    if store_name:
+        where.append("store_name = ?")
+        params.append(store_name)
+    if start_date:
+        where.append("metric_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("metric_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_store_metrics
+            WHERE {where_sql}
+            ORDER BY metric_date DESC
+            """,
+            params,
+        ).fetchall()
+
+        items = [dict(r) for r in rows]
+        total_gmv = sum(i.get("sales_gmv", 0.0) for i in items)
+        total_orders = sum(i.get("order_count", 0) for i in items)
+        avg_aov = round(total_gmv / total_orders, 1) if total_orders > 0 else 0.0
+        avg_sla = round(sum(i.get("sla_adherence_pct", 100.0) for i in items) / len(items), 1) if items else 100.0
+        avg_ipp = round(sum(i.get("packer_ipp", 0.0) for i in items) / len(items), 1) if items else 0.0
+
+        return {
+            "total_gmv": round(total_gmv, 2),
+            "total_orders": total_orders,
+            "avg_aov": avg_aov,
+            "avg_sla_adherence_pct": avg_sla,
+            "avg_packer_ipp": avg_ipp,
+            "daily_metrics": items,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Loss, Expiry & Shrinkage DAL
+# ---------------------------------------------------------------------------
+
+def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist a dark store loss / shrinkage record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    rec_id = data.get("id") or f"loss_{uuid.uuid4().hex[:12]}"
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("record_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_loss_records (
+                id, store_name, record_date, loss_type, category, amount,
+                sku_count, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                data.get("loss_type", "DQ_LOSS").strip().upper(),
+                data.get("category", "GENERAL").strip().upper(),
+                float(data.get("amount", 0.0)),
+                int(data.get("sku_count", 0)),
+                data.get("notes", ""),
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "amount": data.get("amount", 0.0)}
+
+
+def get_loss_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve total store loss, category-wise breakdown, and shrinkage log."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+    if store_name:
+        where.append("store_name = ?")
+        params.append(store_name)
+    if start_date:
+        where.append("record_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("record_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_loss_records
+            WHERE {where_sql}
+            ORDER BY record_date DESC, created_at DESC
+            """,
+            params,
+        ).fetchall()
+
+        items = [dict(r) for r in rows]
+        total_loss = sum(i.get("amount", 0.0) for i in items)
+        dq_total = sum(i.get("amount", 0.0) for i in items if i.get("loss_type") == "DQ_LOSS")
+        shrinkage_total = sum(i.get("amount", 0.0) for i in items if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"))
+
+        # Category breakdown
+        cat_map: dict[str, dict[str, Any]] = {}
+        for it in items:
+            cat = it.get("category") or "GENERAL"
+            if cat not in cat_map:
+                cat_map[cat] = {"category": cat, "amount": 0.0, "count": 0}
+            cat_map[cat]["amount"] += it.get("amount", 0.0)
+            cat_map[cat]["count"] += 1
+
+        cat_list = sorted(cat_map.values(), key=lambda x: x["amount"], reverse=True)
+
+        return {
+            "total_loss_amount": round(total_loss, 2),
+            "dq_loss_total": round(dq_total, 2),
+            "shrinkage_total": round(shrinkage_total, 2),
+            "category_breakdown": cat_list,
+            "records": items,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Manpower Utilization & IPP DAL
+# ---------------------------------------------------------------------------
+
+def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist worker utilization and items-picked-per-hour metrics."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    rec_id = data.get("id") or f"util_{uuid.uuid4().hex[:12]}"
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("util_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    items_picked = int(data.get("items_picked", 0))
+    active_hours = float(data.get("active_pick_hours", 0.0))
+    ipp = float(data.get("ipp", round(items_picked / active_hours, 1) if active_hours > 0 else 0.0))
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_manpower_utilization (
+                id, store_name, util_date, employee_id, employee_name, role,
+                items_picked, active_pick_hours, idle_hours, ipp,
+                flex_labor_cost, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                data.get("employee_id", "").strip(),
+                data.get("employee_name", "").strip(),
+                data.get("role", "Picker").strip(),
+                items_picked,
+                active_hours,
+                float(data.get("idle_hours", 0.0)),
+                ipp,
+                float(data.get("flex_labor_cost", 0.0)),
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "ipp": ipp}
+
+
+def get_manpower_utilization_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve aggregated picker IPP, labor utilization, and efficiency metrics."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+    if store_name:
+        where.append("store_name = ?")
+        params.append(store_name)
+    if start_date:
+        where.append("util_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("util_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_manpower_utilization
+            WHERE {where_sql}
+            ORDER BY util_date DESC, ipp DESC
+            """,
+            params,
+        ).fetchall()
+
+        items = [dict(r) for r in rows]
+        total_items = sum(i.get("items_picked", 0) for i in items)
+        total_active_hours = sum(i.get("active_pick_hours", 0.0) for i in items)
+        total_idle_hours = sum(i.get("idle_hours", 0.0) for i in items)
+        total_flex_cost = sum(i.get("flex_labor_cost", 0.0) for i in items)
+        avg_ipp = round(total_items / total_active_hours, 1) if total_active_hours > 0 else 0.0
+
+        return {
+            "total_items_picked": total_items,
+            "total_active_hours": round(total_active_hours, 1),
+            "total_idle_hours": round(total_idle_hours, 1),
+            "avg_ipp": avg_ipp,
+            "total_flex_cost": round(total_flex_cost, 2),
+            "records": items,
+        }
+
 
