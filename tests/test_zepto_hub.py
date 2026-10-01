@@ -592,3 +592,123 @@ def test_store_income_and_customizable_partner_split(client):
     zepto_db.delete_store_income(inc1["id"], settings)
     zepto_db.delete_store_income(inc2["id"], settings)
 
+
+def test_zepto_drawer_and_operations_endpoints(client):
+    settings = Settings()
+    # 1. Seed attendance record for employee
+    mock_batch = {
+        "store_name": "JMU-Sainik Colony",
+        "file_name": "drawer_test.xlsx",
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-01",
+        "total_records": 1,
+        "total_employees": 1,
+        "records": [
+            {
+                "employee_id": "EMP_API_TEST",
+                "employee_name": "Simran Kaur",
+                "designation": "FR_Packer",
+                "shift_date": "2026-09-01",
+                "shift_name": "Morning",
+                "shift_time": "06:00 - 15:00",
+                "punch_in": "06:02:00",
+                "punch_out": "15:01:00",
+                "work_duration_mins": 539,
+                "break_duration_mins": 35,
+                "raw_status": "P",
+                "status": "PRESENT",
+            }
+        ],
+        "summary": {"present_count": 1, "absent_count": 0, "attendance_rate_pct": 100.0},
+    }
+    saved_batch = zepto_db.save_attendance_batch(mock_batch, source="TEST", settings=settings)
+
+    # Test Employee Attendance Drawer API
+    emp_drawer_resp = client.get("/api/v1/zepto/attendance/employee/EMP_API_TEST")
+    assert emp_drawer_resp.status_code == 200
+    drawer_json = emp_drawer_resp.json()
+    assert drawer_json["success"] is True
+    assert drawer_json["detail"]["employee_name"] == "Simran Kaur"
+    assert drawer_json["detail"]["total_shifts"] == 1
+    assert len(drawer_json["detail"]["punch_history"]) == 1
+
+    # Test 404 for nonexistent employee
+    emp_404_resp = client.get("/api/v1/zepto/attendance/employee/NON_EXISTENT_EMP_999")
+    assert emp_404_resp.status_code == 404
+
+    # 2. Store Metrics API
+    m_post = client.post(
+        "/api/v1/zepto/metrics",
+        json={
+            "store_name": "JMU-Sainik Colony",
+            "metric_date": "2026-09-29",
+            "sales_gmv": 412000.0,
+            "order_count": 950,
+            "aov": 433.7,
+            "inbound_hours": 20.0,
+            "outbound_hours": 45.0,
+            "packer_ipp": 140.0,
+            "sla_adherence_pct": 99.1,
+        },
+    )
+    assert m_post.status_code == 200
+    assert m_post.json()["success"] is True
+
+    m_get = client.get("/api/v1/zepto/metrics/summary?store_name=JMU-Sainik Colony")
+    assert m_get.status_code == 200
+    m_json = m_get.json()
+    assert m_json["success"] is True
+    assert m_json["total_gmv"] >= 412000.0
+    assert m_json["total_orders"] >= 950
+
+    # 3. Loss & Shrinkage API
+    l_post = client.post(
+        "/api/v1/zepto/loss",
+        json={
+            "store_name": "JMU-Sainik Colony",
+            "record_date": "2026-09-29",
+            "loss_type": "DQ_LOSS",
+            "category": "DAIRY",
+            "amount": 890.0,
+            "sku_count": 8,
+            "notes": "Milk crate leakage",
+        },
+    )
+    assert l_post.status_code == 200
+    assert l_post.json()["success"] is True
+
+    l_get = client.get("/api/v1/zepto/loss/summary?store_name=JMU-Sainik Colony")
+    assert l_get.status_code == 200
+    l_json = l_get.json()
+    assert l_json["success"] is True
+    assert l_json["total_loss_amount"] >= 890.0
+
+    # 4. Manpower Utilization API
+    u_post = client.post(
+        "/api/v1/zepto/utilization",
+        json={
+            "store_name": "JMU-Sainik Colony",
+            "util_date": "2026-09-29",
+            "employee_id": "EMP_API_TEST",
+            "employee_name": "Simran Kaur",
+            "role": "FR_Packer",
+            "items_picked": 720,
+            "active_pick_hours": 7.0,
+            "idle_hours": 0.8,
+            "ipp": 102.8,
+            "flex_labor_cost": 1350.0,
+        },
+    )
+    assert u_post.status_code == 200
+    assert u_post.json()["success"] is True
+
+    u_get = client.get("/api/v1/zepto/utilization/summary?store_name=JMU-Sainik Colony")
+    assert u_get.status_code == 200
+    u_json = u_get.json()
+    assert u_json["success"] is True
+    assert u_json["total_items_picked"] >= 720
+
+    # Cleanup
+    zepto_db.delete_attendance_import(saved_batch["import_id"], settings=settings)
+
+

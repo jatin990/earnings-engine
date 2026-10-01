@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Body, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from earnings_engine.config import Settings
@@ -1205,5 +1205,118 @@ async def sync_attendance_from_gmail_endpoint() -> dict[str, Any]:
     except Exception as exc:
         logger.error("[GMAIL-ATTENDANCE] Sync exception: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Gmail sync failed: {str(exc)}")
+
+
+# ---------------------------------------------------------------------------
+# Employee Drilldown, Store Metrics, Loss & Utilization Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/zepto/attendance/employee/{employee_id}", summary="Get Employee Attendance Detail & 30-Day Punch History")
+async def get_employee_attendance_detail_endpoint(employee_id: str) -> dict[str, Any]:
+    """Retrieve individual employee profile, metrics, risk tier, and 30-day punch ledger for slide-out drawer."""
+    try:
+        detail = zepto_db.get_employee_attendance_detail(employee_id, settings=_settings)
+        if not detail:
+            raise HTTPException(status_code=404, detail=f"Employee '{employee_id}' not found.")
+        return {"success": True, "detail": detail}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ZEPTO-ATTENDANCE] Error fetching employee detail %s: %s", employee_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/metrics/summary", summary="Get Daily Dark Store Scorecard Metrics")
+async def get_store_metrics_summary_endpoint(
+    store_name: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+) -> dict[str, Any]:
+    """Retrieve daily sales GMV, orders, AOV, IPP, and SLA adherence trends."""
+    try:
+        summary = zepto_db.get_store_metrics_summary(
+            store_name=store_name,
+            start_date=start_date,
+            end_date=end_date,
+            settings=_settings,
+        )
+        return {"success": True, **summary}
+    except Exception as exc:
+        logger.error("[ZEPTO-METRICS] Error fetching store metrics summary: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/api/v1/zepto/metrics", summary="Save Dark Store Daily Metric Record")
+async def create_store_metrics_endpoint(record: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    """Insert or update a store performance scorecard row."""
+    try:
+        saved = zepto_db.save_store_metrics(record, settings=_settings)
+        return {"success": True, **saved}
+    except Exception as exc:
+        logger.error("[ZEPTO-METRICS] Error saving store metric: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/loss/summary", summary="Get DQ Loss, Shrinkage & Waste Breakdown")
+async def get_loss_summary_endpoint(
+    store_name: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+) -> dict[str, Any]:
+    """Retrieve aggregated quality loss, shrinkage, and damage categorization."""
+    try:
+        summary = zepto_db.get_loss_summary(
+            store_name=store_name,
+            start_date=start_date,
+            end_date=end_date,
+            settings=_settings,
+        )
+        return {"success": True, **summary}
+    except Exception as exc:
+        logger.error("[ZEPTO-LOSS] Error fetching loss summary: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/api/v1/zepto/loss", summary="Record Damage, DQ Loss or Shrinkage")
+async def create_loss_record_endpoint(record: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    """Insert a new loss or shrinkage record."""
+    try:
+        saved = zepto_db.save_loss_record(record, settings=_settings)
+        return {"success": True, **saved}
+    except Exception as exc:
+        logger.error("[ZEPTO-LOSS] Error saving loss record: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/v1/zepto/utilization/summary", summary="Get Manpower Utilization & IPP Summary")
+async def get_manpower_utilization_summary_endpoint(
+    store_name: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+) -> dict[str, Any]:
+    """Retrieve items picked, active picker hours, idle hours, and average IPP."""
+    try:
+        summary = zepto_db.get_manpower_utilization_summary(
+            store_name=store_name,
+            start_date=start_date,
+            end_date=end_date,
+            settings=_settings,
+        )
+        return {"success": True, **summary}
+    except Exception as exc:
+        logger.error("[ZEPTO-UTILIZATION] Error fetching manpower utilization summary: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/api/v1/zepto/utilization", summary="Save Manpower Utilization Record")
+async def create_manpower_utilization_endpoint(record: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    """Insert a new daily manpower utilization and picking productivity record."""
+    try:
+        saved = zepto_db.save_manpower_utilization(record, settings=_settings)
+        return {"success": True, **saved}
+    except Exception as exc:
+        logger.error("[ZEPTO-UTILIZATION] Error saving manpower utilization record: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
 
 
