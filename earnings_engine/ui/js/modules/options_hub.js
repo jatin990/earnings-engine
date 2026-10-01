@@ -34,6 +34,7 @@
     app._chartPriceLines = [];
     app._smartChartData = null;
     app._optionsPollTimer = null;
+    app._hasInitialChartFitted = false;
 
     /**
      * Switch active symbol and refresh both option chain & chart intelligence
@@ -43,6 +44,7 @@
         const clean = symbol.trim().toUpperCase().replace('.NS', '');
         app._optionsSymbol = clean;
         app._optionsExpiry = ''; // Reset expiry to default to nearest active
+        app._hasInitialChartFitted = false;
 
         // Update active class on quick pills
         document.querySelectorAll('.option-sym-pill').forEach(pill => {
@@ -53,7 +55,7 @@
         if (input) input.value = clean;
 
         app.loadOptionChain(false);
-        app.loadOptionsChartIntelligence(false);
+        app.loadOptionsChartIntelligence(false, false);
     };
 
     /**
@@ -78,6 +80,7 @@
     app.setOptionTimeframe = function (tf) {
         if (!tf) return;
         app._optionsTimeframe = tf;
+        app._hasInitialChartFitted = false;
 
         document.querySelectorAll('.opt-tf-btn').forEach(btn => {
             const isActive = btn.getAttribute('data-tf') === tf;
@@ -86,7 +89,7 @@
             btn.style.color = isActive ? '#000000' : '#94a3b8';
         });
 
-        app.loadOptionsChartIntelligence(false);
+        app.loadOptionsChartIntelligence(false, false);
     };
 
     /**
@@ -112,7 +115,7 @@
         }
 
         if (app._smartChartData) {
-            app.renderSmartChart(app._smartChartData);
+            app.renderSmartChart(app._smartChartData, true);
         }
     };
 
@@ -140,11 +143,21 @@
         const resizeChart = () => {
             const container = document.getElementById('optionsSmartChartCanvas');
             if (container && app._smartChart) {
+                let range = null;
+                try {
+                    range = app._smartChart.timeScale().getVisibleLogicalRange();
+                } catch (e) {}
+
                 app._smartChart.applyOptions({
                     width: container.clientWidth || 800,
                     height: container.clientHeight || 460,
                 });
-                app._smartChart.timeScale().fitContent();
+
+                if (range) {
+                    try {
+                        app._smartChart.timeScale().setVisibleLogicalRange(range);
+                    } catch (e) {}
+                }
             }
         };
 
@@ -357,12 +370,15 @@
     /**
      * Load full candlestick & quant intelligence from backend API
      */
-    app.loadOptionsChartIntelligence = async function (forceRefresh = false) {
+    app.loadOptionsChartIntelligence = async function (forceRefresh = false, isBackground = false) {
         const symbol = app._optionsSymbol || 'NIFTY';
         const tf = app._optionsTimeframe || '5m';
         const loadingEl = document.getElementById('optionsSmartChartLoading');
+        const dot = document.getElementById('optLivePulseDot');
 
-        if (loadingEl) loadingEl.style.display = 'flex';
+        if (loadingEl && !isBackground) {
+            loadingEl.style.display = 'flex';
+        }
 
         try {
             const url = `/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(symbol)}&interval=${tf}&force_refresh=${forceRefresh}`;
@@ -372,25 +388,40 @@
             const data = await res.json();
             app._smartChartData = data;
 
-            // Render chart & Tactical HUD
-            app.renderSmartChart(data);
+            // Render chart (preserving user zoom / pan if background update) & Tactical HUD
+            app.renderSmartChart(data, isBackground);
             app.updateTacticalHUD(data);
+
+            if (isBackground && dot) {
+                dot.style.transform = 'scale(1.4)';
+                setTimeout(() => { if (dot) dot.style.transform = 'scale(1)'; }, 350);
+            }
 
         } catch (err) {
             console.error('Failed to load chart intelligence:', err);
         } finally {
-            if (loadingEl) loadingEl.style.display = 'none';
+            if (loadingEl && !isBackground) {
+                loadingEl.style.display = 'none';
+            }
         }
     };
 
     /**
      * Render Candlesticks, Indicators, Order Blocks & Structural Lines on Lightweight Chart
      */
-    app.renderSmartChart = function (data) {
+    app.renderSmartChart = function (data, isBackground = false) {
         if (!app._smartChart) {
             app.initOptionsSmartChart();
         }
         if (!app._smartChart || !app._candleSeries) return;
+
+        // Capture user's current zoom / pan viewport range to prevent resets on auto-refresh
+        let prevLogicalRange = null;
+        try {
+            if (app._hasInitialChartFitted) {
+                prevLogicalRange = app._smartChart.timeScale().getVisibleLogicalRange();
+            }
+        } catch (e) {}
 
         const candles = data.candles || [];
         if (candles.length === 0) {
@@ -560,8 +591,17 @@
             });
         }
 
-        // Fit Content
-        app._smartChart.timeScale().fitContent();
+        // Restore viewport zoom & scroll position if already fitted; else fit initial
+        if (app._hasInitialChartFitted && prevLogicalRange && isBackground) {
+            try {
+                app._smartChart.timeScale().setVisibleLogicalRange(prevLogicalRange);
+            } catch (e) {
+                app._smartChart.timeScale().fitContent();
+            }
+        } else if (!app._hasInitialChartFitted) {
+            app._smartChart.timeScale().fitContent();
+            app._hasInitialChartFitted = true;
+        }
     };
 
     /**
@@ -1064,7 +1104,7 @@
         app._optionsPollTimer = setInterval(() => {
             const tab = document.getElementById('tab-options');
             if (tab && !tab.classList.contains('hidden') && tab.style.display !== 'none') {
-                app.loadOptionsChartIntelligence(false);
+                app.loadOptionsChartIntelligence(false, true);
             }
         }, 15000);
     }
