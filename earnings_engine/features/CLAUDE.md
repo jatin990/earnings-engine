@@ -42,8 +42,8 @@ The features subsystem calculates technical, momentum, volatility, and fundament
 
 ## 3. Targeted Testing
 
-```powershell
+```bash
 # Run feature calculations and PIT compliance tests
-.\.venv\Scripts\python.exe -m pytest tests/test_features.py -v
-.\.venv\Scripts\python.exe -m pytest tests/test_labels.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_features.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_labels.py -v
 ```

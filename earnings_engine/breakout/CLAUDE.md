@@ -35,8 +35,8 @@ The breakout subsystem detects and monitors high-probability price and volume br
 
 ## 3. Targeted Testing
 
-```powershell
+```bash
 # Run breakout radar tests
-.\.venv\Scripts\python.exe -m pytest tests/test_breakout.py -v
-.\.venv\Scripts\python.exe -m pytest tests/test_breakout_radar.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_breakout.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_breakout_radar.py -v
 ```

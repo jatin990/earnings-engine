@@ -45,8 +45,8 @@ The API subsystem exposes REST endpoints for the quantitative equity research pl
 
 ## 3. Targeted Testing
 
-```powershell
+```bash
 # Run API router unit tests
-.\.venv\Scripts\python.exe -m pytest tests/test_api.py -v
-.\.venv\Scripts\python.exe -m pytest tests/ -k "router or api"
+./.venv/Scripts/python.exe -m pytest tests/test_api.py -v
+./.venv/Scripts/python.exe -m pytest tests/ -k "router or api"
 ```

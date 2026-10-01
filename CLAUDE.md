@@ -27,9 +27,9 @@
 
 ### 2.2 Error Ledger & Self-Healing Protocol
 Maintain zero-error hygiene using `scripts/error_ledger.py`:
-1. **Pre-Task Check**: `python scripts/error_ledger.py open`
-2. **Post-Task Verification**: `python scripts/error_ledger.py scan` (verify no new exceptions introduced).
-3. **Resolution Logging**: `python scripts/error_ledger.py resolve <error_id> "<resolution details>"`
+1. **Pre-Task Check**: `./.venv/Scripts/python.exe scripts/error_ledger.py open` (always use forward slashes `./.venv/Scripts/python.exe` to prevent Git Bash `..venvScriptspython.exe` errors)
+2. **Post-Task Verification**: `./.venv/Scripts/python.exe scripts/error_ledger.py scan` (verify no new exceptions introduced).
+3. **Resolution Logging**: `./.venv/Scripts/python.exe scripts/error_ledger.py resolve <error_id> "<resolution details>"`
 
 ### 2.3 Strict Point-in-Time (PIT) Guarantee
 - **Never leak future information**: In `features/`, `dataset.py`, and `backtest/`, feature computation for an event date $T$ must strictly filter price bars up to $T-1$ (`prices.loc[prices.index <= asof_date]`).
@@ -69,7 +69,7 @@ The system operates on local SQLite (`data/cache/prices/prices.sqlite3` or `earn
 - Use `market_of(ticker)` from `earnings_engine.config` to resolve market type (`"IN"` vs `"US"`).
 
 ### 2.10 Agent Performance & Workflow Efficiency
-- **Targeted Test Execution**: Run targeted tests during development (`.\.venv\Scripts\python.exe -m pytest tests/<test_file>.py -k "<test_func>"`). Never run full-suite or slow E2E tests (`test_stock_detail_e2e.py`) during iterative tasks.
+- **Targeted Test Execution**: Run targeted tests during development (`./.venv/Scripts/python.exe -m pytest tests/<test_file>.py -k "<test_func>"`). Never run full-suite or slow E2E tests (`test_stock_detail_e2e.py`) during iterative tasks. Always use forward slashes (`./.venv/Scripts/python.exe`) rather than unquoted backslashes to avoid Git Bash escaping failures (`Exit code 127: ..venvScriptspython.exe`).
 - **Batch Tool Calls**: Concurrently issue multiple independent `Read`, `Grep`, or `Glob` calls in a single response turn.
 - **Context Hygiene**: Bound tool outputs with `head_limit`, specific `grep` patterns, and line offsets. Avoid dumping large payloads or raw logs.
 - **Memory Persistence**: Persist modified database schemas, table column orders, and API contracts to `.claude/projects/.../memory/` so they survive context compaction.

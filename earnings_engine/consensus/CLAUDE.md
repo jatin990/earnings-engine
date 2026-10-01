@@ -34,8 +34,8 @@ The consensus subsystem orchestrates multi-model quantitative equity deliberatio
 
 ## 3. Targeted Testing
 
-```powershell
+```bash
 # Run consensus aggregator and runner tests
-.\.venv\Scripts\python.exe -m pytest tests/test_consensus.py -v
-.\.venv\Scripts\python.exe -m pytest tests/ -k "consensus or model_runner"
+./.venv/Scripts/python.exe -m pytest tests/test_consensus.py -v
+./.venv/Scripts/python.exe -m pytest tests/ -k "consensus or model_runner"
 ```
