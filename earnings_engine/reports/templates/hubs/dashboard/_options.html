@@ -128,7 +128,30 @@
     </div>
 
     <!-- 4. Advanced Institutional Smart Chart & Tactical Order Block Engine -->
-    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:14px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 8px 30px rgba(0,0,0,0.35);">
+    <style>
+        .opt-chart-fullscreen-mode {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 999999 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            padding: 1rem 1.5rem !important;
+            background: #07080b !important;
+            overflow-y: auto !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .opt-chart-fullscreen-mode #optionsSmartChartWrapper {
+            flex: 1 1 auto !important;
+            min-height: calc(100vh - 310px) !important;
+            height: auto !important;
+        }
+    </style>
+    <div id="optionsSmartChartCard" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:14px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 8px 30px rgba(0,0,0,0.35);">
         <!-- Chart Header & Action Controls Bar -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
             <div>
@@ -178,6 +201,12 @@
                     </button>
                 </div>
 
+                <!-- Fullscreen Toggle Button -->
+                <button class="btn btn-sm" id="optFullscreenBtn" onclick="app.toggleOptionChartFullscreen()" style="padding:0.25rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#e2e8f0;font-weight:700;display:flex;align-items:center;gap:0.35rem;cursor:pointer;" title="Toggle Fullscreen Mode (or press Esc to exit)">
+                    <span id="optFullscreenIcon" style="font-size:0.85rem;">⛶</span>
+                    <span id="optFullscreenText" style="font-size:0.75rem;">Full Screen</span>
+                </button>
+
                 <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.25rem;font-family:var(--font-mono);margin-left:0.25rem;">
                     <span id="optLivePulseDot" style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 6px #10b981;"></span>
                     <span id="optAutoRefreshText">Auto: 15s</span>
@@ -186,7 +215,7 @@
         </div>
 
         <!-- High-Resolution Interactive Lightweight Charts Canvas -->
-        <div style="position:relative;width:100%;height:460px;background:#090a0f;border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
+        <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:460px;background:#090a0f;border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
             <div id="optionsSmartChartCanvas" style="width:100%;height:100%;"></div>
             <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(9,10,15,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">

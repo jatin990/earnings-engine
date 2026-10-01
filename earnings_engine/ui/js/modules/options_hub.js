@@ -117,6 +117,54 @@
     };
 
     /**
+     * Toggle Fullscreen Mode for the Tactical Smart Chart & HUD Deck
+     */
+    app.toggleOptionChartFullscreen = function () {
+        const card = document.getElementById('optionsSmartChartCard');
+        const btnText = document.getElementById('optFullscreenText');
+        const btnIcon = document.getElementById('optFullscreenIcon');
+        const btn = document.getElementById('optFullscreenBtn');
+        if (!card) return;
+
+        const isFullscreen = card.classList.toggle('opt-chart-fullscreen-mode');
+        document.body.style.overflow = isFullscreen ? 'hidden' : '';
+
+        if (btnText) btnText.textContent = isFullscreen ? 'Exit Full Screen' : 'Full Screen';
+        if (btnIcon) btnIcon.textContent = isFullscreen ? '✕' : '⛶';
+        if (btn) {
+            btn.style.background = isFullscreen ? '#ef4444' : 'rgba(255,255,255,0.06)';
+            btn.style.color = isFullscreen ? '#ffffff' : '#e2e8f0';
+            btn.style.borderColor = isFullscreen ? '#ef4444' : 'rgba(255,255,255,0.15)';
+        }
+
+        const resizeChart = () => {
+            const container = document.getElementById('optionsSmartChartCanvas');
+            if (container && app._smartChart) {
+                app._smartChart.applyOptions({
+                    width: container.clientWidth || 800,
+                    height: container.clientHeight || 460,
+                });
+                app._smartChart.timeScale().fitContent();
+            }
+        };
+
+        // Resize immediately and after CSS transition completes
+        resizeChart();
+        setTimeout(resizeChart, 100);
+        setTimeout(resizeChart, 300);
+    };
+
+    // Global listener for Escape key to exit fullscreen
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            const card = document.getElementById('optionsSmartChartCard');
+            if (card && card.classList.contains('opt-chart-fullscreen-mode')) {
+                app.toggleOptionChartFullscreen();
+            }
+        }
+    });
+
+    /**
      * Load Option Chain and calculate key metrics
      */
     app.loadOptionChain = async function (forceRefresh = false) {
