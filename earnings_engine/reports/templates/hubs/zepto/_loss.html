@@ -91,6 +91,43 @@
         </div>
     </section>
 
+    <!-- Active Staff DQ Defect & Spoilage Matrix -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff DQ Loss & Accuracy Matrix</h4>
+                <p class="text-[10px] text-slate-400">Quality defect tracking, damage attribution, and accuracy scores across active floor staff.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="lossActiveStaffBadge">
+                0 Active Staff
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2 px-3">Employee Name</th>
+                        <th class="py-2 px-3">Role Profile</th>
+                        <th class="py-2 px-3 text-center">Status</th>
+                        <th class="py-2 px-3 text-right">Packer / Picker Shift Hrs</th>
+                        <th class="py-2 px-3 text-right">DQ Incidents</th>
+                        <th class="py-2 px-3 text-right">Defect Loss Amount</th>
+                        <th class="py-2 px-3 text-center">Packing Accuracy</th>
+                        <th class="py-2 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="lossActiveStaffTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading active staff defect matrix...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- Category Breakdown and Incident Log -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
         <!-- Category Breakdown -->

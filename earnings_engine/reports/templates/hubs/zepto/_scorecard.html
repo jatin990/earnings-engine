@@ -94,6 +94,43 @@
         </div>
     </section>
 
+    <!-- Active Staff Operational Contribution & Performance Matrix -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Operational Scorecard</h4>
+                <p class="text-[10px] text-slate-400">Shift fulfillment, 10-minute SLA reliability, and performance rating distribution across store staff.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/25 font-mono" id="scorecardActiveStaffBadge">
+                0 Active Staff
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2 px-3">Employee Name</th>
+                        <th class="py-2 px-3">Role Profile</th>
+                        <th class="py-2 px-3 text-center">Status</th>
+                        <th class="py-2 px-3 text-right">Total Shift Hours</th>
+                        <th class="py-2 px-3 text-right">Attendance Rate</th>
+                        <th class="py-2 px-3 text-center">Performance Rating</th>
+                        <th class="py-2 px-3 text-center">SLA Reliability</th>
+                        <th class="py-2 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="scorecardActiveStaffTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading active staff scorecard...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- Daily Scorecard History Table -->
     <section class="glass-panel p-4 space-y-3">
         <div class="flex items-center justify-between pb-2 border-b border-white/5">

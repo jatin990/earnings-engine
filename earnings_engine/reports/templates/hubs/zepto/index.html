@@ -85,25 +85,27 @@
 
         .nav-tab {
             position: relative;
-            padding: 0.5rem 1.1rem;
+            padding: 0.6rem 0.9rem;
             font-size: 0.78rem;
             font-weight: 700;
             color: #94a3b8;
-            border-radius: 0.45rem;
+            border-radius: 0.5rem;
             transition: all 0.15s ease;
             cursor: pointer;
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 0.45rem;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            background: rgba(255, 255, 255, 0.02);
-            white-space: nowrap;
+            gap: 0.6rem;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            background: rgba(255, 255, 255, 0.015);
+            width: 100%;
+            text-align: left;
         }
 
         .nav-tab:hover {
             color: #ffffff;
-            background: rgba(255, 255, 255, 0.06);
-            border-color: rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateX(2px);
         }
 
         .nav-tab.active {
@@ -111,7 +113,11 @@
             background: #ffffff !important;
             font-weight: 800;
             border-color: #ffffff !important;
-            box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(255, 255, 255, 0.18);
+        }
+
+        .nav-tab.active span.nav-icon {
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
         }
 
         .btn-zepto,
@@ -310,90 +316,167 @@
         </section>
 
 
-        <!-- ================= TAB NAVIGATION BAR ================= -->
-        <nav class="flex items-center gap-1.5 border-b border-white/10 pb-1.5 overflow-x-auto custom-scrollbar">
-            <button type="button" class="nav-tab active" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
-                <span>👥</span> Employees & Salaries
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-attendance" onclick="zeptoApp.switchTab('attendance')">
-                <span>📅</span> Attendance & Shifts
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-utilization" onclick="zeptoApp.switchTab('utilization')">
-                <span>⚡</span> Manpower Utilization & IPP
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-loss" onclick="zeptoApp.switchTab('loss')">
-                <span>📉</span> DQ Loss & Shrinkage
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-scorecard" onclick="zeptoApp.switchTab('scorecard')">
-                <span>🏆</span> Store Scorecard
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-income" onclick="zeptoApp.switchTab('income')">
-                <span>💵</span> Store Income & Profit Split
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-expenses" onclick="zeptoApp.switchTab('expenses')">
-                <span>🧾</span> Store Expenses & Spend Insights
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-candidates" onclick="zeptoApp.switchTab('candidates')">
-                <span>🎯</span> Future Candidates Pipeline
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-security" onclick="zeptoApp.switchTab('security')">
-                <span>💰</span> Zepto Security Deposit (₹75L 50-50 Split)
-            </button>
-            <button type="button" class="nav-tab" id="tabBtn-gmail" onclick="zeptoApp.switchTab('gmail')">
-                <span>📧</span> Gmail Integration
-            </button>
-        </nav>
+        <!-- ================= MAIN LAYOUT WITH VERTICAL SIDEBAR ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
 
+            <!-- Left Sidebar Navigation -->
+            <aside class="lg:col-span-3 xl:col-span-2 space-y-3 lg:sticky lg:top-3">
+                <div class="glass-panel p-2.5 space-y-1">
+                    <div class="px-2 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                        <span>Operations Rail</span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
 
-        <!-- ================= TAB 1: EMPLOYEES & SALARIES ================= -->
-        <main id="tabContent-employees" class="space-y-4">
-            {% include "hubs/zepto/_employees.html" %}
-        </main>
+                    <!-- Group 1: Store Operations -->
+                    <div class="space-y-1">
+                        <button type="button" class="nav-tab active" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
+                            <span class="nav-icon text-sm">👥</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Staff & Payroll</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Roster & Salaries</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-attendance" onclick="zeptoApp.switchTab('attendance')">
+                            <span class="nav-icon text-sm">📅</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Attendance & Shifts</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Muster & Punches</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-utilization" onclick="zeptoApp.switchTab('utilization')">
+                            <span class="nav-icon text-sm">⚡</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Utilization & IPP</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Picker Throughput</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-loss" onclick="zeptoApp.switchTab('loss')">
+                            <span class="nav-icon text-sm">📉</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">DQ Loss & Spoilage</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Defects & Shrinkage</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-scorecard" onclick="zeptoApp.switchTab('scorecard')">
+                            <span class="nav-icon text-sm">🏆</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Store Scorecard</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">GMV & 10-Min SLA</div>
+                            </div>
+                        </button>
+                    </div>
 
-        <!-- ================= TAB: ATTENDANCE & SHIFTS ================= -->
-        <main id="tabContent-attendance" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_attendance.html" %}
-        </main>
+                    <div class="pt-2 pb-1 px-2 text-[10px] font-black uppercase tracking-wider text-slate-500 border-t border-white/5">
+                        <span>Financial & Equity</span>
+                    </div>
 
-        <!-- ================= TAB: MANPOWER UTILIZATION ================= -->
-        <main id="tabContent-utilization" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_utilization.html" %}
-        </main>
+                    <!-- Group 2: Financials & Admin -->
+                    <div class="space-y-1">
+                        <button type="button" class="nav-tab" id="tabBtn-income" onclick="zeptoApp.switchTab('income')">
+                            <span class="nav-icon text-sm">💵</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Store Income</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">50-50 Profit Split</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-expenses" onclick="zeptoApp.switchTab('expenses')">
+                            <span class="nav-icon text-sm">🧾</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Store Expenses</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Spend & Claims</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-candidates" onclick="zeptoApp.switchTab('candidates')">
+                            <span class="nav-icon text-sm">🎯</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Candidate Pipeline</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Hiring & Interviews</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-security" onclick="zeptoApp.switchTab('security')">
+                            <span class="nav-icon text-sm">💰</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">₹75L Zepto Security</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Partner Capital</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-gmail" onclick="zeptoApp.switchTab('gmail')">
+                            <span class="nav-icon text-sm">📧</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Gmail Reports</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">OAuth Ingestion</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
 
-        <!-- ================= TAB: DQ LOSS & SHRINKAGE ================= -->
-        <main id="tabContent-loss" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_loss.html" %}
-        </main>
+                <!-- Dark Store Quick Info Card -->
+                <div class="glass-panel p-3 text-[11px] text-slate-400 space-y-1.5 hidden lg:block">
+                    <div class="flex items-center justify-between text-white font-bold">
+                        <span>Hub Location</span>
+                        <span class="text-emerald-400 font-mono text-[10px]">LIVE</span>
+                    </div>
+                    <div class="text-slate-300 font-semibold">JMU-Sainik Colony</div>
+                    <div class="text-[10px] text-slate-500 pt-1 border-t border-white/5 flex justify-between">
+                        <span>Franchise Target:</span>
+                        <span class="text-slate-300 font-mono font-bold">₹75,00,000</span>
+                    </div>
+                </div>
+            </aside>
 
-        <!-- ================= TAB: STORE SCORECARD ================= -->
-        <main id="tabContent-scorecard" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_scorecard.html" %}
-        </main>
+            <!-- Main Tab Content Area -->
+            <div class="lg:col-span-9 xl:col-span-10 min-w-0 space-y-4">
+                <!-- ================= TAB 1: EMPLOYEES & SALARIES ================= -->
+                <main id="tabContent-employees" class="space-y-4">
+                    {% include "hubs/zepto/_employees.html" %}
+                </main>
 
-        <!-- ================= TAB 2: STORE INCOME & PARTNER SPLIT ================= -->
-        <main id="tabContent-income" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_income.html" %}
-        </main>
+                <!-- ================= TAB: ATTENDANCE & SHIFTS ================= -->
+                <main id="tabContent-attendance" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_attendance.html" %}
+                </main>
 
-        <!-- ================= TAB 3: STORE EXPENSES ================= -->
-        <main id="tabContent-expenses" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_expenses.html" %}
-        </main>
+                <!-- ================= TAB: MANPOWER UTILIZATION ================= -->
+                <main id="tabContent-utilization" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_utilization.html" %}
+                </main>
 
-        <!-- ================= TAB 4: FUTURE CANDIDATES ================= -->
-        <main id="tabContent-candidates" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_candidates.html" %}
-        </main>
+                <!-- ================= TAB: DQ LOSS & SHRINKAGE ================= -->
+                <main id="tabContent-loss" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_loss.html" %}
+                </main>
 
-        <!-- ================= TAB 5: ZEPTO SECURITY & CAPITAL LEDGER ================= -->
-        <main id="tabContent-security" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_security.html" %}
-        </main>
+                <!-- ================= TAB: STORE SCORECARD ================= -->
+                <main id="tabContent-scorecard" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_scorecard.html" %}
+                </main>
 
-        <!-- ================= TAB 6: GMAIL OAUTH INTEGRATION ================= -->
-        <main id="tabContent-gmail" class="space-y-4" style="display: none;">
-            {% include "hubs/zepto/_gmail.html" %}
-        </main>
+                <!-- ================= TAB 2: STORE INCOME & PARTNER SPLIT ================= -->
+                <main id="tabContent-income" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_income.html" %}
+                </main>
+
+                <!-- ================= TAB 3: STORE EXPENSES ================= -->
+                <main id="tabContent-expenses" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_expenses.html" %}
+                </main>
+
+                <!-- ================= TAB 4: FUTURE CANDIDATES ================= -->
+                <main id="tabContent-candidates" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_candidates.html" %}
+                </main>
+
+                <!-- ================= TAB 5: ZEPTO SECURITY & CAPITAL LEDGER ================= -->
+                <main id="tabContent-security" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_security.html" %}
+                </main>
+
+                <!-- ================= TAB 6: GMAIL OAUTH INTEGRATION ================= -->
+                <main id="tabContent-gmail" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_gmail.html" %}
+                </main>
+            </div>
+        </div>
 
     </div>
 

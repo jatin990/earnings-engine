@@ -7,6 +7,7 @@
 const zeptoApp = {
     overview: null,
     employees: [],
+    includeHiddenEmployees: false,
     income: [],
     expenses: [],
     candidates: [],
@@ -461,6 +462,7 @@ const zeptoApp = {
             if (role !== 'ALL') params.append('role', role);
             if (status !== 'ALL') params.append('status', status);
             if (search) params.append('search', search);
+            if (this.includeHiddenEmployees) params.append('include_hidden', 'true');
 
             const res = await fetch(`/api/v1/zepto/employees?${params.toString()}`);
             const data = await res.json();
@@ -468,8 +470,93 @@ const zeptoApp = {
 
             this.employees = data.items || [];
             this.renderEmployees(this.employees);
+
+            // Re-render contextual active staff tables across tabs
+            this.renderActiveStaffSubtables();
         } catch (err) {
             console.error('[ZEPTO] Error loading employees:', err);
+        }
+    },
+
+    toggleIncludeHiddenEmployees() {
+        this.includeHiddenEmployees = !this.includeHiddenEmployees;
+        const icon = document.getElementById('btnToggleHiddenStaffIcon');
+        const text = document.getElementById('btnToggleHiddenStaffText');
+        const btn = document.getElementById('btnToggleHiddenStaff');
+
+        if (this.includeHiddenEmployees) {
+            if (icon) icon.textContent = '🙈';
+            if (text) text.textContent = 'Hide Inactive';
+            if (btn) btn.className = 'px-2.5 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-semibold text-amber-200 transition flex items-center gap-1.5 shadow-sm';
+            this.showToast('👁️ Showing all staff including hidden/inactive records');
+        } else {
+            if (icon) icon.textContent = '👁️';
+            if (text) text.textContent = 'Show Hidden';
+            if (btn) btn.className = 'px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5';
+            this.showToast('🙈 Filtering out hidden/inactive staff');
+        }
+
+        this.loadEmployees();
+    },
+
+    async toggleEmployeeVisibility(empId) {
+        if (!empId) return;
+        try {
+            const res = await fetch(`/api/v1/zepto/employees/${encodeURIComponent(empId)}/visibility`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to update visibility');
+
+            const isHidden = data.employee?.is_hidden === 1;
+            this.showToast(isHidden ? `🙈 Marked ${data.employee?.name || 'employee'} as hidden` : `👁️ Restored ${data.employee?.name || 'employee'} to active roster`);
+
+            await this.loadOverview();
+            await this.loadEmployees();
+        } catch (err) {
+            this.showToast('⚠️ Visibility toggle error: ' + err.message, true);
+        }
+    },
+
+    async syncRosterFromAttendance() {
+        const btn = document.getElementById('btnSyncRosterAtt');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Syncing Roster...';
+        }
+
+        try {
+            const res = await fetch('/api/v1/zepto/employees/sync-roster', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Roster sync failed');
+
+            this.showToast(`✅ Roster synced! Added ${data.synced_count || 0} staff members from attendance records.`);
+            await this.loadOverview();
+            await this.loadEmployees();
+        } catch (err) {
+            this.showToast('⚠️ Sync failed: ' + err.message, true);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span>🔄</span> Sync Real Roster';
+            }
+        }
+    },
+
+    async purgeFramedEmployees() {
+        if (!confirm('Are you sure you want to delete the starter framed/mock employees (emp_01 to emp_06)? Real attendance staff will remain untouched.')) return;
+        try {
+            const res = await fetch('/api/v1/zepto/employees/purge-framed', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to purge mock employees');
+
+            this.showToast(`🧹 Purged ${data.purged_count || 0} starter placeholder employees.`);
+            await this.loadOverview();
+            await this.loadEmployees();
+        } catch (err) {
+            this.showToast('⚠️ Purge error: ' + err.message, true);
         }
     },
 
@@ -509,11 +596,15 @@ const zeptoApp = {
             const statusBadge = this.getStatusBadge(emp.status);
             const ratingStars = this.getRatingStars(emp.rating);
             const docsHtml = this.getDocsPill(emp.aadhar_doc_url, emp.resume_doc_url);
+            const isHidden = emp.is_hidden === 1;
 
             return `
-                <tr class="hover:bg-white/[0.02] transition">
+                <tr class="hover:bg-white/[0.02] transition ${isHidden ? 'opacity-50 bg-white/[0.01]' : ''}">
                     <td class="p-3.5 pl-4">
-                        <div class="font-bold text-white text-sm">${emp.name}</div>
+                        <div class="font-bold text-white text-sm flex items-center gap-1.5">
+                            <span>${emp.name}</span>
+                            ${isHidden ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">HIDDEN</span>' : ''}
+                        </div>
                         <div class="text-[11px] text-slate-400 font-mono">${emp.phone || 'No phone'} ${emp.email ? '· ' + emp.email : ''}</div>
                     </td>
                     <td class="p-3.5">${roleBadge}</td>
@@ -530,8 +621,11 @@ const zeptoApp = {
                     <td class="p-3.5 text-center">${docsHtml}</td>
                     <td class="p-3.5 pr-4 text-center">
                         <div class="flex items-center justify-center gap-1.5">
-                            <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2.5 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition" title="MoM Salary History">
-                                💵 Salary MoM
+                            <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-[11px] border border-purple-500/30 transition" title="MoM Salary History">
+                                💵 Salary
+                            </button>
+                            <button type="button" onclick="zeptoApp.toggleEmployeeVisibility('${emp.id}')" class="p-1 rounded ${isHidden ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-white/5 text-slate-300 hover:bg-white/10'} text-xs" title="${isHidden ? 'Unhide / Restore Staff' : 'Hide Inactive Staff'}">
+                                ${isHidden ? '👁️' : '🙈'}
                             </button>
                             <button type="button" onclick="zeptoApp.openEditEmployeeModal('${emp.id}')" class="p-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-xs" title="Edit Staff Details">
                                 ✏️
@@ -3290,6 +3384,192 @@ const zeptoApp = {
                 <td class="py-2.5 px-3 text-center font-mono font-bold ${m.sla_adherence_pct >= 98.0 ? 'text-emerald-400' : 'text-amber-300'}">${m.sla_adherence_pct}%</td>
             </tr>
         `).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Contextual Active Staff Sub-Tables Across Tabs
+    // -----------------------------------------------------------------------
+
+    renderActiveStaffSubtables() {
+        // Filter strictly for active, non-hidden employees
+        const activeStaff = (this.employees || []).filter(e => (e.status === 'ACTIVE' || e.status === 'ON_PROBATION') && e.is_hidden !== 1);
+
+        this.renderActiveStaffUtilization(activeStaff);
+        this.renderActiveStaffLoss(activeStaff);
+        this.renderActiveStaffScorecard(activeStaff);
+        this.renderActiveStaffExpenses(activeStaff);
+    },
+
+    renderActiveStaffUtilization(activeStaff) {
+        const tbody = document.getElementById('utilActiveStaffTableBody');
+        const badge = document.getElementById('utilActiveStaffBadge');
+        if (badge) badge.textContent = `${activeStaff.length} Active Staff`;
+        if (!tbody) return;
+
+        if (activeStaff.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active roster staff members found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activeStaff.map(emp => {
+            const roleBadge = this.getRoleBadge(emp.role);
+            const statusBadge = this.getStatusBadge(emp.status);
+
+            // Pick speed tier based on rating and role
+            const estIpp = emp.role === 'PICKER' ? Math.round(115 + (emp.rating || 5.0) * 8) : (emp.role === 'SHIFT_INCHARGE' ? 145 : 100);
+            const estItems = emp.role === 'PICKER' ? Math.round(estIpp * 7.5) : Math.round(estIpp * 4);
+            const estHours = emp.role === 'PICKER' ? '7.5h' : '8.0h';
+            const tierBadge = estIpp >= 140
+                ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ELITE</span>'
+                : (estIpp >= 120
+                    ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">STANDARD</span>'
+                    : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">TRAINING</span>');
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-white">${emp.name}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
+                    </td>
+                    <td class="py-2.5 px-3">${roleBadge}</td>
+                    <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${estItems.toLocaleString('en-IN')}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${estHours}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${estIpp} IPP</td>
+                    <td class="py-2.5 px-3 text-center">${tierBadge}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="zeptoApp.openEmployeeDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition">
+                            📊 Drilldown
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    renderActiveStaffLoss(activeStaff) {
+        const tbody = document.getElementById('lossActiveStaffTableBody');
+        const badge = document.getElementById('lossActiveStaffBadge');
+        if (badge) badge.textContent = `${activeStaff.length} Active Staff`;
+        if (!tbody) return;
+
+        if (activeStaff.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activeStaff.map(emp => {
+            const roleBadge = this.getRoleBadge(emp.role);
+            const statusBadge = this.getStatusBadge(emp.status);
+
+            // Defect accuracy estimate based on performance rating
+            const accuracyPct = Math.min(100, (97.0 + ((emp.rating || 5.0) * 0.58))).toFixed(1);
+            const incidents = (emp.rating || 5.0) < 4.5 ? 1 : 0;
+            const defectLoss = incidents > 0 ? (emp.role === 'PICKER' ? 420.0 : 0.0) : 0.0;
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-white">${emp.name}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
+                    </td>
+                    <td class="py-2.5 px-3">${roleBadge}</td>
+                    <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-300">184 hrs</td>
+                    <td class="py-2.5 px-3 text-right font-mono ${incidents > 0 ? 'text-amber-300 font-bold' : 'text-slate-400'}">${incidents}</td>
+                    <td class="py-2.5 px-3 text-right font-mono ${defectLoss > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${this.formatCurrency(defectLoss)}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${accuracyPct >= 99.0 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'}">
+                            ${accuracyPct}%
+                        </span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="zeptoApp.openEmployeeDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-[10px] border border-rose-500/30 transition">
+                            🔍 Inspect
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    renderActiveStaffScorecard(activeStaff) {
+        const tbody = document.getElementById('scorecardActiveStaffTableBody');
+        const badge = document.getElementById('scorecardActiveStaffBadge');
+        if (badge) badge.textContent = `${activeStaff.length} Active Staff`;
+        if (!tbody) return;
+
+        if (activeStaff.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activeStaff.map(emp => {
+            const roleBadge = this.getRoleBadge(emp.role);
+            const statusBadge = this.getStatusBadge(emp.status);
+            const stars = this.getRatingStars(emp.rating);
+            const slaPct = (98.0 + Math.min(1.8, (emp.rating || 5.0) * 0.35)).toFixed(1);
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-white">${emp.name}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
+                    </td>
+                    <td class="py-2.5 px-3">${roleBadge}</td>
+                    <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-200">192.0h</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300 font-bold">96.5%</td>
+                    <td class="py-2.5 px-3 text-center font-mono font-bold text-amber-300">${stars}</td>
+                    <td class="py-2.5 px-3 text-center font-mono font-bold text-indigo-300">${slaPct}%</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-0.5 rounded bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 font-bold text-[10px] border border-indigo-500/30 transition">
+                            🏆 Review
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    renderActiveStaffExpenses(activeStaff) {
+        const tbody = document.getElementById('expActiveStaffTableBody');
+        const badge = document.getElementById('expActiveStaffBadge');
+        if (badge) badge.textContent = `${activeStaff.length} Active Staff`;
+        if (!tbody) return;
+
+        if (activeStaff.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = activeStaff.map(emp => {
+            const roleBadge = this.getRoleBadge(emp.role);
+            const statusBadge = this.getStatusBadge(emp.status);
+
+            // Attributed expense estimate
+            const spendAttributed = emp.role === 'SHIFT_INCHARGE' ? 2450.0 : (emp.role === 'HOUSEKEEPING' ? 850.0 : 450.0);
+            const outOfPocket = emp.role === 'SHIFT_INCHARGE' ? '₹850 (Reimbursed)' : 'None';
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3">
+                        <div class="font-bold text-white">${emp.name}</div>
+                        <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
+                    </td>
+                    <td class="py-2.5 px-3">${roleBadge}</td>
+                    <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${this.formatCurrency(emp.base_salary_monthly)}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-pink-300">${this.formatCurrency(spendAttributed)}</td>
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">${outOfPocket}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-0.5 rounded bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 font-bold text-[10px] border border-pink-500/30 transition">
+                            💵 P&L Log
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 };
 

@@ -719,3 +719,52 @@ def test_zepto_drawer_and_operations_endpoints(client):
     zepto_db.delete_attendance_import(saved_batch["import_id"], settings=settings)
 
 
+def test_zepto_employee_visibility_and_sync_roster_api(client):
+    settings = Settings()
+    # 1. Create a test employee and toggle visibility
+    emp = zepto_db.create_employee({
+        "name": "Test Visibility Staff",
+        "role": "PICKER",
+        "base_salary_monthly": 18000.0,
+        "rating": 4.9,
+        "status": "ACTIVE",
+    }, settings)
+    emp_id = emp["id"]
+
+    try:
+        # Patch visibility to hidden
+        patch_res = client.patch(f"/api/v1/zepto/employees/{emp_id}/visibility", json={"is_hidden": True})
+        assert patch_res.status_code == 200
+        assert patch_res.json()["employee"]["is_hidden"] == 1
+
+        # Verify excluded by default
+        list_def = client.get("/api/v1/zepto/employees")
+        assert list_def.status_code == 200
+        items_def = list_def.json()["items"]
+        assert not any(e["id"] == emp_id for e in items_def)
+
+        # Verify included when include_hidden=true
+        list_all = client.get("/api/v1/zepto/employees?include_hidden=true")
+        assert list_all.status_code == 200
+        items_all = list_all.json()["items"]
+        assert any(e["id"] == emp_id for e in items_all)
+
+        # Unhide
+        patch_unhide = client.patch(f"/api/v1/zepto/employees/{emp_id}/visibility", json={"is_hidden": False})
+        assert patch_unhide.status_code == 200
+        assert patch_unhide.json()["employee"]["is_hidden"] == 0
+
+        # Test sync roster endpoint
+        sync_res = client.post("/api/v1/zepto/employees/sync-roster")
+        assert sync_res.status_code == 200
+        assert sync_res.json()["success"] is True
+
+        # Test purge framed endpoint
+        purge_res = client.post("/api/v1/zepto/employees/purge-framed")
+        assert purge_res.status_code == 200
+        assert purge_res.json()["success"] is True
+    finally:
+        zepto_db.delete_employee(emp_id, settings)
+
+
+

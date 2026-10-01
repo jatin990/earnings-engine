@@ -132,15 +132,56 @@ async def update_staffing_targets_endpoint(payload: dict[str, Any]) -> dict[str,
 async def get_employees_endpoint(
     role: str | None = Query(None, description="Filter by role e.g. PICKER, SHIFT_INCHARGE"),
     status: str | None = Query(None, description="Filter by status: ACTIVE, RESIGNED, ON_PROBATION"),
-    search: str | None = Query(None, description="Search employee name or phone"),
+    search: str | None = Query(None, description="Search employee name, phone, ID"),
+    include_hidden: bool = Query(False, description="Whether to include soft-hidden employees"),
 ) -> dict[str, Any]:
     """Retrieve store employees with role, status and search filters."""
     try:
-        employees = zepto_db.get_employees(role=role, status=status, search=search, settings=_settings)
+        employees = zepto_db.get_employees(role=role, status=status, search=search, include_hidden=include_hidden, settings=_settings)
         return {"success": True, "count": len(employees), "items": employees}
     except Exception as e:
         logger.error("[ZEPTO-API] Error listing employees: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/zepto/employees/sync-roster", summary="Sync Real Roster from Attendance")
+async def sync_roster_endpoint() -> dict[str, Any]:
+    """Auto-populate / sync master employee roster from imported attendance Excel sheets."""
+    try:
+        res = zepto_db.sync_roster_from_attendance(_settings)
+        return {"success": True, **res}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error syncing roster: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/zepto/employees/purge-framed", summary="Purge Framed Starter Employees")
+async def purge_framed_endpoint() -> dict[str, Any]:
+    """Purge synthetic/framed sample employees (emp_01 to emp_06)."""
+    try:
+        res = zepto_db.purge_mock_framed_employees(_settings)
+        return {"success": True, **res}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error purging framed employees: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/api/v1/zepto/employees/{emp_id}/visibility", summary="Toggle Employee Hidden Visibility")
+async def toggle_employee_visibility_endpoint(emp_id: str, payload: dict[str, Any] = Body(default={})) -> dict[str, Any]:
+    """Hide or unhide an employee in UI tables and metrics."""
+    try:
+        is_hidden = payload.get("is_hidden")
+        if is_hidden is not None:
+            is_hidden = bool(is_hidden)
+        emp = zepto_db.toggle_employee_visibility(emp_id, is_hidden=is_hidden, settings=_settings)
+        if not emp:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        return {"success": True, "employee": emp}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating employee visibility %s: %s", emp_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/api/v1/zepto/employees", summary="Create Store Employee")

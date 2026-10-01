@@ -124,6 +124,7 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 rating REAL DEFAULT 5.0,
                 base_salary_monthly REAL NOT NULL DEFAULT 0.0,
                 current_month_bonus REAL DEFAULT 0.0,
+                is_hidden INTEGER DEFAULT 0,
                 aadhar_doc_url TEXT,
                 resume_doc_url TEXT,
                 photo_url TEXT,
@@ -353,6 +354,14 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_inc_date ON zepto_store_income(income_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_inc_month ON zepto_store_income(year_month);
         """)
+
+        # Migration: Ensure is_hidden column exists on zepto_employees
+        emp_cols = _get_table_columns(conn, "zepto_employees")
+        if not emp_cols or "is_hidden" not in emp_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_employees ADD COLUMN is_hidden INTEGER DEFAULT 0")
+            except Exception:
+                pass
 
         # Migration: Ensure performance_rating column exists on zepto_salaries
         sal_cols = _get_table_columns(conn, "zepto_salaries")
@@ -705,7 +714,7 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         conn.row_factory = sqlite3.Row
 
         # Employee Headcount
-        emp_rows = conn.execute("SELECT role, status, COUNT(*) as cnt FROM zepto_employees GROUP BY role, status").fetchall()
+        emp_rows = conn.execute("SELECT role, status, COUNT(*) as cnt FROM zepto_employees WHERE (is_hidden = 0 OR is_hidden IS NULL) GROUP BY role, status").fetchall()
         active_count = 0
         resigned_count = 0
         probation_count = 0
@@ -763,11 +772,11 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         projected_payroll_target = round(projected_payroll_target, 2)
 
         # Average Rating
-        avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
+        avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE' AND (is_hidden = 0 OR is_hidden IS NULL)").fetchone()
         avg_rating = round(float(avg_rating_row["avg_r"] or 5.0), 1)
 
         # Monthly Payroll
-        payroll_row = conn.execute("SELECT SUM(base_salary_monthly + current_month_bonus) as total_pay FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
+        payroll_row = conn.execute("SELECT SUM(base_salary_monthly + current_month_bonus) as total_pay FROM zepto_employees WHERE status = 'ACTIVE' AND (is_hidden = 0 OR is_hidden IS NULL)").fetchone()
         current_monthly_payroll = float(payroll_row["total_pay"] or 0.0)
 
         # Total Store Expenses & Reimbursements
@@ -985,6 +994,7 @@ def get_employees(
     role: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    include_hidden: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve employees with optional role, status, and name/phone search."""
@@ -995,6 +1005,8 @@ def get_employees(
         query = "SELECT * FROM zepto_employees WHERE 1=1"
         params: list[Any] = []
 
+        if not include_hidden:
+            query += " AND (is_hidden = 0 OR is_hidden IS NULL)"
         if role and role.upper() != "ALL":
             query += " AND role = ?"
             params.append(role.upper())
@@ -1002,11 +1014,11 @@ def get_employees(
             query += " AND status = ?"
             params.append(status.upper())
         if search:
-            query += " AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)"
+            query += " AND (name LIKE ? OR phone LIKE ? OR email LIKE ? OR id LIKE ?)"
             term = f"%{search.strip()}%"
-            params.extend([term, term, term])
+            params.extend([term, term, term, term])
 
-        query += " ORDER BY status ASC, role ASC, name ASC"
+        query += " ORDER BY is_hidden ASC, status ASC, role ASC, name ASC"
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
@@ -1071,7 +1083,7 @@ def update_employee(emp_id: str, data: dict[str, Any], settings: Settings | None
     for key in (
         "name", "role", "phone", "email", "joining_date", "resignation_date",
         "resignation_reason", "status", "rating", "base_salary_monthly",
-        "current_month_bonus", "aadhar_doc_url", "resume_doc_url", "photo_url", "notes"
+        "current_month_bonus", "is_hidden", "aadhar_doc_url", "resume_doc_url", "photo_url", "notes"
     ):
         if key in data:
             fields.append(f"{key} = ?")
@@ -1266,8 +1278,109 @@ def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
     settings = settings or Settings()
     with _connect(settings) as conn:
         conn.execute("DELETE FROM zepto_salaries WHERE employee_id = ?", (emp_id,))
+        conn.execute("DELETE FROM zepto_monthly_ratings WHERE employee_id = ?", (emp_id,))
         conn.execute("DELETE FROM zepto_employees WHERE id = ?", (emp_id,))
     return True
+
+
+def toggle_employee_visibility(emp_id: str, is_hidden: bool | None = None, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Toggle or set the hidden status of an employee."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        emp = conn.execute("SELECT id, is_hidden FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
+        if not emp:
+            return None
+        current_hidden = bool(emp["is_hidden"]) if emp["is_hidden"] is not None else False
+        new_hidden = int(is_hidden) if is_hidden is not None else int(not current_hidden)
+        conn.execute("UPDATE zepto_employees SET is_hidden = ?, updated_at = ? WHERE id = ?", (new_hidden, now_iso, emp_id))
+    return get_employee_by_id(emp_id, settings)
+
+
+def sync_roster_from_attendance(settings: Settings | None = None) -> dict[str, Any]:
+    """Populate/sync zepto_employees master roster from unique attendance records."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    synced_count = 0
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        # Find all distinct employees in attendance records
+        att_emps = conn.execute(
+            """
+            SELECT employee_id, employee_name, designation, MIN(shift_date) as first_seen
+            FROM zepto_attendance_records
+            WHERE employee_id IS NOT NULL AND employee_id != ''
+            GROUP BY employee_id
+            """
+        ).fetchall()
+
+        for ae in att_emps:
+            emp_id = ae["employee_id"]
+            name = (ae["employee_name"] or emp_id).strip()
+            desig = (ae["designation"] or "").strip()
+            joining = ae["first_seen"] or datetime.now().strftime("%Y-%m-%d")
+
+            # Map designation to standardized store role
+            desig_lower = desig.lower()
+            if "incharge" in desig_lower or "lead" in desig_lower or "shift" in desig_lower:
+                role = "SHIFT_INCHARGE"
+                base_sal = 25000.0
+            elif "security" in desig_lower or "guard" in desig_lower:
+                role = "SECURITY_GUARD"
+                base_sal = 16000.0
+            elif "housekeeping" in desig_lower or "clean" in desig_lower:
+                role = "HOUSEKEEPING"
+                base_sal = 14000.0
+            else:
+                role = "PICKER"
+                base_sal = 18000.0
+
+            # Insert or update
+            existing = conn.execute("SELECT id FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
+            if not existing:
+                conn.execute(
+                    """
+                    INSERT INTO zepto_employees (
+                        id, name, role, phone, email, joining_date,
+                        status, rating, base_salary_monthly, current_month_bonus,
+                        is_hidden, notes, created_at, updated_at
+                    ) VALUES (?, ?, ?, '', '', ?, 'ACTIVE', 5.0, ?, 0.0, 0, ?, ?, ?)
+                    """,
+                    (emp_id, name, role, joining, base_sal, f"Auto-synced from Dark Store Attendance ({desig})", now_iso, now_iso),
+                )
+                synced_count += 1
+            else:
+                # Keep active and update name/role if unconfigured
+                conn.execute(
+                    """
+                    UPDATE zepto_employees SET
+                        name = CASE WHEN name LIKE 'emp_%' OR name = '' THEN ? ELSE name END,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (name, now_iso, emp_id),
+                )
+
+    return {"status": "success", "synced_new_employees": synced_count, "total_attendance_staff": len(att_emps)}
+
+
+def purge_mock_framed_employees(settings: Settings | None = None) -> dict[str, Any]:
+    """Purge synthetic/mock starter employees (emp_01 to emp_06) if real attendance data exists."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    purged_count = 0
+    with _connect(settings) as conn:
+        mock_ids = ["emp_01", "emp_02", "emp_03", "emp_04", "emp_05", "emp_06"]
+        placeholders = ",".join("?" for _ in mock_ids)
+        res = conn.execute(f"DELETE FROM zepto_employees WHERE id IN ({placeholders})", mock_ids)
+        purged_count = res.rowcount
+        conn.execute(f"DELETE FROM zepto_salaries WHERE employee_id IN ({placeholders})", mock_ids)
+        conn.execute(f"DELETE FROM zepto_monthly_ratings WHERE employee_id IN ({placeholders})", mock_ids)
+    return {"status": "success", "purged_count": purged_count}
 
 
 # ---------------------------------------------------------------------------
