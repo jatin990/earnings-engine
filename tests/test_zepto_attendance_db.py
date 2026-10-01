@@ -248,3 +248,65 @@ def test_employee_attendance_drawer_detail_and_operations():
     # Clean up
     delete_attendance_import(imp_id)
 
+
+def test_hidden_staff_resigned_and_excluded_from_operational_queries():
+    import uuid
+    from earnings_engine.data import zepto_db
+
+    emp_id = f"test_hidden_{uuid.uuid4().hex[:6]}"
+    emp_name = "Test Hidden Staff"
+
+    # Create active employee
+    zepto_db.create_employee({
+        "id": emp_id,
+        "name": emp_name,
+        "role": "PICKER",
+        "status": "ACTIVE",
+    })
+
+    # Add attendance records
+    zepto_db.save_attendance_batch({
+        "store_name": "JMU-Sainik Colony",
+        "file_name": "test_hidden.xlsx",
+        "records": [
+            {
+                "employee_id": emp_id,
+                "employee_name": emp_name,
+                "designation": "Picker",
+                "shift_date": "2026-09-25",
+                "status": "PRESENT",
+                "work_duration_mins": 480,
+            }
+        ]
+    })
+
+    # Initially employee appears in summary
+    summary_before = zepto_db.get_attendance_summary(store_name="JMU-Sainik Colony")
+    assert any(s["employee_id"] == emp_id for s in summary_before["staff_roster"])
+
+    # Toggle hidden to 1
+    updated = zepto_db.toggle_employee_visibility(emp_id, is_hidden=True)
+    assert updated["is_hidden"] == 1
+    assert updated["status"] == "RESIGNED"
+
+    # Verify employee is completely excluded from get_attendance_summary
+    summary_after = zepto_db.get_attendance_summary(store_name="JMU-Sainik Colony")
+    assert not any(s["employee_id"] == emp_id for s in summary_after["staff_roster"])
+    assert not any(w["employee_id"] == emp_id for w in summary_after["absenteeism_watchlist"])
+
+    # Verify employee is excluded from get_attendance_records by default
+    records = zepto_db.get_attendance_records(store_name="JMU-Sainik Colony")
+    assert not any(r["employee_id"] == emp_id for r in records)
+
+    # Verify employee appears in get_employees ONLY when include_hidden=True
+    normal_staff = zepto_db.get_employees(include_hidden=False)
+    assert not any(e["id"] == emp_id for e in normal_staff)
+
+    hidden_staff = zepto_db.get_employees(include_hidden=True)
+    hidden_emp = next((e for e in hidden_staff if e["id"] == emp_id), None)
+    assert hidden_emp is not None
+    assert hidden_emp["status"] == "RESIGNED"
+
+    # Cleanup
+    zepto_db.delete_employee(emp_id)
+

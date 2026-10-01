@@ -444,14 +444,14 @@
                 </div>
             </div>
 
-            <!-- Granular Shift & Punch Ledger (Selected Month) -->
+            <!-- Granular Shift & Work Log (Selected Month) -->
             <div class="glass-panel-sub p-3 space-y-2">
                 <div class="flex items-center justify-between">
                     <div>
                         <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                            <span>🕒</span> Shift Punches & Daily Work Logs
+                            <span>🕒</span> Shift Muster & Daily Work Logs
                         </h4>
-                        <p class="text-[10px] text-slate-400">Granular daily punch in/out timestamps, shift timings & duration.</p>
+                        <p class="text-[10px] text-slate-400">Granular daily shift assignments, shift timings & scheduled work duration.</p>
                     </div>
                     <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300" id="staffDrawerPunchCount">
                         0 Days
@@ -463,17 +463,16 @@
                         <thead>
                             <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase bg-black/40">
                                 <th class="py-2 px-2.5">Date</th>
+                                <th class="py-2 px-2.5">Shift Name</th>
                                 <th class="py-2 px-2.5">Shift Timing</th>
-                                <th class="py-2 px-2.5 font-mono">Punch In</th>
-                                <th class="py-2 px-2.5 font-mono">Punch Out</th>
-                                <th class="py-2 px-2.5 text-right">Work Mins</th>
+                                <th class="py-2 px-2.5 text-right">Work Duration</th>
                                 <th class="py-2 px-2.5 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody id="staffDrawerPunchTableBody" class="divide-y divide-white/5 font-mono text-[11px]">
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-slate-500">
-                                    No punch records found for this period.
+                                <td colspan="5" class="text-center py-4 text-slate-500">
+                                    No shift records found for this period.
                                 </td>
                             </tr>
                         </tbody>

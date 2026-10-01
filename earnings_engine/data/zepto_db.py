@@ -499,6 +499,18 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
         conn.execute("UPDATE zepto_candidates SET target_role = 'SECURITY_GUARD' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND target_role LIKE '%SEC%'")
         conn.execute("UPDATE zepto_candidates SET target_role = 'PICKER' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING')")
 
+        # Mark all hidden staff as RESIGNED and ensure hidden flag is synchronized
+        conn.execute("UPDATE zepto_employees SET status = 'RESIGNED' WHERE is_hidden = 1")
+
+        # Clean up legacy bogus EMAIL_INGESTED loss rows where regex erroneously captured calendar year 2026 as amount
+        conn.execute(
+            """
+            DELETE FROM zepto_loss_records
+            WHERE (notes LIKE '%Auto-ingested from email%' OR notes LIKE '%EMAIL_INGESTED%')
+              AND amount = 2026.0
+            """
+        )
+
         # Strict Anti-Fabrication: Do not automatically insert starter demo/mock records
         # Schema initialization leaves tables pristine and ready for authentic imports or user entry.
 
@@ -2830,7 +2842,10 @@ def get_attendance_summary(
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
-    where_clauses = ["1=1"]
+    where_clauses = [
+        "1=1",
+        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+    ]
     params: list[Any] = []
 
     if store_name:
@@ -3128,7 +3143,10 @@ def get_attendance_records(
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
-    where_clauses = ["1=1"]
+    where_clauses = [
+        "1=1",
+        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+    ]
     params: list[Any] = []
 
     if store_name:
@@ -3799,11 +3817,11 @@ def get_loss_summary(
             msg_date = e_dict["iso_date"]
             msg_store = e_dict["store_name"] or "JMU-Sainik Colony"
 
-            # Query all linked Excel items for this message
+            # Query all linked Excel items for this message: exact source_email_id match first, or unlinked date+store fallback
             linked_excel_rows = conn.execute(
                 """
                 SELECT amount, sku_count, category, loss_type FROM zepto_loss_records
-                WHERE (source_email_id = ? OR (record_date = ? AND store_name = ?))
+                WHERE (source_email_id = ? OR (source_email_id IS NULL AND record_date = ? AND store_name = ?))
                   AND category != 'EMAIL_INGESTED'
                 """,
                 (msg_id, msg_date, msg_store),
@@ -3884,7 +3902,9 @@ def get_loss_summary(
             "shrinkage_total": round(shrinkage_total, 2),
             "spoilage_total": round(spoilage_total, 2),
             "total_skus_affected": total_skus,
+            "total_sku_count": total_skus,
             "total_loss_records": len(active_items),
+            "total_records": len(active_items),
             "category_breakdown": cat_list,
             "reconciliation": {
                 "items": recon_items,

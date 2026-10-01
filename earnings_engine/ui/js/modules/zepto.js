@@ -978,15 +978,15 @@ const zeptoApp = {
                 }
             }
 
-            // 8. Granular Shift & Punch Ledger (Selected Month)
+            // 8. Granular Shift & Work Log (Selected Month)
             const punchTbody = document.getElementById('staffDrawerPunchTableBody');
             const punchCountEl = document.getElementById('staffDrawerPunchCount');
             const punches = att.punch_history || [];
-            if (punchCountEl) punchCountEl.textContent = `${punches.length} Punches`;
+            if (punchCountEl) punchCountEl.textContent = `${punches.length} Shifts`;
 
             if (punchTbody) {
                 if (punches.length === 0) {
-                    punchTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 text-xs">No punch records found for ${selMonth}.</td></tr>`;
+                    punchTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-500 text-xs">No shift records found for ${selMonth}.</td></tr>`;
                 } else {
                     punchTbody.innerHTML = punches.map(p => {
                         let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">PRESENT</span>';
@@ -1001,9 +1001,8 @@ const zeptoApp = {
                         return `
                             <tr class="hover:bg-white/[0.02] transition">
                                 <td class="py-2 px-2.5 font-bold text-white">${p.shift_date}</td>
-                                <td class="py-2 px-2.5 text-slate-300 text-[10px]">${p.shift_name || p.shift_time || 'General Shift'}</td>
-                                <td class="py-2 px-2.5 text-emerald-400 font-mono">${p.punch_in || '—'}</td>
-                                <td class="py-2 px-2.5 text-sky-300 font-mono">${p.punch_out || '—'}</td>
+                                <td class="py-2 px-2.5 text-slate-300 text-[10px]">${p.shift_name || 'General Shift'}</td>
+                                <td class="py-2 px-2.5 text-sky-300 font-mono text-[10px]">${p.shift_time || '09:00 - 18:00'}</td>
                                 <td class="py-2 px-2.5 text-right font-mono text-purple-300">${durMins > 0 ? `${durHours}h (${durMins}m)` : '—'}</td>
                                 <td class="py-2 px-2.5 text-center">${stBadge}</td>
                             </tr>
@@ -3246,13 +3245,13 @@ const zeptoApp = {
 
         // History table
         const history = emp.punch_history || [];
-        if (histCountEl) histCountEl.textContent = `${history.length} punches`;
+        if (histCountEl) histCountEl.textContent = `${history.length} shifts`;
 
         const tbody = document.getElementById('drawerPunchHistoryBody');
         if (!tbody) return;
 
         if (history.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No punch history found for this staff member.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 text-xs">No shift history found for this staff member.</td></tr>`;
             return;
         }
 
@@ -3273,9 +3272,8 @@ const zeptoApp = {
             return `
                 <tr class="hover:bg-white/[0.02] transition">
                     <td class="py-2 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">${p.shift_date}</td>
-                    <td class="py-2 px-2.5 text-[10px] text-slate-400 truncate max-w-[100px]">${p.shift_time || p.shift_name || 'General'}</td>
-                    <td class="py-2 px-2.5 font-mono text-[10px] ${p.punch_in ? 'text-emerald-300' : 'text-slate-600'}">${p.punch_in || '—'}</td>
-                    <td class="py-2 px-2.5 font-mono text-[10px] ${p.punch_out ? 'text-emerald-300' : 'text-slate-600'}">${p.punch_out || '—'}</td>
+                    <td class="py-2 px-2.5 text-[10px] text-slate-300 truncate max-w-[120px]">${p.shift_name || 'General Shift'}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] text-sky-300 whitespace-nowrap">${p.shift_time || '09:00 - 18:00'}</td>
                     <td class="py-2 px-2.5 text-right font-mono text-[10px] ${p.work_duration_mins > 0 ? 'text-white' : 'text-slate-600'}">
                         ${p.work_duration_mins > 0 ? `${(p.work_duration_mins / 60).toFixed(1)}h` : '—'}
                     </td>
@@ -3361,7 +3359,7 @@ const zeptoApp = {
             return;
         }
 
-        const headers = ['Date', 'Employee ID', 'Employee Name', 'Designation', 'Shift Time', 'Punch In', 'Punch Out', 'Work Duration (mins)', 'Status'];
+        const headers = ['Date', 'Employee ID', 'Employee Name', 'Designation', 'Shift Name', 'Shift Time', 'Work Duration (mins)', 'Status'];
         const csvRows = [headers.join(',')];
 
         records.forEach(r => {
@@ -3370,9 +3368,8 @@ const zeptoApp = {
                 `"${r.employee_id || ''}"`,
                 `"${(r.employee_name || '').replace(/"/g, '""')}"`,
                 `"${(r.designation || '').replace(/"/g, '""')}"`,
+                `"${(r.shift_name || '').replace(/"/g, '""')}"`,
                 `"${r.shift_time || ''}"`,
-                `"${r.punch_in || ''}"`,
-                `"${r.punch_out || ''}"`,
                 r.work_duration_mins || 0,
                 `"${r.status || ''}"`,
             ];

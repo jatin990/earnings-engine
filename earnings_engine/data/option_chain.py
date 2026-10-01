@@ -387,6 +387,11 @@ def _calculate_option_metrics_from_records(
         if not sdf.empty and "put_oi" in sdf.columns and sdf["put_oi"].max() > 0
         else None
     )
+    pin_strike = (
+        high_call_strike
+        if high_call_strike and high_put_strike and high_call_strike == high_put_strike
+        else None
+    )
 
     # Find ATM strike
     atm_strike = None
@@ -449,6 +454,7 @@ def _calculate_option_metrics_from_records(
         "put_oi_total": int(put_oi),
         "resistance_strike": high_call_strike,
         "support_strike": high_put_strike,
+        "pin_strike": pin_strike,
         "atm_strike": atm_strike,
         "records_count": len(formatted_strikes),
         "strikes": formatted_strikes,
