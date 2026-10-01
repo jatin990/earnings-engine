@@ -86,3 +86,10 @@ def test_gmail_disconnect_lifecycle(monkeypatch, auth_client):
     assert get_gmail_auth() is None
 
 
+def test_gmail_ingest_all_emails_endpoint_requires_auth(auth_client):
+    # When no token connected
+    resp = auth_client.post("/api/v1/zepto/gmail/ingest-all-emails")
+    assert resp.status_code == 400
+    assert "No active Gmail account" in resp.json()["detail"]
+
+

@@ -3493,6 +3493,48 @@ const zeptoApp = {
         }
     },
 
+    async ingestAllEmails() {
+        const btn = document.getElementById('btnIngestAllEmails');
+        const icon = document.getElementById('btnIngestAllEmailsIcon');
+        const text = document.getElementById('btnIngestAllEmailsText');
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.className = 'inline-block animate-spin';
+        if (text) text.textContent = 'Ingesting Emails...';
+
+        try {
+            const res = await fetch('/api/v1/zepto/gmail/ingest-all-emails?limit=50', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Email ingestion failed');
+
+            this.showToast(`⚡ ${data.message || 'Successfully ingested emails and updated counts'}`);
+
+            // If category counts returned, update cards immediately
+            if (data.category_counts) {
+                Object.keys(data.category_counts).forEach(cat => {
+                    const countEl = document.getElementById(`gmailCatCount-${cat}`);
+                    if (countEl) countEl.textContent = data.category_counts[cat];
+                });
+            }
+
+            // Reload email feed and store tabs
+            await this.loadRecentEmails();
+            await this.loadOverview();
+            if (this.currentTab === 'attendance') await this.loadAttendanceData();
+            if (this.currentTab === 'metrics') await this.loadMetrics();
+            if (this.currentTab === 'loss') await this.loadLoss();
+        } catch (err) {
+            this.showToast(`Error ingesting emails: ${err.message}`, true);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) icon.className = '';
+            if (text) text.textContent = 'Ingest All Emails';
+        }
+    },
+
     filterGmailEmails() {
         const query = (document.getElementById('gmailSearchInput')?.value || '').toLowerCase().trim();
         const catFilter = document.getElementById('gmailCategoryFilter')?.value || 'ALL';

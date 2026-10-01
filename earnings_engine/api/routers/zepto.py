@@ -873,6 +873,199 @@ async def get_recent_emails_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/api/v1/zepto/gmail/ingest-all-emails", summary="Ingest All Operational Emails & Parse Metrics into Database")
+async def ingest_all_emails_endpoint(
+    limit: int = Query(50, ge=1, le=100, description="Max emails to inspect and ingest"),
+) -> dict[str, Any]:
+    """
+    Ingest all operational emails from linked Gmail inbox:
+    1. Fetches and categorizes recent emails across all 8 operational categories.
+    2. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, and DQ Loss.
+    3. Extracts structured body metrics (GMV, Orders, AOV, SLA, IPP, Loss) and updates persistent tables.
+    4. Returns updated category counters and ingested payload details.
+    """
+    import base64
+    import httpx
+    from earnings_engine.data.zepto_attendance_parser import parse_zepto_attendance_excel
+    from earnings_engine.data.zepto_parsers import (
+        parse_zepto_store_metrics_excel,
+        parse_zepto_loss_shrinkage_excel,
+        extract_metrics_from_email_body,
+    )
+
+    token = zepto_db.get_valid_gmail_token("primary", _settings)
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
+        )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    ingested_counts = {
+        "STORE_METRICS": 0,
+        "ATTENDANCE": 0,
+        "MANPOWER_UTILIZATION": 0,
+        "DQ_LOSS": 0,
+        "SHRINKAGE": 0,
+        "MANPOWER_PLAN": 0,
+        "OPERATIONAL": 0,
+        "SECURITY_ALERT": 0,
+    }
+
+    processed_details = {
+        "attendance_records": 0,
+        "store_metrics_records": 0,
+        "loss_records": 0,
+        "emails_scanned": 0,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            list_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults={limit}"
+            resp = await client.get(list_url, headers=headers)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Gmail API error: {resp.text}")
+
+            msg_list = resp.json().get("messages", [])
+            processed_details["emails_scanned"] = len(msg_list)
+
+            for msg_summary in msg_list:
+                msg_id = msg_summary["id"]
+                msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
+                m_resp = await client.get(msg_url, headers=headers)
+                if m_resp.status_code != 200:
+                    continue
+
+                msg_data = m_resp.json()
+                payload = msg_data.get("payload", {})
+                headers_list = payload.get("headers", [])
+
+                subject = ""
+                sender = ""
+                date_str = ""
+                for h in headers_list:
+                    h_name = h.get("name", "").lower()
+                    if h_name == "subject":
+                        subject = h.get("value", "")
+                    elif h_name == "from":
+                        sender = h.get("value", "")
+                    elif h_name == "date":
+                        date_str = h.get("value", "")
+
+                snippet = msg_data.get("snippet", "")
+                cat_info = _classify_zepto_email(subject, sender, snippet)
+                category = cat_info["category"]
+                if category in ingested_counts:
+                    ingested_counts[category] += 1
+                else:
+                    ingested_counts["OPERATIONAL"] += 1
+
+                # Parse body text metrics
+                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet}")
+
+                # Format ISO date from date_str
+                iso_date = datetime.now().strftime("%Y-%m-%d")
+                if date_str:
+                    try:
+                        from email.utils import parsedate_to_datetime
+                        dt = parsedate_to_datetime(date_str)
+                        iso_date = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        pass
+
+                # If email contains store metrics text numbers, persist them
+                if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count")):
+                    zepto_db.save_store_metrics({
+                        "store_name": "JMU-Sainik Colony",
+                        "metric_date": iso_date,
+                        "sales_gmv": body_metrics.get("sales_gmv", 0.0),
+                        "order_count": body_metrics.get("order_count", 0),
+                        "aov": body_metrics.get("aov", 0.0),
+                        "sla_adherence_pct": body_metrics.get("sla_adherence_pct", 100.0),
+                        "packer_ipp": body_metrics.get("packer_ipp", 0.0),
+                        "raw_source": "GMAIL_BODY",
+                    }, settings=_settings)
+                    processed_details["store_metrics_records"] += 1
+
+                # If email contains DQ loss / shrinkage text numbers, persist them
+                if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount"):
+                    zepto_db.save_loss_record({
+                        "store_name": "JMU-Sainik Colony",
+                        "record_date": iso_date,
+                        "loss_type": category,
+                        "category": "EMAIL_INGESTED",
+                        "amount": body_metrics.get("loss_amount", 0.0),
+                        "sku_count": 1,
+                        "notes": f"Ingested from email: {subject[:60]}",
+                    }, settings=_settings)
+                    processed_details["loss_records"] += 1
+
+                # Inspect and download attachments (.xlsx)
+                all_parts = []
+                def collect_parts(p_list):
+                    for p in p_list:
+                        all_parts.append(p)
+                        if "parts" in p:
+                            collect_parts(p["parts"])
+                collect_parts(payload.get("parts", []))
+
+                for part in all_parts:
+                    fname = part.get("filename", "")
+                    if fname.lower().endswith((".xlsx", ".xlsm")):
+                        body = part.get("body", {})
+                        att_id = body.get("attachmentId")
+                        raw_data = body.get("data")
+
+                        if att_id:
+                            att_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}/attachments/{att_id}"
+                            a_resp = await client.get(att_url, headers=headers)
+                            if a_resp.status_code == 200:
+                                raw_data = a_resp.json().get("data")
+
+                        if raw_data:
+                            file_bytes = base64.urlsafe_b64decode(raw_data.encode("UTF-8"))
+
+                            # Route attachment parser by category or filename
+                            if "attendance" in fname.lower() or category == "ATTENDANCE":
+                                try:
+                                    parsed_att = parse_zepto_attendance_excel(file_bytes, file_name=fname)
+                                    saved_att = zepto_db.save_attendance_batch(parsed_att, source="GMAIL", settings=_settings)
+                                    processed_details["attendance_records"] += saved_att.get("imported_records", 0)
+                                except Exception as e:
+                                    logger.warning("[GMAIL-INGEST] Error parsing attendance attachment %s: %s", fname, e)
+
+                            elif "metric" in fname.lower() or category == "STORE_METRICS":
+                                try:
+                                    parsed_met = parse_zepto_store_metrics_excel(file_bytes, file_name=fname)
+                                    for r in parsed_met.get("records", []):
+                                        zepto_db.save_store_metrics(r, settings=_settings)
+                                        processed_details["store_metrics_records"] += 1
+                                except Exception as e:
+                                    logger.warning("[GMAIL-INGEST] Error parsing store metrics attachment %s: %s", fname, e)
+
+                            elif "loss" in fname.lower() or "shrinkage" in fname.lower() or category in ("DQ_LOSS", "SHRINKAGE"):
+                                try:
+                                    parsed_loss = parse_zepto_loss_shrinkage_excel(file_bytes, file_name=fname)
+                                    for r in parsed_loss.get("records", []):
+                                        zepto_db.save_loss_record(r, settings=_settings)
+                                        processed_details["loss_records"] += 1
+                                except Exception as e:
+                                    logger.warning("[GMAIL-INGEST] Error parsing loss attachment %s: %s", fname, e)
+
+            return {
+                "success": True,
+                "status": "success",
+                "message": f"Successfully ingested {processed_details['emails_scanned']} emails and synchronized metrics.",
+                "category_counts": ingested_counts,
+                "processed_details": processed_details,
+            }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[GMAIL-INGEST] Error during bulk email ingestion: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Email ingestion failed: {str(exc)}")
+
+
 @router.get("/api/v1/zepto/gmail/status", summary="Gmail Integration Status")
 async def get_gmail_status_endpoint() -> dict[str, Any]:
     """Return whether Gmail OAuth credentials are configured and whether an account is currently linked."""
