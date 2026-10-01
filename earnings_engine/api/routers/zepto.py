@@ -458,6 +458,56 @@ async def delete_candidate_endpoint(cand_id: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Offer Letter Generation & Management
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/zepto/offer-letters", summary="List Offer Letters")
+async def get_offer_letters_endpoint(
+    search: str | None = Query(None, description="Search candidate name, role, or doc ref")
+) -> dict[str, Any]:
+    """Retrieve saved offer letters."""
+    try:
+        letters = zepto_db.get_offer_letters(search=search, settings=_settings)
+        return {"success": True, "count": len(letters), "items": letters}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error listing offer letters: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/zepto/offer-letters", summary="Save Offer Letter")
+async def save_offer_letter_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    """Create or update an offer letter record."""
+    try:
+        if not payload.get("candidate_name"):
+            raise HTTPException(status_code=422, detail="Candidate name is required.")
+        letter = zepto_db.save_offer_letter(payload, settings=_settings)
+        return {"success": True, "letter": letter}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error saving offer letter: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/zepto/offer-letters/{letter_id}", summary="Get Offer Letter Details")
+async def get_offer_letter_endpoint(letter_id: str) -> dict[str, Any]:
+    """Retrieve full details and snapshot of an offer letter."""
+    letter = zepto_db.get_offer_letter(letter_id, settings=_settings)
+    if not letter:
+        raise HTTPException(status_code=404, detail=f"Offer letter {letter_id} not found.")
+    return {"success": True, "letter": letter}
+
+
+@router.delete("/api/v1/zepto/offer-letters/{letter_id}", summary="Delete Offer Letter")
+async def delete_offer_letter_endpoint(letter_id: str) -> dict[str, Any]:
+    """Delete an offer letter."""
+    success = zepto_db.delete_offer_letter(letter_id, settings=_settings)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Offer letter {letter_id} not found.")
+    return {"success": True, "deleted": True, "id": letter_id}
+
+
+# ---------------------------------------------------------------------------
 # Zepto Security Deposit & 50-50 Capital Contribution Ledger
 # ---------------------------------------------------------------------------
 
