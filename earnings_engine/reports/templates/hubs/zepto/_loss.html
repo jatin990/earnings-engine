@@ -1,0 +1,139 @@
+<!-- Loss, Quality & Shrinkage Subtab Partial -->
+<div class="space-y-4">
+    <!-- Header Banner -->
+    <div class="glass-panel p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-xl">📉</span>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">DQ Loss, Shrinkage & Waste</h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono">
+                    Inventory Protection
+                </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+                Monitor Dispatch Quality (DQ) defects, transit damage, spoilage waste, and unexplained shrinkage.
+            </p>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <input
+                type="date"
+                id="lossDateFilter"
+                onchange="zeptoApp.loadLoss()"
+                class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+            />
+            <button
+                type="button"
+                onclick="zeptoApp.loadLoss()"
+                class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+            >
+                <span>🔄</span> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Metric Cards Grid -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- Total Loss Value -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Total Loss Value</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="lossTotalCountBadge">-- Incidents</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-rose-400 tracking-tight" id="lossTotalAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Gross Spoilage & Damages</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Total Impacted SKUs:</span>
+                <span class="font-mono font-bold text-slate-300" id="lossTotalSkuCount">--</span>
+            </div>
+        </div>
+
+        <!-- DQ Loss Rate -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Dispatch Quality Loss</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-amber-300 tracking-tight" id="lossDqAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Packer / Picker Packing Defects</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Loss Classification:</span>
+                <span class="font-mono font-bold text-amber-300">DQ_LOSS</span>
+            </div>
+        </div>
+
+        <!-- Fruits & Vegetables Spoilage -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">F&V Fresh Spoilage</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-emerald-300 tracking-tight" id="lossFvAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Perishable Decay & Grade-Out</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Category Exposure:</span>
+                <span class="font-mono font-bold text-emerald-300">FRUITS_VEG</span>
+            </div>
+        </div>
+
+        <!-- Shrinkage & Inventory Variance -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">Shrinkage & Variance</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-purple-300 tracking-tight" id="lossShrinkageAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Stock Count Reconciliations</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Variance Threshold:</span>
+                <span class="font-mono font-bold text-purple-300">&lt; 0.15% GMV</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Category Breakdown and Incident Log -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        <!-- Category Breakdown -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-5">
+            <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Loss by Category</h4>
+                <span class="text-[10px] text-slate-500 font-mono">Top Impacted Categories</span>
+            </div>
+            <div id="lossCategoryDistributionGrid" class="space-y-2">
+                <div class="text-xs text-slate-500 py-4 text-center">Loading category breakdown...</div>
+            </div>
+        </div>
+
+        <!-- Granular Incident Log -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-7">
+            <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Incident Breakdown & SKU Log</h4>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossRecordCountBadge">
+                    0 incidents
+                </span>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar max-h-72">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                            <th class="py-2 px-2.5">Date</th>
+                            <th class="py-2 px-2.5">Type</th>
+                            <th class="py-2 px-2.5">Category</th>
+                            <th class="py-2 px-2.5 text-right">SKUs</th>
+                            <th class="py-2 px-2.5 text-right">Amount</th>
+                            <th class="py-2 px-2.5">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lossTableBody" class="divide-y divide-white/5 font-sans">
+                        <tr>
+                            <td colspan="6" class="text-center py-6 text-slate-500 text-xs">
+                                Loading loss records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>

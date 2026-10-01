@@ -318,6 +318,15 @@
             <button type="button" class="nav-tab" id="tabBtn-attendance" onclick="zeptoApp.switchTab('attendance')">
                 <span>📅</span> Attendance & Shifts
             </button>
+            <button type="button" class="nav-tab" id="tabBtn-utilization" onclick="zeptoApp.switchTab('utilization')">
+                <span>⚡</span> Manpower Utilization & IPP
+            </button>
+            <button type="button" class="nav-tab" id="tabBtn-loss" onclick="zeptoApp.switchTab('loss')">
+                <span>📉</span> DQ Loss & Shrinkage
+            </button>
+            <button type="button" class="nav-tab" id="tabBtn-scorecard" onclick="zeptoApp.switchTab('scorecard')">
+                <span>🏆</span> Store Scorecard
+            </button>
             <button type="button" class="nav-tab" id="tabBtn-income" onclick="zeptoApp.switchTab('income')">
                 <span>💵</span> Store Income & Profit Split
             </button>
@@ -344,6 +353,21 @@
         <!-- ================= TAB: ATTENDANCE & SHIFTS ================= -->
         <main id="tabContent-attendance" class="space-y-4" style="display: none;">
             {% include "hubs/zepto/_attendance.html" %}
+        </main>
+
+        <!-- ================= TAB: MANPOWER UTILIZATION ================= -->
+        <main id="tabContent-utilization" class="space-y-4" style="display: none;">
+            {% include "hubs/zepto/_utilization.html" %}
+        </main>
+
+        <!-- ================= TAB: DQ LOSS & SHRINKAGE ================= -->
+        <main id="tabContent-loss" class="space-y-4" style="display: none;">
+            {% include "hubs/zepto/_loss.html" %}
+        </main>
+
+        <!-- ================= TAB: STORE SCORECARD ================= -->
+        <main id="tabContent-scorecard" class="space-y-4" style="display: none;">
+            {% include "hubs/zepto/_scorecard.html" %}
         </main>
 
         <!-- ================= TAB 2: STORE INCOME & PARTNER SPLIT ================= -->

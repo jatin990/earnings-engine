@@ -285,6 +285,13 @@ def test_zepto_api_endpoints(client):
     ui_resp = client.get("/zepto")
     assert ui_resp.status_code == 200
     assert "Zepto Dark Store Hub" in ui_resp.text
+    assert "tabBtn-utilization" in ui_resp.text
+    assert "tabBtn-loss" in ui_resp.text
+    assert "tabBtn-scorecard" in ui_resp.text
+    assert "tabContent-utilization" in ui_resp.text
+    assert "tabContent-loss" in ui_resp.text
+    assert "tabContent-scorecard" in ui_resp.text
+    assert "attEmployeeDrawer" in ui_resp.text
 
     # 2. Overview API
     overview_resp = client.get("/api/v1/zepto/overview")

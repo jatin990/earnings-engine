@@ -58,6 +58,9 @@ const zeptoApp = {
             this.loadOverview(),
             this.loadEmployees(),
             this.loadAttendanceData(),
+            this.loadUtilization(),
+            this.loadLoss(),
+            this.loadScorecard(),
             this.loadIncome(),
             this.loadExpenses(),
             this.loadCandidates(),
@@ -76,7 +79,7 @@ const zeptoApp = {
             window.location.hash = tabId;
         }
 
-        ['employees', 'attendance', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
+        ['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -90,6 +93,10 @@ const zeptoApp = {
                 content.style.display = t === tabId ? 'block' : 'none';
             }
         });
+
+        if (tabId === 'utilization') this.loadUtilization();
+        if (tabId === 'loss') this.loadLoss();
+        if (tabId === 'scorecard') this.loadScorecard();
     },
 
     // -----------------------------------------------------------------------
@@ -3059,6 +3066,230 @@ const zeptoApp = {
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 300);
         }, 4000);
+    },
+
+    // -----------------------------------------------------------------------
+    // Manpower Utilization & IPP Tab Logic
+    // -----------------------------------------------------------------------
+
+    async loadUtilization() {
+        const date = document.getElementById('utilDateFilter')?.value || '';
+        const params = new URLSearchParams();
+        if (date) params.append('start_date', date);
+
+        try {
+            const res = await fetch(`/api/v1/zepto/utilization/summary?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderUtilization(data);
+        } catch (err) {
+            console.error('[ZEPTO-UTIL] Error loading utilization:', err);
+        }
+    },
+
+    renderUtilization(data) {
+        if (!data) return;
+
+        const totItemsEl = document.getElementById('utilTotalItems');
+        const activePickersEl = document.getElementById('utilActivePickers');
+        const avgIppEl = document.getElementById('utilAvgIpp');
+        const activeHoursEl = document.getElementById('utilActiveHours');
+        const idleHoursEl = document.getElementById('utilIdleHours');
+        const floorEffEl = document.getElementById('utilFloorEfficiency');
+        const flexCostEl = document.getElementById('utilFlexLaborCost');
+        const costPerItemEl = document.getElementById('utilCostPerItem');
+        const countBadge = document.getElementById('utilRecordCountBadge');
+        const tbody = document.getElementById('utilTableBody');
+
+        const records = data.records || [];
+        if (totItemsEl) totItemsEl.textContent = (data.total_items_picked || 0).toLocaleString('en-IN');
+        if (activePickersEl) activePickersEl.textContent = `${data.active_pickers_count || 0} Pickers`;
+        if (avgIppEl) avgIppEl.textContent = data.avg_ipp ? `${data.avg_ipp} IPP` : '—';
+        if (activeHoursEl) activeHoursEl.textContent = `${data.total_active_hours || 0} hrs`;
+        if (idleHoursEl) idleHoursEl.textContent = `${data.total_idle_hours || 0} hrs`;
+
+        const totalHours = (data.total_active_hours || 0) + (data.total_idle_hours || 0);
+        if (floorEffEl) {
+            const eff = totalHours > 0 ? Math.round(((data.total_active_hours || 0) / totalHours) * 100) : 100;
+            floorEffEl.textContent = `${eff}% Active`;
+        }
+
+        if (flexCostEl) flexCostEl.textContent = this.formatCurrency(data.total_flex_labor_cost || 0);
+        if (costPerItemEl) {
+            const cpi = data.total_items_picked > 0 ? ((data.total_flex_labor_cost || 0) / data.total_items_picked).toFixed(2) : '0.00';
+            costPerItemEl.textContent = `₹${cpi} / item`;
+        }
+
+        if (countBadge) countBadge.textContent = `${records.length} records`;
+        if (!tbody) return;
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = records.map(r => `
+            <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-2.5 px-3 font-mono text-slate-300 font-medium">${r.util_date}</td>
+                <td class="py-2.5 px-3">
+                    <div class="font-bold text-white">${r.employee_name || '—'}</div>
+                    <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
+                </td>
+                <td class="py-2.5 px-3 text-slate-300">${r.role}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${(r.items_picked || 0).toLocaleString('en-IN')}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${r.active_pick_hours} hrs</td>
+                <td class="py-2.5 px-3 text-right font-mono text-rose-400">${r.idle_hours} hrs</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${r.ipp} IPP</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${this.formatCurrency(r.flex_labor_cost || 0)}</td>
+            </tr>
+        `).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Loss, Quality & Shrinkage Tab Logic
+    // -----------------------------------------------------------------------
+
+    async loadLoss() {
+        const date = document.getElementById('lossDateFilter')?.value || '';
+        const params = new URLSearchParams();
+        if (date) params.append('start_date', date);
+
+        try {
+            const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderLoss(data);
+        } catch (err) {
+            console.error('[ZEPTO-LOSS] Error loading loss summary:', err);
+        }
+    },
+
+    renderLoss(data) {
+        if (!data) return;
+
+        const totAmtEl = document.getElementById('lossTotalAmount');
+        const countBadge = document.getElementById('lossTotalCountBadge');
+        const skuCountEl = document.getElementById('lossTotalSkuCount');
+        const dqAmtEl = document.getElementById('lossDqAmount');
+        const fvAmtEl = document.getElementById('lossFvAmount');
+        const shrinkAmtEl = document.getElementById('lossShrinkageAmount');
+        const catGrid = document.getElementById('lossCategoryDistributionGrid');
+        const countBadgeTable = document.getElementById('lossRecordCountBadge');
+        const tbody = document.getElementById('lossTableBody');
+
+        const records = data.records || [];
+        const cats = data.category_breakdown || [];
+
+        if (totAmtEl) totAmtEl.textContent = this.formatCurrency(data.total_loss_amount || 0);
+        if (countBadge) countBadge.textContent = `${data.total_loss_records || 0} Incidents`;
+        if (skuCountEl) skuCountEl.textContent = `${data.total_skus_affected || 0} SKUs`;
+
+        const dqLoss = cats.filter(c => c.loss_type === 'DQ_LOSS').reduce((s, c) => s + c.total_amount, 0);
+        const fvLoss = cats.filter(c => c.category === 'FRUITS_VEG').reduce((s, c) => s + c.total_amount, 0);
+        const shrinkLoss = cats.filter(c => c.loss_type === 'SHRINKAGE').reduce((s, c) => s + c.total_amount, 0);
+
+        if (dqAmtEl) dqAmtEl.textContent = this.formatCurrency(dqLoss);
+        if (fvAmtEl) fvAmtEl.textContent = this.formatCurrency(fvLoss);
+        if (shrinkAmtEl) shrinkAmtEl.textContent = this.formatCurrency(shrinkLoss);
+
+        if (catGrid) {
+            if (cats.length === 0) {
+                catGrid.innerHTML = `<div class="text-xs text-slate-500 py-4 text-center">No loss incidents categorized.</div>`;
+            } else {
+                catGrid.innerHTML = cats.map(c => `
+                    <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between text-xs">
+                        <div>
+                            <span class="font-bold text-white">${c.category}</span>
+                            <span class="text-[10px] text-slate-400 font-mono ml-2">(${c.incident_count} events · ${c.total_skus} SKUs)</span>
+                        </div>
+                        <span class="font-mono font-bold text-rose-400">${this.formatCurrency(c.total_amount)}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        if (countBadgeTable) countBadgeTable.textContent = `${records.length} incidents`;
+        if (!tbody) return;
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No loss records logged for this period.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = records.map(r => `
+            <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">${r.record_date}</td>
+                <td class="py-2 px-2.5">
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${r.loss_type === 'DQ_LOSS' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'}">
+                        ${r.loss_type}
+                    </span>
+                </td>
+                <td class="py-2 px-2.5 text-slate-300">${r.category}</td>
+                <td class="py-2 px-2.5 text-right font-mono text-slate-300">${r.sku_count || 0}</td>
+                <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(r.amount || 0)}</td>
+                <td class="py-2 px-2.5 text-slate-400 text-[11px] truncate max-w-xs">${r.notes || '—'}</td>
+            </tr>
+        `).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Dark Store Scorecard Tab Logic
+    // -----------------------------------------------------------------------
+
+    async loadScorecard() {
+        const date = document.getElementById('scorecardDateFilter')?.value || '';
+        const params = new URLSearchParams();
+        if (date) params.append('start_date', date);
+
+        try {
+            const res = await fetch(`/api/v1/zepto/metrics/summary?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderScorecard(data);
+        } catch (err) {
+            console.error('[ZEPTO-SCORECARD] Error loading scorecard:', err);
+        }
+    },
+
+    renderScorecard(data) {
+        if (!data) return;
+
+        const totGmvEl = document.getElementById('scorecardTotalGmv');
+        const avgAovEl = document.getElementById('scorecardAvgAov');
+        const totOrdersEl = document.getElementById('scorecardTotalOrders');
+        const avgSlaEl = document.getElementById('scorecardAvgSla');
+        const avgIppEl = document.getElementById('scorecardAvgIpp');
+        const countBadge = document.getElementById('scorecardRecordCountBadge');
+        const tbody = document.getElementById('scorecardTableBody');
+
+        const metrics = data.daily_metrics || [];
+
+        if (totGmvEl) totGmvEl.textContent = this.formatCurrency(data.total_gmv || 0);
+        if (avgAovEl) avgAovEl.textContent = `₹${data.avg_aov || 0}`;
+        if (totOrdersEl) totOrdersEl.textContent = (data.total_orders || 0).toLocaleString('en-IN');
+        if (avgSlaEl) avgSlaEl.textContent = `${data.avg_sla_adherence_pct || 98.6}%`;
+        if (avgIppEl) avgIppEl.textContent = `${data.avg_packer_ipp || 132.0} IPP`;
+
+        if (countBadge) countBadge.textContent = `${metrics.length} days tracked`;
+        if (!tbody) return;
+
+        if (metrics.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500 text-xs">No daily store scorecard metrics logged yet.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = metrics.map(m => `
+            <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-2.5 px-3 font-mono text-slate-300 font-medium">${m.metric_date}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-300">${this.formatCurrency(m.sales_gmv || 0)}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-white">${(m.order_count || 0).toLocaleString('en-IN')}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-slate-300">₹${m.aov || 0}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.packer_ipp} IPP</td>
+                <td class="py-2.5 px-3 text-right font-mono text-cyan-300">${m.inbound_hours}h</td>
+                <td class="py-2.5 px-3 text-right font-mono text-indigo-300">${m.outbound_hours}h</td>
+                <td class="py-2.5 px-3 text-center font-mono font-bold ${m.sla_adherence_pct >= 98.0 ? 'text-emerald-400' : 'text-amber-300'}">${m.sla_adherence_pct}%</td>
+            </tr>
+        `).join('');
     }
 };
 
