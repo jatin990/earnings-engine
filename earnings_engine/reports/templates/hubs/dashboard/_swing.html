@@ -1,137 +1,120 @@
 {% import 'dashboard/_components.html' as comps %}
         <div id="tab-swing" class="tab-content" style="width: 100%; max-width: 100%;">
 
-            <!-- ⚡ Top Metric KPI Cards with Interactive Filtering -->
-            <div id="swingSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+            <!-- ⚡ Sleek, Decluttered High-Density KPI Metrics Strip -->
+            <div id="swingSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.65rem;">
 
                 <!-- 1. Monitored Universe -->
-                <div id="swingCardAll" onclick="app.setSwingSubTab('setups'); app.setSwingTierFilter('ALL'); app.clearSwingFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(59,130,246,0.25); border-top:2px solid #3b82f6; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to show all candidates">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Monitored Universe</span>
-                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.60rem;">Show All</span>
+                <div id="swingCardAll" onclick="app.switchSwingSubTab('setups'); app.setSwingTierFilter('ALL'); app.clearSwingFilter();" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(255,255,255,0.07); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to view all monitored swing candidates">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Monitored Universe</span>
+                        <span class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.58rem;padding:0.05rem 0.3rem;">All Tiers</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><span id="count-all">0</span> <span style="font-size:0.80rem;color:#94a3b8;font-weight:500;">Tickers</span></div>
-                    <div id="swingKpiSubAll" style="font-size:0.67rem;color:#64748b;margin-top:0.15rem;">Cycle Oscillators &amp; Bands</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);line-height:1.2;"><span id="count-all">0</span> <span style="font-size:0.72rem;color:#64748b;font-weight:500;">Tickers</span></div>
+                    <div id="swingKpiSubAll" style="font-size:0.64rem;color:#64748b;margin-top:0.15rem;">Trading Bands &amp; S/R Floors</div>
                 </div>
 
-                <!-- 2. 🏆 Top Swingers KPI Card -->
-                <div id="swingCardTopSwingers" onclick="app.setSwingSubTab('top-swingers')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(234,179,8,0.35); border-top:2px solid #eab308; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to view Top Ranked Swingers by Cycle Rhythm &amp; Frequency">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#facc15;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🏆 Top Swingers</span>
-                        <span class="signal-badge" style="background:rgba(234,179,8,0.18);color:#facc15;font-size:0.60rem;font-weight:700;">Cycle Matrix</span>
+                <!-- 2. 🏆 Top Swingers -->
+                <div id="swingCardTopSwingers" onclick="app.switchSwingSubTab('top-swingers')" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(234,179,8,0.22); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to view Best Top Swingers ranked by Cycle Count &amp; Duration">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#facc15;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🏆 Top Swingers</span>
+                        <span class="signal-badge" style="background:rgba(234,179,8,0.12);color:#facc15;font-size:0.58rem;padding:0.05rem 0.3rem;">Cycle Matrix</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#facc15;font-family:var(--font-heading);"><span id="count-top-swingers">0</span> <span style="font-size:0.80rem;color:#fef08a;font-weight:500;">Best</span></div>
-                    <div style="font-size:0.67rem;color:#a16207;margin-top:0.15rem;">Multi-Cycle Harmonic Rhythms</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#facc15;font-family:var(--font-heading);line-height:1.2;"><span id="count-top-swingers">0</span> <span style="font-size:0.72rem;color:#ca8a04;font-weight:500;">Best</span></div>
+                    <div style="font-size:0.64rem;color:#854d0e;margin-top:0.15rem;">Harmonic Multi-Cycles (≥1)</div>
                 </div>
 
-                <!-- 3. 🔥 Hot Tier Pool -->
-                <div id="swingCardHot" onclick="app.setSwingSubTab('setups'); app.setSwingTierFilter('HOT')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(239,68,68,0.3); border-top:2px solid #ef4444; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter to HOT tier swing setups">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 Hot Pool</span>
-                        <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.60rem;">T2 Fast Loop</span>
+                <!-- 3. 🔥 Hot Pool / Buy Zone -->
+                <div id="swingCardHot" onclick="app.switchSwingSubTab('setups'); app.setSwingTierFilter('HOT')" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(239,68,68,0.22); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to filter to Hot tier fast setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 Hot Pool</span>
+                        <span class="signal-badge" style="background:rgba(239,68,68,0.12);color:#f87171;font-size:0.58rem;padding:0.05rem 0.3rem;">T2 Active</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#f87171;font-family:var(--font-heading);"><span id="count-hot-pool">0</span> <span style="font-size:0.80rem;color:#fca5a5;font-weight:500;">Hot</span></div>
-                    <div style="font-size:0.67rem;color:#991b1b;margin-top:0.15rem;">High Velocity · Rescore 5m</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#f87171;font-family:var(--font-heading);line-height:1.2;"><span id="count-hot-pool">0</span> <span style="font-size:0.72rem;color:#991b1b;font-weight:500;">Hot</span></div>
+                    <div style="font-size:0.64rem;color:#7f1d1d;margin-top:0.15rem;">Immediate Floor Proximity</div>
                 </div>
 
-                <!-- 4. ⚡ Warm Tier Pool -->
-                <div id="swingCardWarm" onclick="app.setSwingSubTab('setups'); app.setSwingTierFilter('WARM')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(245,158,11,0.3); border-top:2px solid #f59e0b; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter to WARM tier swing setups">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⚡ Warm Pool</span>
-                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.60rem;">T1 Setup Loop</span>
+                <!-- 4. ⚡ Warm Pool -->
+                <div id="swingCardWarm" onclick="app.switchSwingSubTab('setups'); app.setSwingTierFilter('WARM')" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(245,158,11,0.22); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to filter to Warm tier setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⚡ Warm Pool</span>
+                        <span class="signal-badge" style="background:rgba(245,158,11,0.12);color:#fbbf24;font-size:0.58rem;padding:0.05rem 0.3rem;">T1 Setup</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="count-warm-pool">0</span> <span style="font-size:0.80rem;color:#fde68a;font-weight:500;">Warm</span></div>
-                    <div style="font-size:0.67rem;color:#92400e;margin-top:0.15rem;">Coiling Channel · Rescore 15m</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);line-height:1.2;"><span id="count-warm-pool">0</span> <span style="font-size:0.72rem;color:#b45309;font-weight:500;">Warm</span></div>
+                    <div style="font-size:0.64rem;color:#78350f;margin-top:0.15rem;">Channel Coiling · Rescore 15m</div>
                 </div>
 
-                <!-- 5. ❄️ Cold Pool -->
-                <div id="swingCardCold" onclick="app.setSwingSubTab('setups'); app.setSwingTierFilter('COLD')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(148,163,184,0.25); border-top:2px solid #64748b; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to view Cold Tier monitoring universe">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">❄️ Cold Pool</span>
-                        <span class="signal-badge" style="background:rgba(148,163,184,0.15);color:#cbd5e1;font-size:0.60rem;">T0 Background</span>
+                <!-- 5. 🟢 Active Buy Zone -->
+                <div id="swingCardBuyZone" onclick="app.switchSwingSubTab('setups'); app.toggleSwingBuyZoneFilter()" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(16,185,129,0.22); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to filter to In Buy Zone setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🟢 Buy Zone</span>
+                        <span id="swingFilterIndicatorBz" style="font-size:0.58rem;background:rgba(16,185,129,0.2);color:#6ee7b7;padding:0.05rem 0.3rem;border-radius:3px;display:none;">ON</span>
+                        <span id="swingStatBzSub" class="signal-badge" style="background:rgba(16,185,129,0.12);color:#34d399;font-size:0.58rem;padding:0.05rem 0.3rem;">Floor</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#cbd5e1;font-family:var(--font-heading);"><span id="count-cold-pool">0</span> <span style="font-size:0.80rem;color:#94a3b8;font-weight:500;">Cold</span></div>
-                    <div style="font-size:0.67rem;color:#475569;margin-top:0.15rem;">Broad Monitoring · 60m Cycle</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#34d399;font-family:var(--font-heading);line-height:1.2;"><span id="count-buyzone">0</span> <span style="font-size:0.72rem;color:#059669;font-weight:500;">Setups</span></div>
+                    <div id="swingKpiSubBz" style="font-size:0.64rem;color:#065f46;margin-top:0.15rem;">0–3% from Support Floor</div>
                 </div>
 
-                <!-- 6. Active Buy Zone -->
-                <div id="swingCardBuyZone" onclick="app.setSwingSubTab('setups'); app.toggleSwingBuyZoneFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(16,185,129,0.3); border-top:2px solid #10b981; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to In Buy Zone setups only">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;display:flex;align-items:center;gap:0.3rem;">
-                            <span>🟢</span> <span>In Buy Zone</span>
-                        </span>
-                        <span id="swingFilterIndicatorBz" style="font-size:0.60rem;background:rgba(16,185,129,0.2);color:#6ee7b7;border:1px solid rgba(16,185,129,0.4);padding:0.05rem 0.3rem;border-radius:3px;display:none;">FILTER ON</span>
-                        <span id="swingStatBzSub" class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.60rem;">Support Floor</span>
+                <!-- 6. ⭐ Grade A+ Strong Buy -->
+                <div id="swingCardStrongBuy" onclick="app.switchSwingSubTab('setups'); app.filterSwing('strongbuy')" class="card cursor-pointer" style="padding:0.6rem 0.8rem; margin-bottom:0; background:#090d16; border:1px solid rgba(56,189,248,0.22); border-radius:6px; cursor:pointer; transition:all 0.2s ease; user-select:none;" title="Click to filter to Strong Buy Grade A+ setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.65rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⭐ Strong Buy</span>
+                        <span class="signal-badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;font-size:0.58rem;padding:0.05rem 0.3rem;">Grade A+</span>
                     </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><span id="count-buyzone">0</span> <span style="font-size:0.80rem;color:#6ee7b7;font-weight:500;">Setups</span></div>
-                    <div id="swingKpiSubBz" style="font-size:0.67rem;color:#065f46;margin-top:0.15rem;">0–3% from Floor • Click to Filter</div>
+                    <div style="font-size:1.35rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);line-height:1.2;"><span id="count-strongbuy">0</span> <span style="font-size:0.72rem;color:#0284c7;font-weight:500;">Stocks</span></div>
+                    <div id="swingKpiSubStrongBuy" style="font-size:0.64rem;color:#0369a1;margin-top:0.15rem;">High Beat Rate + Buy Zone</div>
                 </div>
 
-                <!-- 7. Strong Buy (High Quality Grade A+) -->
-                <div id="swingCardStrongBuy" onclick="app.setSwingSubTab('setups'); app.filterSwing('strongbuy')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(56,189,248,0.25); border-top:2px solid #38bdf8; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to Strong Buy setups only">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Strong Buy</span>
-                        <span class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.60rem;">Grade A+</span>
-                    </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><span id="count-strongbuy">0</span> <span style="font-size:0.80rem;color:#93c5fd;font-weight:500;">Stocks</span></div>
-                    <div style="font-size:0.67rem;color:#0369a1;margin-top:0.15rem;">High Beat Rate + Buy Zone</div>
-                </div>
-
-                <!-- 8. Custom User Ranges -->
-                <div id="swingCardCustom" onclick="app.setSwingSubTab('setups'); app.filterSwing('custom')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(245,158,11,0.25); border-top:2px solid #f59e0b; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to Custom User-defined ranges">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Custom Ranges</span>
-                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.60rem;">User Locked</span>
-                    </div>
-                    <div style="font-size:1.55rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="count-custom">0</span> <span style="font-size:0.80rem;color:#fde68a;font-weight:500;">Custom</span></div>
-                    <div style="font-size:0.67rem;color:#78350f;margin-top:0.15rem;">Protected Trading Channels</div>
-                </div>
             </div>
 
-            <!-- Main Swing Trading Section -->
-            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+            <!-- Main High-Density Terminal Workspace -->
+            <section class="card" style="padding: 0.75rem 0.95rem; border: 1px solid rgba(255,255,255,0.06); background: #060609; border-radius: 8px;">
 
-                <!-- Header & Action Controls Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                <!-- Header & Unified Action Controls Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.55rem; flex-wrap: wrap; gap: 0.45rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
-                            <span>🔄 Swing Trading &amp; Cycle Oscillators</span>
-                            <span id="swingCountBadge" class="signal-badge" style="font-size:0.68rem;display:none;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;"></span>
-                        </h3>
-                        <p class="timestamp" style="margin:0.15rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Horizontal trading bands, multi-cycle support floors, and real-time harmonic cycle ranking across universes.</p>
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <h3 style="margin: 0; font-size: 0.98rem; font-family: var(--font-heading); color: #ffffff; display: flex; align-items: center; gap: 0.35rem;">
+                                <span>🔄 Swing Ranges &amp; Harmonic Oscillators</span>
+                            </h3>
+                            <span id="swingSubtabContextLabel" class="signal-badge" style="background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);font-size:0.65rem;padding:0.08rem 0.45rem;font-weight:700;">⚡ Active Trading Channels &amp; Setups</span>
+                        </div>
+                        <p class="timestamp" style="margin:0.15rem 0 0 0;font-size:0.68rem;color:var(--text-muted);">
+                            Multi-cycle trading channels, support floors &amp; real-time cycle frequency ranking (90D Lookback). Click any stock to slide out Stock Intelligence.
+                        </p>
                     </div>
 
                     <!-- Right Global Controls -->
-                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
-                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm btn-tactile" title="Load and refresh swing setups">🔄 Refresh Setups</button>
-                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm btn-tactile" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
-                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm btn-tactile" title="Run Multi-Modal AI News &amp; Synthesis">🧠 AI Thesis</button>
-                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm btn-tactile" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
+                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-xs btn-tactile" style="font-size:0.70rem;padding:0.22rem 0.55rem;" title="Refresh swing setups">🔄 Refresh</button>
+                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.70rem;padding:0.22rem 0.55rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cbd5e1;" title="Compute Kronos AI neural forecasts">🔮 Kronos 14D</button>
+                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.70rem;padding:0.22rem 0.55rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cbd5e1;" title="Run AI Thesis synthesis">🧠 AI Thesis</button>
+                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.70rem;padding:0.22rem 0.55rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cbd5e1;" title="Run 4-Model AI Consensus">🤖 Consensus</button>
                     </div>
                 </div>
 
-                <!-- 🗂️ Swing Sub-Tabs Navigation Bar -->
-                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.65rem; padding-bottom: 0.45rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                        <button type="button" id="swingSubTabBtn-setups" onclick="app.setSwingSubTab('setups')" class="btn-micro" style="padding:0.32rem 0.75rem;font-size:0.75rem;font-weight:700;border-radius:0.35rem;background:#2563eb;color:#ffffff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;">
-                            <span>⚡ Active Setups &amp; Channels</span>
-                            <span id="swingSubTabCount-setups" class="signal-badge" style="background:rgba(255,255,255,0.2);color:#ffffff;font-size:0.62rem;padding:0.05rem 0.35rem;">0</span>
+                <!-- Sub-Tabs Quick Nav Bar -->
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.55rem; padding-bottom: 0.4rem; flex-wrap: wrap; gap: 0.45rem;">
+                    <div style="display: inline-flex; align-items: center; gap: 0.25rem; background: #030305; padding: 2px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.06);">
+                        <button type="button" id="swingSubTabBtn-setups" onclick="app.switchSwingSubTab('setups')" class="btn-micro active" style="padding:0.22rem 0.6rem;font-size:0.70rem;font-weight:700;border-radius:4px;background:rgba(255,255,255,0.12);color:#ffffff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;">
+                            <span>⚡ Active Setups</span>
+                            <span id="swingSubTabCount-setups" class="signal-badge" style="background:rgba(255,255,255,0.15);color:#ffffff;font-size:0.58rem;padding:0.02rem 0.3rem;">0</span>
                         </button>
-                        <button type="button" id="swingSubTabBtn-top-swingers" onclick="app.setSwingSubTab('top-swingers')" class="btn-micro" style="padding:0.32rem 0.75rem;font-size:0.75rem;font-weight:600;border-radius:0.35rem;background:transparent;color:#94a3b8;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;">
-                            <span>🏆 Best Top Swingers (Cycle Matrix)</span>
-                            <span id="swingSubTabCount-top" class="signal-badge" style="background:rgba(234,179,8,0.2);color:#facc15;font-size:0.62rem;padding:0.05rem 0.35rem;">0</span>
+                        <button type="button" id="swingSubTabBtn-top-swingers" onclick="app.switchSwingSubTab('top-swingers')" class="btn-micro" style="padding:0.22rem 0.6rem;font-size:0.70rem;font-weight:500;border-radius:4px;background:transparent;color:#94a3b8;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;">
+                            <span>🏆 Best Top Swingers</span>
+                            <span id="swingSubTabCount-top" class="signal-badge" style="background:rgba(234,179,8,0.15);color:#facc15;font-size:0.58rem;padding:0.02rem 0.3rem;">0</span>
                         </button>
-                        <button type="button" id="swingSubTabBtn-audit" onclick="app.setSwingSubTab('audit')" class="btn-micro" style="padding:0.32rem 0.75rem;font-size:0.75rem;font-weight:600;border-radius:0.35rem;background:transparent;color:#94a3b8;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;">
+                        <button type="button" id="swingSubTabBtn-audit" onclick="app.switchSwingSubTab('audit')" class="btn-micro" style="padding:0.22rem 0.6rem;font-size:0.70rem;font-weight:500;border-radius:4px;background:transparent;color:#94a3b8;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;">
                             <span>🔄 Tier Audit Log</span>
-                            <span id="swingSubTabCount-audit" class="signal-badge" style="background:rgba(148,163,184,0.15);color:#cbd5e1;font-size:0.62rem;padding:0.05rem 0.35rem;">0</span>
+                            <span id="swingSubTabCount-audit" class="signal-badge" style="background:rgba(148,163,184,0.12);color:#cbd5e1;font-size:0.58rem;padding:0.02rem 0.3rem;">0</span>
                         </button>
                     </div>
 
-                    <div style="font-size:0.68rem;color:#64748b;display:flex;align-items:center;gap:0.4rem;">
-                        <span>⏱️ Lookback: <strong style="color:#94a3b8;">90D Channel Rhythm</strong></span>
+                    <div style="font-size:0.65rem;color:#64748b;display:flex;align-items:center;gap:0.35rem;">
+                        <span>⏱️ Baseline: <strong style="color:#94a3b8;">90D Channel Rhythm</strong></span>
                         <span>•</span>
-                        <span>Auto-Refreshed Real-Time</span>
+                        <span>Persistent Drawer on Click</span>
                     </div>
                 </div>
 
@@ -140,31 +123,31 @@
                 <!-- ================================================================= -->
                 <div id="swingSubTabContent-setups" style="display: block;">
 
-                    <!-- Operations Toolbar: Filter Pills, Search, View Switcher -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.45rem;">
+                    <!-- Operations Toolbar: Tier Filter Pills, Search, View Switcher -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #0a0e1a; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.4rem;">
 
                         <!-- Left: Tier Selection Pills & Strategy Filter Pills -->
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
                             <!-- Tier Filter Pills -->
-                            <div id="swingTierPillsContainer" style="display:inline-flex;align-items:center;background:#030305;border:1px solid rgba(255,255,255,0.1);border-radius:0.4rem;padding:2px;gap:2px;">
-                                <button type="button" onclick="app.setSwingTierFilter('ALL')" id="swingTierPill-ALL" class="btn-micro btn-primary" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:700;border-radius:0.3rem;background:#2563eb;color:#ffffff;border:none;cursor:pointer;" title="View all tracked candidates">🌐 All (<span id="count-all-pill">0</span>)</button>
-                                <button type="button" onclick="app.setSwingTierFilter('HOT')" id="swingTierPill-HOT" class="btn-micro" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:500;border-radius:0.3rem;background:transparent;color:#f87171;border:none;cursor:pointer;" title="Hot Tier: High velocity immediate action candidates">🔥 Hot (<span id="count-hot-pill">0</span>)</button>
-                                <button type="button" onclick="app.setSwingTierFilter('WARM')" id="swingTierPill-WARM" class="btn-micro" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:500;border-radius:0.3rem;background:transparent;color:#fbbf24;border:none;cursor:pointer;" title="Warm Tier: Coiling setup / compression candidates">⚡ Warm (<span id="count-warm-pill">0</span>)</button>
-                                <button type="button" onclick="app.setSwingTierFilter('COLD')" id="swingTierPill-COLD" class="btn-micro" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:500;border-radius:0.3rem;background:transparent;color:#94a3b8;border:none;cursor:pointer;" title="Cold Tier: Monitored pool background">❄️ Cold (<span id="count-cold-pill">0</span>)</button>
+                            <div id="swingTierPillsContainer" style="display:inline-flex;align-items:center;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:2px;gap:2px;">
+                                <button type="button" onclick="app.setSwingTierFilter('ALL')" id="swingTierPill-ALL" class="btn-micro btn-primary" style="padding:0.18rem 0.5rem;font-size:0.68rem;font-weight:700;border-radius:3px;background:#2563eb;color:#ffffff;border:none;cursor:pointer;" title="View all tracked candidates">🌐 All (<span id="count-all-pill">0</span>)</button>
+                                <button type="button" onclick="app.setSwingTierFilter('HOT')" id="swingTierPill-HOT" class="btn-micro" style="padding:0.18rem 0.5rem;font-size:0.68rem;font-weight:500;border-radius:3px;background:transparent;color:#f87171;border:none;cursor:pointer;" title="Hot Tier: High velocity immediate action candidates">🔥 Hot (<span id="count-hot-pill">0</span>)</button>
+                                <button type="button" onclick="app.setSwingTierFilter('WARM')" id="swingTierPill-WARM" class="btn-micro" style="padding:0.18rem 0.5rem;font-size:0.68rem;font-weight:500;border-radius:3px;background:transparent;color:#fbbf24;border:none;cursor:pointer;" title="Warm Tier: Coiling setup / compression candidates">⚡ Warm (<span id="count-warm-pill">0</span>)</button>
+                                <button type="button" onclick="app.setSwingTierFilter('COLD')" id="swingTierPill-COLD" class="btn-micro" style="padding:0.18rem 0.5rem;font-size:0.68rem;font-weight:500;border-radius:3px;background:transparent;color:#94a3b8;border:none;cursor:pointer;" title="Cold Tier: Monitored pool background">❄️ Cold (<span id="count-cold-pill">0</span>)</button>
                             </div>
 
                             <!-- Strategy Setup Pills -->
-                            <div id="swingFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center;">
-                                <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
-                                <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
-                                <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#fbbf24;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
+                            <div id="swingFilterPills" style="display: flex; gap: 0.25rem; flex-wrap: wrap; align-items: center;">
+                                <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.18rem 0.45rem;font-size:0.68rem;color:#34d399;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
+                                <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.18rem 0.45rem;font-size:0.68rem;color:#38bdf8;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
+                                <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.18rem 0.45rem;font-size:0.68rem;color:#fbbf24;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
                             </div>
                         </div>
 
                         <!-- Search & View Toggle -->
-                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                            <input type="text" id="swingSearchInput" oninput="app.filterSwingTable(this.value)" placeholder="🔍 Search symbol, zone, signal..." style="width: 190px; padding: 0.25rem 0.5rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
-                            <div style="display: flex; align-items: center; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; padding: 1px;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <input type="text" id="swingSearchInput" oninput="app.filterSwingTable(this.value)" placeholder="🔍 Search ticker, sector, signal..." style="width: 175px; padding: 0.22rem 0.45rem; background: #030305; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; color: #ffffff; font-size: 0.70rem; font-family: var(--font-mono); outline: none;">
+                            <div style="display: flex; align-items: center; background: #030305; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px;">
                                 <button type="button" onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn-micro btn-tactile" style="background:rgba(255,255,255,0.12);color:#ffffff;font-size:0.65rem;" title="Table View">📋 Table</button>
                                 <button type="button" onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn-micro btn-tactile" style="background:transparent;color:#71717a;font-size:0.65rem;" title="Cards View">🎴 Cards</button>
                             </div>
@@ -172,35 +155,34 @@
                     </div>
 
                     <!-- Notice Bar -->
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;font-size:0.68rem;color:#64748b;">
-                        <div style="display:flex;align-items:center;gap:0.6rem;">
-                            <span>💡 <strong>Consolidated High-Density View:</strong> Click channel for support/resistance editor • Click AI badge for unified thesis</span>
-                            <span id="swingFilterNotice" style="display:none;align-items:center;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.35);padding:0.15rem 0.5rem;border-radius:4px;font-size:0.68rem;font-weight:600;"></span>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;font-size:0.65rem;color:#64748b;">
+                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                            <span>💡 <strong>Tip:</strong> Click any row to slide out Stock Intelligence Drawer (Technicals &amp; Institutional Forensics)</span>
+                            <span id="swingFilterNotice" style="display:none;align-items:center;background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);padding:0.1rem 0.45rem;border-radius:4px;font-size:0.65rem;font-weight:600;"></span>
                         </div>
-                        <span id="swingColOrderNotice" style="color:#38bdf8;font-weight:600;display:none;">Custom Layout Saved</span>
                     </div>
 
                     <!-- Streamlined 7-Column Table View Container -->
-                    <div id="swingTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 240px);min-height:360px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;margin-top:0;">
-                        <table id="swingTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+                    <div id="swingTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 250px);min-height:360px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:#05070d;margin-top:0;">
+                        <table id="swingTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.72rem;">
                             <thead>
-                                <tr style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
-                                    <th onclick="app.sortSwing('ticker')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;">Ticker ⇅</th>
-                                    <th onclick="app.sortSwing('current_price')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;">Price &amp; 30D Move ⇅</th>
-                                    <th onclick="app.sortSwing('swing_signal')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;">Tier &amp; Signal ⇅</th>
-                                    <th onclick="app.sortSwing('current_support')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;">Trading Channel (S/R) ⇅</th>
-                                    <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;">Earnings &amp; Quality ⇅</th>
-                                    <th onclick="app.sortSwing('consensus_strength')" style="cursor:pointer;padding:0.5rem 0.65rem;text-align:left;" title="Consolidated 4-Model AI Consensus + Kronos 14D + News Thesis">🤖 AI Intelligence &amp; Thesis ⇅</th>
-                                    <th style="text-align:right;padding:0.5rem 0.65rem;">Action</th>
+                                <tr style="background:#090d16;border-bottom:1px solid rgba(255,255,255,0.08);">
+                                    <th onclick="app.sortSwing('ticker')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Ticker ⇅</th>
+                                    <th onclick="app.sortSwing('current_price')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Price &amp; 30D Move ⇅</th>
+                                    <th onclick="app.sortSwing('swing_signal')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Tier &amp; Signal ⇅</th>
+                                    <th onclick="app.sortSwing('current_support')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Trading Channel (S/R) ⇅</th>
+                                    <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Earnings &amp; Quality ⇅</th>
+                                    <th onclick="app.sortSwing('consensus_strength')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;" title="Consolidated 4-Model AI Consensus + Kronos 14D + News Thesis">🤖 AI Intelligence ⇅</th>
+                                    <th style="text-align:right;padding:0.45rem 0.6rem;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="swingTableBody">
                                 <tr>
                                     <td colspan="7" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
-                                        <div style="font-size:2rem;margin-bottom:0.5rem;">🔄</div>
-                                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Swing Trading Matrix Ready</h4>
-                                        <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Select your universe above and click <strong>Load Setups</strong> to scan trading bands and buy zones.</p>
-                                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm btn-tactile" style="font-weight:600;">▶ Load Swing Setups</button>
+                                        <div style="font-size:1.8rem;margin-bottom:0.4rem;">🔄</div>
+                                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:0.98rem;">Swing Trading Matrix Ready</h4>
+                                        <p style="font-size:0.75rem;margin:0 0 0.85rem 0;color:var(--text-muted);">Select your universe above and click <strong>Refresh</strong> to scan trading bands and buy zones.</p>
+                                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-xs btn-tactile" style="font-weight:600;padding:0.3rem 0.75rem;">▶ Load Swing Setups</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -208,7 +190,7 @@
                     </div>
 
                     <!-- Cards View Container (hidden by default) -->
-                    <div id="swingWidgets" class="widget-grid" style="display:none;margin-top:0.75rem;"></div>
+                    <div id="swingWidgets" class="widget-grid" style="display:none;margin-top:0.65rem;"></div>
                 </div>
 
                 <!-- ================================================================= -->
@@ -217,13 +199,13 @@
                 <div id="swingSubTabContent-top-swingers" style="display: none;">
 
                     <!-- Top Swingers Toolbar -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.65rem; background: #0a0a10; border: 1px solid rgba(234,179,8,0.25); border-radius: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #0a0e1a; border: 1px solid rgba(234,179,8,0.18); border-radius: 6px; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.4rem;">
 
                         <!-- Left Filter Controls -->
-                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                            <div style="display: flex; align-items: center; gap: 0.35rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; padding: 0.2rem 0.5rem;">
-                                <span style="font-size: 0.70rem; color: #fbbf24; font-weight: 700;">🔄 Min Cycles:</span>
-                                <select id="swingTopMinCycles" onchange="app.onTopSwingersMinCyclesChange(this.value)" style="background: transparent; border: none; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none; cursor: pointer;">
+                        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.3rem; background: #030305; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 0.18rem 0.45rem;">
+                                <span style="font-size: 0.68rem; color: #fbbf24; font-weight: 700;">🔄 Min Cycles:</span>
+                                <select id="swingTopMinCycles" onchange="app.onTopSwingersMinCyclesChange(this.value)" style="background: transparent; border: none; color: #ffffff; font-size: 0.70rem; font-family: var(--font-mono); outline: none; cursor: pointer;">
                                     <option value="1" selected>≥ 1 Cycle (All Candidates)</option>
                                     <option value="2">≥ 2 Cycles (Established Swingers)</option>
                                     <option value="3">≥ 3 Cycles (High Harmonic Rhythm)</option>
@@ -231,42 +213,42 @@
                                 </select>
                             </div>
 
-                            <span class="signal-badge" style="background:rgba(234,179,8,0.12);color:#facc15;border:1px solid rgba(234,179,8,0.3);font-size:0.68rem;padding:0.15rem 0.45rem;">
+                            <span class="signal-badge" style="background:rgba(234,179,8,0.1);color:#facc15;border:1px solid rgba(234,179,8,0.22);font-size:0.65rem;padding:0.1rem 0.4rem;">
                                 📐 Sweet Spot Velocity: 10d – 30d / cycle
                             </span>
                         </div>
 
                         <!-- Right Search & Refresh -->
-                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                            <input type="text" id="swingTopSearchInput" oninput="app.filterTopSwingersTable(this.value)" placeholder="🔍 Filter top swingers..." style="width: 190px; padding: 0.25rem 0.5rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
-                            <button type="button" onclick="app.loadTopSwingers(event)" class="btn btn-primary btn-sm btn-tactile" style="background:#eab308;color:#000000;border:none;font-weight:700;" title="Refresh Top Swingers Matrix">🏆 Refresh Top Swingers</button>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <input type="text" id="swingTopSearchInput" oninput="app.filterTopSwingersTable(this.value)" placeholder="🔍 Filter top swingers..." style="width: 175px; padding: 0.22rem 0.45rem; background: #030305; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; color: #ffffff; font-size: 0.70rem; font-family: var(--font-mono); outline: none;">
+                            <button type="button" onclick="app.loadTopSwingers(event)" class="btn btn-xs btn-tactile" style="background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.35);font-weight:700;padding:0.22rem 0.55rem;" title="Refresh Top Swingers Matrix">🏆 Refresh Top Swingers</button>
                         </div>
                     </div>
 
                     <!-- Top Swingers Table Container -->
-                    <div id="swingTopSwingersTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 240px);min-height:360px;border-radius:0.6rem;border:1px solid rgba(234,179,8,0.2);background:#000000;margin-top:0;">
-                        <table id="swingTopSwingersTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+                    <div id="swingTopSwingersTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 250px);min-height:360px;border-radius:6px;border:1px solid rgba(234,179,8,0.15);background:#05070d;margin-top:0;">
+                        <table id="swingTopSwingersTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.72rem;">
                             <thead>
-                                <tr style="background:#0c101c;border-bottom:1px solid rgba(234,179,8,0.3);">
-                                    <th onclick="app.sortTopSwingers('rank')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;color:#facc15;">Rank ⇅</th>
-                                    <th onclick="app.sortTopSwingers('ticker')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;">Ticker &amp; Sector ⇅</th>
-                                    <th onclick="app.sortTopSwingers('current_price')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;">Price &amp; 30D Move ⇅</th>
-                                    <th onclick="app.sortTopSwingers('cycles')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;" title="Completed Harmonic Oscillations between Support and Resistance">🔄 Cycle Count &amp; Frequency ⇅</th>
-                                    <th onclick="app.sortTopSwingers('avg_cycle_days')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;" title="Average Calendar Days to Complete one Bottom-to-Top Oscillation Cycle">⏱️ Avg Cycle Duration ⇅</th>
-                                    <th onclick="app.sortTopSwingers('spread_pct')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;">📐 Channel &amp; Spread ⇅</th>
-                                    <th onclick="app.sortTopSwingers('dist_to_support_pct')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;">🎯 Floor Proximity ⇅</th>
-                                    <th onclick="app.sortTopSwingers('swing_rank_score')" style="cursor:pointer;padding:0.55rem 0.65rem;text-align:left;" title="Composite Score based on Cycle Count, Velocity, Channel Spread and Support Proximity">⭐ Swing Score ⇅</th>
-                                    <th style="padding:0.55rem 0.65rem;text-align:left;">🤖 AI &amp; Kronos</th>
-                                    <th style="text-align:right;padding:0.55rem 0.65rem;">Actions</th>
+                                <tr style="background:#0c101c;border-bottom:1px solid rgba(234,179,8,0.25);">
+                                    <th onclick="app.sortTopSwingers('rank')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#facc15;">Rank ⇅</th>
+                                    <th onclick="app.sortTopSwingers('ticker')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Ticker &amp; Sector ⇅</th>
+                                    <th onclick="app.sortTopSwingers('current_price')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">Price &amp; 30D Move ⇅</th>
+                                    <th onclick="app.sortTopSwingers('cycles')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;" title="Completed Harmonic Oscillations between Support and Resistance">🔄 Cycles ⇅</th>
+                                    <th onclick="app.sortTopSwingers('avg_cycle_days')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;" title="Average Calendar Days to Complete one Bottom-to-Top Oscillation Cycle">⏱️ Avg Duration ⇅</th>
+                                    <th onclick="app.sortTopSwingers('spread_pct')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">📐 Spread ⇅</th>
+                                    <th onclick="app.sortTopSwingers('dist_to_support_pct')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;">🎯 Floor Proximity ⇅</th>
+                                    <th onclick="app.sortTopSwingers('swing_rank_score')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;" title="Composite Score based on Cycle Count, Velocity, Channel Spread and Support Proximity">⭐ Swing Score ⇅</th>
+                                    <th style="padding:0.45rem 0.6rem;text-align:left;">🤖 AI &amp; Kronos</th>
+                                    <th style="text-align:right;padding:0.45rem 0.6rem;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="swingTopSwingersTableBody">
                                 <tr>
                                     <td colspan="10" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
-                                        <div style="font-size:2rem;margin-bottom:0.5rem;">🏆</div>
-                                        <h4 style="margin:0 0 0.3rem 0;color:#facc15;font-size:1.05rem;">Top Swinger Matrix Loading</h4>
-                                        <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Ranking stocks by harmonic cycle counts, oscillator velocity, and support proximity.</p>
-                                        <button type="button" onclick="app.loadTopSwingers(event)" class="btn btn-primary btn-sm btn-tactile" style="font-weight:700;background:#eab308;color:#000000;">▶ Load Top Swingers</button>
+                                        <div style="font-size:1.8rem;margin-bottom:0.4rem;">🏆</div>
+                                        <h4 style="margin:0 0 0.3rem 0;color:#facc15;font-size:0.98rem;">Top Swinger Matrix Loading</h4>
+                                        <p style="font-size:0.75rem;margin:0 0 0.85rem 0;color:var(--text-muted);">Ranking stocks by harmonic cycle counts, oscillator velocity, and support proximity.</p>
+                                        <button type="button" onclick="app.loadTopSwingers(event)" class="btn btn-xs btn-tactile" style="font-weight:700;background:rgba(234,179,8,0.2);color:#facc15;border:1px solid rgba(234,179,8,0.4);padding:0.3rem 0.75rem;">▶ Load Top Swingers</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -278,18 +260,18 @@
                 <!-- SUB-TAB 3: 🔄 Tier Movement Audit Log                            -->
                 <!-- ================================================================= -->
                 <div id="swingSubTabContent-audit" style="display: none;">
-                    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;background:#030305;overflow:hidden;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0.85rem;background:#090d16;border-bottom:1px solid rgba(255,255,255,0.06);">
-                            <div style="display:flex;align-items:center;gap:0.45rem;">
-                                <span style="font-size:0.95rem;">🔄</span>
-                                <span style="font-size:0.82rem;font-weight:700;color:#ffffff;">Swing Tier Movement &amp; Promotion Audit Transitions</span>
-                                <span id="swingAuditBadgeCount" style="font-size:0.70rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
+                    <div style="border:1px solid rgba(255,255,255,0.06);border-radius:6px;background:#030305;overflow:hidden;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0.75rem;background:#090d16;border-bottom:1px solid rgba(255,255,255,0.06);">
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span style="font-size:0.88rem;">🔄</span>
+                                <span style="font-size:0.78rem;font-weight:700;color:#ffffff;">Swing Tier Movement &amp; Promotion Audit Transitions</span>
+                                <span id="swingAuditBadgeCount" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
                             </div>
-                            <button type="button" onclick="app.loadSwingAuditLog()" class="btn btn-xs" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">↻ Refresh Log</button>
+                            <button type="button" onclick="app.loadSwingAuditLog()" class="btn btn-xs" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.18rem 0.45rem;">↻ Refresh Log</button>
                         </div>
-                        <div id="swingAuditContainer" style="padding:0.75rem;display:block;">
+                        <div id="swingAuditContainer" style="padding:0.65rem;display:block;">
                             <div id="swingAuditList" style="max-height:420px;overflow-y:auto;">
-                                <div style="text-align:center;color:#64748b;font-size:0.75rem;padding:1.5rem;">Loading audit transitions...</div>
+                                <div style="text-align:center;color:#64748b;font-size:0.72rem;padding:1.5rem;">Loading audit transitions...</div>
                             </div>
                         </div>
                     </div>

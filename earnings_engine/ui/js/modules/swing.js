@@ -19,10 +19,33 @@
         _swingAuditOpen: false,
 
         // -------------------------------------------------------------------------
-        // Sub-Tab Navigation Controller
+        // Stock Intelligence Slide-Out Drawer Integration
         // -------------------------------------------------------------------------
-        setSwingSubTab(tabName) {
+        openStockDrawer(ticker) {
+            if (!ticker) return;
+            const clean = String(ticker).trim().toUpperCase();
+            const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : (clean.includes('.') ? clean : clean + '.NS');
+            if (typeof app.openStockIntelligencePanel === 'function') {
+                app.openStockIntelligencePanel(cleanTicker);
+            } else if (typeof app.openBreakoutInspectorDrawer === 'function') {
+                app.openBreakoutInspectorDrawer(cleanTicker);
+            } else if (typeof app.selectBreakoutCandidate === 'function') {
+                app.selectBreakoutCandidate(cleanTicker, false, true);
+            } else {
+                window.open('/stock/' + encodeURIComponent(cleanTicker), '_blank');
+            }
+        },
+
+        // -------------------------------------------------------------------------
+        // Sub-Tab Navigation Controller (Synced with Sidebar Tree & Context Label)
+        // -------------------------------------------------------------------------
+        switchSwingSubTab(tabName) {
             this.swingSubTab = tabName || 'setups';
+            try {
+                localStorage.setItem('subtab_swing', this.swingSubTab);
+                if (!app._subtabState) app._subtabState = {};
+                app._subtabState['swing'] = this.swingSubTab;
+            } catch (e) {}
 
             const tabIds = ['setups', 'top-swingers', 'audit'];
             tabIds.forEach(t => {
@@ -31,14 +54,31 @@
                 const isActive = t === this.swingSubTab;
 
                 if (btn) {
-                    btn.style.background = isActive ? (t === 'top-swingers' ? '#eab308' : '#2563eb') : 'transparent';
-                    btn.style.color = isActive ? (t === 'top-swingers' ? '#000000' : '#ffffff') : '#94a3b8';
-                    btn.style.fontWeight = isActive ? '700' : '600';
+                    btn.classList.toggle('active', isActive);
+                    btn.style.background = isActive ? 'rgba(255,255,255,0.12)' : 'transparent';
+                    btn.style.color = isActive ? '#ffffff' : '#94a3b8';
+                    btn.style.fontWeight = isActive ? '700' : '500';
                 }
                 if (panel) {
                     panel.style.display = isActive ? 'block' : 'none';
                 }
             });
+
+            // Update sidebar sub-items highlight
+            const sideSetups = document.getElementById('sidebarSubSwingSetups');
+            const sideTop = document.getElementById('sidebarSubSwingTop');
+            const sideAudit = document.getElementById('sidebarSubSwingAudit');
+            if (sideSetups) sideSetups.classList.toggle('active', this.swingSubTab === 'setups');
+            if (sideTop) sideTop.classList.toggle('active', this.swingSubTab === 'top-swingers');
+            if (sideAudit) sideAudit.classList.toggle('active', this.swingSubTab === 'audit');
+
+            // Update contextual header badge
+            const ctxLabel = document.getElementById('swingSubtabContextLabel');
+            if (ctxLabel) {
+                if (this.swingSubTab === 'top-swingers') ctxLabel.textContent = '🏆 Best Top Swingers (Harmonic Cycle Matrix)';
+                else if (this.swingSubTab === 'audit') ctxLabel.textContent = '🔄 Tier Movement Audit Log';
+                else ctxLabel.textContent = '⚡ Active Trading Channels & Setups';
+            }
 
             if (this.swingSubTab === 'top-swingers') {
                 if (!this.topSwingersData || !this.topSwingersData.length) {
@@ -51,6 +91,10 @@
             } else {
                 this.renderSwing();
             }
+        },
+
+        setSwingSubTab(tabName) {
+            this.switchSwingSubTab(tabName);
         },
 
         // -------------------------------------------------------------------------
@@ -496,7 +540,7 @@
                     const posColor = posPct <= 25 ? '#34d399' : (posPct <= 60 ? '#38bdf8' : '#fb923c');
 
                     return `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')">
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
                             <!-- Col 1: Ticker -->
                             <td class="cell-ticker" style="padding:0.55rem 0.65rem;">
                                 <div style="display:flex;align-items:center;gap:0.4rem;">
@@ -579,7 +623,7 @@
                     const curPriceStr = r.current_price !== null && r.current_price !== undefined ? ('₹' + Number(r.current_price).toFixed(2)) : 'N/A';
 
                     return `
-                        <div class="widget-card" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                        <div class="widget-card" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')" style="cursor:pointer;">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h4>${r.ticker || '?'}</h4>
                                 <span class="signal-badge" style="${badgeStyle}">${badgeText}</span>
@@ -814,7 +858,7 @@
                 const kpCls = kpTrend === 'Bullish' ? '#34d399' : kpTrend === 'Bearish' ? '#f87171' : '#94a3b8';
 
                 return `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(234,179,8,0.04)'" onmouseleave="this.style.background='transparent'" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')">
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(234,179,8,0.04)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
                         <!-- Col 1: Rank -->
                         <td style="padding:0.55rem 0.65rem;">${rankBadge}</td>
 

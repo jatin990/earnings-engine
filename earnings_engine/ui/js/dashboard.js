@@ -988,7 +988,8 @@ const API_BASE = window.location.origin;
                         premarket: localStorage.getItem('subtab_premarket') || 'active',
                         gainers: localStorage.getItem('subtab_gainers') || 'gainers',
                         institutional: localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities',
-                        kronos: localStorage.getItem('subtab_kronos') || 'latest'
+                        kronos: localStorage.getItem('subtab_kronos') || 'latest',
+                        swing: localStorage.getItem('subtab_swing') || 'setups'
                     };
                 }
 
@@ -1195,6 +1196,10 @@ const API_BASE = window.location.origin;
                     }
                 }
                 if (name === 'swing') {
+                    const activeSub = (app._subtabState && app._subtabState['swing']) || localStorage.getItem('subtab_swing') || 'setups';
+                    if (typeof this.switchSwingSubTab === 'function') {
+                        this.switchSwingSubTab(activeSub);
+                    }
                     if (!this.swingData || !this.swingData.length) {
                         this.loadSwing();
                     }
