@@ -128,6 +128,7 @@ SYNC_TABLES = [
     "zepto_loss_records",
     "zepto_manpower_utilization",
     "zepto_gmail_messages",
+    "zepto_offer_letters",
 ]
 
 

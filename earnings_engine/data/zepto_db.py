@@ -360,6 +360,30 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_offer_letters (
+                id TEXT PRIMARY KEY,
+                cand_id TEXT,
+                candidate_name TEXT NOT NULL,
+                title TEXT DEFAULT 'Mr.',
+                role TEXT NOT NULL,
+                department TEXT DEFAULT 'Operations',
+                work_location TEXT DEFAULT 'Sector F Sainik Colony Jammu',
+                date_of_joining TEXT NOT NULL,
+                employment_type TEXT DEFAULT 'Full - Time',
+                doc_ref TEXT,
+                basic_pay REAL DEFAULT 12000.0,
+                total_potential REAL DEFAULT 17000.0,
+                signatory_name TEXT DEFAULT 'Jatin',
+                signatory_title TEXT DEFAULT 'Authorized Signatory',
+                data_json TEXT,
+                html_snapshot TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_ol_cand ON zepto_offer_letters(cand_id);
+            CREATE INDEX IF NOT EXISTS idx_zepto_ol_created ON zepto_offer_letters(created_at);
+
             CREATE INDEX IF NOT EXISTS idx_zepto_att_store_date ON zepto_attendance_records(store_name, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_emp ON zepto_attendance_records(employee_id, shift_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_att_status ON zepto_attendance_records(status);
@@ -2653,6 +2677,17 @@ def get_saved_gmail_message_by_id(
         return d
 
 
+def get_saved_gmail_message_ids(
+    settings: Settings | None = None,
+) -> set[str]:
+    """Retrieve all existing Gmail message IDs already saved in local SQLite database."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        rows = conn.execute("SELECT id FROM zepto_gmail_messages").fetchall()
+        return {r[0] for r in rows if r[0]}
+
+
 def get_saved_gmail_messages(
     month: str | None = None,
     category: str | None = None,
@@ -3499,6 +3534,128 @@ def get_employee_profile_analytics(
 
 
 # ---------------------------------------------------------------------------
+# Offer Letter Generation & Persistence DAL
+# ---------------------------------------------------------------------------
+
+def save_offer_letter(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Create or update an offer letter record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    letter_id = data.get("id") or f"ol_{uuid.uuid4().hex[:12]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute("SELECT created_at FROM zepto_offer_letters WHERE id = ?", (letter_id,)).fetchone()
+        created_at = existing["created_at"] if existing else now_iso
+
+        conn.execute(
+            """
+            INSERT INTO zepto_offer_letters (
+                id, cand_id, candidate_name, title, role, department, work_location,
+                date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                signatory_name, signatory_title, data_json, html_snapshot,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                cand_id = excluded.cand_id,
+                candidate_name = excluded.candidate_name,
+                title = excluded.title,
+                role = excluded.role,
+                department = excluded.department,
+                work_location = excluded.work_location,
+                date_of_joining = excluded.date_of_joining,
+                employment_type = excluded.employment_type,
+                doc_ref = excluded.doc_ref,
+                basic_pay = excluded.basic_pay,
+                total_potential = excluded.total_potential,
+                signatory_name = excluded.signatory_name,
+                signatory_title = excluded.signatory_title,
+                data_json = excluded.data_json,
+                html_snapshot = excluded.html_snapshot,
+                updated_at = excluded.updated_at
+            """,
+            (
+                letter_id,
+                data.get("cand_id"),
+                data.get("candidate_name", "").strip(),
+                data.get("title", "Mr.").strip(),
+                data.get("role", "Pickpackers").strip(),
+                data.get("department", "Operations").strip(),
+                data.get("work_location", "Sector F Sainik Colony Jammu").strip(),
+                str(data.get("date_of_joining", "")).strip(),
+                data.get("employment_type", "Full - Time").strip(),
+                data.get("doc_ref", "").strip(),
+                float(data.get("basic_pay", 12000.0) or 0.0),
+                float(data.get("total_potential", 17000.0) or 0.0),
+                data.get("signatory_name", "Jatin").strip(),
+                data.get("signatory_title", "Authorized Signatory").strip(),
+                data.get("data_json", "{}") if isinstance(data.get("data_json"), str) else json.dumps(data.get("data_json") or {}, ensure_ascii=False),
+                data.get("html_snapshot", ""),
+                created_at,
+                now_iso,
+            ),
+        )
+    res = get_offer_letter(letter_id, settings=settings)
+    return res if res else {"id": letter_id}
+
+
+def get_offer_letters(search: str | None = None, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """List all saved offer letters sorted by creation date descending."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        if search:
+            q = f"%{search.strip()}%"
+            rows = conn.execute(
+                """
+                SELECT id, cand_id, candidate_name, title, role, department, work_location,
+                       date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                       signatory_name, signatory_title, created_at, updated_at
+                FROM zepto_offer_letters
+                WHERE candidate_name LIKE ? OR doc_ref LIKE ? OR role LIKE ?
+                ORDER BY created_at DESC
+                """,
+                (q, q, q),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, cand_id, candidate_name, title, role, department, work_location,
+                       date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                       signatory_name, signatory_title, created_at, updated_at
+                FROM zepto_offer_letters
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_offer_letter(letter_id: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve full detail and snapshot for a specific offer letter."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_offer_letters WHERE id = ?", (letter_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_offer_letter(letter_id: str, settings: Settings | None = None) -> bool:
+    """Delete a saved offer letter."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        cur = conn.execute("DELETE FROM zepto_offer_letters WHERE id = ?", (letter_id,))
+        return cur.rowcount > 0
+
+
+
+# ---------------------------------------------------------------------------
 # Store Metrics Scorecard DAL
 # ---------------------------------------------------------------------------
 
@@ -3545,17 +3702,21 @@ def get_store_metrics_summary(
     store_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    month: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Retrieve aggregated store metrics, daily trends, and SLA performance."""
+    """Retrieve aggregated store metrics, daily trends, and SLA performance with monthly scoping."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
     where = ["1=1"]
     params: list[Any] = []
-    if store_name:
+    if store_name and store_name != "ALL":
         where.append("store_name = ?")
         params.append(store_name)
+    if month and month != "ALL":
+        where.append("substr(metric_date, 1, 7) = ?")
+        params.append(month)
     if start_date:
         where.append("metric_date >= ?")
         params.append(start_date)
