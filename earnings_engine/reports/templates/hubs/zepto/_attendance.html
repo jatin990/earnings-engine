@@ -141,15 +141,165 @@
         </div>
     </section>
 
-    <!-- Role Composition & Distribution -->
-    <section class="glass-panel p-4 space-y-3">
-        <div class="flex items-center justify-between">
-            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Role Breakdown & Attendance Adherence</h4>
-            <span class="text-[10px] text-slate-500 font-mono">Real-time breakdown by designation</span>
+    <!-- Operational Capacity & Throughput Cards (Packers, Leadership, Inbound/Quality/NSO) -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- 1. Packers Capacity -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-4 border-l-purple-500/80">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🛒</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Packer Fulfillment Force</h4>
+                        <p class="text-[10px] text-slate-400">Picking, packing & sub-10m dispatch</p>
+                    </div>
+                </div>
+                <span id="attCapPackersBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-purple-300" id="attCapPackersPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapPackersTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapPackersAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapPackersBar" class="bg-purple-400 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
         </div>
-        <div id="attRoleDistributionGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            <!-- Populated via JavaScript -->
-            <div class="text-xs text-slate-500 py-3 text-center col-span-full">Loading role metrics...</div>
+
+        <!-- 2. Store Leadership & Tech -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-4 border-l-indigo-500/80">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">⚡</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Shift Leadership & Ops</h4>
+                        <p class="text-[10px] text-slate-400">Shift Incharges & Maintenance Techs</p>
+                    </div>
+                </div>
+                <span id="attCapLeadBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/25 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-indigo-300" id="attCapLeadPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapLeadTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapLeadAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapLeadBar" class="bg-indigo-400 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 3. Inbound, Quality & NSO -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-4 border-l-sky-500/80">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">📦</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Inbound, QA & NSO</h4>
+                        <p class="text-[10px] text-slate-400">Receiving, QA audit & launch associates</p>
+                    </div>
+                </div>
+                <span id="attCapInboundBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-sky-300" id="attCapInboundPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapInboundTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapInboundAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapInboundBar" class="bg-sky-400 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Daily Staffing Timeline & Heatmap Bar -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📊</span> Daily Staffing Timeline & Roster Coverage
+                </h4>
+                <p class="text-[10px] text-slate-500">Day-by-day scheduled capacity. Click any day bar to filter ledger.</p>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Present</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span> Absent</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span> Week Off</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Holiday</span>
+            </div>
+        </div>
+        <!-- Horizontal Scrollable Timeline Bar Chart -->
+        <div class="overflow-x-auto custom-scrollbar pb-1">
+            <div id="attDailyTimelineContainer" class="flex items-end gap-1.5 min-w-[720px] h-32 pt-6 px-1">
+                <!-- Populated via JavaScript -->
+                <div class="text-xs text-slate-500 text-center w-full py-8">Loading daily staffing heatmap...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Split Grid: Absenteeism Watchlist & Role Distribution -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        <!-- Left: Absenteeism & Attrition Watchlist (7 cols) -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-7">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>⚠️</span> Absenteeism & Churn Risk Watchlist
+                    </h4>
+                    <p class="text-[10px] text-slate-400">Staff with repeated unannounced absences and low shift reliability</p>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="attWatchlistCount">
+                    0 Flagged
+                </span>
+            </div>
+            <div class="overflow-x-auto custom-scrollbar max-h-64">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase bg-white/[0.02]">
+                            <th class="py-2 px-2.5">Employee</th>
+                            <th class="py-2 px-2.5">Role</th>
+                            <th class="py-2 px-2.5 text-center">Absences</th>
+                            <th class="py-2 px-2.5 text-center">Attendance %</th>
+                            <th class="py-2 px-2.5 text-center">Risk Tier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attWatchlistTableBody" class="divide-y divide-white/5 font-sans">
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-slate-500 text-xs">
+                                No chronic absenteeism detected.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right: Role Composition Breakdown (5 cols) -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-5">
+            <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Role Breakdown</h4>
+                <span class="text-[10px] text-slate-500 font-mono">By Designation</span>
+            </div>
+            <div id="attRoleDistributionGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                <!-- Populated via JavaScript -->
+                <div class="text-xs text-slate-500 py-3 text-center col-span-full">Loading role metrics...</div>
+            </div>
         </div>
     </section>
 

@@ -2219,8 +2219,202 @@ const zeptoApp = {
         // Role Breakdown Grid & Role Filter Dropdown
         this.renderAttendanceRoles(sum.role_breakdown || []);
 
+        // 5. Operational Capacity & Throughput Cards
+        this.renderAttendanceCapacity(sum.role_capacity_summary || {});
+
+        // 6. Daily Staffing Timeline & Heatmap
+        this.renderAttendanceTimeline(sum.daily_trend || []);
+
+        // 7. Absenteeism & Churn Risk Watchlist
+        this.renderAttendanceWatchlist(sum.absenteeism_watchlist || []);
+
         // Muster Records Table
         this.renderAttendanceTable();
+    },
+
+    renderAttendanceCapacity(cap) {
+        // Packers
+        const p = cap.packers || { scheduled: 0, present: 0, absent: 0, rate: 0, health: 'OPTIMAL' };
+        const pPresEl = document.getElementById('attCapPackersPresent');
+        const pTotEl = document.getElementById('attCapPackersTotal');
+        const pAbsEl = document.getElementById('attCapPackersAbsent');
+        const pBarEl = document.getElementById('attCapPackersBar');
+        const pBadgeEl = document.getElementById('attCapPackersBadge');
+
+        if (pPresEl) pPresEl.textContent = p.present;
+        if (pTotEl) pTotEl.textContent = ` / ${p.scheduled} shifts (${p.headcount || 0} Staff)`;
+        if (pAbsEl) pAbsEl.textContent = `${p.absent} Absences`;
+        if (pBarEl) pBarEl.style.width = `${Math.min(100, p.rate)}%`;
+        if (pBadgeEl) {
+            pBadgeEl.textContent = `${p.rate}% Adherence · ${p.health}`;
+            pBadgeEl.className = p.health === 'ALERT'
+                ? 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono animate-pulse'
+                : (p.health === 'WARNING'
+                    ? 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono'
+                    : 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono');
+        }
+
+        // Leadership
+        const l = cap.leadership || { scheduled: 0, present: 0, absent: 0, rate: 0, health: 'OPTIMAL' };
+        const lPresEl = document.getElementById('attCapLeadPresent');
+        const lTotEl = document.getElementById('attCapLeadTotal');
+        const lAbsEl = document.getElementById('attCapLeadAbsent');
+        const lBarEl = document.getElementById('attCapLeadBar');
+        const lBadgeEl = document.getElementById('attCapLeadBadge');
+
+        if (lPresEl) lPresEl.textContent = l.present;
+        if (lTotEl) lTotEl.textContent = ` / ${l.scheduled} shifts (${l.headcount || 0} Leads)`;
+        if (lAbsEl) lAbsEl.textContent = `${l.absent} Absences`;
+        if (lBarEl) lBarEl.style.width = `${Math.min(100, l.rate)}%`;
+        if (lBadgeEl) {
+            lBadgeEl.textContent = `${l.rate}% Adherence · ${l.health}`;
+            lBadgeEl.className = l.health === 'ALERT'
+                ? 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono'
+                : 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono';
+        }
+
+        // Inbound / QA / NSO
+        const i = cap.inbound_quality_nso || { scheduled: 0, present: 0, absent: 0, rate: 0, health: 'OPTIMAL' };
+        const iPresEl = document.getElementById('attCapInboundPresent');
+        const iTotEl = document.getElementById('attCapInboundTotal');
+        const iAbsEl = document.getElementById('attCapInboundAbsent');
+        const iBarEl = document.getElementById('attCapInboundBar');
+        const iBadgeEl = document.getElementById('attCapInboundBadge');
+
+        if (iPresEl) iPresEl.textContent = i.present;
+        if (iTotEl) iTotEl.textContent = ` / ${i.scheduled} shifts (${i.headcount || 0} Staff)`;
+        if (iAbsEl) iAbsEl.textContent = `${i.absent} Absences`;
+        if (iBarEl) iBarEl.style.width = `${Math.min(100, i.rate)}%`;
+        if (iBadgeEl) {
+            iBadgeEl.textContent = `${i.rate}% Adherence · ${i.health}`;
+            iBadgeEl.className = i.health === 'ALERT'
+                ? 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono'
+                : 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono';
+        }
+    },
+
+    renderAttendanceTimeline(trend) {
+        const container = document.getElementById('attDailyTimelineContainer');
+        if (!container) return;
+
+        if (!trend || trend.length === 0) {
+            container.innerHTML = `<div class="text-xs text-slate-500 text-center w-full py-8">No daily timeline records.</div>`;
+            return;
+        }
+
+        const maxScheduled = Math.max(...trend.map(d => d.scheduled || 1), 15);
+
+        container.innerHTML = trend.map(d => {
+            const scheduled = d.scheduled || 0;
+            const present = d.present || 0;
+            const absent = d.absent || 0;
+            const weekOff = d.week_off || 0;
+            const holiday = d.holiday || 0;
+
+            const totalHeightPct = Math.min(100, Math.max(15, (scheduled / maxScheduled) * 100));
+            const dayLabel = (d.date || '').slice(8, 10);
+            const monthLabel = (d.date || '').slice(5, 7);
+
+            const pPct = scheduled > 0 ? (present / scheduled) * 100 : 0;
+            const aPct = scheduled > 0 ? (absent / scheduled) * 100 : 0;
+            const wPct = scheduled > 0 ? (weekOff / scheduled) * 100 : 0;
+            const hPct = scheduled > 0 ? (holiday / scheduled) * 100 : 0;
+
+            const isLowAttendance = scheduled >= 5 && (present / scheduled) < 0.6;
+            const borderHighlight = isLowAttendance ? 'border-b-2 border-b-rose-500' : '';
+
+            return `
+                <div
+                    class="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer ${borderHighlight}"
+                    onclick="zeptoApp.filterByDate('${d.date}')"
+                    title="${d.date}: ${present} Present, ${absent} Absent, ${weekOff} Week Off (${scheduled} Total)"
+                >
+                    <!-- Bar Stack Container -->
+                    <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125" style="height: ${totalHeightPct}%;">
+                        <div class="bg-emerald-500/80 w-full" style="height: ${pPct}%;"></div>
+                        <div class="bg-rose-500/80 w-full" style="height: ${aPct}%;"></div>
+                        <div class="bg-slate-600/80 w-full" style="height: ${wPct}%;"></div>
+                        <div class="bg-sky-500/80 w-full" style="height: ${hPct}%;"></div>
+                    </div>
+                    <!-- Date Label -->
+                    <div class="text-[9px] font-mono font-bold text-slate-400 mt-1.5 group-hover:text-white">
+                        ${dayLabel}/${monthLabel}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    filterByDate(dateStr) {
+        const dateInput = document.getElementById('attDateFilter');
+        if (dateInput) {
+            dateInput.value = dateStr;
+            this.filterAttendance();
+            this.showToast(`📅 Filtered attendance ledger to ${dateStr}`);
+        }
+    },
+
+    renderAttendanceWatchlist(watchlist) {
+        const tbody = document.getElementById('attWatchlistTableBody');
+        const countBadge = document.getElementById('attWatchlistCount');
+
+        if (countBadge) {
+            const count = watchlist ? watchlist.length : 0;
+            countBadge.textContent = `${count} Flagged`;
+            countBadge.className = count > 0
+                ? 'text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono animate-pulse'
+                : 'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono';
+        }
+
+        if (!tbody) return;
+        if (!watchlist || watchlist.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-6 text-emerald-400 text-xs font-semibold">
+                        ✨ 100% Roster Reliability · No chronic absenteeism flagged!
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = watchlist.map(w => {
+            const riskBadge = w.risk_tier === 'CRITICAL'
+                ? '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">CRITICAL</span>'
+                : (w.risk_tier === 'HIGH'
+                    ? '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40">HIGH RISK</span>'
+                    : '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-slate-500/20 text-slate-300 border border-white/10">MODERATE</span>');
+
+            return `
+                <tr class="hover:bg-rose-500/[0.04] transition cursor-pointer" onclick="zeptoApp.filterByEmployee('${w.employee_name}')" title="Click to view shifts for ${w.employee_name}">
+                    <td class="py-2 px-2.5">
+                        <div class="font-bold text-white text-xs">${w.employee_name}</div>
+                        <div class="text-[9px] font-mono text-slate-500">${w.employee_id}</div>
+                    </td>
+                    <td class="py-2 px-2.5 text-[10px] text-slate-300">
+                        ${w.designation}
+                    </td>
+                    <td class="py-2 px-2.5 text-center font-mono font-extrabold text-rose-400">
+                        ${w.absent_count} / ${w.total_shifts}
+                    </td>
+                    <td class="py-2 px-2.5 text-center font-mono font-bold ${w.attendance_rate_pct < 50 ? 'text-rose-400' : 'text-amber-300'}">
+                        ${w.attendance_rate_pct}%
+                    </td>
+                    <td class="py-2 px-2.5 text-center whitespace-nowrap">
+                        ${riskBadge}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    filterByEmployee(empName) {
+        const searchInput = document.getElementById('attSearchInput');
+        if (searchInput) {
+            searchInput.value = empName;
+            this.filterAttendance();
+            this.showToast(`🔍 Showing shift ledger for ${empName}`);
+        }
     },
 
     renderAttendanceRoles(roles) {
