@@ -546,15 +546,18 @@ const zeptoApp = {
     },
 
     async purgeFramedEmployees() {
-        if (!confirm('Are you sure you want to delete the starter framed/mock employees (emp_01 to emp_06)? Real attendance staff will remain untouched.')) return;
+        if (!confirm('Are you sure you want to delete all starter framed/mock demo records (employees, candidates, demo expenses, capital tranches)? Real attendance and authentic imports will remain untouched.')) return;
         try {
             const res = await fetch('/api/v1/zepto/employees/purge-framed', { method: 'POST' });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Failed to purge mock employees');
+            if (!res.ok) throw new Error(data.detail || 'Failed to purge mock records');
 
-            this.showToast(`🧹 Purged ${data.purged_count || 0} starter placeholder employees.`);
+            this.showToast(`🧹 Purged demo records (${data.purged_employees || data.purged_count || 0} employees, ${data.purged_expenses || 0} expenses, ${data.purged_candidates || 0} candidates).`);
             await this.loadOverview();
             await this.loadEmployees();
+            await this.loadExpenses();
+            await this.loadCandidates();
+            await this.loadSecurity();
         } catch (err) {
             this.showToast('⚠️ Purge error: ' + err.message, true);
         }
