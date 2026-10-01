@@ -30,6 +30,7 @@ const zeptoApp = {
     async init() {
         // Hydrate partner dropdowns immediately with defaults
         this.populatePartnerDropdowns();
+        this.populateDynamicMonthDropdowns();
 
         // Tab routing via hash
         const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
@@ -298,6 +299,23 @@ const zeptoApp = {
 
         const kpiP2Bar = document.getElementById('kpiPartner2Bar');
         if (kpiP2Bar) kpiP2Bar.title = p2.name;
+    },
+
+    populateDynamicMonthDropdowns() {
+        const incMonthSelect = document.getElementById('incMonthFilter');
+        if (incMonthSelect) {
+            const currentVal = incMonthSelect.value;
+            const now = new Date();
+            let opts = '<option value="ALL">All Months</option>';
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                opts += `<option value="${ym}">${label}</option>`;
+            }
+            incMonthSelect.innerHTML = opts;
+            if (currentVal) incMonthSelect.value = currentVal;
+        }
     },
 
     // -----------------------------------------------------------------------

@@ -441,16 +441,26 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
 
 def _seed_sample_data(conn: sqlite3.Connection) -> None:
     """Insert initial starter seed records for store setup demonstration."""
+    now_dt = datetime.now()
     now_iso = datetime.now(timezone.utc).isoformat()
-    
+
+    # Dynamic temporal anchors relative to current date
+    cur_ym = now_dt.strftime("%Y-%m")
+    m1_dt = (now_dt.replace(day=1) - timedelta(days=1))
+    m1_ym = m1_dt.strftime("%Y-%m")
+    m2_dt = (m1_dt.replace(day=1) - timedelta(days=1))
+    m2_ym = m2_dt.strftime("%Y-%m")
+    m3_dt = (m2_dt.replace(day=1) - timedelta(days=1))
+    m3_ym = m3_dt.strftime("%Y-%m")
+
     # 1. Sample Staff (Only the 4 Store Roles)
     employees = [
-        ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", "2026-06-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
-        ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", "2026-06-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
-        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", "2026-07-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
-        ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", "2026-06-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
-        ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", "2026-05-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
-        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", "2026-06-20", "2026-08-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
+        ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", f"{m3_ym}-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
+        ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", f"{m3_ym}-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
+        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", f"{m2_ym}-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
+        ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", f"{m3_ym}-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
+        ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", f"{m3_ym}-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
+        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", f"{m3_ym}-20", f"{m1_ym}-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -463,13 +473,13 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         employees
     )
 
-        # 2. Sample Salaries (with performance rating)
+    # 2. Sample Salaries (with performance rating)
     salaries = [
-        (str(uuid.uuid4()), "emp_01", "2026-07", 32000.0, 2500.0, 0.0, 34500.0, 4.9, "2026-08-02", "PAID", "BANK_TRANSFER", "July performance reward included", now_iso),
-        (str(uuid.uuid4()), "emp_01", "2026-08", 32000.0, 3000.0, 0.0, 35000.0, 4.9, "2026-08-28", "PAID", "BANK_TRANSFER", "August on-time shift incentive", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-07", 18500.0, 1200.0, 0.0, 19700.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July picker speed bonus", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-08", 18500.0, 1500.0, 0.0, 20000.0, 4.8, "2026-08-28", "PAID", "BANK_TRANSFER", "August UPT bonus", now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-07", 16500.0, 1000.0, 0.0, 17500.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July security attendance bonus", now_iso),
+        (str(uuid.uuid4()), "emp_01", m2_ym, 32000.0, 2500.0, 0.0, 34500.0, 4.9, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Performance reward included", now_iso),
+        (str(uuid.uuid4()), "emp_01", m1_ym, 32000.0, 3000.0, 0.0, 35000.0, 4.9, f"{m1_ym}-28", "PAID", "BANK_TRANSFER", "On-time shift incentive", now_iso),
+        (str(uuid.uuid4()), "emp_02", m2_ym, 18500.0, 1200.0, 0.0, 19700.0, 4.7, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Picker speed bonus", now_iso),
+        (str(uuid.uuid4()), "emp_02", m1_ym, 18500.0, 1500.0, 0.0, 20000.0, 4.8, f"{m1_ym}-28", "PAID", "BANK_TRANSFER", "UPT bonus", now_iso),
+        (str(uuid.uuid4()), "emp_04", m2_ym, 16500.0, 1000.0, 0.0, 17500.0, 4.7, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Security attendance bonus", now_iso),
     ]
     conn.executemany(
         """
@@ -483,16 +493,16 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 3. Sample Monthly Ratings (MoM Performance History)
     monthly_ratings = [
-        (str(uuid.uuid4()), "emp_01", "2026-07", 4.9, "Excellent night shift management and zero dispatch delays", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_01", "2026-08", 4.9, "Maintained 99.8% inventory accuracy during peak surge", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-07", 4.7, "Top picking speed: 46 items/hr", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-08", 4.8, "Achieved store record 52 items/hr UPT speed", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_03", "2026-07", 4.5, "Good picking consistency in morning shifts", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_03", "2026-08", 4.5, "Reliable shift attendance", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-07", 4.7, "Strict night surveillance and visitor logging", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-08", 4.8, "Prevented inventory shrinkage during off-hours", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_05", "2026-07", 5.0, "Flawless aisle hygiene and trash removal", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_05", "2026-08", 5.0, "Zero pest inspection violations", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_01", m2_ym, 4.9, "Excellent night shift management and zero dispatch delays", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_01", m1_ym, 4.9, "Maintained 99.8% inventory accuracy during peak surge", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", m2_ym, 4.7, "Top picking speed: 46 items/hr", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", m1_ym, 4.8, "Achieved store record 52 items/hr UPT speed", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", m2_ym, 4.5, "Good picking consistency in morning shifts", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", m1_ym, 4.5, "Reliable shift attendance", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", m2_ym, 4.7, "Strict night surveillance and visitor logging", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", m1_ym, 4.8, "Prevented inventory shrinkage during off-hours", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", m2_ym, 5.0, "Flawless aisle hygiene and trash removal", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", m1_ym, 5.0, "Zero pest inspection violations", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -505,11 +515,11 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 4. Sample Store Expenses
     expenses = [
-        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
-        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
-        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", PARTNER_1_NAME, None, "racks_bill.pdf", 0, "Aisle A-D high density racking system (Pending Reimbursement)", now_iso),
-        (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, "2026-08-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
-        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, "2026-08-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
+        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, f"{m3_ym}-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
+        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, f"{m3_ym}-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
+        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, f"{m2_ym}-18", PARTNER_1_NAME, None, "racks_bill.pdf", 0, "Aisle A-D high density racking system (Pending Reimbursement)", now_iso),
+        (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, f"{m1_ym}-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
+        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, f"{m1_ym}-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
     ]
     conn.executemany(
         """
@@ -523,9 +533,9 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 5. Sample Store Income (50-50 Partner Split)
     store_income = [
-        (str(uuid.uuid4()), "Zepto Dark Store Monthly Order Commission (July 2026)", "COMMISSION", 420000.0, 4200.0, 415800.0, "2026-08-05", "2026-07", 50.0, 50.0, 207900.0, 207900.0, None, "BANK_TRANSFER", "ZEPTO-COM-202607-9821", "Base dark store order commission payout directly from Zepto Escrow", now_iso, now_iso),
-        (str(uuid.uuid4()), "Zepto Peak Delivery & SLA Incentive Payout", "GROWTH_INCENTIVE", 180000.0, 1800.0, 178200.0, "2026-08-15", "2026-08", 50.0, 50.0, 89100.0, 89100.0, None, "BANK_TRANSFER", "ZEPTO-INC-202608-4412", "SLA < 10 mins dispatch reward for August week 1-2", now_iso, now_iso),
-        (str(uuid.uuid4()), "Brand Slotting & Warehouse End-Cap Promotion Fee", "ORDER_SLOTTING", 95000.0, 950.0, 94050.0, "2026-08-22", "2026-08", 50.0, 50.0, 47025.0, 47025.0, None, "BANK_TRANSFER", "ZEPTO-SLOT-202608-7711", "Beverage & FMCG priority shelf placement revenue", now_iso, now_iso),
+        (str(uuid.uuid4()), f"Zepto Dark Store Monthly Order Commission ({m2_ym})", "COMMISSION", 420000.0, 4200.0, 415800.0, f"{m1_ym}-05", m2_ym, 50.0, 50.0, 207900.0, 207900.0, None, "BANK_TRANSFER", f"ZEPTO-COM-{m2_ym.replace('-', '')}-9821", "Base dark store order commission payout directly from Zepto Escrow", now_iso, now_iso),
+        (str(uuid.uuid4()), "Zepto Peak Delivery & SLA Incentive Payout", "GROWTH_INCENTIVE", 180000.0, 1800.0, 178200.0, f"{m1_ym}-15", m1_ym, 50.0, 50.0, 89100.0, 89100.0, None, "BANK_TRANSFER", f"ZEPTO-INC-{m1_ym.replace('-', '')}-4412", "SLA < 10 mins dispatch reward", now_iso, now_iso),
+        (str(uuid.uuid4()), "Brand Slotting & Warehouse End-Cap Promotion Fee", "ORDER_SLOTTING", 95000.0, 950.0, 94050.0, f"{m1_ym}-22", m1_ym, 50.0, 50.0, 47025.0, 47025.0, None, "BANK_TRANSFER", f"ZEPTO-SLOT-{m1_ym.replace('-', '')}-7711", "Beverage & FMCG priority shelf placement revenue", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -541,8 +551,8 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 6. Sample Hiring Candidates (4 Strict Roles)
     candidates = [
-        (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", "2026-08-30", now_iso, now_iso),
-        (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", "2026-08-29", now_iso, now_iso),
+        (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", (now_dt - timedelta(days=1)).strftime("%Y-%m-%d"), now_iso, now_iso),
+        (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", (now_dt - timedelta(days=2)).strftime("%Y-%m-%d"), now_iso, now_iso),
         (str(uuid.uuid4()), "Balwan Singh", "+91 99223 34455", "balwan.s@gmail.com", "SECURITY_GUARD", 16500.0, 4.5, "APPLIED", None, None, "Ex-serviceman with physical verification badge", None, now_iso, now_iso),
         (str(uuid.uuid4()), "Sunita Soni", "+91 99334 45566", "sunita.s@gmail.com", "HOUSEKEEPING", 14000.0, 4.4, "APPLIED", None, None, "Experienced dark store sanitization worker", None, now_iso, now_iso),
     ]
@@ -558,10 +568,10 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 7. Sample Security Capital Tranches (50-50 Partner Equity Split)
     capital_tranches = [
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, "2026-05-15", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202605159812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, "2026-05-16", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202605161142", None, "50% equity matching tranche", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, "2026-06-10", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202606105521", None, "Second installment towards ₹75L commitment", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, "2026-06-12", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202606127891", None, "Matching second installment", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, f"{m3_ym}-15", PARTNER_1_NAME, "NEFT_RTGS", f"HDFC{m3_ym.replace('-', '')}9812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, f"{m3_ym}-16", PARTNER_2_NAME, "NEFT_RTGS", f"ICIC{m3_ym.replace('-', '')}1142", None, "50% equity matching tranche", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, f"{m2_ym}-10", PARTNER_1_NAME, "NEFT_RTGS", f"HDFC{m2_ym.replace('-', '')}5521", None, "Second installment towards ₹75L commitment", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, f"{m2_ym}-12", PARTNER_2_NAME, "NEFT_RTGS", f"ICIC{m2_ym.replace('-', '')}7891", None, "Matching second installment", now_iso),
     ]
     conn.executemany(
         """
@@ -1434,7 +1444,7 @@ def purge_mock_framed_employees(settings: Settings | None = None) -> dict[str, A
             "Brand Slotting & Warehouse End-Cap Promotion Fee",
         ]
         res_inc = conn.execute(
-            f"DELETE FROM zepto_store_income WHERE title IN ({','.join('?' for _ in mock_income_titles)})",
+            f"DELETE FROM zepto_store_income WHERE title LIKE 'Zepto Dark Store Monthly Order Commission%' OR title IN ({','.join('?' for _ in mock_income_titles)})",
             mock_income_titles,
         )
         purged_income_count = res_inc.rowcount

@@ -80,10 +80,18 @@ def excel_date_to_iso(val: Any) -> str:
         d, m_month, y = m.groups()
         return f"{int(y):04d}-{int(m_month):02d}-{int(d):02d}"
 
-    # Check DD-Mon-YYYY (e.g. 26-Aug-2026)
+    # Check DD-Mon-YYYY or DD-Mon-YY or DD-Mon (e.g. 26-Aug-2026, 26-Aug-26, 26-Aug)
+    for fmt in ("%d-%b-%Y", "%d-%b-%y", "%d-%B-%Y", "%d/%b/%Y", "%d/%b/%y", "%d-%m-%y", "%d/%m/%y", "%Y/%m/%d", "%Y.%m.%d", "%b %d, %Y"):
+        try:
+            dt = datetime.strptime(sval, fmt)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    # Check DD-Mon without year (defaults to current year)
     try:
-        dt = datetime.strptime(sval, "%d-%b-%Y")
-        return dt.strftime("%Y-%m-%d")
+        dt = datetime.strptime(sval, "%d-%b")
+        return dt.replace(year=datetime.now().year).strftime("%Y-%m-%d")
     except ValueError:
         pass
 
