@@ -137,6 +137,65 @@
             </div>
         </div>
 
+        <!-- Ingested Category Breakdown Metrics Header Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" id="gmailCategoryCountCards">
+            <!-- 1. Store Metrics -->
+            <div onclick="zeptoApp.selectGmailCategory('STORE_METRICS')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-emerald-500/40 hover:bg-emerald-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-emerald-300">📊 Metrics</div>
+                <div class="text-base font-extrabold font-mono text-emerald-400 mt-0.5" id="gmailCatCount-STORE_METRICS">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">GMV & Orders</div>
+            </div>
+
+            <!-- 2. Attendance -->
+            <div onclick="zeptoApp.selectGmailCategory('ATTENDANCE')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-sky-500/40 hover:bg-sky-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-sky-300">👥 Attendance</div>
+                <div class="text-base font-extrabold font-mono text-sky-300 mt-0.5" id="gmailCatCount-ATTENDANCE">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Muster Sheets</div>
+            </div>
+
+            <!-- 3. Utilization -->
+            <div onclick="zeptoApp.selectGmailCategory('MANPOWER_UTILIZATION')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-purple-500/40 hover:bg-purple-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-purple-300">⚡ Utilization</div>
+                <div class="text-base font-extrabold font-mono text-purple-300 mt-0.5" id="gmailCatCount-MANPOWER_UTILIZATION">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Picker IPP</div>
+            </div>
+
+            <!-- 4. DQ Loss -->
+            <div onclick="zeptoApp.selectGmailCategory('DQ_LOSS')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-rose-500/40 hover:bg-rose-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-rose-300">⚠️ DQ Loss</div>
+                <div class="text-base font-extrabold font-mono text-rose-400 mt-0.5" id="gmailCatCount-DQ_LOSS">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Defects & Waste</div>
+            </div>
+
+            <!-- 5. Shrinkage -->
+            <div onclick="zeptoApp.selectGmailCategory('SHRINKAGE')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-amber-500/40 hover:bg-amber-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-amber-300">📉 Shrinkage</div>
+                <div class="text-base font-extrabold font-mono text-amber-300 mt-0.5" id="gmailCatCount-SHRINKAGE">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Cycle Variance</div>
+            </div>
+
+            <!-- 6. Manpower Plan -->
+            <div onclick="zeptoApp.selectGmailCategory('MANPOWER_PLAN')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-indigo-500/40 hover:bg-indigo-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-indigo-300">📋 Plan</div>
+                <div class="text-base font-extrabold font-mono text-indigo-300 mt-0.5" id="gmailCatCount-MANPOWER_PLAN">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Headcount Plan</div>
+            </div>
+
+            <!-- 7. Operational -->
+            <div onclick="zeptoApp.selectGmailCategory('OPERATIONAL')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-cyan-500/40 hover:bg-cyan-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-cyan-300">📧 Ops Updates</div>
+                <div class="text-base font-extrabold font-mono text-cyan-300 mt-0.5" id="gmailCatCount-OPERATIONAL">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Notices & Payouts</div>
+            </div>
+
+            <!-- 8. Security Alerts -->
+            <div onclick="zeptoApp.selectGmailCategory('SECURITY_ALERT')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-slate-500/40 hover:bg-slate-500/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-300">🔒 Security</div>
+                <div class="text-base font-extrabold font-mono text-slate-400 mt-0.5" id="gmailCatCount-SECURITY_ALERT">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5">Google Alerts</div>
+            </div>
+        </div>
+
         <!-- Live Operational Mailbox & Intelligence Feed (Tabular Ledger & Direct Extraction) -->
         <div class="glass-panel p-4 sm:p-5 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
@@ -181,7 +240,7 @@
                     <!-- Category Filter Dropdown -->
                     <select
                         id="gmailCategoryFilter"
-                        onchange="zeptoApp.filterGmailEmails()"
+                        onchange="zeptoApp.highlightSelectedGmailCategory(this.value); zeptoApp.filterGmailEmails()"
                         class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-white/30"
                     >
                         <option value="ALL" selected>⚡ All Categories</option>

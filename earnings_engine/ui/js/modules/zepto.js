@@ -3064,6 +3064,7 @@ const zeptoApp = {
             const emails = data.emails || [];
 
             this.gmail.emails = emails;
+            this.updateGmailCategoryCounts(emails);
             this.filterGmailEmails();
 
             if (badgeEl) badgeEl.textContent = `${emails.length} Emails`;
@@ -3169,7 +3170,70 @@ const zeptoApp = {
         if (icon) icon.textContent = '👁️';
         if (text) text.textContent = `Show Hidden (${this.gmail.hiddenEmailIds.size})`;
 
+        this.highlightSelectedGmailCategory('ALL');
         this.filterGmailEmails();
+    },
+
+    selectGmailCategory(category) {
+        const catFilter = document.getElementById('gmailCategoryFilter');
+        if (!catFilter) return;
+
+        // If clicking same category that is already selected, toggle back to ALL
+        if (catFilter.value === category) {
+            catFilter.value = 'ALL';
+        } else {
+            catFilter.value = category;
+        }
+
+        this.highlightSelectedGmailCategory(catFilter.value);
+        this.filterGmailEmails();
+    },
+
+    highlightSelectedGmailCategory(activeCategory) {
+        const categories = [
+            'STORE_METRICS', 'ATTENDANCE', 'MANPOWER_UTILIZATION',
+            'DQ_LOSS', 'SHRINKAGE', 'MANPOWER_PLAN', 'OPERATIONAL', 'SECURITY_ALERT'
+        ];
+
+        categories.forEach(cat => {
+            const el = document.getElementById(`gmailCatCount-${cat}`)?.parentElement;
+            if (!el) return;
+
+            if (activeCategory === cat) {
+                el.classList.add('ring-2', 'ring-white/40', 'bg-white/10');
+            } else {
+                el.classList.remove('ring-2', 'ring-white/40', 'bg-white/10');
+            }
+        });
+    },
+
+    updateGmailCategoryCounts(emails) {
+        const counts = {
+            STORE_METRICS: 0,
+            ATTENDANCE: 0,
+            MANPOWER_UTILIZATION: 0,
+            DQ_LOSS: 0,
+            SHRINKAGE: 0,
+            MANPOWER_PLAN: 0,
+            OPERATIONAL: 0,
+            SECURITY_ALERT: 0,
+        };
+
+        (emails || []).forEach(m => {
+            const cat = m.category || 'OPERATIONAL';
+            if (counts[cat] !== undefined) {
+                counts[cat]++;
+            } else {
+                counts['OPERATIONAL']++;
+            }
+        });
+
+        Object.keys(counts).forEach(cat => {
+            const countEl = document.getElementById(`gmailCatCount-${cat}`);
+            if (countEl) {
+                countEl.textContent = counts[cat];
+            }
+        });
     },
 
     updateGmailHideCountBadge() {
