@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from earnings_engine.api.dependencies import _settings
 from earnings_engine.data import option_chain as oc_mod
+from earnings_engine.data import options_chart_engine as oce_mod
 from earnings_engine.data.universe import is_fno_eligible, _SEED_NSE_FNO
 from earnings_engine.logging_utils import get_logger
 
@@ -140,3 +141,28 @@ async def get_options_chain(
     except Exception as e:
         logger.exception("Error analyzing option chain for %s: %s", clean_symbol, e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/options/chart-intelligence")
+async def get_options_chart_intelligence(
+    symbol: str = Query("NIFTY", description="NSE symbol or index (e.g. NIFTY, BANKNIFTY, RELIANCE)"),
+    interval: str = Query("5m", description="Candle interval (1m, 5m, 15m, 1h, 1d)"),
+    period: str = Query("5d", description="Lookback window (e.g. 5d, 1mo, 6mo)"),
+    force_refresh: bool = Query(False, description="Bypass cache and refresh live candles"),
+) -> dict[str, Any]:
+    """Retrieve full candlestick history, indicators (VWAP, ORB), Order Blocks, and tactical trade plans."""
+    clean_symbol = symbol.strip().upper().replace(".NS", "")
+    try:
+        data = await asyncio.to_thread(
+            oce_mod.get_options_chart_intelligence,
+            symbol=clean_symbol,
+            interval=interval,
+            period=period,
+            force_refresh=force_refresh,
+            settings=_get_settings(),
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_options_chart_intelligence for %s: %s", clean_symbol, e)
+        raise HTTPException(status_code=500, detail=str(e))
+

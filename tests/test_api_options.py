@@ -126,3 +126,32 @@ async def test_options_history_endpoint():
         assert data["symbol"] == "NIFTY"
         assert "history" in data
         assert isinstance(data["history"], list)
+
+
+@pytest.mark.anyio
+async def test_options_chart_intelligence_endpoint():
+    """Verify /api/v1/options/chart-intelligence returns complete candlestick, SMC, and trade setups."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res = await ac.get("/api/v1/options/chart-intelligence?symbol=NIFTY&interval=5m")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert data["symbol"] == "NIFTY"
+        assert "candles" in data
+        assert "indicators" in data
+        assert "smart_money" in data
+        assert "derivatives_levels" in data
+        assert "tactical_signals" in data
+
+
+@pytest.mark.anyio
+async def test_options_chart_intelligence_non_fno():
+    """Verify non-FNO symbol returns clean NOT_FNO response."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res = await ac.get("/api/v1/options/chart-intelligence?symbol=INVALID_NON_FNO_XYZ")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert data["status"] == "NOT_FNO"
+        assert data["candles"] == []
+
