@@ -384,4 +384,122 @@
             </table>
         </div>
     </section>
+
+    <!-- Slide-Out Employee Attendance & Shift Drawer (Desktop App Master-Detail) -->
+    <div
+        id="attEmployeeDrawerBackdrop"
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-out"
+        onclick="zeptoApp.closeEmployeeDrawer()"
+    ></div>
+
+    <aside
+        id="attEmployeeDrawer"
+        class="fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-[#0d121c] border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-out flex flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawerEmpName"
+    >
+        <!-- Drawer Header -->
+        <div class="p-5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold font-mono text-sm" id="drawerEmpAvatar">
+                    --
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2" id="drawerEmpName">
+                        Employee Profile
+                    </h3>
+                    <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                        <span id="drawerEmpCode">EMP-XXXX</span>
+                        <span>•</span>
+                        <span id="drawerEmpRole" class="text-slate-300 font-sans font-medium">Role</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <span id="drawerRiskBadge" class="text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                    --
+                </span>
+                <button
+                    onclick="zeptoApp.closeEmployeeDrawer()"
+                    class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors focus:outline-none"
+                    aria-label="Close drawer"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Drawer Body Scrollable Container -->
+        <div class="p-5 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            <!-- Metric KPI Highlights -->
+            <div class="grid grid-cols-3 gap-2.5">
+                <div class="p-3 rounded-lg bg-black/30 border border-white/5 space-y-1">
+                    <span class="text-[10px] text-slate-400 block uppercase font-medium">Attendance Rate</span>
+                    <span class="text-lg font-bold text-white font-mono" id="drawerAttRate">--%</span>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerTotalShifts">0 total shifts</div>
+                </div>
+                <div class="p-3 rounded-lg bg-black/30 border border-white/5 space-y-1">
+                    <span class="text-[10px] text-slate-400 block uppercase font-medium">Present / Absent</span>
+                    <div class="text-lg font-bold font-mono">
+                        <span class="text-emerald-400" id="drawerPresentCount">0</span>
+                        <span class="text-slate-600">/</span>
+                        <span class="text-rose-400" id="drawerAbsentCount">0</span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerWOLeaves">0 WO · 0 Leave</div>
+                </div>
+                <div class="p-3 rounded-lg bg-black/30 border border-white/5 space-y-1">
+                    <span class="text-[10px] text-slate-400 block uppercase font-medium">Avg Daily Hours</span>
+                    <span class="text-lg font-bold text-cyan-300 font-mono" id="drawerAvgHours">-- hrs</span>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerTotalHours">0 hrs total</div>
+                </div>
+            </div>
+
+            <!-- 30-Day Punch History Timeline & Ledger -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Shift & Punch Ledger (30 Days)
+                    </h4>
+                    <span class="text-[10px] text-slate-500 font-mono" id="drawerHistoryCount">0 punches</span>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-white/5 bg-black/20">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400 font-semibold text-[10px] uppercase bg-white/[0.02]">
+                                <th class="py-2 px-2.5">Date</th>
+                                <th class="py-2 px-2.5">Shift</th>
+                                <th class="py-2 px-2.5">Punch In</th>
+                                <th class="py-2 px-2.5">Punch Out</th>
+                                <th class="py-2 px-2.5 text-right">Work Mins</th>
+                                <th class="py-2 px-2.5 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drawerPunchHistoryBody" class="divide-y divide-white/5 font-sans">
+                            <tr>
+                                <td colspan="6" class="text-center py-6 text-slate-500 text-xs">
+                                    Loading employee punch history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drawer Footer -->
+        <div class="p-4 border-t border-white/10 bg-white/[0.01] flex items-center justify-between shrink-0">
+            <span class="text-[10px] text-slate-500 font-mono">Store: JMU-Sainik Colony</span>
+            <button
+                onclick="zeptoApp.closeEmployeeDrawer()"
+                class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 border border-white/10 transition-colors"
+            >
+                Close Drawer
+            </button>
+        </div>
+    </aside>
 </div>

@@ -43,6 +43,13 @@ const zeptoApp = {
             });
         }
 
+        // Global Escape key listener for slide drawers and modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeEmployeeDrawer();
+            }
+        });
+
         await this.loadAll();
     },
 
@@ -2386,7 +2393,7 @@ const zeptoApp = {
                     : '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-slate-500/20 text-slate-300 border border-white/10">MODERATE</span>');
 
             return `
-                <tr class="hover:bg-rose-500/[0.04] transition cursor-pointer" onclick="zeptoApp.filterByEmployee('${w.employee_name}')" title="Click to view shifts for ${w.employee_name}">
+                <tr class="hover:bg-rose-500/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${w.employee_id}')" title="Click to view full 30-day drilldown for ${w.employee_name}">
                     <td class="py-2 px-2.5">
                         <div class="font-bold text-white text-xs">${w.employee_name}</div>
                         <div class="text-[9px] font-mono text-slate-500">${w.employee_id}</div>
@@ -2517,10 +2524,13 @@ const zeptoApp = {
             }
 
             return `
-                <tr class="hover:bg-white/[0.02] transition">
+                <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view 30-day shift & punctuality history">
                     <td class="py-2.5 px-3 font-mono text-slate-300 font-medium whitespace-nowrap">${r.shift_date || '—'}</td>
                     <td class="py-2.5 px-3">
-                        <div class="font-bold text-white">${r.employee_name || '—'}</div>
+                        <div class="font-bold text-white flex items-center gap-1.5">
+                            <span>${r.employee_name || '—'}</span>
+                            <span class="text-[10px] text-emerald-400 opacity-60">↗</span>
+                        </div>
                         <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
                     </td>
                     <td class="py-2.5 px-3">
@@ -2546,6 +2556,172 @@ const zeptoApp = {
                 </tr>
             `;
         }).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Employee Slide-Out Drawer Master-Detail Logic (sumi:desktop-app-design)
+    // -----------------------------------------------------------------------
+
+    async openEmployeeDrawer(employeeId) {
+        if (!employeeId) return;
+
+        const drawer = document.getElementById('attEmployeeDrawer');
+        const backdrop = document.getElementById('attEmployeeDrawerBackdrop');
+
+        if (!drawer || !backdrop) return;
+
+        // Reset drawer UI to loading state
+        document.getElementById('drawerEmpName').textContent = 'Loading employee...';
+        document.getElementById('drawerEmpCode').textContent = employeeId;
+        document.getElementById('drawerEmpRole').textContent = 'Fetching details...';
+        document.getElementById('drawerEmpAvatar').textContent = '--';
+        document.getElementById('drawerAttRate').textContent = '--%';
+        document.getElementById('drawerTotalShifts').textContent = '0 total shifts';
+        document.getElementById('drawerPresentCount').textContent = '0';
+        document.getElementById('drawerAbsentCount').textContent = '0';
+        document.getElementById('drawerWOLeaves').textContent = '0 WO · 0 Leave';
+        document.getElementById('drawerAvgHours').textContent = '-- hrs';
+        document.getElementById('drawerTotalHours').textContent = '0 hrs total';
+
+        const tbody = document.getElementById('drawerPunchHistoryBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">Loading shift records...</td></tr>`;
+        }
+
+        // Open drawer animations
+        backdrop.classList.remove('opacity-0', 'pointer-events-none');
+        backdrop.classList.add('opacity-100', 'pointer-events-auto');
+        drawer.classList.remove('translate-x-full');
+        drawer.classList.add('translate-x-0');
+        document.body.style.overflow = 'hidden';
+
+        try {
+            const res = await fetch(`/api/v1/zepto/attendance/employee/${encodeURIComponent(employeeId)}`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Failed to load employee details');
+            }
+            const data = await res.json();
+            this.renderEmployeeDrawer(data.detail);
+        } catch (err) {
+            console.error('[ZEPTO-DRAWER] Error fetching employee detail:', err);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-rose-400 text-xs">⚠️ ${err.message}</td></tr>`;
+            }
+        }
+    },
+
+    renderEmployeeDrawer(emp) {
+        if (!emp) return;
+
+        // Header info
+        const nameEl = document.getElementById('drawerEmpName');
+        const codeEl = document.getElementById('drawerEmpCode');
+        const roleEl = document.getElementById('drawerEmpRole');
+        const avatarEl = document.getElementById('drawerEmpAvatar');
+        const riskEl = document.getElementById('drawerRiskBadge');
+
+        if (nameEl) nameEl.textContent = emp.employee_name || 'Staff Member';
+        if (codeEl) codeEl.textContent = emp.employee_id || 'EMP-XXXX';
+        if (roleEl) roleEl.textContent = emp.designation || 'Unassigned Role';
+
+        // Avatar initials
+        if (avatarEl) {
+            const initials = (emp.employee_name || 'E')
+                .split(' ')
+                .map(n => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
+            avatarEl.textContent = initials || 'EM';
+        }
+
+        // Risk badge
+        if (riskEl) {
+            riskEl.textContent = emp.risk_tier || 'LOW';
+            if (emp.risk_tier === 'CRITICAL') {
+                riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded border bg-rose-500/20 text-rose-300 border-rose-500/40 uppercase tracking-wider font-mono animate-pulse';
+            } else if (emp.risk_tier === 'HIGH') {
+                riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-500/20 text-amber-300 border-amber-500/40 uppercase tracking-wider font-mono';
+            } else if (emp.risk_tier === 'MODERATE') {
+                riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded border bg-sky-500/20 text-sky-300 border-sky-500/40 uppercase tracking-wider font-mono';
+            } else {
+                riskEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 uppercase tracking-wider font-mono';
+            }
+        }
+
+        // Metrics
+        const attRateEl = document.getElementById('drawerAttRate');
+        const totalShiftsEl = document.getElementById('drawerTotalShifts');
+        const presEl = document.getElementById('drawerPresentCount');
+        const absEl = document.getElementById('drawerAbsentCount');
+        const woLeavesEl = document.getElementById('drawerWOLeaves');
+        const avgHoursEl = document.getElementById('drawerAvgHours');
+        const totalHoursEl = document.getElementById('drawerTotalHours');
+        const histCountEl = document.getElementById('drawerHistoryCount');
+
+        if (attRateEl) attRateEl.textContent = `${emp.attendance_rate_pct}%`;
+        if (totalShiftsEl) totalShiftsEl.textContent = `${emp.total_shifts} shifts tracked`;
+        if (presEl) presEl.textContent = emp.present_count;
+        if (absEl) absEl.textContent = emp.absent_count;
+        if (woLeavesEl) woLeavesEl.textContent = `${emp.week_off_count} WO · ${emp.leave_count} Leave`;
+        if (avgHoursEl) avgHoursEl.textContent = `${emp.avg_daily_hours} hrs`;
+        if (totalHoursEl) totalHoursEl.textContent = `${emp.total_hours_worked} hrs total`;
+
+        // History table
+        const history = emp.punch_history || [];
+        if (histCountEl) histCountEl.textContent = `${history.length} punches`;
+
+        const tbody = document.getElementById('drawerPunchHistoryBody');
+        if (!tbody) return;
+
+        if (history.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No punch history found for this staff member.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = history.map(p => {
+            let statusBadge = '';
+            if (p.status === 'PRESENT') {
+                statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">P</span>';
+            } else if (p.status === 'ABSENT') {
+                statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">A</span>';
+            } else if (p.status === 'WEEK_OFF') {
+                statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-500/15 text-slate-300 border border-white/10">WO</span>';
+            } else if (p.status === 'HALF_DAY') {
+                statusBadge = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">HD</span>';
+            } else {
+                statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-slate-300">${p.status}</span>`;
+            }
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">${p.shift_date}</td>
+                    <td class="py-2 px-2.5 text-[10px] text-slate-400 truncate max-w-[100px]">${p.shift_time || p.shift_name || 'General'}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] ${p.punch_in ? 'text-emerald-300' : 'text-slate-600'}">${p.punch_in || '—'}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] ${p.punch_out ? 'text-emerald-300' : 'text-slate-600'}">${p.punch_out || '—'}</td>
+                    <td class="py-2 px-2.5 text-right font-mono text-[10px] ${p.work_duration_mins > 0 ? 'text-white' : 'text-slate-600'}">
+                        ${p.work_duration_mins > 0 ? `${(p.work_duration_mins / 60).toFixed(1)}h` : '—'}
+                    </td>
+                    <td class="py-2 px-2.5 text-center whitespace-nowrap">${statusBadge}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    closeEmployeeDrawer() {
+        const drawer = document.getElementById('attEmployeeDrawer');
+        const backdrop = document.getElementById('attEmployeeDrawerBackdrop');
+
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100', 'pointer-events-auto');
+            backdrop.classList.add('opacity-0', 'pointer-events-none');
+        }
+        if (drawer) {
+            drawer.classList.remove('translate-x-0');
+            drawer.classList.add('translate-x-full');
+        }
+        document.body.style.overflow = '';
     },
 
     async handleAttendanceFileUpload(event) {
