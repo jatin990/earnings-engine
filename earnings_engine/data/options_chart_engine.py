@@ -273,7 +273,8 @@ def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]]
                     "start_time": ts,
                     "mitigated": mitigated,
                     "strength": "HIGH" if not mitigated else "TESTED",
-                    "label": "Institutional Demand OB",
+                    "label": "Demand OB",
+                    "short_label": "D-OB",
                 })
 
         # Bearish OB: Bullish candle followed by strong downward impulse breaking recent low
@@ -295,7 +296,8 @@ def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]]
                     "start_time": ts,
                     "mitigated": mitigated,
                     "strength": "HIGH" if not mitigated else "TESTED",
-                    "label": "Institutional Supply OB",
+                    "label": "Supply OB",
+                    "short_label": "S-OB",
                 })
 
     return order_blocks[-6:], fvgs[-6:]

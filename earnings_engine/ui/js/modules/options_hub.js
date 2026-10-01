@@ -548,12 +548,15 @@
             const fvgs = smartMoney.fvg_gaps || [];
 
             obs.forEach(ob => {
+                const isBull = ob.type === 'BULLISH_OB';
+                const tag = isBull ? 'D-OB' : 'S-OB';
                 markers.push({
                     time: ob.start_time,
-                    position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
-                    color: ob.type === 'BULLISH_OB' ? '#10b981' : '#ef4444',
-                    shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
-                    text: `${ob.type === 'BULLISH_OB' ? 'Demand OB' : 'Supply OB'} [₹${ob.bottom}-${ob.top}]`,
+                    position: isBull ? 'belowBar' : 'aboveBar',
+                    color: isBull ? '#10b981' : '#ef4444',
+                    shape: isBull ? 'arrowUp' : 'arrowDown',
+                    text: tag,
+                    size: 1,
                 });
             });
 
@@ -563,7 +566,8 @@
                     position: fvg.type === 'BULLISH_FVG' ? 'belowBar' : 'aboveBar',
                     color: fvg.type === 'BULLISH_FVG' ? '#38bdf8' : '#fb7185',
                     shape: 'circle',
-                    text: `FVG [₹${fvg.bottom}-${fvg.top}]`,
+                    text: 'FVG',
+                    size: 1,
                 });
             });
 
