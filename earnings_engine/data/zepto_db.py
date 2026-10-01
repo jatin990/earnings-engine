@@ -2491,6 +2491,11 @@ def save_gmail_messages(
             attachments_json = str(attachments or "[]")
 
         has_attachments = 1 if (msg.get("has_attachments") or (isinstance(attachments, list) and len(attachments) > 0)) else 0
+        store_name = str(msg.get("store_name") or "").strip()
+        body_text = str(msg.get("body_text") or "").strip()
+        body_html = str(msg.get("body_html") or "").strip()
+        parsed_status = str(msg.get("parsed_status") or "PENDING").strip().upper()
+        parsed_records_count = int(msg.get("parsed_records_count") or 0)
 
         rows.append((
             msg_id,
@@ -2509,6 +2514,11 @@ def save_gmail_messages(
             attachments_json,
             has_attachments,
             str(msg.get("internal_date") or ""),
+            store_name,
+            body_text,
+            body_html,
+            parsed_status,
+            parsed_records_count,
             now_iso,
             now_iso,
             now_iso,
@@ -2524,8 +2534,10 @@ def save_gmail_messages(
                 id, thread_id, subject, sender, date_str,
                 iso_date, month_ym, snippet, category, category_label,
                 badge_color, icon, extracted_metrics, attachments,
-                has_attachments, internal_date, synced_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                has_attachments, internal_date, store_name, body_text,
+                body_html, parsed_status, parsed_records_count,
+                synced_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 thread_id = excluded.thread_id,
                 subject = excluded.subject,
@@ -2542,12 +2554,91 @@ def save_gmail_messages(
                 attachments = excluded.attachments,
                 has_attachments = excluded.has_attachments,
                 internal_date = excluded.internal_date,
+                store_name = CASE WHEN excluded.store_name != '' THEN excluded.store_name ELSE zepto_gmail_messages.store_name END,
+                body_text = CASE WHEN excluded.body_text != '' THEN excluded.body_text ELSE zepto_gmail_messages.body_text END,
+                body_html = CASE WHEN excluded.body_html != '' THEN excluded.body_html ELSE zepto_gmail_messages.body_html END,
+                parsed_status = CASE WHEN excluded.parsed_status != 'PENDING' THEN excluded.parsed_status ELSE zepto_gmail_messages.parsed_status END,
+                parsed_records_count = CASE WHEN excluded.parsed_records_count > 0 THEN excluded.parsed_records_count ELSE zepto_gmail_messages.parsed_records_count END,
                 synced_at = excluded.synced_at,
                 updated_at = excluded.updated_at
             """,
             rows,
         )
     return len(rows)
+
+
+def update_email_parsed_status(
+    msg_id: str,
+    parsed_status: str,
+    parsed_records_count: int = 0,
+    settings: Settings | None = None,
+) -> bool:
+    """Update email parsing status and translated records count."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            UPDATE zepto_gmail_messages SET
+                parsed_status = ?,
+                parsed_records_count = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (parsed_status.upper(), parsed_records_count, now_iso, msg_id),
+        )
+    return True
+
+
+def get_saved_gmail_message_by_id(
+    msg_id: str,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve a single saved email by ID along with its translated linked records."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_gmail_messages WHERE id = ?", (msg_id,)).fetchone()
+        if not row:
+            return None
+
+        d = dict(row)
+        d["from"] = d.get("sender", "")
+        d["date"] = d.get("date_str", "")
+        try:
+            d["extracted_metrics"] = json.loads(d.get("extracted_metrics") or "{}")
+        except Exception:
+            d["extracted_metrics"] = {}
+        try:
+            d["attachments"] = json.loads(d.get("attachments") or "[]")
+        except Exception:
+            d["attachments"] = []
+
+        # Find linked loss records
+        loss_rows = conn.execute(
+            "SELECT * FROM zepto_loss_records WHERE source_email_id = ? OR notes LIKE ? ORDER BY record_date DESC",
+            (msg_id, f"%{msg_id}%"),
+        ).fetchall()
+        d["linked_loss_records"] = [dict(lr) for lr in loss_rows]
+
+        # Find linked store metrics
+        metric_rows = conn.execute(
+            "SELECT * FROM zepto_store_metrics WHERE source_email_id = ? ORDER BY metric_date DESC",
+            (msg_id,),
+        ).fetchall()
+        d["linked_store_metrics"] = [dict(mr) for mr in metric_rows]
+
+        # Find linked attendance imports
+        att_rows = conn.execute(
+            "SELECT * FROM zepto_attendance_imports WHERE source_email_id = ? ORDER BY imported_at DESC",
+            (msg_id,),
+        ).fetchall()
+        d["linked_attendance_imports"] = [dict(ar) for ar in att_rows]
+
+        return d
 
 
 def get_saved_gmail_messages(
@@ -2607,6 +2698,7 @@ def get_saved_gmail_messages(
 def save_attendance_batch(
     parsed_data: dict[str, Any],
     source: str = "UPLOAD",
+    source_email_id: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """
@@ -2626,6 +2718,7 @@ def save_attendance_batch(
     records = parsed_data.get("records") or []
     total_records = len(records)
     total_employees = parsed_data.get("total_employees") or len({r.get("employee_id") for r in records if r.get("employee_id")})
+    final_email_id = source_email_id or parsed_data.get("source_email_id")
 
     import_id = f"imp_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
@@ -2635,8 +2728,8 @@ def save_attendance_batch(
             """
             INSERT INTO zepto_attendance_imports (
                 id, file_name, store_name, start_date, end_date,
-                total_records, total_employees, source, imported_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                total_records, total_employees, source, source_email_id, imported_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 import_id,
@@ -2647,6 +2740,7 @@ def save_attendance_batch(
                 total_records,
                 total_employees,
                 source,
+                final_email_id,
                 now_iso,
                 now_iso,
                 now_iso,

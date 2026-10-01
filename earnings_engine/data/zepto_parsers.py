@@ -19,6 +19,232 @@ from earnings_engine.data.zepto_attendance_parser import (
 )
 
 
+# ===========================================================================
+# Deterministic Subject Line Pattern Registry & Classifier
+# ===========================================================================
+
+ZEPTO_SUBJECT_PATTERNS = [
+    # 1. DQ Loss & Spoilage Audits (e.g. "JMU-Sainik Colony DQ Loss - 2026-09-30", "Store BLR-01 - Daily Shift Summary & DQ Loss Audit - 2026-09-30")
+    {
+        "category": "DQ_LOSS",
+        "category_label": "DQ Loss & Expiry",
+        "badge_color": "rose",
+        "icon": "⚠️",
+        "pattern": re.compile(
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Shift\s+Summary\s+&\s+)?DQ\s+Loss(?:\s+Audit)?(?:\s*&\s*Expiry)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            re.IGNORECASE,
+        ),
+    },
+    # 2. Shrinkage & Inventory Variance (e.g. "JMU-Sainik Colony Shrinkage - 2026-09-30", "Weekly Store Shrinkage & Cycle Count Variance")
+    {
+        "category": "SHRINKAGE",
+        "category_label": "Shrinkage & Variance",
+        "badge_color": "amber",
+        "icon": "📉",
+        "pattern": re.compile(
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+|Weekly\s+)?(?:Store\s+)?Shrinkage(?:\s*&\s*(?:Cycle\s+Count\s+)?Variance)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            re.IGNORECASE,
+        ),
+    },
+    # 3. Attendance Muster Reports (e.g. "JMU-Sainik_Colony-Attendance-report-8165178", "Store JMU - Attendance - 2026-09-30")
+    {
+        "category": "ATTENDANCE",
+        "category_label": "Attendance & Shifts",
+        "badge_color": "sky",
+        "icon": "👥",
+        "pattern": re.compile(
+            r"^(?P<store>[A-Za-z0-9_\-\s]+?)[-_]Attendance[-_]report[-_](?P<report_id>\d+)",
+            re.IGNORECASE,
+        ),
+    },
+    {
+        "category": "ATTENDANCE",
+        "category_label": "Attendance & Shifts",
+        "badge_color": "sky",
+        "icon": "👥",
+        "pattern": re.compile(
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Staff\s+)?Attendance(?:\s+Muster|\s+Report)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            re.IGNORECASE,
+        ),
+    },
+    # 4. Daily Store Metrics & Performance Scorecard (e.g. "Store JMU-Sainik Colony Daily Update - 2026-09-30", "Store Metrics Summary - 2026-09-30")
+    {
+        "category": "STORE_METRICS",
+        "category_label": "Store Metric Summary",
+        "badge_color": "emerald",
+        "icon": "📊",
+        "pattern": re.compile(
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Store\s+)?(?:Metrics?(?:\s+Summary)?|Update|Scorecard|Performance)\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            re.IGNORECASE,
+        ),
+    },
+    # 5. Manpower Utilization & Roster
+    {
+        "category": "MANPOWER_UTILIZATION",
+        "category_label": "Manpower Utilization",
+        "badge_color": "purple",
+        "icon": "⚡",
+        "pattern": re.compile(
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Manpower\s+Plan|Utilization|Picker\s+IPP|Staffing\s+Roster)\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            re.IGNORECASE,
+        ),
+    },
+    # 6. Monthly Manpower Planning
+    {
+        "category": "MANPOWER_PLAN",
+        "category_label": "Monthly Manpower Plan",
+        "badge_color": "indigo",
+        "icon": "📋",
+        "pattern": re.compile(
+            r"(?:Monthly\s+)?Manpower\s+Plan(?:ning)?|Target\s+(?:Headcount|HC)|Staffing\s+Budget",
+            re.IGNORECASE,
+        ),
+    },
+    # 7. Security Alert
+    {
+        "category": "SECURITY_ALERT",
+        "category_label": "Security Alert",
+        "badge_color": "slate",
+        "icon": "🔒",
+        "pattern": re.compile(
+            r"Security\s+Alert|Critical\s+Security|Unauthorized\s+Access|Password\s+Reset",
+            re.IGNORECASE,
+        ),
+    },
+]
+
+
+def match_zepto_subject_pattern(
+    subject: str,
+    sender: str = "",
+    snippet: str = "",
+) -> Dict[str, Any]:
+    """
+    Deterministic pattern matcher for Zepto operational emails.
+    Extracts store name, date, report type, report id, and metadata directly from subject line.
+    Falls back to keyword matching if regex pattern does not strictly match.
+    """
+    sub_clean = (subject or "").strip()
+    from_clean = (sender or "").strip().lower()
+    snip_clean = (snippet or "").strip().lower()
+
+    for item in ZEPTO_SUBJECT_PATTERNS:
+        pat = item["pattern"]
+        m = pat.search(sub_clean)
+        if m:
+            groups = m.groupdict()
+            store_name = groups.get("store", "").strip().replace("_", " ") if groups.get("store") else ""
+            record_date = groups.get("date", "").strip() if groups.get("date") else ""
+            report_id = groups.get("report_id", "").strip() if groups.get("report_id") else ""
+
+            return {
+                "category": item["category"],
+                "category_label": item["category_label"],
+                "badge_color": item["badge_color"],
+                "icon": item["icon"],
+                "store_name": store_name,
+                "record_date": record_date,
+                "report_id": report_id,
+                "is_pattern_matched": True,
+            }
+
+    # Fallback keyword classification if exact regex pattern didn't match
+    sub_lower = sub_clean.lower()
+    if "store metric summary" in sub_lower or "store metric" in sub_lower or "daily scorecard" in sub_lower:
+        cat = "STORE_METRICS"
+        lbl = "Store Metric Summary"
+        color = "emerald"
+        icon = "📊"
+    elif "attendance" in sub_lower or "muster" in sub_lower or "shift report" in sub_lower:
+        cat = "ATTENDANCE"
+        lbl = "Attendance & Shifts"
+        color = "sky"
+        icon = "👥"
+    elif "manpower utilization" in sub_lower or "utilization" in sub_lower or "picker ipp" in sub_lower:
+        cat = "MANPOWER_UTILIZATION"
+        lbl = "Manpower Utilization"
+        color = "purple"
+        icon = "⚡"
+    elif "dq loss" in sub_lower or "damage" in sub_lower or "expiry" in sub_lower or "spoilage" in sub_lower:
+        cat = "DQ_LOSS"
+        lbl = "DQ Loss & Expiry"
+        color = "rose"
+        icon = "⚠️"
+    elif "shrinkage" in sub_lower or "cycle count" in sub_lower or "fcc" in sub_lower or "short-pick" in sub_lower:
+        cat = "SHRINKAGE"
+        lbl = "Shrinkage & Variance"
+        color = "amber"
+        icon = "📉"
+    elif "manpower plan" in sub_lower or "headcount" in sub_lower or "target hc" in sub_lower:
+        cat = "MANPOWER_PLAN"
+        lbl = "Monthly Manpower Plan"
+        color = "indigo"
+        icon = "📋"
+    elif "security alert" in sub_lower or "critical security" in sub_lower or "google" in from_clean:
+        cat = "SECURITY_ALERT"
+        lbl = "Security Alert"
+        color = "slate"
+        icon = "🔒"
+    else:
+        cat = "OPERATIONAL"
+        lbl = "Operational Update"
+        color = "slate"
+        icon = "📧"
+
+    # Extract store name heuristically from subject if available
+    inferred_store = ""
+    store_match = re.search(r"([A-Z]{2,4}-[A-Za-z0-9_]+)", sub_clean)
+    if store_match:
+        inferred_store = store_match.group(1).replace("_", " ")
+
+    # Extract date heuristically if present
+    inferred_date = ""
+    date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", sub_clean)
+    if date_match:
+        inferred_date = date_match.group(1)
+
+    return {
+        "category": cat,
+        "category_label": lbl,
+        "badge_color": color,
+        "icon": icon,
+        "store_name": inferred_store,
+        "record_date": inferred_date,
+        "report_id": "",
+        "is_pattern_matched": False,
+    }
+
+
+def build_targeted_gmail_query(month: str | None = None) -> tuple[str, str]:
+    """
+    Build targeted Gmail API query string focusing strictly on Zepto operational pattern keywords.
+    Avoids fetching random or noisy unrelated personal emails.
+    Returns (clean_month_ym, gmail_q_str).
+    """
+    pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
+
+    if not month or month.upper() in ("CURRENT", "NOW"):
+        clean_month = datetime.now().strftime("%Y-%m")
+    elif month.upper() == "ALL":
+        return ("ALL", pattern_clause)
+    else:
+        clean_month = month.strip()
+
+    try:
+        parts = clean_month.split("-")
+        y = int(parts[0])
+        m = int(parts[1])
+        start_date = f"{y:04d}/{m:02d}/01"
+        if m == 12:
+            next_y, next_m = y + 1, 1
+        else:
+            next_y, next_m = y, m + 1
+        end_date = f"{next_y:04d}/{next_m:02d}/01"
+        return (clean_month, f"{pattern_clause} after:{start_date} before:{end_date}")
+    except Exception:
+        return (clean_month, pattern_clause)
+
+
 # ---------------------------------------------------------------------------
 # 1. Store Metrics / Scorecard Excel & Email Parser
 # ---------------------------------------------------------------------------
