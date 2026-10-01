@@ -496,26 +496,26 @@
                     // Signal & Tier Badges
                     const tierName = (r.tier || (isBz ? 'HOT' : 'WARM')).toUpperCase();
                     const tierBadge = tierName === 'HOT'
-                        ? '<span class="signal-badge" style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:0.62rem;">🔥 HOT</span>'
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.08);color:#ffffff;border:1px solid rgba(255,255,255,0.18);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:600;"><span style="color:#f87171;margin-right:2px;">●</span> HOT</span>'
                         : (tierName === 'WARM'
-                            ? '<span class="signal-badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:0.62rem;">⚡ WARM</span>'
-                            : '<span class="signal-badge" style="background:rgba(148,163,184,0.15);color:#cbd5e1;font-size:0.62rem;">❄️ COLD</span>');
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#cbd5e1;border:1px solid rgba(255,255,255,0.09);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:500;"><span style="color:#fbbf24;margin-right:2px;">●</span> WARM</span>'
+                            : '<span class="signal-badge" style="background:rgba(255,255,255,0.02);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:400;"><span style="color:#64748b;margin-right:2px;">○</span> COLD</span>');
 
-                    const sigBadgeStyle = isBz ? 'background:rgba(16,185,129,0.25);color:#34d399;border:1px solid #10b981;font-weight:700;' :
-                        r.swing_signal === 'Strong Buy' ? 'background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;' :
-                        r.swing_signal === 'Overbought' ? 'background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);' :
-                        r.swing_signal === 'Sell Zone' ? 'background:rgba(251,146,60,0.2);color:#fb923c;border:1px solid rgba(251,146,60,0.4);' :
-                        r.swing_signal === 'Breakdown' ? 'background:rgba(239,68,68,0.25);color:#ef4444;border:1px solid #ef4444;' :
-                        r.swing_signal === 'Buy' ? 'background:rgba(16,185,129,0.15);color:#6ee7b7;' :
-                        'background:rgba(148,163,184,0.15);color:#94a3b8;';
-                    const sigBadgeText = isBz ? '🟢 BUY ZONE' : (r.swing_signal || 'Neutral');
-                    const signalBadge = `<span class="signal-badge" style="${sigBadgeStyle}font-size:0.65rem;padding:0.12rem 0.45rem;">${sigBadgeText}</span>`;
+                    const sigBadgeStyle = isBz ? 'background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.22);font-weight:600;' :
+                        r.swing_signal === 'Strong Buy' ? 'background:rgba(255,255,255,0.06);color:#ffffff;border:1px solid rgba(255,255,255,0.14);font-weight:600;' :
+                        r.swing_signal === 'Overbought' ? 'background:rgba(248,113,113,0.08);color:#f87171;border:1px solid rgba(248,113,113,0.2);' :
+                        r.swing_signal === 'Sell Zone' ? 'background:rgba(251,146,60,0.08);color:#fb923c;border:1px solid rgba(251,146,60,0.2);' :
+                        r.swing_signal === 'Breakdown' ? 'background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);' :
+                        r.swing_signal === 'Buy' ? 'background:rgba(52,211,153,0.06);color:#6ee7b7;border:1px solid rgba(52,211,153,0.15);' :
+                        'background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.07);';
+                    const sigBadgeText = isBz ? '● BUY ZONE' : (r.swing_signal || 'Neutral');
+                    const signalBadge = `<span class="signal-badge" style="${sigBadgeStyle}font-size:0.62rem;padding:0.06rem 0.35rem;">${sigBadgeText}</span>`;
 
                     // AI & Kronos Column Data
                     const kp = r.kronos_prediction || {};
                     const kpTrend = kp.trend || '—';
                     const kpRet = kp.return_pct != null ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
-                    const kpCls = kpTrend === 'Bullish' ? '#34d399' : kpTrend === 'Bearish' ? '#f87171' : '#94a3b8';
+                    const kpCls = kpTrend === 'Bullish' ? '#34d399' : (kpTrend === 'Bearish' ? '#f87171' : '#94a3b8');
 
                     const consensusData = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
                     const rawDir = typeof consensusData === 'string' ? consensusData : (consensusData && typeof consensusData === 'object' ? (consensusData.consensus_direction || consensusData.direction) : null);
@@ -523,16 +523,16 @@
                     const consensusStrength = consensusData.consensus_strength != null ? Math.round(consensusData.consensus_strength) + '%' : '';
                     const isConsensusBull = consensusDir.includes('BUY') || consensusDir.includes('BULL');
                     const isConsensusBear = consensusDir.includes('SELL') || consensusDir.includes('BEAR');
-                    const cBg = isConsensusBull ? 'rgba(16,185,129,0.18)' : isConsensusBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
-                    const cClr = isConsensusBull ? '#34d399' : isConsensusBear ? '#f87171' : '#fbbf24';
-                    const cBrd = isConsensusBull ? 'rgba(16,185,129,0.35)' : isConsensusBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+                    const cBg = 'rgba(255,255,255,0.03)';
+                    const cClr = isConsensusBull ? '#34d399' : (isConsensusBear ? '#f87171' : '#cbd5e1');
+                    const cBrd = 'rgba(255,255,255,0.07)';
 
                     const aiColHtml = `
                         <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                            <span class="signal-badge" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="background:${cBg};color:${cClr};border:1px solid ${cBrd};font-size:0.65rem;padding:0.12rem 0.45rem;cursor:pointer;" title="4-Model AI Consensus (Click for thesis)">
+                            <span class="signal-badge" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="background:${cBg};color:${cClr};border:1px solid ${cBrd};font-size:0.62rem;padding:0.06rem 0.35rem;cursor:pointer;" title="4-Model AI Consensus (Click for thesis)">
                                 🤖 ${consensusDir} ${consensusStrength ? '(' + consensusStrength + ')' : ''}
                             </span>
-                            ${kpTrend !== '—' ? `<span style="font-size:0.65rem;color:${kpCls};font-weight:700;font-family:var(--font-mono);background:rgba(255,255,255,0.05);padding:0.1rem 0.35rem;border-radius:3px;">🔮 14D: ${kpTrend} ${kpRet}</span>` : ''}
+                            ${kpTrend !== '—' ? `<span style="font-size:0.62rem;color:${kpCls};font-weight:600;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.06rem 0.3rem;border-radius:3px;border:1px solid rgba(255,255,255,0.06);">14D: ${kpRet}</span>` : ''}
                         </div>
                     `;
 
@@ -795,12 +795,12 @@
             tbody.innerHTML = list.map((r, idx) => {
                 const rankNum = idx + 1;
                 const rankBadge = rankNum === 1
-                    ? '<span class="signal-badge" style="background:#eab308;color:#000000;font-weight:800;font-size:0.75rem;padding:0.15rem 0.45rem;">🥇 #1</span>'
+                    ? '<span class="signal-badge" style="background:rgba(255,255,255,0.12);color:#ffffff;border:1px solid rgba(255,255,255,0.22);font-weight:700;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#1</span>'
                     : (rankNum === 2
-                        ? '<span class="signal-badge" style="background:#94a3b8;color:#000000;font-weight:800;font-size:0.75rem;padding:0.15rem 0.45rem;">🥈 #2</span>'
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#2</span>'
                         : (rankNum === 3
-                            ? '<span class="signal-badge" style="background:#b45309;color:#ffffff;font-weight:800;font-size:0.75rem;padding:0.15rem 0.45rem;">🥉 #3</span>'
-                            : `<span style="font-weight:700;color:#94a3b8;font-family:var(--font-mono);font-size:0.82rem;">#${rankNum}</span>`));
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#3</span>'
+                            : `<span style="font-weight:600;color:#64748b;font-family:var(--font-mono);font-size:0.75rem;">#${rankNum}</span>`));
 
                 const curPrice = r.current_price;
                 const curPriceStr = curPrice !== null && curPrice !== undefined ? ('₹' + Number(curPrice).toFixed(2)) : '—';
@@ -810,17 +810,17 @@
 
                 const cycles = r.cycles || 0;
                 const cycleHealth = r.cycle_health || (cycles >= 4 ? 'High Frequency' : (cycles >= 2 ? 'Established' : 'Emerging'));
-                const cycleHealthBg = cycles >= 4 ? 'rgba(16,185,129,0.2)' : (cycles >= 2 ? 'rgba(56,189,248,0.2)' : 'rgba(148,163,184,0.15)');
-                const cycleHealthClr = cycles >= 4 ? '#34d399' : (cycles >= 2 ? '#38bdf8' : '#cbd5e1');
+                const cycleHealthBg = 'rgba(255,255,255,0.03)';
+                const cycleHealthClr = cycles >= 4 ? '#e2e8f0' : (cycles >= 2 ? '#cbd5e1' : '#94a3b8');
 
                 const avgDays = r.avg_cycle_days || 0;
                 const avgDaysStr = avgDays > 0 ? `~${avgDays.toFixed(1)}d` : '—';
                 const velocityTier = (avgDays >= 10 && avgDays <= 30)
-                    ? '<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.60rem;padding:0.05rem 0.35rem;">⚡ Sweet Spot (10-30d)</span>'
+                    ? '<span class="signal-badge" style="background:rgba(255,255,255,0.05);color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.60rem;padding:0.04rem 0.32rem;">● Sweet Spot (10-30d)</span>'
                     : (avgDays > 0 && avgDays < 10
-                        ? '<span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.60rem;padding:0.05rem 0.35rem;">⚡ Rapid (&lt;10d)</span>'
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Rapid (&lt;10d)</span>'
                         : (avgDays > 30
-                            ? '<span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.60rem;padding:0.05rem 0.35rem;">⏳ Extended (&gt;30d)</span>'
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.03);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Extended (&gt;30d)</span>'
                             : ''));
 
                 const supp = r.current_support;
@@ -834,13 +834,13 @@
                 const distStr = distPct !== null ? `${distPct >= 0 ? '+' : ''}${distPct.toFixed(1)}%` : '—';
                 const isNearFloor = distPct !== null && distPct <= 3.5;
                 const floorBadge = isNearFloor
-                    ? '<span class="signal-badge" style="background:rgba(16,185,129,0.25);color:#34d399;border:1px solid #10b981;font-size:0.62rem;font-weight:700;">🟢 Buy Zone</span>'
+                    ? '<span class="signal-badge" style="background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.22);font-size:0.60rem;font-weight:600;padding:0.04rem 0.32rem;">● Floor (0-3%)</span>'
                     : (distPct !== null && distPct <= 8.0
-                        ? '<span class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.62rem;">🟡 Mid-Range</span>'
-                        : '<span class="signal-badge" style="background:rgba(251,146,60,0.15);color:#fb923c;font-size:0.62rem;">🟠 Upper Band</span>');
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);font-size:0.60rem;padding:0.04rem 0.32rem;">Mid-Range</span>'
+                        : '<span class="signal-badge" style="background:rgba(255,255,255,0.02);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Upper Band</span>');
 
                 const rankScore = r.swing_rank_score != null ? Number(r.swing_rank_score).toFixed(1) : '—';
-                const scoreColor = rankScore >= 75 ? '#34d399' : (rankScore >= 55 ? '#38bdf8' : '#fbbf24');
+                const scoreColor = rankScore >= 75 ? '#ffffff' : (rankScore >= 55 ? '#cbd5e1' : '#94a3b8');
 
                 // AI Consensus & Kronos
                 const consensusData = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
@@ -848,14 +848,14 @@
                 const consensusDir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
                 const isConsensusBull = consensusDir.includes('BUY') || consensusDir.includes('BULL');
                 const isConsensusBear = consensusDir.includes('SELL') || consensusDir.includes('BEAR');
-                const cBg = isConsensusBull ? 'rgba(16,185,129,0.18)' : isConsensusBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
-                const cClr = isConsensusBull ? '#34d399' : isConsensusBear ? '#f87171' : '#fbbf24';
-                const cBrd = isConsensusBull ? 'rgba(16,185,129,0.35)' : isConsensusBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+                const cBg = 'rgba(255,255,255,0.03)';
+                const cClr = isConsensusBull ? '#34d399' : (isConsensusBear ? '#f87171' : '#cbd5e1');
+                const cBrd = 'rgba(255,255,255,0.07)';
 
                 const kp = r.kronos_prediction || {};
                 const kpTrend = kp.trend || '—';
                 const kpRet = kp.return_pct != null ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
-                const kpCls = kpTrend === 'Bullish' ? '#34d399' : kpTrend === 'Bearish' ? '#f87171' : '#94a3b8';
+                const kpCls = kpTrend === 'Bullish' ? '#34d399' : (kpTrend === 'Bearish' ? '#f87171' : '#94a3b8');
 
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(234,179,8,0.04)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">

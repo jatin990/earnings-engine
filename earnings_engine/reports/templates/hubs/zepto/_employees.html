@@ -178,6 +178,15 @@
             >
                 <span>🔄</span> Sync Real Roster
             </button>
+            <button
+                type="button"
+                onclick="zeptoApp.purgeFramedEmployees()"
+                id="btnPurgeFramedStaff"
+                class="px-3 py-1.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                title="Purge all starter synthetic / framed demo records from the database"
+            >
+                <span>🧹</span> Purge Demo Records
+            </button>
 
             <span class="text-xs text-slate-400 font-mono" id="empTableCountBadge">0 Staff found</span>
             <button type="button" onclick="zeptoApp.openAddEmployeeModal()" class="btn-zepto text-xs whitespace-nowrap">

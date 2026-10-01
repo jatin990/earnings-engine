@@ -435,10 +435,8 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
         conn.execute("UPDATE zepto_candidates SET target_role = 'SECURITY_GUARD' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND target_role LIKE '%SEC%'")
         conn.execute("UPDATE zepto_candidates SET target_role = 'PICKER' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING')")
 
-        # Check if seed data needed
-        row = conn.execute("SELECT COUNT(*) FROM zepto_employees").fetchone()
-        if row and row[0] == 0:
-            _seed_sample_data(conn)
+        # Strict Anti-Fabrication: Do not automatically insert starter demo/mock records
+        # Schema initialization leaves tables pristine and ready for authentic imports or user entry.
 
 
 def _seed_sample_data(conn: sqlite3.Connection) -> None:
@@ -1369,18 +1367,80 @@ def sync_roster_from_attendance(settings: Settings | None = None) -> dict[str, A
 
 
 def purge_mock_framed_employees(settings: Settings | None = None) -> dict[str, Any]:
-    """Purge synthetic/mock starter employees (emp_01 to emp_06) if real attendance data exists."""
+    """Purge synthetic/mock starter employees (emp_01 to emp_06), demo candidates, mock expenses, sample income, and demo capital tranches."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
-    purged_count = 0
+    purged_emp_count = 0
+    purged_expenses_count = 0
+    purged_candidates_count = 0
+    purged_income_count = 0
+    purged_capital_count = 0
+
     with _connect(settings) as conn:
+        # 1. Purge framed starter employees
         mock_ids = ["emp_01", "emp_02", "emp_03", "emp_04", "emp_05", "emp_06"]
         placeholders = ",".join("?" for _ in mock_ids)
-        res = conn.execute(f"DELETE FROM zepto_employees WHERE id IN ({placeholders})", mock_ids)
-        purged_count = res.rowcount
-        conn.execute(f"DELETE FROM zepto_salaries WHERE employee_id IN ({placeholders})", mock_ids)
-        conn.execute(f"DELETE FROM zepto_monthly_ratings WHERE employee_id IN ({placeholders})", mock_ids)
-    return {"status": "success", "purged_count": purged_count}
+        res_emp = conn.execute(f"DELETE FROM zepto_employees WHERE id IN ({placeholders}) OR id LIKE 'emp_0%'", mock_ids)
+        purged_emp_count = res_emp.rowcount
+        conn.execute(f"DELETE FROM zepto_salaries WHERE employee_id IN ({placeholders}) OR employee_id LIKE 'emp_0%'", mock_ids)
+        conn.execute(f"DELETE FROM zepto_monthly_ratings WHERE employee_id IN ({placeholders}) OR employee_id LIKE 'emp_0%'", mock_ids)
+
+        # 2. Purge framed starter expenses
+        mock_exp_titles = [
+            "Initial Picker Onboarding & Zepto Training Batch",
+            "Staff Uniforms, Thermal Bags & Reflective Vests",
+            "Heavy-Duty Warehouse Racks & Bins Installation",
+            "Staff Refreshment & Breakroom Tea/Snacks (Monthly)",
+            "Store Deep Cleaning & Pest Control Service",
+        ]
+        res_exp = conn.execute(
+            f"DELETE FROM zepto_expenses WHERE title IN ({','.join('?' for _ in mock_exp_titles)})",
+            mock_exp_titles,
+        )
+        purged_expenses_count = res_exp.rowcount
+
+        # 3. Purge framed demo candidates
+        mock_cand_names = ["Rohit Mehra", "Manish Tiwari", "Balwan Singh", "Sunita Soni"]
+        res_cand = conn.execute(
+            f"DELETE FROM zepto_candidates WHERE name IN ({','.join('?' for _ in mock_cand_names)})",
+            mock_cand_names,
+        )
+        purged_candidates_count = res_cand.rowcount
+
+        # 4. Purge framed demo store income
+        mock_income_titles = [
+            "Zepto Dark Store Monthly Order Commission (July 2026)",
+            "Zepto Peak Delivery & SLA Incentive Payout",
+            "Brand Slotting & Warehouse End-Cap Promotion Fee",
+        ]
+        res_inc = conn.execute(
+            f"DELETE FROM zepto_store_income WHERE title IN ({','.join('?' for _ in mock_income_titles)})",
+            mock_income_titles,
+        )
+        purged_income_count = res_inc.rowcount
+
+        # 5. Purge framed demo capital tranches
+        mock_cap_titles = [
+            "Initial Franchise Security Tranche 1",
+            "Initial Franchise Security Tranche 1 Match",
+            "Dark Store Capex & Inventory Deposit Tranche 2",
+            "Dark Store Capex & Inventory Deposit Tranche 2 Match",
+        ]
+        res_cap = conn.execute(
+            f"DELETE FROM zepto_security_capital WHERE tranche_title IN ({','.join('?' for _ in mock_cap_titles)})",
+            mock_cap_titles,
+        )
+        purged_capital_count = res_cap.rowcount
+
+    return {
+        "status": "success",
+        "purged_count": purged_emp_count,
+        "purged_employees": purged_emp_count,
+        "purged_expenses": purged_expenses_count,
+        "purged_candidates": purged_candidates_count,
+        "purged_income": purged_income_count,
+        "purged_capital": purged_capital_count,
+    }
 
 
 # ---------------------------------------------------------------------------
