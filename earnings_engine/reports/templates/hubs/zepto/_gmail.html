@@ -137,14 +137,14 @@
             </div>
         </div>
 
-        <!-- Live Operational Mailbox & Intelligence Feed (Latest 10 Emails) -->
-        <div class="glass-panel p-5 space-y-4">
+        <!-- Live Operational Mailbox & Intelligence Feed (Tabular Ledger & Direct Extraction) -->
+        <div class="glass-panel p-4 sm:p-5 space-y-4">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📥</span>
                     <div>
                         <h4 class="text-xs font-bold text-white uppercase tracking-wider">Store Mailbox Intelligence & Reports Feed</h4>
-                        <p class="text-[11px] text-slate-400">Live operational emails categorized by operational domain with direct summaries</p>
+                        <p class="text-[11px] text-slate-400">Operational email reports ledger with extracted KPI metrics, category filtering, and visibility controls</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -163,17 +163,99 @@
                 </div>
             </div>
 
-            <!-- Email Feed Container -->
+            <!-- Filter & Visibility Control Toolbar -->
+            <div class="glass-panel-sub p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2 flex-wrap flex-1">
+                    <!-- Search Input -->
+                    <div class="relative min-w-[200px] flex-1">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+                        <input
+                            type="text"
+                            id="gmailSearchInput"
+                            oninput="zeptoApp.filterGmailEmails()"
+                            placeholder="Search email subject, sender, metrics..."
+                            class="w-full bg-black/60 border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-white/30 transition"
+                        >
+                    </div>
+
+                    <!-- Category Filter Dropdown -->
+                    <select
+                        id="gmailCategoryFilter"
+                        onchange="zeptoApp.filterGmailEmails()"
+                        class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-white/30"
+                    >
+                        <option value="ALL" selected>⚡ All Categories</option>
+                        <option value="STORE_METRICS">📊 Store Metrics & GMV</option>
+                        <option value="ATTENDANCE">👥 Attendance & Shifts</option>
+                        <option value="MANPOWER_UTILIZATION">⚡ Utilization & IPP</option>
+                        <option value="DQ_LOSS">⚠️ DQ Loss & Spoilage</option>
+                        <option value="SHRINKAGE">📉 Shrinkage & Variance</option>
+                        <option value="MANPOWER_PLAN">📋 Manpower Plan</option>
+                        <option value="OPERATIONAL">📧 Operational Updates</option>
+                        <option value="SECURITY_ALERT">🔒 Security Alerts</option>
+                    </select>
+
+                    <!-- Quick Hide Security Alerts Toggle -->
+                    <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white cursor-pointer select-none transition">
+                        <input
+                            type="checkbox"
+                            id="gmailHideSecurityAlertsCheckbox"
+                            onchange="zeptoApp.toggleHideSecurityAlerts(this.checked)"
+                            checked
+                            class="w-3.5 h-3.5 rounded bg-black/60 border-white/20 text-emerald-500 focus:ring-0 focus:ring-offset-0"
+                        >
+                        <span>Hide Security Alerts</span>
+                    </label>
+
+                    <!-- Show Hidden Emails Toggle -->
+                    <button
+                        type="button"
+                        id="btnToggleHiddenGmail"
+                        onclick="zeptoApp.toggleShowHiddenEmails()"
+                        class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5"
+                    >
+                        <span id="btnToggleHiddenGmailIcon">👁️</span>
+                        <span id="btnToggleHiddenGmailText">Show Hidden (0)</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick="zeptoApp.resetGmailFilters()"
+                        class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition"
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Email Feed Loading & Empty States -->
             <div id="gmailEmailsLoading" class="text-center py-8 text-slate-400 text-xs flex items-center justify-center gap-2">
                 <span class="animate-spin text-base">⏳</span> Fetching latest store emails from Gmail...
             </div>
 
-            <div id="gmailEmailsList" class="space-y-2.5" style="display: none;">
-                <!-- Dynamically rendered email cards via zepto.js -->
+            <div id="gmailEmailsEmpty" style="display: none;" class="text-center py-8 text-slate-500 text-xs">
+                No recent emails found matching your filters.
             </div>
 
-            <div id="gmailEmailsEmpty" style="display: none;" class="text-center py-8 text-slate-500 text-xs">
-                No recent emails found in the connected mailbox.
+            <!-- Tabular View Container -->
+            <div id="gmailTableContainer" class="overflow-hidden border border-white/10 rounded-lg" style="display: none;">
+                <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-white/[0.02]">
+                                <th class="p-2.5 pl-3.5 whitespace-nowrap">Date / Time</th>
+                                <th class="p-2.5 whitespace-nowrap">Category</th>
+                                <th class="p-2.5 min-w-[220px]">Subject & Sender</th>
+                                <th class="p-2.5 min-w-[180px]">Key Metrics & Intelligence</th>
+                                <th class="p-2.5 whitespace-nowrap">Attachments</th>
+                                <th class="p-2.5 pr-3.5 text-center whitespace-nowrap">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gmailEmailsTableBody" class="divide-y divide-white/5 font-sans">
+                            <!-- Populated dynamically via zepto.js -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

@@ -25,6 +25,21 @@
             />
             <button
                 type="button"
+                onclick="document.getElementById('scorecardFileInput').click()"
+                class="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+                title="Upload daily store performance Excel report (.xlsx)"
+            >
+                <span>📤</span> Upload Report (.xlsx)
+            </button>
+            <input
+                type="file"
+                id="scorecardFileInput"
+                accept=".xlsx,.xlsm"
+                style="display: none;"
+                onchange="zeptoApp.handleScorecardFileUpload(event)"
+            />
+            <button
+                type="button"
                 onclick="zeptoApp.loadScorecard()"
                 class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
             >

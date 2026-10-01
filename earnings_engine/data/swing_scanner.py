@@ -927,7 +927,8 @@ def get_top_swingers(
         dist_pct = float(item.get("dist_to_support_pct", 99.0) if item.get("dist_to_support_pct") is not None else 99.0)
         comp_score = float(item.get("composite_score") or 0.0)
 
-        if cycles < min_cycles and comp_score < 40.0:
+        # Strict filter by minimum completed cycles
+        if cycles < min_cycles:
             continue
 
         # Cycle Quality Points (0-40)

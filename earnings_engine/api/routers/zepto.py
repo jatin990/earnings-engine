@@ -823,6 +823,8 @@ async def get_recent_emails_endpoint(
                 extract_attachments(payload)
 
                 cat_info = _classify_zepto_email(subject, sender, snippet)
+                from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
+                extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet}")
 
                 emails.append({
                     "id": msg_id,
@@ -835,6 +837,7 @@ async def get_recent_emails_endpoint(
                     "category_label": cat_info["category_label"],
                     "badge_color": cat_info["badge_color"],
                     "icon": cat_info["icon"],
+                    "extracted_metrics": extracted_metrics,
                     "attachments": attachments,
                     "has_attachments": len(attachments) > 0,
                     "internal_date": msg_data.get("internalDate"),
@@ -1358,6 +1361,67 @@ async def create_manpower_utilization_endpoint(record: dict[str, Any] = Body(...
     except Exception as exc:
         logger.error("[ZEPTO-UTILIZATION] Error saving manpower utilization record: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Store Metrics & DQ Loss Excel Upload Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v1/zepto/metrics/upload", summary="Upload Store Metrics Report (.xlsx)")
+async def upload_store_metrics_excel_endpoint(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Upload and parse an Excel daily store metric report."""
+    from earnings_engine.data.zepto_parsers import parse_zepto_store_metrics_excel
+
+    if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Only Excel .xlsx files are supported.")
+
+    try:
+        content = await file.read()
+        parsed = parse_zepto_store_metrics_excel(content, file_name=file.filename)
+        saved_count = 0
+        for rec in parsed.get("records", []):
+            zepto_db.save_store_metrics(rec, settings=_settings)
+            saved_count += 1
+
+        return {
+            "success": True,
+            "status": "success",
+            "store_name": parsed.get("store_name"),
+            "total_records": parsed.get("total_records", 0),
+            "saved_count": saved_count,
+        }
+    except Exception as exc:
+        logger.error("[ZEPTO-METRICS] Error parsing store metrics file: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Failed to parse store metrics: {str(exc)}")
+
+
+@router.post("/api/v1/zepto/loss/upload", summary="Upload DQ Loss / Shrinkage Report (.xlsx)")
+async def upload_loss_shrinkage_excel_endpoint(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Upload and parse an Excel DQ loss, defect, and shrinkage report."""
+    from earnings_engine.data.zepto_parsers import parse_zepto_loss_shrinkage_excel
+
+    if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Only Excel .xlsx files are supported.")
+
+    try:
+        content = await file.read()
+        parsed = parse_zepto_loss_shrinkage_excel(content, file_name=file.filename)
+        saved_count = 0
+        for rec in parsed.get("records", []):
+            zepto_db.save_loss_record(rec, settings=_settings)
+            saved_count += 1
+
+        return {
+            "success": True,
+            "status": "success",
+            "store_name": parsed.get("store_name"),
+            "total_records": parsed.get("total_records", 0),
+            "saved_count": saved_count,
+        }
+    except Exception as exc:
+        logger.error("[ZEPTO-LOSS] Error parsing loss file: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Failed to parse loss report: {str(exc)}")
+
 
 
 

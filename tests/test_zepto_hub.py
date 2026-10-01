@@ -87,7 +87,8 @@ def test_zepto_hub_renders_gmail_tab(client):
     assert "tabBtn-gmail" in resp.text
     assert "tabContent-gmail" in resp.text
     assert "Store Mailbox Intelligence & Reports Feed" in resp.text
-    assert "gmailEmailsList" in resp.text
+    assert "gmailTableContainer" in resp.text
+    assert "gmailEmailsTableBody" in resp.text
 
 
 def test_classify_zepto_email_categories():

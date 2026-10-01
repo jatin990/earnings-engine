@@ -88,9 +88,6 @@
                     <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
                         <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-xs btn-tactile" style="font-size:0.68rem;padding:0.20rem 0.55rem;background:#1e293b;border:1px solid rgba(255,255,255,0.15);color:#ffffff;" title="Refresh swing setups">↻ Refresh</button>
-                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.68rem;padding:0.20rem 0.55rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:#cbd5e1;" title="Compute Kronos AI neural forecasts">Kronos 14D</button>
-                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.68rem;padding:0.20rem 0.55rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:#cbd5e1;" title="Run AI Thesis synthesis">AI Thesis</button>
-                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-xs btn-tactile" style="font-size:0.68rem;padding:0.20rem 0.55rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);color:#cbd5e1;" title="Run 4-Model AI Consensus">Consensus</button>
                     </div>
                 </div>
 
@@ -162,7 +159,7 @@
                         </div>
                     </div>
 
-                    <!-- Streamlined 7-Column Table View Container -->
+                    <!-- Streamlined 6-Column Table View Container -->
                     <div id="swingTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 250px);min-height:360px;border-radius:6px;border:1px solid rgba(255,255,255,0.07);background:#05070c;margin-top:0;">
                         <table id="swingTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.71rem;">
                             <thead>
@@ -172,13 +169,12 @@
                                     <th onclick="app.sortSwing('swing_signal')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">Tier &amp; Signal ⇅</th>
                                     <th onclick="app.sortSwing('current_support')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">Trading Channel (S/R) ⇅</th>
                                     <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">Earnings &amp; Quality ⇅</th>
-                                    <th onclick="app.sortSwing('consensus_strength')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;" title="Consolidated 4-Model AI Consensus + Kronos 14D + News Thesis">AI Intelligence ⇅</th>
                                     <th style="text-align:right;padding:0.45rem 0.6rem;color:#cbd5e1;font-weight:600;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="swingTableBody">
                                 <tr>
-                                    <td colspan="7" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
+                                    <td colspan="6" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
                                         <div style="font-size:1.4rem;margin-bottom:0.4rem;color:#94a3b8;">🔄</div>
                                         <h4 style="margin:0 0 0.3rem 0;color:#f8fafc;font-size:0.95rem;font-weight:600;">Swing Trading Matrix Ready</h4>
                                         <p style="font-size:0.72rem;margin:0 0 0.85rem 0;color:#64748b;">Select your universe above and click <strong>Refresh</strong> to scan trading bands and buy zones.</p>
@@ -225,7 +221,7 @@
                         </div>
                     </div>
 
-                    <!-- Top Swingers Table Container -->
+                    <!-- Top Swingers 9-Column Table Container -->
                     <div id="swingTopSwingersTableContainer" class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 250px);min-height:360px;border-radius:6px;border:1px solid rgba(255,255,255,0.07);background:#05070c;margin-top:0;">
                         <table id="swingTopSwingersTable" class="results-table" style="width:100%;border-collapse:collapse;font-size:0.71rem;">
                             <thead>
@@ -238,13 +234,12 @@
                                     <th onclick="app.sortTopSwingers('spread_pct')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">Spread ⇅</th>
                                     <th onclick="app.sortTopSwingers('dist_to_support_pct')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">Floor Proximity ⇅</th>
                                     <th onclick="app.sortTopSwingers('swing_rank_score')" style="cursor:pointer;padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;" title="Composite Score based on Cycle Count, Velocity, Channel Spread and Support Proximity">Swing Score ⇅</th>
-                                    <th style="padding:0.45rem 0.6rem;text-align:left;color:#cbd5e1;font-weight:600;">AI &amp; Kronos</th>
                                     <th style="text-align:right;padding:0.45rem 0.6rem;color:#cbd5e1;font-weight:600;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="swingTopSwingersTableBody">
                                 <tr>
-                                    <td colspan="10" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
+                                    <td colspan="9" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
                                         <div style="font-size:1.4rem;margin-bottom:0.4rem;color:#94a3b8;">🏆</div>
                                         <h4 style="margin:0 0 0.3rem 0;color:#f8fafc;font-size:0.95rem;font-weight:600;">Top Swinger Matrix Loading</h4>
                                         <p style="font-size:0.72rem;margin:0 0 0.85rem 0;color:#64748b;">Ranking stocks by harmonic cycle counts, oscillator velocity, and support proximity.</p>
@@ -277,22 +272,4 @@
                 </div>
 
             </section>
-        </div>
-
-        <!-- 🧠 Unified AI Thesis & Intelligence Modal -->
-        <div id="swingAiThesisModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
-            <div class="card" style="background:#080b12;border:1px solid rgba(255,255,255,0.12);border-radius:0.75rem;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 40px rgba(0,0,0,0.85);">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.85rem 1.1rem;border-bottom:1px solid rgba(255,255,255,0.08);">
-                    <div style="display:flex;align-items:center;gap:0.5rem;">
-                        <div>
-                            <h3 id="swingAiModalTicker" style="margin:0;font-size:1.02rem;font-weight:700;color:#ffffff;">AI Intelligence Thesis</h3>
-                            <span id="swingAiModalSub" style="font-size:0.68rem;color:#64748b;">Consensus · Kronos 14D · News Catalysts</span>
-                        </div>
-                    </div>
-                    <button type="button" onclick="document.getElementById('swingAiThesisModal').style.display='none'" class="btn-micro" style="color:#94a3b8;font-size:1.1rem;padding:0.2rem 0.5rem;">✕</button>
-                </div>
-                <div id="swingAiModalBody" style="padding:1.1rem;">
-                    <!-- Dynamically populated -->
-                </div>
-            </div>
         </div>

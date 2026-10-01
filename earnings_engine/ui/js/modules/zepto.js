@@ -13,6 +13,13 @@ const zeptoApp = {
     candidates: [],
     security: null,
     attendance: { summary: null, records: [], filtered: [], roles: [] },
+    gmail: {
+        emails: [],
+        filtered: [],
+        hideSecurityAlerts: true,
+        showHidden: false,
+        hiddenEmailIds: new Set(JSON.parse(localStorage.getItem('zepto_hidden_email_ids') || '[]')),
+    },
     activeTab: 'employees',
     currentEmpId: null,
 
@@ -3036,18 +3043,18 @@ const zeptoApp = {
 
     async loadRecentEmails() {
         const loadingEl = document.getElementById('gmailEmailsLoading');
-        const listEl = document.getElementById('gmailEmailsList');
+        const tableContainer = document.getElementById('gmailTableContainer');
         const emptyEl = document.getElementById('gmailEmailsEmpty');
         const badgeEl = document.getElementById('gmailFeedCountBadge');
         const refreshIcon = document.getElementById('btnRefreshGmailFeedIcon');
 
         if (loadingEl) loadingEl.style.display = 'flex';
-        if (listEl) listEl.style.display = 'none';
+        if (tableContainer) tableContainer.style.display = 'none';
         if (emptyEl) emptyEl.style.display = 'none';
         if (refreshIcon) refreshIcon.className = 'inline-block animate-spin';
 
         try {
-            const res = await fetch('/api/v1/zepto/gmail/recent-emails?limit=10');
+            const res = await fetch('/api/v1/zepto/gmail/recent-emails?limit=30');
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.detail || 'Failed to fetch emails');
@@ -3056,17 +3063,11 @@ const zeptoApp = {
             const data = await res.json();
             const emails = data.emails || [];
 
+            this.gmail.emails = emails;
+            this.filterGmailEmails();
+
             if (badgeEl) badgeEl.textContent = `${emails.length} Emails`;
-
-            if (emails.length === 0) {
-                if (loadingEl) loadingEl.style.display = 'none';
-                if (emptyEl) emptyEl.style.display = 'block';
-                return;
-            }
-
-            this.renderRecentEmails(emails);
             if (loadingEl) loadingEl.style.display = 'none';
-            if (listEl) listEl.style.display = 'block';
         } catch (err) {
             console.error('[ZEPTO-GMAIL] Error loading recent emails:', err);
             if (loadingEl) {
@@ -3077,11 +3078,127 @@ const zeptoApp = {
         }
     },
 
-    renderRecentEmails(emails) {
-        const listEl = document.getElementById('gmailEmailsList');
-        if (!listEl) return;
+    filterGmailEmails() {
+        const query = (document.getElementById('gmailSearchInput')?.value || '').toLowerCase().trim();
+        const catFilter = document.getElementById('gmailCategoryFilter')?.value || 'ALL';
+        const hideSecCheckbox = document.getElementById('gmailHideSecurityAlertsCheckbox');
+        const hideSecurity = hideSecCheckbox ? hideSecCheckbox.checked : this.gmail.hideSecurityAlerts;
+        const showHidden = this.gmail.showHidden;
 
-        listEl.innerHTML = emails.map(m => {
+        let filtered = (this.gmail.emails || []).filter(m => {
+            const isManuallyHidden = this.gmail.hiddenEmailIds.has(m.id);
+            if (isManuallyHidden && !showHidden) return false;
+
+            if (hideSecurity && m.category === 'SECURITY_ALERT') return false;
+
+            if (catFilter !== 'ALL' && m.category !== catFilter) return false;
+
+            if (query) {
+                const sub = (m.subject || '').toLowerCase();
+                const from = (m.from || '').toLowerCase();
+                const snip = (m.snippet || '').toLowerCase();
+                const cat = (m.category_label || m.category || '').toLowerCase();
+                const metrics = JSON.stringify(m.extracted_metrics || {}).toLowerCase();
+                if (!sub.includes(query) && !from.includes(query) && !snip.includes(query) && !cat.includes(query) && !metrics.includes(query)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        this.gmail.filtered = filtered;
+        this.renderGmailTable(filtered);
+        this.updateGmailHideCountBadge();
+    },
+
+    toggleHideSecurityAlerts(checked) {
+        this.gmail.hideSecurityAlerts = checked;
+        this.filterGmailEmails();
+    },
+
+    toggleShowHiddenEmails() {
+        this.gmail.showHidden = !this.gmail.showHidden;
+        const btn = document.getElementById('btnToggleHiddenGmail');
+        const icon = document.getElementById('btnToggleHiddenGmailIcon');
+        const text = document.getElementById('btnToggleHiddenGmailText');
+
+        if (this.gmail.showHidden) {
+            if (btn) btn.className = 'px-2.5 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-xs font-semibold text-amber-300 transition flex items-center gap-1.5';
+            if (icon) icon.textContent = '🙈';
+            if (text) text.textContent = `Hide Archived (${this.gmail.hiddenEmailIds.size})`;
+        } else {
+            if (btn) btn.className = 'px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5';
+            if (icon) icon.textContent = '👁️';
+            if (text) text.textContent = `Show Hidden (${this.gmail.hiddenEmailIds.size})`;
+        }
+        this.filterGmailEmails();
+    },
+
+    hideSingleEmail(emailId) {
+        if (!emailId) return;
+        this.gmail.hiddenEmailIds.add(emailId);
+        localStorage.setItem('zepto_hidden_email_ids', JSON.stringify(Array.from(this.gmail.hiddenEmailIds)));
+        this.showToast('Email hidden from view.');
+        this.filterGmailEmails();
+    },
+
+    unhideSingleEmail(emailId) {
+        if (!emailId) return;
+        this.gmail.hiddenEmailIds.delete(emailId);
+        localStorage.setItem('zepto_hidden_email_ids', JSON.stringify(Array.from(this.gmail.hiddenEmailIds)));
+        this.showToast('Email restored to active ledger.');
+        this.filterGmailEmails();
+    },
+
+    resetGmailFilters() {
+        const searchInput = document.getElementById('gmailSearchInput');
+        const catFilter = document.getElementById('gmailCategoryFilter');
+        const secCheckbox = document.getElementById('gmailHideSecurityAlertsCheckbox');
+
+        if (searchInput) searchInput.value = '';
+        if (catFilter) catFilter.value = 'ALL';
+        if (secCheckbox) secCheckbox.checked = true;
+        this.gmail.hideSecurityAlerts = true;
+        this.gmail.showHidden = false;
+
+        const btn = document.getElementById('btnToggleHiddenGmail');
+        const icon = document.getElementById('btnToggleHiddenGmailIcon');
+        const text = document.getElementById('btnToggleHiddenGmailText');
+        if (btn) btn.className = 'px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5';
+        if (icon) icon.textContent = '👁️';
+        if (text) text.textContent = `Show Hidden (${this.gmail.hiddenEmailIds.size})`;
+
+        this.filterGmailEmails();
+    },
+
+    updateGmailHideCountBadge() {
+        const text = document.getElementById('btnToggleHiddenGmailText');
+        const count = this.gmail.hiddenEmailIds.size;
+        if (text) {
+            text.textContent = this.gmail.showHidden ? `Hide Archived (${count})` : `Show Hidden (${count})`;
+        }
+    },
+
+    renderGmailTable(emails) {
+        const tableContainer = document.getElementById('gmailTableContainer');
+        const emptyEl = document.getElementById('gmailEmailsEmpty');
+        const tbody = document.getElementById('gmailEmailsTableBody');
+        const badgeEl = document.getElementById('gmailFeedCountBadge');
+
+        if (badgeEl) badgeEl.textContent = `${emails.length} of ${this.gmail.emails.length} Emails`;
+
+        if (!emails || emails.length === 0) {
+            if (tableContainer) tableContainer.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+            return;
+        }
+
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (tableContainer) tableContainer.style.display = 'block';
+        if (!tbody) return;
+
+        tbody.innerHTML = emails.map(m => {
             const dateStr = m.date ? new Date(m.date).toLocaleString('en-IN', {
                 month: 'short',
                 day: 'numeric',
@@ -3089,7 +3206,6 @@ const zeptoApp = {
                 minute: '2-digit',
             }) : 'Recent';
 
-            // Clean sender display
             let senderDisplay = m.from || 'Unknown Sender';
             if (senderDisplay.includes('<')) {
                 senderDisplay = senderDisplay.split('<')[0].replace(/"/g, '').trim();
@@ -3110,46 +3226,104 @@ const zeptoApp = {
                 badgeClass = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
             }
 
-            // Attachment badges
-            let attHtml = '';
+            // Key Metrics Pill tags
+            const met = m.extracted_metrics || {};
+            const metricPills = [];
+            if (met.sales_gmv) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 font-mono text-[10px] font-bold">₹${met.sales_gmv.toLocaleString('en-IN')} GMV</span>`);
+            if (met.order_count) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono text-[10px]">${met.order_count} Orders</span>`);
+            if (met.aov) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono text-[10px]">₹${met.aov} AOV</span>`);
+            if (met.sla_adherence_pct) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono text-[10px]">${met.sla_adherence_pct}% SLA</span>`);
+            if (met.packer_ipp) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 font-mono text-[10px]">${met.packer_ipp} IPP</span>`);
+            if (met.loss_amount) metricPills.push(`<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono text-[10px]">₹${met.loss_amount} Loss</span>`);
+
+            let metricsHtml = metricPills.length > 0
+                ? `<div class="flex flex-wrap gap-1 mb-1">${metricPills.join('')}</div>`
+                : '';
+
+            // Attachments
+            let attHtml = '—';
             if (m.attachments && m.attachments.length > 0) {
                 attHtml = `
-                    <div class="flex flex-wrap gap-1.5 pt-2 mt-2 border-t border-white/5">
+                    <div class="flex flex-wrap gap-1">
                         ${m.attachments.map(a => `
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-mono">
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-mono" title="${a.filename}">
                                 <span>📎</span>
-                                <span class="truncate max-w-[200px]">${a.filename}</span>
+                                <span class="truncate max-w-[130px]">${a.filename}</span>
                             </span>
                         `).join('')}
                     </div>
                 `;
             }
 
+            const isHidden = this.gmail.hiddenEmailIds.has(m.id);
+
             return `
-                <div class="glass-panel p-3.5 hover:border-white/20 transition group">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
-                        <div class="flex items-center gap-2">
-                            <span class="text-base">${m.icon || '📧'}</span>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass} uppercase tracking-wider">
-                                ${m.category_label || m.category}
-                            </span>
-                            <span class="text-xs font-bold text-white group-hover:text-emerald-300 transition">
-                                ${m.subject}
-                            </span>
+                <tr class="hover:bg-white/[0.02] transition ${isHidden ? 'opacity-50 bg-rose-500/[0.03]' : ''}">
+                    <!-- Date -->
+                    <td class="p-2.5 pl-3.5 font-mono text-[11px] text-slate-300 whitespace-nowrap align-top">
+                        ${dateStr}
+                    </td>
+
+                    <!-- Category -->
+                    <td class="p-2.5 whitespace-nowrap align-top">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass} uppercase tracking-wider">
+                            <span>${m.icon || '📧'}</span>
+                            <span>${m.category_label || m.category}</span>
+                        </span>
+                    </td>
+
+                    <!-- Subject & Sender -->
+                    <td class="p-2.5 align-top">
+                        <div class="text-xs font-bold text-white group-hover:text-emerald-300 transition line-clamp-1" title="${m.subject}">
+                            ${m.subject}
                         </div>
-                        <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono shrink-0">
-                            <span class="text-slate-300 font-medium">${senderDisplay}</span>
-                            <span>•</span>
-                            <span>${dateStr}</span>
+                        <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[280px]">
+                            ${senderDisplay}
                         </div>
-                    </div>
-                    <p class="text-xs text-slate-400 line-clamp-2 leading-relaxed pl-6">
-                        ${m.snippet || 'No plain text snippet available.'}
-                    </p>
-                    ${attHtml ? `<div class="pl-6">${attHtml}</div>` : ''}
-                </div>
+                        <div class="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                            ${m.snippet || 'No plain text snippet.'}
+                        </div>
+                    </td>
+
+                    <!-- Key Metrics -->
+                    <td class="p-2.5 align-top">
+                        ${metricsHtml}
+                        ${metricPills.length === 0 ? '<span class="text-[10px] text-slate-500 font-mono">Informational Report</span>' : ''}
+                    </td>
+
+                    <!-- Attachments -->
+                    <td class="p-2.5 align-top">
+                        ${attHtml}
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="p-2.5 pr-3.5 text-center align-top whitespace-nowrap">
+                        ${isHidden ? `
+                            <button
+                                type="button"
+                                onclick="zeptoApp.unhideSingleEmail('${m.id}')"
+                                class="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/25 text-[10px] font-bold transition flex items-center gap-1 mx-auto"
+                                title="Restore to main feed"
+                            >
+                                <span>↩️</span> Restore
+                            </button>
+                        ` : `
+                            <button
+                                type="button"
+                                onclick="zeptoApp.hideSingleEmail('${m.id}')"
+                                class="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-white/5 transition"
+                                title="Hide this email"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                                </svg>
+                            </button>
+                        `}
+                    </td>
+                </tr>
             `;
         }).join('');
+    },
     },
 
     showToast(message, isError = false) {

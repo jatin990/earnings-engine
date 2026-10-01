@@ -588,16 +588,10 @@
                                 </div>
                             </td>
 
-                            <!-- Col 6: AI Intelligence & Thesis -->
-                            <td style="padding:0.55rem 0.65rem;">
-                                ${aiColHtml}
-                            </td>
-
-                            <!-- Col 7: Actions -->
+                            <!-- Col 6: Actions -->
                             <td style="padding:0.55rem 0.65rem;text-align:right;">
                                 <div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">
                                     <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Edit Support & Resistance bounds">✎ Range</button>
-                                    <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View unified AI Thesis">🧠 AI</button>
                                     <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;">📊 Chart</a>
                                 </div>
                             </td>
