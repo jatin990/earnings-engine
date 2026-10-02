@@ -2253,6 +2253,103 @@ def _migration_044_shareholding_fetch_tracking(conn: Any) -> None:
         pass
 
 
+def _migration_045_market_pulse_and_pricing_indexes(conn: Any) -> None:
+    """Create composite indexes for Participant OI, FII/DII Net Flows, Price History, and Daily Quotes."""
+    # Ensure tables exist before indexing
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS participant_oi_positioning (
+                date TEXT NOT NULL,
+                participant TEXT NOT NULL,
+                category_label TEXT NOT NULL DEFAULT '',
+                future_index_long INTEGER NOT NULL DEFAULT 0,
+                future_index_short INTEGER NOT NULL DEFAULT 0,
+                future_index_net INTEGER NOT NULL DEFAULT 0,
+                future_index_long_pct REAL NOT NULL DEFAULT 50.0,
+                future_stock_long INTEGER NOT NULL DEFAULT 0,
+                future_stock_short INTEGER NOT NULL DEFAULT 0,
+                future_stock_net INTEGER NOT NULL DEFAULT 0,
+                opt_index_call_long INTEGER NOT NULL DEFAULT 0,
+                opt_index_call_short INTEGER NOT NULL DEFAULT 0,
+                opt_index_put_long INTEGER NOT NULL DEFAULT 0,
+                opt_index_put_short INTEGER NOT NULL DEFAULT 0,
+                opt_stock_call_long INTEGER NOT NULL DEFAULT 0,
+                opt_stock_call_short INTEGER NOT NULL DEFAULT 0,
+                opt_stock_put_long INTEGER NOT NULL DEFAULT 0,
+                opt_stock_put_short INTEGER NOT NULL DEFAULT 0,
+                futures_long INTEGER NOT NULL DEFAULT 0,
+                futures_short INTEGER NOT NULL DEFAULT 0,
+                calls_long INTEGER NOT NULL DEFAULT 0,
+                calls_short INTEGER NOT NULL DEFAULT 0,
+                puts_long INTEGER NOT NULL DEFAULT 0,
+                puts_short INTEGER NOT NULL DEFAULT 0,
+                total_long INTEGER NOT NULL DEFAULT 0,
+                total_short INTEGER NOT NULL DEFAULT 0,
+                net_contracts INTEGER NOT NULL DEFAULT 0,
+                long_short_ratio REAL NOT NULL DEFAULT 1.0,
+                long_pct REAL NOT NULL DEFAULT 50.0,
+                short_pct REAL NOT NULL DEFAULT 50.0,
+                stance TEXT NOT NULL DEFAULT 'Neutral',
+                updated_at TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (date, participant)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_participant_oi_date_part ON participant_oi_positioning (date DESC, participant)")
+    except Exception:
+        pass
+
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS institutional_net_flows (
+                date TEXT PRIMARY KEY,
+                day_label TEXT NOT NULL DEFAULT '',
+                fii_buy_cr REAL NOT NULL DEFAULT 0.0,
+                fii_sell_cr REAL NOT NULL DEFAULT 0.0,
+                fii_net_cr REAL NOT NULL DEFAULT 0.0,
+                dii_buy_cr REAL NOT NULL DEFAULT 0.0,
+                dii_sell_cr REAL NOT NULL DEFAULT 0.0,
+                dii_net_cr REAL NOT NULL DEFAULT 0.0,
+                total_net_cr REAL NOT NULL DEFAULT 0.0,
+                stance TEXT NOT NULL DEFAULT 'Neutral',
+                updated_at TEXT NOT NULL DEFAULT ''
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date_desc ON institutional_net_flows (date DESC)")
+    except Exception:
+        pass
+
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_price_history_ticker_date ON price_history (ticker, date DESC)")
+    except Exception:
+        pass
+
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ticker_metrics (
+                ticker TEXT PRIMARY KEY,
+                week_change REAL,
+                thirty_day_return_pct REAL,
+                updated_at TEXT
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ticker_metrics_perf ON ticker_metrics (week_change, thirty_day_return_pct)")
+    except Exception:
+        pass
+
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS daily_quotes_cache (
+                ticker TEXT PRIMARY KEY,
+                price REAL,
+                change_pct REAL,
+                updated_at TEXT
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_daily_quotes_ticker ON daily_quotes_cache (ticker, updated_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2299,6 +2396,7 @@ MIGRATIONS: list[Migration] = [
     Migration(42, "042_nepal_abc_trek_purge_and_seed", _migration_042_nepal_abc_trek),
     Migration(43, "043_missing_query_indexes", _migration_043_missing_query_indexes),
     Migration(44, "044_shareholding_fetch_tracking", _migration_044_shareholding_fetch_tracking),
+    Migration(45, "045_market_pulse_and_pricing_indexes", _migration_045_market_pulse_and_pricing_indexes),
 ]
 
 
