@@ -4,8 +4,27 @@
  * Candidate Pipeline Conversions, and ₹75L 50-50 Partner Capital Ledger.
  */
 
+const ZEPTO_ALL_TABS = [
+    'dashboard',
+    'employees',
+    'attendance',
+    'utilization',
+    'loss',
+    'scorecard',
+    'income',
+    'expenses',
+    'candidates',
+    'offers',
+    'security',
+    'gmail',
+];
+
 const zeptoApp = {
     overview: null,
+    dashboard: {
+        analytics: null,
+        dod_filtered: [],
+    },
     employees: [],
     includeHiddenEmployees: false,
     empSortColumn: 'name',
@@ -14,7 +33,7 @@ const zeptoApp = {
     expenses: [],
     candidates: [],
     security: null,
-    attendance: { summary: null, records: [], filtered: [], roles: [] },
+    attendance: { summary: null, records: [], filtered: [], staff_roster: [], filtered_staff: [], roles: [] },
     gmail: {
         emails: [],
         filtered: [],
@@ -22,7 +41,9 @@ const zeptoApp = {
         showHidden: false,
         hiddenEmailIds: new Set(JSON.parse(localStorage.getItem('zepto_hidden_email_ids') || '[]')),
     },
-    activeTab: 'employees',
+    currentGlobalMonth: 'ALL',
+    availableMonths: [],
+    activeTab: 'dashboard',
     currentEmpId: null,
     currentStaffDrawerEmpId: null,
     currentStaffDrawerMonth: null,
@@ -33,16 +54,18 @@ const zeptoApp = {
         this.populateDynamicMonthDropdowns();
 
         // Tab routing via hash
-        const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-        if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].includes(rawHash)) {
+        const rawHash = (window.location.hash || '#dashboard').replace('#', '').split('?')[0];
+        if (ZEPTO_ALL_TABS.includes(rawHash)) {
             this.activeTab = rawHash;
+        } else {
+            this.activeTab = 'dashboard';
         }
         this.switchTab(this.activeTab, false);
 
         // Listen for browser back/forward and anchor hash changes
         window.addEventListener('hashchange', () => {
-            const newHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-            if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].includes(newHash)) {
+            const newHash = (window.location.hash || '#dashboard').replace('#', '').split('?')[0];
+            if (ZEPTO_ALL_TABS.includes(newHash)) {
                 if (this.activeTab !== newHash) {
                     this.switchTab(newHash, false);
                 }
@@ -80,6 +103,7 @@ const zeptoApp = {
     async loadAll() {
         await Promise.all([
             this.loadOverview(),
+            this.loadOperationsDashboard(),
             this.loadEmployees(),
             this.loadAttendanceData(),
             this.loadUtilization(),
@@ -98,12 +122,15 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     switchTab(tabId, updateHash = true) {
+        if (!ZEPTO_ALL_TABS.includes(tabId)) {
+            tabId = 'dashboard';
+        }
         this.activeTab = tabId;
         if (updateHash) {
             window.location.hash = tabId;
         }
 
-        ['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].forEach(t => {
+        ZEPTO_ALL_TABS.forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -118,10 +145,18 @@ const zeptoApp = {
             }
         });
 
-        if (tabId === 'utilization') this.loadUtilization();
-        if (tabId === 'loss') this.loadLoss();
-        if (tabId === 'scorecard') this.loadScorecard();
-        if (tabId === 'offers') this.initOfferLetterModule();
+        if (tabId === 'dashboard') this.loadOperationsDashboard();
+        else if (tabId === 'employees') this.loadEmployees();
+        else if (tabId === 'attendance') this.loadAttendanceData();
+        else if (tabId === 'utilization') this.loadUtilization();
+        else if (tabId === 'loss') this.loadLoss();
+        else if (tabId === 'scorecard') this.loadScorecard();
+        else if (tabId === 'income') this.loadIncome();
+        else if (tabId === 'expenses') this.loadExpenses();
+        else if (tabId === 'candidates') this.loadCandidates();
+        else if (tabId === 'offers') this.initOfferLetterModule();
+        else if (tabId === 'security') this.loadSecurity();
+        else if (tabId === 'gmail') this.loadRecentEmails();
     },
 
     // -----------------------------------------------------------------------
@@ -135,9 +170,14 @@ const zeptoApp = {
             if (!res.ok) throw new Error(data.detail || 'Failed to load store overview');
 
             this.overview = data;
+            if (data.available_months && Array.isArray(data.available_months)) {
+                this.updateAvailableMonths(data.available_months);
+            }
             this.renderOverviewWidgets(data);
         } catch (err) {
             console.error('[ZEPTO] Error loading overview:', err);
+        }
+    },
         }
     },
 
@@ -312,51 +352,332 @@ const zeptoApp = {
         if (kpiP2Bar) kpiP2Bar.title = p2.name;
     },
 
+    updateAvailableMonths(months) {
+        if (!months || !Array.isArray(months)) return;
+        const set = new Set([...this.availableMonths, ...months]);
+        this.availableMonths = Array.from(set).filter(m => m && m.length === 7).sort().reverse();
+        this.populateDynamicMonthDropdowns();
+    },
+
     populateDynamicMonthDropdowns() {
-        const incMonthSelect = document.getElementById('incMonthFilter');
-        if (incMonthSelect) {
-            const currentVal = incMonthSelect.value;
-            const now = new Date();
-            let opts = '<option value="ALL">All Months</option>';
+        const now = new Date();
+        const monthList = [...(this.availableMonths || [])];
+        if (monthList.length === 0) {
             for (let i = 0; i < 12; i++) {
                 const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-                opts += `<option value="${ym}">${label}</option>`;
+                monthList.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
             }
+        }
+
+        const formatMonthLabel = (ym) => {
+            const [yr, mo] = ym.split('-');
+            const d = new Date(parseInt(yr, 10), parseInt(mo, 10) - 1, 1);
+            return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        };
+
+        // 1. Global Header Month Scope Selector
+        const globalSelect = document.getElementById('globalMonthSelector');
+        if (globalSelect) {
+            const currentVal = globalSelect.value || this.currentGlobalMonth || 'ALL';
+            let opts = '<option value="ALL" class="bg-slate-900 text-white">All Months</option>';
+            monthList.forEach(ym => {
+                opts += `<option value="${ym}" class="bg-slate-900 text-white">${formatMonthLabel(ym)} (${ym})</option>`;
+            });
+            globalSelect.innerHTML = opts;
+            if (Array.from(globalSelect.options).some(o => o.value === currentVal)) {
+                globalSelect.value = currentVal;
+            }
+            this.currentGlobalMonth = globalSelect.value;
+        }
+
+        // 2. Attendance Month Filter
+        const attMonthSelect = document.getElementById('attMonthFilter');
+        if (attMonthSelect) {
+            const currentVal = attMonthSelect.value || this.currentGlobalMonth || 'ALL';
+            let opts = '<option value="ALL">All Records</option>';
+            monthList.forEach(ym => {
+                opts += `<option value="${ym}">${formatMonthLabel(ym)} (${ym})</option>`;
+            });
+            attMonthSelect.innerHTML = opts;
+            if (currentVal && Array.from(attMonthSelect.options).some(o => o.value === currentVal)) {
+                attMonthSelect.value = currentVal;
+            }
+        }
+
+        // 3. Gmail Month Filter
+        const gmailMonthSelect = document.getElementById('gmailMonthFilter');
+        if (gmailMonthSelect) {
+            const currentVal = gmailMonthSelect.value || this.currentGlobalMonth || 'ALL';
+            let opts = '<option value="ALL">All Months</option>';
+            monthList.forEach(ym => {
+                opts += `<option value="${ym}">${formatMonthLabel(ym)} (${ym})</option>`;
+            });
+            gmailMonthSelect.innerHTML = opts;
+            if (currentVal && Array.from(gmailMonthSelect.options).some(o => o.value === currentVal)) {
+                gmailMonthSelect.value = currentVal;
+            }
+        }
+
+        // 4. Income Month Filter
+        const incMonthSelect = document.getElementById('incMonthFilter');
+        if (incMonthSelect) {
+            const currentVal = incMonthSelect.value || this.currentGlobalMonth || 'ALL';
+            let opts = '<option value="ALL">All Months</option>';
+            monthList.forEach(ym => {
+                opts += `<option value="${ym}">${formatMonthLabel(ym)} (${ym})</option>`;
+            });
             incMonthSelect.innerHTML = opts;
-            if (currentVal) incMonthSelect.value = currentVal;
+            if (currentVal && Array.from(incMonthSelect.options).some(o => o.value === currentVal)) {
+                incMonthSelect.value = currentVal;
+            }
+        }
+    },
+
+    onGlobalMonthChange(val) {
+        this.currentGlobalMonth = val || 'ALL';
+
+        // Synchronize labels and scope badges across all subtabs
+        const scopeText = val === 'ALL' ? 'ALL' : val;
+        const scopeFull = val === 'ALL' ? 'All Historical Months' : `Month: ${val}`;
+
+        const dashScope = document.getElementById('dashActiveScopeBadge');
+        if (dashScope) dashScope.textContent = scopeFull;
+
+        const dashLabel = document.getElementById('dashSelectedMonthLabel');
+        if (dashLabel) dashLabel.textContent = scopeText;
+
+        const lossScope = document.getElementById('lossActiveScopeBadge');
+        if (lossScope) lossScope.textContent = scopeText;
+
+        const scScope = document.getElementById('scorecardActiveScopeBadge');
+        if (scScope) scScope.textContent = scopeText;
+
+        const utilScope = document.getElementById('utilActiveScopeBadge');
+        if (utilScope) utilScope.textContent = scopeText;
+
+        // Synchronize subtab dropdowns if they exist
+        const attMonthSelect = document.getElementById('attMonthFilter');
+        if (attMonthSelect && Array.from(attMonthSelect.options).some(o => o.value === val)) {
+            attMonthSelect.value = val;
         }
 
         const gmailMonthSelect = document.getElementById('gmailMonthFilter');
-        if (gmailMonthSelect) {
-            const currentVal = gmailMonthSelect.value || 'CURRENT';
-            const now = new Date();
-            let opts = '<option value="CURRENT">Current Month</option><option value="ALL">All Months</option>';
-            for (let i = 0; i < 12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-                opts += `<option value="${ym}">${label}</option>`;
-            }
-            gmailMonthSelect.innerHTML = opts;
-            if (currentVal) gmailMonthSelect.value = currentVal;
+        if (gmailMonthSelect && Array.from(gmailMonthSelect.options).some(o => o.value === val)) {
+            gmailMonthSelect.value = val;
         }
 
-        const attMonthSelect = document.getElementById('attMonthFilter');
-        if (attMonthSelect) {
-            const currentVal = attMonthSelect.value || 'CURRENT';
-            const now = new Date();
-            let opts = '<option value="CURRENT">Current Month</option><option value="ALL">All Records</option>';
-            for (let i = 0; i < 12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-                opts += `<option value="${ym}">${label}</option>`;
-            }
-            attMonthSelect.innerHTML = opts;
-            if (currentVal) attMonthSelect.value = currentVal;
+        const incMonthSelect = document.getElementById('incMonthFilter');
+        if (incMonthSelect && Array.from(incMonthSelect.options).some(o => o.value === val)) {
+            incMonthSelect.value = val;
         }
+
+        // Reload data for currently active tab
+        if (this.activeTab === 'dashboard') this.loadOperationsDashboard();
+        else if (this.activeTab === 'attendance') this.loadAttendanceData();
+        else if (this.activeTab === 'loss') this.loadLoss();
+        else if (this.activeTab === 'scorecard') this.loadScorecard();
+        else if (this.activeTab === 'utilization') this.loadUtilization();
+        else if (this.activeTab === 'income') this.loadIncome();
+        else if (this.activeTab === 'expenses') this.loadExpenses();
+        else if (this.activeTab === 'gmail') this.loadRecentEmails();
+    },
+
+    // -----------------------------------------------------------------------
+    // Tab: Master Operations Dashboard (MoM & DoD Executive Ledger)
+    // -----------------------------------------------------------------------
+
+    async loadOperationsDashboard() {
+        const month = this.currentGlobalMonth || 'ALL';
+        const params = new URLSearchParams();
+        if (month && month !== 'ALL') {
+            params.append('month', month);
+        }
+
+        try {
+            const res = await fetch(`/api/v1/zepto/operations/analytics?${params.toString()}`);
+            if (!res.ok) throw new Error('Failed to load operational analytics');
+            const data = await res.json();
+
+            this.dashboard = this.dashboard || {};
+            this.dashboard.analytics = data;
+            this.dashboard.dod_filtered = data.dod_metrics || [];
+
+            if (data.available_months && Array.isArray(data.available_months)) {
+                this.updateAvailableMonths(data.available_months);
+            }
+
+            this.renderOperationsDashboard(data);
+        } catch (err) {
+            console.error('[ZEPTO-DASHBOARD] Error loading dashboard:', err);
+        }
+    },
+
+    renderOperationsDashboard(data) {
+        if (!data) return;
+
+        const kpis = data.summary_kpis || {};
+        const mom = data.mom_trends || [];
+        const dod = this.dashboard?.dod_filtered || data.dod_metrics || [];
+        const activeMonth = data.selected_month || this.currentGlobalMonth || 'ALL';
+
+        // 1. Header Badges
+        const scopeBadge = document.getElementById('dashActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = activeMonth === 'ALL' ? 'All Historical Months' : `Month: ${activeMonth}`;
+        const monthLabel = document.getElementById('dashSelectedMonthLabel');
+        if (monthLabel) monthLabel.textContent = activeMonth;
+
+        // 2. Executive KPI Cards
+        const totalLossEl = document.getElementById('dashTotalLoss');
+        if (totalLossEl) totalLossEl.textContent = this.formatCurrency(kpis.total_loss || 0);
+
+        const lossIncidentsEl = document.getElementById('dashLossIncidents');
+        if (lossIncidentsEl) {
+            const incCount = kpis.total_loss_incidents || (dod.reduce((acc, d) => acc + (d.loss_incidents || 0), 0));
+            lossIncidentsEl.textContent = `${incCount.toLocaleString('en-IN')} Incidents`;
+        }
+
+        const attBadge = document.getElementById('dashAttendanceBadge');
+        if (attBadge) attBadge.textContent = `${(kpis.attendance_rate_pct || 0).toFixed(1)}% Rate`;
+
+        const presentShiftsEl = document.getElementById('dashPresentShifts');
+        if (presentShiftsEl) presentShiftsEl.textContent = `${kpis.total_present || 0} / ${kpis.total_shifts || 0}`;
+
+        const absentShiftsEl = document.getElementById('dashAbsentShifts');
+        if (absentShiftsEl) absentShiftsEl.textContent = `${kpis.total_absent || 0} Shifts`;
+
+        const totalOrdersEl = document.getElementById('dashTotalOrders');
+        if (totalOrdersEl) totalOrdersEl.textContent = (kpis.total_orders || 0).toLocaleString('en-IN');
+
+        const totalGmvEl = document.getElementById('dashTotalGmv');
+        if (totalGmvEl) totalGmvEl.textContent = this.formatCurrency(kpis.total_gmv || 0);
+
+        const avgIppEl = document.getElementById('dashAvgIpp');
+        if (avgIppEl) avgIppEl.textContent = `${kpis.avg_packer_ipp || 0} IPP`;
+
+        const daysCountEl = document.getElementById('dashDaysCount');
+        if (daysCountEl) daysCountEl.textContent = kpis.days_count || dod.length || 0;
+
+        const daysBadge = document.getElementById('dashDaysCountBadge');
+        if (daysBadge) daysBadge.textContent = `${kpis.days_count || dod.length || 0} Days`;
+
+        // 3. Month-on-Month Table
+        const momBadge = document.getElementById('dashMomMonthsBadge');
+        if (momBadge) momBadge.textContent = `${mom.length} Months`;
+
+        const momTbody = document.getElementById('dashMomTableBody');
+        if (momTbody) {
+            if (mom.length === 0) {
+                momTbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-slate-500 text-xs">No historical monthly data recorded.</td></tr>`;
+            } else {
+                momTbody.innerHTML = mom.map(m => {
+                    const [yr, mo] = m.month_ym.split('-');
+                    const dateObj = new Date(parseInt(yr, 10), parseInt(mo, 10) - 1, 1);
+                    const label = dateObj.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2.5 px-3">
+                                <div class="font-bold text-white">${label}</div>
+                                <div class="text-[10px] font-mono text-slate-500">${m.month_ym}</div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${m.active_headcount || 0}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-emerald-400">${(m.present_count || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-right font-mono ${m.absent_count > 0 ? 'text-rose-400' : 'text-slate-500'}">${m.absent_count || 0}</td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold ${m.attendance_rate_pct >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${m.attendance_rate_pct}%</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-white">${(m.total_orders || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.avg_ipp || 0}</td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-400">${this.formatCurrency(m.loss_total || 0)}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(m.loss_incidents || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-center">
+                                <button type="button" onclick="zeptoApp.onGlobalMonthChange('${m.month_ym}')" class="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-slate-300 hover:text-white transition">
+                                    Filter ↗
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 4. Day-on-Day Table
+        this.renderDashboardDodTable();
+    },
+
+    renderDashboardDodTable() {
+        const dod = this.dashboard?.dod_filtered || [];
+        const badge = document.getElementById('dashDodRecordBadge');
+        if (badge) badge.textContent = `${dod.length} Days`;
+
+        const tbody = document.getElementById('dashDodTableBody');
+        if (!tbody) return;
+
+        if (dod.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" class="text-center py-6 text-slate-500 text-xs">No daily operational records found for this scope.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = dod.map(d => `
+            <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">${d.date}</td>
+                <td class="py-2 px-3 text-right font-mono text-slate-400">${d.shifts_scheduled || 0}</td>
+                <td class="py-2 px-3 text-right font-mono text-emerald-400">${d.shifts_present || 0}</td>
+                <td class="py-2 px-3 text-right font-mono ${d.shifts_absent > 0 ? 'text-rose-400' : 'text-slate-500'}">${d.shifts_absent || 0}</td>
+                <td class="py-2 px-3 text-right font-mono font-bold ${d.attendance_rate_pct >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${d.attendance_rate_pct}%</td>
+                <td class="py-2 px-3 text-right font-mono text-white">${(d.orders_dispatched || 0).toLocaleString('en-IN')}</td>
+                <td class="py-2 px-3 text-right font-mono text-slate-300">${this.formatCurrency(d.sales_gmv || 0)}</td>
+                <td class="py-2 px-3 text-right font-mono text-amber-300">${d.packer_ipp || 0}</td>
+                <td class="py-2 px-3 text-right font-mono font-bold text-rose-400">${this.formatCurrency(d.loss_total || 0)}</td>
+                <td class="py-2 px-3 text-right font-mono text-slate-400">${d.loss_incidents || 0}</td>
+                <td class="py-2 px-3 text-right font-mono text-slate-300">${d.skus_affected || 0}</td>
+            </tr>
+        `).join('');
+    },
+
+    filterDashboardDod() {
+        const query = (document.getElementById('dashDodSearchInput')?.value || '').trim().toLowerCase();
+        const all = this.dashboard?.analytics?.dod_metrics || [];
+        if (!query) {
+            this.dashboard.dod_filtered = [...all];
+        } else {
+            this.dashboard.dod_filtered = all.filter(d => (d.date || '').toLowerCase().includes(query));
+        }
+        this.renderDashboardDodTable();
+    },
+
+    exportDashboardDodCsv() {
+        const dod = this.dashboard?.dod_filtered || this.dashboard?.analytics?.dod_metrics || [];
+        if (dod.length === 0) {
+            alert('No Day-on-Day records available to export.');
+            return;
+        }
+
+        const headers = ['Date', 'Shifts Scheduled', 'Shifts Present', 'Shifts Absent', 'Attendance Rate (%)', 'Orders Dispatched', 'Sales GMV (INR)', 'Packer IPP', 'Loss Amount (INR)', 'Loss Incidents', 'SKUs Affected'];
+        const csvRows = [headers.join(',')];
+
+        dod.forEach(d => {
+            csvRows.push([
+                `"${d.date}"`,
+                d.shifts_scheduled || 0,
+                d.shifts_present || 0,
+                d.shifts_absent || 0,
+                d.attendance_rate_pct || 0,
+                d.orders_dispatched || 0,
+                d.sales_gmv || 0,
+                d.packer_ipp || 0,
+                d.loss_total || 0,
+                d.loss_incidents || 0,
+                d.skus_affected || 0,
+            ].join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `zepto_dod_operations_${this.currentGlobalMonth || 'ALL'}_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     },
 
     // -----------------------------------------------------------------------
@@ -2697,13 +3018,21 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadAttendanceData() {
-        const monthFilter = document.getElementById('attMonthFilter')?.value || 'CURRENT';
+        const attFilter = document.getElementById('attMonthFilter');
         let ym = '';
-        if (monthFilter === 'CURRENT') {
-            const now = new Date();
-            ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-        } else if (monthFilter !== 'ALL') {
-            ym = monthFilter;
+        if (this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL') {
+            ym = this.currentGlobalMonth;
+            if (attFilter && Array.from(attFilter.options).some(o => o.value === ym)) {
+                attFilter.value = ym;
+            }
+        } else {
+            const filterVal = attFilter?.value || 'ALL';
+            if (filterVal === 'CURRENT') {
+                const now = new Date();
+                ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            } else if (filterVal !== 'ALL') {
+                ym = filterVal;
+            }
         }
 
         try {
@@ -2714,20 +3043,40 @@ const zeptoApp = {
             if (ym) recParams.append('year_month', ym);
             recParams.append('limit', '1000');
 
-            const [sumRes, recRes] = await Promise.all([
+            let [sumRes, recRes] = await Promise.all([
                 fetch(`/api/v1/zepto/attendance/summary?${summaryParams.toString()}`),
                 fetch(`/api/v1/zepto/attendance/records?${recParams.toString()}`),
             ]);
 
             if (sumRes.ok) {
-                this.attendance.summary = await sumRes.json();
-                this.attendance.staff_roster = this.attendance.summary.staff_roster || [];
+                let sumData = await sumRes.json();
+                if (sumData.available_months && Array.isArray(sumData.available_months)) {
+                    this.updateAvailableMonths(sumData.available_months);
+                }
+
+                // If no shifts in the current/selected month and global scope is ALL, fallback to all records
+                if ((sumData.total_shifts_scheduled === 0 || !sumData.total_shifts_scheduled) && ym && this.currentGlobalMonth === 'ALL') {
+                    const [sumAllRes, recAllRes] = await Promise.all([
+                        fetch('/api/v1/zepto/attendance/summary'),
+                        fetch('/api/v1/zepto/attendance/records?limit=1000'),
+                    ]);
+                    if (sumAllRes.ok) {
+                        sumData = await sumAllRes.json();
+                        if (recAllRes.ok) {
+                            const recAllData = await recAllRes.json();
+                            this.attendance.records = recAllData.records || [];
+                            this.attendance.filtered = [...this.attendance.records];
+                        }
+                    }
+                } else if (recRes.ok) {
+                    const recData = await recRes.json();
+                    this.attendance.records = recData.records || [];
+                    this.attendance.filtered = [...this.attendance.records];
+                }
+
+                this.attendance.summary = sumData;
+                this.attendance.staff_roster = sumData.staff_roster || [];
                 this.attendance.filtered_staff = [...this.attendance.staff_roster];
-            }
-            if (recRes.ok) {
-                const recData = await recRes.json();
-                this.attendance.records = recData.records || [];
-                this.attendance.filtered = [...this.attendance.records];
             }
 
             this.renderAttendance();
@@ -4189,9 +4538,12 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadUtilization() {
-        const date = document.getElementById('utilDateFilter')?.value || '';
+        const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : '';
         const params = new URLSearchParams();
-        if (date) params.append('start_date', date);
+        if (month) params.append('month', month);
+
+        const scopeBadge = document.getElementById('utilActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = this.currentGlobalMonth || 'ALL';
 
         try {
             const res = await fetch(`/api/v1/zepto/utilization/summary?${params.toString()}`);
@@ -4266,7 +4618,7 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadLoss() {
-        const month = document.getElementById('lossMonthFilter')?.value || 'ALL';
+        const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : (document.getElementById('lossMonthFilter')?.value || 'ALL');
         const lossType = document.getElementById('lossTypeFilter')?.value || 'ALL';
         const category = document.getElementById('lossCategoryFilter')?.value || 'ALL';
 
@@ -4275,10 +4627,16 @@ const zeptoApp = {
         if (lossType && lossType !== 'ALL') params.append('loss_type', lossType);
         if (category && category !== 'ALL') params.append('category', category);
 
+        const scopeBadge = document.getElementById('lossActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = month;
+
         try {
             const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
             if (!res.ok) return;
             const data = await res.json();
+            if (data.available_months && Array.isArray(data.available_months)) {
+                this.updateAvailableMonths(data.available_months);
+            }
             this.renderLoss(data);
         } catch (err) {
             console.error('[ZEPTO-LOSS] Error loading loss summary:', err);
@@ -4787,9 +5145,12 @@ const zeptoApp = {
     // -----------------------------------------------------------------------
 
     async loadScorecard() {
-        const date = document.getElementById('scorecardDateFilter')?.value || '';
+        const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : '';
         const params = new URLSearchParams();
-        if (date) params.append('start_date', date);
+        if (month) params.append('month', month);
+
+        const scopeBadge = document.getElementById('scorecardActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = this.currentGlobalMonth || 'ALL';
 
         try {
             const res = await fetch(`/api/v1/zepto/metrics/summary?${params.toString()}`);

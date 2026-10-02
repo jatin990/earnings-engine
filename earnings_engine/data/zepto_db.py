@@ -45,6 +45,45 @@ def _get_table_columns(conn: Any, table_name: str) -> set[str]:
         return set()
 
 
+def get_all_available_months(conn: Any) -> list[str]:
+    """Retrieve list of distinct YYYY-MM months across all Zepto operational tables."""
+    try:
+        q = """
+        SELECT DISTINCT ym FROM (
+            SELECT DISTINCT substr(shift_date, 1, 7) AS ym FROM zepto_attendance_records WHERE shift_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(metric_date, 1, 7) AS ym FROM zepto_store_metrics WHERE metric_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL
+            UNION
+            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL
+            UNION
+            SELECT DISTINCT year_month AS ym FROM zepto_store_income WHERE year_month IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(expense_date, 1, 7) AS ym FROM zepto_expenses WHERE expense_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(util_date, 1, 7) AS ym FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
+        ) WHERE ym IS NOT NULL AND length(ym) = 7
+        ORDER BY ym DESC
+        """
+        rows = conn.execute(q).fetchall()
+        months = []
+        for r in rows:
+            if hasattr(r, "get"):
+                val = r.get("ym")
+            elif isinstance(r, (tuple, list)) and len(r) > 0:
+                val = r[0]
+            elif hasattr(r, "keys") and "ym" in r.keys():
+                val = r["ym"]
+            else:
+                val = None
+            if val and len(str(val)) == 7:
+                months.append(str(val))
+        return months
+    except Exception:
+        return []
+
+
 # ===========================================================================
 # Centralized Partners Configuration (Single Source of Truth)
 # ===========================================================================
@@ -1099,6 +1138,7 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                     ),
                 }
             },
+            "available_months": get_all_available_months(conn),
             "as_of": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -3144,8 +3184,21 @@ def get_attendance_summary(
                 "last_shift_date": s["last_shift_date"],
             })
 
+        # Available months across attendance records
+        att_months_rows = conn.execute(
+            """
+            SELECT DISTINCT substr(shift_date, 1, 7) as ym
+            FROM zepto_attendance_records
+            WHERE shift_date IS NOT NULL AND length(shift_date) >= 7
+            ORDER BY ym DESC
+            """
+        ).fetchall()
+        available_months = [r["ym"] for r in att_months_rows if r["ym"]]
+
         return {
             "store_name": store_name or "All Stores",
+            "selected_month": year_month or "ALL",
+            "available_months": available_months if available_months else get_all_available_months(conn),
             "period": {
                 "start": stats_row["min_date"] or start_date or "",
                 "end": stats_row["max_date"] or end_date or "",
@@ -4405,26 +4458,7 @@ def get_zepto_dashboard_analytics(
         conn.row_factory = sqlite3.Row
 
         # 1. Available Months (distinct YYYY-MM across all operational domains)
-        q_months = """
-        SELECT DISTINCT ym FROM (
-            SELECT DISTINCT substr(shift_date, 1, 7) AS ym FROM zepto_attendance_records WHERE shift_date IS NOT NULL
-            UNION
-            SELECT DISTINCT substr(metric_date, 1, 7) AS ym FROM zepto_store_metrics WHERE metric_date IS NOT NULL
-            UNION
-            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL
-            UNION
-            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL
-            UNION
-            SELECT DISTINCT year_month AS ym FROM zepto_store_income WHERE year_month IS NOT NULL
-            UNION
-            SELECT DISTINCT substr(expense_date, 1, 7) AS ym FROM zepto_expenses WHERE expense_date IS NOT NULL
-            UNION
-            SELECT DISTINCT substr(util_date, 1, 7) AS ym FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
-        ) WHERE ym IS NOT NULL AND length(ym) = 7
-        ORDER BY ym DESC
-        """
-        month_rows = conn.execute(q_months).fetchall()
-        available_months = [r["ym"] for r in month_rows if r["ym"]]
+        available_months = get_all_available_months(conn)
         if not available_months:
             available_months = [datetime.now().strftime("%Y-%m")]
 

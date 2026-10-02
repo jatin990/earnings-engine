@@ -974,5 +974,29 @@ def test_staff_employee_profile_analytics_drawer(client):
         zepto_db.delete_employee(emp_id, settings)
 
 
+def test_zepto_hub_available_months_and_dashboard_analytics(client):
+    settings = Settings()
+    # 1. Overview returns available_months list
+    overview = zepto_db.get_zepto_overview(settings)
+    assert "available_months" in overview
+    assert isinstance(overview["available_months"], list)
+
+    # 2. Attendance summary returns available_months list and selected_month
+    att_summary = zepto_db.get_attendance_summary(year_month=None, settings=settings)
+    assert "available_months" in att_summary
+    assert "selected_month" in att_summary
+    assert att_summary["selected_month"] == "ALL"
+
+    # 3. Operations Dashboard analytics endpoint
+    res = client.get("/api/v1/zepto/operations/analytics?month=ALL")
+    assert res.status_code == 200
+    data = res.json()
+    assert "available_months" in data
+    assert "mom_trends" in data
+    assert "dod_metrics" in data
+    assert "summary_kpis" in data
+
+
+
 
 
