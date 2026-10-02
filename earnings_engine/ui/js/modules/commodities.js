@@ -58,13 +58,13 @@
     mod.init = function () {
         mod.loadChart(false);
 
-        // 1. 30s full chart intelligence refresh timer
+        // 1. 60s background structural intelligence refresh timer
         if (!mod._pollTimer) {
             mod._pollTimer = setInterval(() => {
                 if (mod.isTabActive()) {
-                    mod.loadChart(false);
+                    mod.loadChart(false, true); // preserve zoom on background refresh
                 }
-            }, 30000);
+            }, 60000);
         }
 
         // 2. 3s lightweight incremental tick poller
@@ -137,7 +137,7 @@
     /**
      * Fetch full chart intelligence from REST API
      */
-    mod.loadChart = async function (forceRefresh = false) {
+    mod.loadChart = async function (forceRefresh = false, preserveZoom = false) {
         const loadingEl = document.getElementById('commChartLoading');
         const refreshBtn = document.getElementById('commRefreshBtn');
 
@@ -480,17 +480,13 @@
         // 3. Render Indicator Layers
         mod.renderChartLayers(data);
 
-        // Autoscale price axis and fit time content on every asset/timeframe switch
-        try {
-            mod._chart.priceScale('right').applyOptions({ autoScale: true });
-        } catch (e) {}
-
+        // Only fitContent on first load or explicit asset/timeframe switch, NOT on background tick/price refreshes
         if (!mod._hasFitted) {
+            try {
+                mod._chart.priceScale('right').applyOptions({ autoScale: true });
+            } catch (e) {}
             mod._chart.timeScale().fitContent();
             mod._hasFitted = true;
-        } else {
-            // Also reset time scale to fit new asset data extent cleanly
-            mod._chart.timeScale().fitContent();
         }
     };
 
