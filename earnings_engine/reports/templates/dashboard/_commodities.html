@@ -13,6 +13,7 @@
                 <span id="commRegimeBadge" class="badge" style="display:none;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-weight:700;">
                     --
                 </span>
+                <span id="commTimelineBadge" class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-family:var(--font-mono);font-weight:700;">📅 5D SMC Window</span>
             </div>
             <p style="color:var(--text-secondary);font-size:0.875rem;margin:0.35rem 0 0 0;">
                 Institutional Smart Money Order Blocks, Session VWAP, ORB-15, Gold/Silver Ratio (GSR), and quantitative tactical trade execution setups for Gold, Silver &amp; Energy.
@@ -142,6 +143,7 @@
                 <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#10b981;cursor:pointer;font-weight:600;">
                     <input type="checkbox" id="commToggleOb" checked onchange="commoditiesModule.toggleLayer('ob', this.checked)" /> Order Blocks
                 </label>
+                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#38bdf8;cursor:pointer;font-weight:600;"><input type="checkbox" id="commToggleFvg" checked onchange="commoditiesModule.toggleLayer('fvg', this.checked)" /> FVGs</label>
                 <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#fbbf24;cursor:pointer;font-weight:600;">
                     <input type="checkbox" id="commTogglePivots" checked onchange="commoditiesModule.toggleLayer('pivots', this.checked)" /> Pivots
                 </label>

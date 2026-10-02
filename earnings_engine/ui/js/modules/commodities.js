@@ -23,6 +23,7 @@
         vwap: true,
         orb: true,
         ob: true,
+        fvg: true,
         pivots: true,
         trendlines: true,
     };
@@ -592,19 +593,35 @@
             mod._priceLines.push(pLine, r1Line, s1Line);
         }
 
-        // 5. Order Blocks (Markers on Candlesticks)
+        // 5. Order Blocks & Fair Value Gaps (Markers on Candlesticks)
+        const markers = [];
+        // Order Blocks
         if (mod._layers.ob && ind.order_blocks && ind.order_blocks.length > 0) {
-            const markers = ind.order_blocks.map(ob => ({
-                time: ob.time,
-                position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
-                color: ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e',
-                shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
-                text: ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB'),
-            }));
-            mod._candleSeries.setMarkers(markers);
-        } else {
-            mod._candleSeries.setMarkers([]);
+            ind.order_blocks.forEach(ob => {
+                markers.push({
+                    time: ob.time,
+                    position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
+                    color: ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e',
+                    shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
+                    text: `${ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB')} (${ob.status || 'UNMIT'})`,
+                });
+            });
         }
+        // Fair Value Gaps (FVG)
+        if (mod._layers.fvg && ind.fvgs && ind.fvgs.length > 0) {
+            ind.fvgs.forEach(fvg => {
+                const isBull = fvg.type === 'BULLISH_FVG';
+                markers.push({
+                    time: fvg.time,
+                    position: isBull ? 'belowBar' : 'aboveBar',
+                    color: isBull ? '#38bdf8' : '#fb7185',
+                    shape: 'circle',
+                    text: isBull ? 'B-FVG' : 'S-FVG',
+                });
+            });
+        }
+        markers.sort((a, b) => a.time - b.time);
+        mod._candleSeries.setMarkers(markers);
 
         // 6. Trendlines
         if (mod._layers.trendlines && ind.trendlines && ind.trendlines.length > 0) {
@@ -758,6 +775,11 @@
         const regimeTag = document.getElementById('commRegimeTag');
         const momentumBias = document.getElementById('commMomentumBias');
         const regimeBadge = document.getElementById('commRegimeBadge');
+        const timelineBadge = document.getElementById('commTimelineBadge');
+
+        if (timelineBadge) {
+            timelineBadge.textContent = `📅 5D SMC Window (${(data.candles || []).length} bars)`;
+        }
 
         if (regimeTag) regimeTag.textContent = hud.regime || 'NEUTRAL';
         if (momentumBias) momentumBias.textContent = hud.momentum_bias?.replace(/_/g, ' ') || 'NEUTRAL';

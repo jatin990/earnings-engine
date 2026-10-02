@@ -442,7 +442,7 @@ def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]]
                 })
 
     # Return top freshest order blocks & FVGs
-    return order_blocks[-6:], fvgs[-6:]
+    return order_blocks[-12:], fvgs[-12:]
 
 
 def _detect_liquidity_sweeps(df: pd.DataFrame) -> list[dict[str, Any]]:
