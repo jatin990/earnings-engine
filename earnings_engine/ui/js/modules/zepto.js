@@ -5176,8 +5176,8 @@ const zeptoApp = {
         if (totGmvEl) totGmvEl.textContent = this.formatCurrency(data.total_gmv || 0);
         if (avgAovEl) avgAovEl.textContent = `₹${data.avg_aov || 0}`;
         if (totOrdersEl) totOrdersEl.textContent = (data.total_orders || 0).toLocaleString('en-IN');
-        if (avgSlaEl) avgSlaEl.textContent = `${data.avg_sla_adherence_pct || 98.6}%`;
-        if (avgIppEl) avgIppEl.textContent = `${data.avg_packer_ipp || 132.0} IPP`;
+        if (avgSlaEl) avgSlaEl.textContent = data.avg_sla_adherence_pct > 0 ? `${data.avg_sla_adherence_pct}%` : '—';
+        if (avgIppEl) avgIppEl.textContent = data.avg_packer_ipp > 0 ? `${data.avg_packer_ipp} IPP` : '—';
 
         if (countBadge) countBadge.textContent = `${metrics.length} days tracked`;
         if (!tbody) return;

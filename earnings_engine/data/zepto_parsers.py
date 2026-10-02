@@ -20,6 +20,27 @@ from earnings_engine.data.zepto_attendance_parser import (
 
 
 # ===========================================================================
+# Store Name Normalization Utility
+# ===========================================================================
+
+def normalize_store_name(name: str, default: str = "JMU-Sainik Colony") -> str:
+    """
+    Normalize dark store names across diverse formats (UUIDs, truncated names, underscores).
+    Resolves UUIDs and branch variants (e.g. 'JMU-Sainik', 'JMU_Sainik_Colony') to canonical names.
+    """
+    if not name:
+        return default
+    clean = str(name).strip()
+    # If store name is a UUID or hex hash, fallback to default canonical store
+    if re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", clean, re.I):
+        return default
+    clean_lower = clean.lower()
+    if "sainik" in clean_lower or "jmu" in clean_lower:
+        return "JMU-Sainik Colony"
+    return clean.replace("_", " ")
+
+
+# ===========================================================================
 # Deterministic Subject Line Pattern Registry & Classifier
 # ===========================================================================
 
@@ -31,7 +52,7 @@ ZEPTO_SUBJECT_PATTERNS = [
         "badge_color": "rose",
         "icon": "⚠️",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Shift\s+Summary\s+&\s+)?DQ\s+Loss(?:\s+Audit)?(?:\s*&\s*Expiry)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+)?(?:Shift\s+Summary\s+&\s+)?DQ\s+Loss(?:\s+Audit)?(?:\s*&\s*Expiry)?\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
@@ -42,7 +63,7 @@ ZEPTO_SUBJECT_PATTERNS = [
         "badge_color": "amber",
         "icon": "📉",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+|Weekly\s+)?(?:Store\s+)?Shrinkage(?:\s*&\s*(?:Cycle\s+Count\s+)?Variance)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+|Weekly\s+)?(?:Store\s+)?Shrinkage(?:\s*&\s*(?:Cycle\s+Count\s+)?Variance)?\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
@@ -63,7 +84,7 @@ ZEPTO_SUBJECT_PATTERNS = [
         "badge_color": "sky",
         "icon": "👥",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Staff\s+)?Attendance(?:\s+Muster|\s+Report)?\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+)?(?:Staff\s+)?Attendance(?:\s+Muster|\s+Report)?\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
@@ -74,18 +95,18 @@ ZEPTO_SUBJECT_PATTERNS = [
         "badge_color": "emerald",
         "icon": "📊",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Daily\s+)?(?:Store\s+)?(?:Metrics?(?:\s+Summary)?|Update|Scorecard|Performance)\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+)?(?:Store\s+)?(?:Metrics?(?:\s+Summary)?|Update|Scorecard|Performance)\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
-    # 5. Manpower Utilization & Roster
+    # 5. Manpower Utilization & Roster (e.g. "JMU-Sainik Colony | Manpower Utilization D-1 & MTD - 2026-09-30")
     {
         "category": "MANPOWER_UTILIZATION",
         "category_label": "Manpower Utilization",
         "badge_color": "purple",
         "icon": "⚡",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:]\s*(?:Manpower\s+Plan|Utilization|Picker\s+IPP|Staffing\s+Roster)\s*[-–:]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:(?:Updated\s+)?Manpower\s+Utilization(?:\s+D-1\s+&\s+MTD)?|Picker\s+IPP|Staffing\s+Roster|Manpower\s+Plan)\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
@@ -133,7 +154,8 @@ def match_zepto_subject_pattern(
         m = pat.search(sub_clean)
         if m:
             groups = m.groupdict()
-            store_name = groups.get("store", "").strip().replace("_", " ") if groups.get("store") else ""
+            store_raw = groups.get("store", "").strip() if groups.get("store") else ""
+            store_name = normalize_store_name(store_raw) if store_raw else "JMU-Sainik Colony"
             record_date = groups.get("date", "").strip() if groups.get("date") else ""
             report_id = groups.get("report_id", "").strip() if groups.get("report_id") else ""
 
@@ -192,10 +214,12 @@ def match_zepto_subject_pattern(
         icon = "📧"
 
     # Extract store name heuristically from subject if available
-    inferred_store = ""
-    store_match = re.search(r"([A-Z]{2,4}-[A-Za-z0-9_]+)", sub_clean)
+    inferred_store = "JMU-Sainik Colony"
+    store_match = re.search(r"([A-Z]{2,4}-[A-Za-z0-9_\s]+?)(?=\s*[\-–:|]|\s*$)", sub_clean)
     if store_match:
-        inferred_store = store_match.group(1).replace("_", " ")
+        inferred_store = normalize_store_name(store_match.group(1))
+    else:
+        inferred_store = normalize_store_name(sub_clean)
 
     # Extract date heuristically if present
     inferred_date = ""
@@ -265,24 +289,24 @@ def parse_zepto_store_metrics_excel(
         raise ValueError("Store metrics spreadsheet contains no readable rows.")
 
     # Infer Store Name
-    inferred_store = "Zepto Dark Store"
+    inferred_store = "JMU-Sainik Colony"
     if file_name:
         clean_name = os.path.splitext(file_name)[0]
-        m = re.search(r"([A-Z]{3,}-[A-Za-z0-9_]+)", clean_name)
+        m = re.search(r"([A-Z]{2,4}-[A-Za-z0-9_\s]+)", clean_name)
         if m:
-            inferred_store = m.group(1).replace("_", " ")
+            inferred_store = normalize_store_name(m.group(1))
 
     # Expected column aliases
     alias_map = {
-        "metric_date": ["date", "metric date", "report date", "day", "order date"],
-        "store_name": ["store", "store name", "darkstore", "dark store", "hub"],
+        "metric_date": ["date", "metric date", "report date", "day", "order date", "shift date"],
+        "store_name": ["store", "store name", "darkstore", "dark store", "hub", "facility", "store id"],
         "sales_gmv": ["sales gmv", "gmv", "total sales", "revenue", "gross sales", "sales"],
-        "order_count": ["orders", "order count", "total orders", "dispatched orders", "delivered orders", "orders count"],
+        "order_count": ["orders", "order count", "total orders", "dispatched orders", "delivered orders", "orders count", "dispatch orders"],
         "aov": ["aov", "average order value", "avg order value", "basket size"],
         "inbound_hours": ["inbound hours", "inbound hrs", "inbound", "grn hours"],
         "outbound_hours": ["outbound hours", "outbound hrs", "outbound", "dispatch hours"],
-        "packer_ipp": ["packer ipp", "ipp", "picker ipp", "items per hour", "packer throughput"],
-        "sla_adherence_pct": ["sla adherence", "sla %", "10 min sla", "10-min sla", "sla adherence %", "sla"],
+        "packer_ipp": ["packer ipp", "ipp", "picker ipp", "items per hour", "packer throughput", "picking ipp", "packing ipp", "throughput", "units per hour", "items/hour", "d-1 ipp", "mtd ipp"],
+        "sla_adherence_pct": ["sla adherence", "sla %", "10 min sla", "10-min sla", "sla adherence %", "sla", "dispatch sla"],
     }
 
     header_idx = -1
@@ -322,11 +346,12 @@ def parse_zepto_store_metrics_excel(
         raw_date = row[col_map["metric_date"]] if "metric_date" in col_map and col_map["metric_date"] < len(row) else ""
         metric_date = excel_date_to_iso(raw_date) or datetime.now().strftime("%Y-%m-%d")
 
-        store = (
+        raw_store = (
             str(row[col_map["store_name"]]).strip()
             if "store_name" in col_map and col_map["store_name"] < len(row) and str(row[col_map["store_name"]]).strip()
             else inferred_store
         )
+        store = normalize_store_name(raw_store, default=inferred_store)
 
         def _to_float(val: Any, default: float = 0.0) -> float:
             if val is None or val == "":
@@ -372,10 +397,163 @@ def parse_zepto_store_metrics_excel(
     }
 
 
+def parse_zepto_manpower_utilization_html(
+    html_text: str,
+    subject: str = "",
+) -> Dict[str, Any]:
+    """
+    Parse Zepto Dark Store Manpower & Flex Utilization HTML email report.
+    Extracts headcount actuals vs plan for Packers, SIs, Loaders, Security, Housekeeping,
+    along with Flex manpower utilization, arbitrage, daily deductions, and D-1 / MTD IPP.
+    Supports both horizontal table formats and vertical metric matrices.
+    """
+    if not html_text:
+        return {}
+
+    # Infer Store Name
+    store_name = "JMU-Sainik Colony"
+    store_match = re.search(r"<div[^>]*font-weight:\s*bold[^>]*>([A-Za-z0-9_\-\s]+?)</div>", html_text, re.I)
+    if store_match:
+        store_name = normalize_store_name(store_match.group(1))
+    elif subject:
+        cat_info = match_zepto_subject_pattern(subject)
+        if cat_info.get("store_name"):
+            store_name = cat_info["store_name"]
+
+    # Extract Record Date (e.g. "Manpower utilization MTD, as of 2026-09-30" or in subject / header)
+    record_date = ""
+    date_match = re.search(r"as\s+of\s+(\d{4}-\d{2}-\d{2})", html_text, re.I)
+    if not date_match:
+        date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", html_text)
+    if date_match:
+        record_date = date_match.group(1)
+    elif subject:
+        d_m = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", subject)
+        if d_m:
+            record_date = d_m.group(1)
+
+    if not record_date:
+        record_date = datetime.now().strftime("%Y-%m-%d")
+
+    def _clean_num(v_str: str) -> float:
+        clean_v = re.sub(r"[₹$,Rs\.\s]", "", v_str)
+        try:
+            return float(clean_v) if clean_v and clean_v != "-" else 0.0
+        except ValueError:
+            return 0.0
+
+    def _clean_float(v_str: str) -> float:
+        clean_v = re.sub(r"[^\d\.]", "", v_str)
+        try:
+            return float(clean_v) if clean_v else 0.0
+        except ValueError:
+            return 0.0
+
+    # Parse table rows
+    row_chunks = re.findall(r"<tr[^>]*>(.*?)</tr>", html_text, re.DOTALL | re.IGNORECASE)
+    metrics_map: Dict[str, Any] = {}
+
+    headers: list[str] = []
+    horizontal_parsed = False
+
+    # Check for horizontal table format (Header row with column names, data row with values)
+    for row_html in row_chunks:
+        th_cells = re.findall(r"<th[^>]*>(.*?)</th>", row_html, re.DOTALL | re.IGNORECASE)
+        td_cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL | re.IGNORECASE)
+
+        if th_cells and not headers:
+            headers = [re.sub(r"<[^>]+>", "", c).strip().lower() for c in th_cells]
+            continue
+
+        if headers and td_cells:
+            data_cells = [re.sub(r"<[^>]+>", "", c).strip() for c in td_cells]
+            col_dict = dict(zip(headers, data_cells))
+
+            # Store name from table cell if present
+            for k in col_dict:
+                if "store" in k:
+                    store_name = normalize_store_name(col_dict[k])
+                elif "packer" in k and "hc" in k:
+                    metrics_map["packer_headcount"] = int(_clean_num(col_dict[k]))
+                elif k in ("si", "shift incharge", "shift incharge count", "headcount (si)"):
+                    metrics_map["shift_incharge_count"] = int(_clean_num(col_dict[k]))
+                elif "security" in k:
+                    metrics_map["security_count"] = int(_clean_num(col_dict[k]))
+                elif "housekeeping" in k or "house keeping" in k:
+                    metrics_map["housekeeping_count"] = int(_clean_num(col_dict[k]))
+                elif "flex" in k and "hc" in k:
+                    metrics_map["flex_headcount"] = int(_clean_num(col_dict[k]))
+                elif "flex" in k and ("deduction" in k or "deductions" in k):
+                    metrics_map["flex_deductions"] = _clean_float(col_dict[k])
+                elif "d-1 ipp" in k or "d1 ipp" in k:
+                    metrics_map["d1_ipp"] = _clean_float(col_dict[k])
+                elif "mtd ipp" in k:
+                    metrics_map["mtd_ipp"] = _clean_float(col_dict[k])
+            horizontal_parsed = True
+            break
+
+    # If not a horizontal table, check vertical matrix structure
+    if not horizontal_parsed:
+        for row_html in row_chunks:
+            cells = re.findall(r"<(?:td|th)[^>]*>(.*?)</(?:td|th)>", row_html, re.DOTALL | re.IGNORECASE)
+            clean_cells = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+            if len(clean_cells) >= 3:
+                row_label = clean_cells[0].lower()
+                val_d1 = clean_cells[2] if len(clean_cells) >= 3 else ""
+                val_mtd = clean_cells[3] if len(clean_cells) >= 4 else ""
+                val_plan = clean_cells[1] if len(clean_cells) >= 2 else ""
+
+                if "packer hc" in row_label:
+                    metrics_map["packer_plan_hc"] = _clean_num(val_plan)
+                    metrics_map["packer_d1_hc"] = _clean_num(val_d1)
+                    metrics_map["packer_mtd_hc"] = _clean_num(val_mtd)
+                    metrics_map["packer_headcount"] = int(_clean_num(val_d1))
+                elif "delta inc absenteeism" in row_label:
+                    metrics_map["delta_absenteeism_d1"] = _clean_num(val_d1)
+                    metrics_map["delta_absenteeism_mtd"] = _clean_num(val_mtd)
+                elif "flex hc" in row_label and "arbitrage" not in row_label and "extra" not in row_label:
+                    metrics_map["flex_hc_plan"] = _clean_num(val_plan)
+                    metrics_map["flex_hc_d1"] = _clean_num(val_d1)
+                    metrics_map["flex_hc_mtd"] = _clean_num(val_mtd)
+                    metrics_map["flex_headcount"] = int(_clean_num(val_d1))
+                elif "arbitrage flex hc deduction" in row_label:
+                    metrics_map["arbitrage_flex_deduction_d1"] = _clean_float(val_d1)
+                    metrics_map["arbitrage_flex_deduction_mtd"] = _clean_float(val_mtd)
+                elif "total flex deduction" in row_label:
+                    metrics_map["total_flex_deduction_d1"] = _clean_float(val_d1)
+                    metrics_map["total_flex_deduction_mtd"] = _clean_float(val_mtd)
+                    metrics_map["flex_deductions"] = _clean_float(val_d1)
+                elif "head-count (si)" in row_label or "headcount (si)" in row_label:
+                    metrics_map["si_plan_hc"] = _clean_num(val_plan)
+                    metrics_map["si_d1_hc"] = _clean_num(val_d1)
+                    metrics_map["si_mtd_hc"] = _clean_num(val_mtd)
+                    metrics_map["shift_incharge_count"] = int(_clean_num(val_d1))
+                elif "head-count (security)" in row_label:
+                    metrics_map["security_hc_d1"] = _clean_num(val_d1)
+                    metrics_map["security_count"] = int(_clean_num(val_d1))
+                elif "head-count (house keeping)" in row_label:
+                    metrics_map["housekeeping_hc_d1"] = _clean_num(val_d1)
+                    metrics_map["housekeeping_count"] = int(_clean_num(val_d1))
+                elif "d-1 ipp" in row_label or "d1 ipp" in row_label:
+                    metrics_map["d1_ipp"] = _clean_float(val_d1)
+                elif "mtd ipp" in row_label:
+                    metrics_map["mtd_ipp"] = _clean_float(val_mtd if val_mtd else val_d1)
+
+    result = {
+        "store_name": store_name,
+        "record_date": record_date,
+        "date": record_date,
+        "metrics": metrics_map,
+    }
+    # Flatten top-level keys for direct access
+    result.update(metrics_map)
+    return result
+
+
 def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
     """
     Extract key operational numbers from plain text / snippet of Zepto operational emails.
-    Identifies GMV sales, order throughput, AOV, SLA adherence %, and IPP.
+    Identifies GMV sales, order throughput, AOV, SLA adherence %, IPP, and losses.
     """
     metrics: Dict[str, Any] = {}
     if not text:
@@ -422,10 +600,22 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
     if sla_match:
         metrics["sla_adherence_pct"] = float(sla_match.group(1))
 
-    # 5. IPP Throughput (e.g. "IPP: 132", "Picker IPP 140")
-    ipp_match = re.search(r"(?:ipp|picker ipp|packer ipp)[:\s\-]+([\d\.]+)", clean_text, re.I)
+    # 5. IPP Throughput (e.g. "IPP: 132", "Picker IPP 140", "Packer IPP: 138.2", "121.66 IPP", "D-1 IPP: 145")
+    ipp_match = re.search(
+        r"(?:ipp|picker\s+ipp|packer\s+ipp|packing\s+ipp|picking\s+ipp|store\s+ipp|d-1\s+ipp|mtd\s+ipp|overall\s+ipp|packer\s+throughput|items\s*(?:picked|packed)?\s*(?:per\s+hour|/\s*hr|/\s*hour))\s*[:=\-]\s*([\d\.]+)",
+        clean_text,
+        re.I,
+    )
+    if not ipp_match:
+        # Check trailing e.g. "138.2 IPP" or "145 Picker IPP"
+        ipp_match = re.search(r"\b([\d\.]+)\s*(?:picker\s+|packer\s+)?ipp\b", clean_text, re.I)
     if ipp_match:
-        metrics["packer_ipp"] = float(ipp_match.group(1))
+        try:
+            val_ipp = float(ipp_match.group(1))
+            if 30.0 <= val_ipp <= 500.0:  # Valid realistic IPP speed range
+                metrics["packer_ipp"] = val_ipp
+        except ValueError:
+            pass
 
     # 6. Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages: Rs. 1,200", "Shrinkage: 1450")
     # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture

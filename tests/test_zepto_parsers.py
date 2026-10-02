@@ -293,3 +293,74 @@ def test_save_loss_record_idempotency_and_sku_deduplication():
     assert dairy_cat["incident_count"] == 2     # 2 separate shift incidents
 
 
+def test_normalize_store_name():
+    from earnings_engine.data.zepto_parsers import normalize_store_name
+
+    assert normalize_store_name("32010130-3ad5-40a0-b614-9522956474ba") == "JMU-Sainik Colony"
+    assert normalize_store_name("JMU - Sainik") == "JMU-Sainik Colony"
+    assert normalize_store_name("JMU-Sainik") == "JMU-Sainik Colony"
+    assert normalize_store_name("JMU-Sainik Colony") == "JMU-Sainik Colony"
+    assert normalize_store_name("DL-Saket") == "DL-Saket"
+
+
+def test_parse_zepto_manpower_utilization_html():
+    from earnings_engine.data.zepto_parsers import parse_zepto_manpower_utilization_html
+
+    sample_html = """
+    <html>
+    <body>
+        <h2>Manpower Utilization Scorecard - 2026-03-15</h2>
+        <table border="1">
+            <tr>
+                <th>Store</th>
+                <th>Packer HC</th>
+                <th>SI</th>
+                <th>Security</th>
+                <th>Housekeeping</th>
+                <th>Flex HC</th>
+                <th>Flex Deductions</th>
+                <th>D-1 IPP</th>
+                <th>MTD IPP</th>
+            </tr>
+            <tr>
+                <td>JMU-Sainik Colony</td>
+                <td>9</td>
+                <td>3</td>
+                <td>2</td>
+                <td>1</td>
+                <td>2</td>
+                <td>500.0</td>
+                <td>142.5</td>
+                <td>138.2</td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    res = parse_zepto_manpower_utilization_html(sample_html, subject="Manpower Report 2026-03-15")
+    assert res is not None
+    assert res["store_name"] == "JMU-Sainik Colony"
+    assert res["date"] == "2026-03-15"
+    assert res["packer_headcount"] == 9
+    assert res["shift_incharge_count"] == 3
+    assert res["security_count"] == 2
+    assert res["housekeeping_count"] == 1
+    assert res["flex_headcount"] == 2
+    assert res["flex_deductions"] == 500.0
+    assert res["d1_ipp"] == 142.5
+    assert res["mtd_ipp"] == 138.2
+
+
+def test_safe_b64decode_padding():
+    from earnings_engine.api.routers.zepto import _safe_b64decode
+    import base64
+
+    original_text = "Hello Zepto Dark Hub IPP Scanner!"
+    # Produce unpadded base64url string
+    encoded = base64.urlsafe_b64encode(original_text.encode('utf-8')).decode('utf-8').rstrip('=')
+
+    decoded_bytes = _safe_b64decode(encoded)
+    assert decoded_bytes.decode('utf-8') == original_text
+
+
+

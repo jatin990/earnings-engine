@@ -6,6 +6,7 @@ Store Out-of-Pocket Expenses, Hiring Candidates Pipeline, and ₹75L 50-50 Partn
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timedelta, timezone
 import logging
 import os
@@ -845,6 +846,17 @@ async def get_persisted_email_detail_endpoint(email_id: str) -> dict[str, Any]:
 # Gmail OAuth 2.0 Linking & Status Endpoints
 # ---------------------------------------------------------------------------
 
+def _safe_b64decode(data_str: str) -> bytes:
+    """Decode URL-safe base64 string handling missing RFC 4648 padding."""
+    if not data_str:
+        return b""
+    clean_str = data_str.strip()
+    pad = len(clean_str) % 4
+    if pad:
+        clean_str += "=" * (4 - pad)
+    return base64.urlsafe_b64decode(clean_str.encode("utf-8"))
+
+
 def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[str, Any]:
     """
     Categorize dark store operational email based on subject line and sender
@@ -974,7 +986,7 @@ async def get_recent_emails_endpoint(
                     b_data = part_node.get("body", {}).get("data")
                     if b_data:
                         try:
-                            decoded = base64.urlsafe_b64decode(b_data.encode("UTF-8")).decode("utf-8", errors="replace")
+                            decoded = _safe_b64decode(b_data).decode("utf-8", errors="replace")
                             if m_type == "text/plain" and not body_text:
                                 body_text = decoded
                             elif m_type == "text/html" and not body_html:
@@ -1004,8 +1016,12 @@ async def get_recent_emails_endpoint(
                 extract_attachments(payload)
 
                 cat_info = _classify_zepto_email(subject, sender, snippet)
-                from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
-                extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text[:1000]}")
+                from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body, parse_zepto_manpower_utilization_html
+                extracted_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text}")
+                if cat_info["category"] == "MANPOWER_UTILIZATION" and body_html:
+                    parsed_manpower = parse_zepto_manpower_utilization_html(body_html, subject=subject)
+                    if parsed_manpower.get("metrics"):
+                        extracted_metrics.update(parsed_manpower["metrics"])
 
                 # Format ISO date
                 iso_date = cat_info.get("record_date") or datetime.now().strftime("%Y-%m-%d")
@@ -1198,7 +1214,7 @@ async def ingest_all_emails_endpoint(
                     b_data = part_node.get("body", {}).get("data")
                     if b_data:
                         try:
-                            decoded = base64.urlsafe_b64decode(b_data.encode("UTF-8")).decode("utf-8", errors="replace")
+                            decoded = _safe_b64decode(b_data).decode("utf-8", errors="replace")
                             if m_type == "text/plain" and not body_text:
                                 body_text = decoded
                             elif m_type == "text/html" and not body_html:
@@ -1219,8 +1235,13 @@ async def ingest_all_emails_endpoint(
                 else:
                     ingested_counts["OPERATIONAL"] += 1
 
-                # Parse body text metrics
-                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text[:1000]}")
+                # Parse body text & HTML metrics
+                from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body, parse_zepto_manpower_utilization_html
+                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text}")
+                if category == "MANPOWER_UTILIZATION" and body_html:
+                    parsed_manpower = parse_zepto_manpower_utilization_html(body_html, subject=subject)
+                    if parsed_manpower.get("metrics"):
+                        body_metrics.update(parsed_manpower["metrics"])
 
                 # Format ISO date from subject regex or date header
                 iso_date = cat_info.get("record_date") or datetime.now().strftime("%Y-%m-%d")
@@ -1237,7 +1258,7 @@ async def ingest_all_emails_endpoint(
                 email_parsed_count = 0
 
                 # If email contains store metrics text numbers, persist them
-                if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count")):
+                if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count") or body_metrics.get("packer_ipp")):
                     zepto_db.save_store_metrics({
                         "store_name": store_name,
                         "metric_date": iso_date,
@@ -1252,6 +1273,23 @@ async def ingest_all_emails_endpoint(
                     processed_details["store_metrics_records"] += 1
                     email_parsed_status = "PARSED"
                     email_parsed_count += 1
+
+                # If email contains Manpower Utilization numbers, record in metrics and utilization
+                if category == "MANPOWER_UTILIZATION" and (body_metrics.get("packer_d1_hc") or body_metrics.get("packer_ipp")):
+                    packer_hc = float(body_metrics.get("packer_d1_hc") or 0.0)
+                    packer_ipp = float(body_metrics.get("packer_ipp") or 0.0)
+                    flex_deduction = float(body_metrics.get("total_flex_deduction_d1") or 0.0)
+                    if packer_ipp > 0 or packer_hc > 0:
+                        zepto_db.save_store_metrics({
+                            "store_name": store_name,
+                            "metric_date": iso_date,
+                            "packer_ipp": packer_ipp,
+                            "raw_source": "GMAIL_MANPOWER_UTILIZATION",
+                            "source_email_id": msg_id,
+                        }, settings=_settings)
+                        processed_details["store_metrics_records"] += 1
+                        email_parsed_status = "PARSED"
+                        email_parsed_count += 1
 
                 # If email contains DQ loss / shrinkage text numbers, persist them
                 if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount"):
@@ -1303,7 +1341,7 @@ async def ingest_all_emails_endpoint(
                                 raw_data = a_resp.json().get("data")
 
                         if raw_data:
-                            file_bytes = base64.urlsafe_b64decode(raw_data.encode("UTF-8"))
+                            file_bytes = _safe_b64decode(raw_data)
 
                             # Route attachment parser by category or filename
                             if "attendance" in fname.lower() or category == "ATTENDANCE":
@@ -1768,8 +1806,8 @@ async def sync_attendance_from_gmail_endpoint() -> dict[str, Any]:
                                 raw_data = a_resp.json().get("data")
 
                         if raw_data:
-                            # Decode base64url data
-                            file_bytes = base64.urlsafe_b64decode(raw_data.encode("UTF-8"))
+                            # Decode base64url data safely with padding
+                            file_bytes = _safe_b64decode(raw_data)
                             parsed = parse_zepto_attendance_excel(file_bytes, file_name=fname)
                             saved = zepto_db.save_attendance_batch(parsed, source="GMAIL", settings=_settings)
 
