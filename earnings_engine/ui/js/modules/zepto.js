@@ -178,8 +178,6 @@ const zeptoApp = {
             console.error('[ZEPTO] Error loading overview:', err);
         }
     },
-        }
-    },
 
     renderOverviewWidgets(data) {
         const hc = data.headcount || {};
@@ -5847,6 +5845,8 @@ const zeptoApp = {
         }
     }
 };
+
+window.zeptoApp = zeptoApp;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => zeptoApp.init());
