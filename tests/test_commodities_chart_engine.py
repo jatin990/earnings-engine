@@ -52,8 +52,9 @@ def test_supported_commodities_list():
 
 
 def test_resolve_commodity_symbol():
-    assert resolve_commodity_symbol("GOLD") == "GOLDBEES.NS"
-    assert resolve_commodity_symbol("SILVER") == "SILVERBEES.NS"
+    assert resolve_commodity_symbol("GOLD") == "GC=F"
+    assert resolve_commodity_symbol("SILVER") == "SI=F"
+    assert resolve_commodity_symbol("CRUDEOIL") == "CL=F"
     assert resolve_commodity_symbol("GC=F") == "GC=F"
     assert resolve_commodity_symbol("GOLDBEES.NS") == "GOLDBEES.NS"
 

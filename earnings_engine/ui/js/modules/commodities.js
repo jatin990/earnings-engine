@@ -37,6 +37,8 @@
     mod._chartData = null;
     mod._pollTimer = null;
     mod._hasFitted = false;
+    mod._isFullscreen = false;
+    mod._escListenerBound = false;
 
     /**
      * Initialize the module
@@ -162,7 +164,7 @@
         if (!mod._chart) {
             mod._chart = window.LightweightCharts.createChart(container, {
                 width: container.clientWidth || 800,
-                height: 460,
+                height: 640,
                 layout: {
                     background: { type: 'solid', color: '#050505' },
                     textColor: '#94a3b8',
@@ -191,9 +193,52 @@
 
             window.addEventListener('resize', () => {
                 if (mod._chart && container) {
-                    mod._chart.applyOptions({ width: container.clientWidth });
+                    const h = mod._isFullscreen ? Math.max(window.innerHeight - 120, 400) : 640;
+                    mod._chart.applyOptions({ width: container.clientWidth, height: h });
                 }
             });
+
+            if (!mod._escListenerBound) {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && mod._isFullscreen) {
+                        mod.toggleFullscreen();
+                    }
+                });
+                mod._escListenerBound = true;
+            }
+        }
+    };
+
+    /**
+     * Toggle chart card fullscreen mode
+     */
+    mod.toggleFullscreen = function () {
+        const card = document.getElementById('commoditiesChartCard');
+        const container = document.getElementById('commoditiesChartCanvas');
+        const fsText = document.getElementById('commFsText');
+        if (!card || !container) return;
+
+        mod._isFullscreen = !mod._isFullscreen;
+
+        if (mod._isFullscreen) {
+            card.style.cssText = 'position: fixed; inset: 0; z-index: 99999; background: #09090b; width: 100vw; height: 100vh; padding: 1.25rem; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column;';
+            const fsHeight = Math.max(window.innerHeight - 120, 400);
+            container.style.height = `${fsHeight}px`;
+            container.style.minHeight = `${fsHeight}px`;
+            if (fsText) fsText.textContent = 'Exit Fullscreen';
+            if (mod._chart) {
+                mod._chart.applyOptions({ width: container.clientWidth, height: fsHeight });
+                mod._chart.timeScale().fitContent();
+            }
+        } else {
+            card.style.cssText = '';
+            container.style.height = '640px';
+            container.style.minHeight = '640px';
+            if (fsText) fsText.textContent = 'Fullscreen';
+            if (mod._chart) {
+                mod._chart.applyOptions({ width: container.clientWidth, height: 640 });
+                mod._chart.timeScale().fitContent();
+            }
         }
     };
 
@@ -389,6 +434,8 @@
     mod.renderTacticalHUD = function (data) {
         if (!data) return;
 
+        const curr = data.currency_symbol || '$';
+
         // 1. Header & Title
         const titleEl = document.getElementById('commChartSymbolTitle');
         const timeEl = document.getElementById('commChartTimestamp');
@@ -406,7 +453,7 @@
         const atrEl = document.getElementById('commKpiAtr');
         const pivotFloorEl = document.getElementById('commKpiPivotFloor');
 
-        if (spotEl) spotEl.textContent = `₹${data.spot_price?.toLocaleString('en-IN') || '--'}`;
+        if (spotEl) spotEl.textContent = `${curr}${data.spot_price !== undefined && data.spot_price !== null ? data.spot_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         if (spotChangeEl) {
             const chg = data.change_24h || 0;
             const sign = chg >= 0 ? '+' : '';
@@ -419,26 +466,28 @@
         const ind = data.indicators || {};
         if (vwapEl && ind.vwap && ind.vwap.length > 0) {
             const lastVwap = ind.vwap[ind.vwap.length - 1]?.value;
-            vwapEl.textContent = `₹${lastVwap?.toLocaleString('en-IN') || '--'}`;
+            vwapEl.textContent = `${curr}${lastVwap !== undefined && lastVwap !== null ? lastVwap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         }
         if (vwapBandsEl && ind.vwap_upper && ind.vwap_lower) {
             const u = ind.vwap_upper[ind.vwap_upper.length - 1]?.value;
             const l = ind.vwap_lower[ind.vwap_lower.length - 1]?.value;
-            if (u && l) vwapBandsEl.textContent = `Bands: ₹${l.toLocaleString('en-IN')} – ₹${u.toLocaleString('en-IN')}`;
+            if (u !== undefined && l !== undefined) {
+                vwapBandsEl.textContent = `Bands: ${curr}${l.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} – ${curr}${u.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
         }
 
         if (orbRangeEl && ind.orb && ind.orb.active) {
-            orbRangeEl.textContent = `₹${ind.orb.range?.toLocaleString('en-IN') || '--'}`;
+            orbRangeEl.textContent = `${curr}${ind.orb.range !== undefined && ind.orb.range !== null ? ind.orb.range.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         }
         if (orbTargetsEl && ind.orb && ind.orb.active) {
-            orbTargetsEl.textContent = `T1: ₹${ind.orb.target_long_1?.toLocaleString('en-IN')} | T2: ₹${ind.orb.target_long_2?.toLocaleString('en-IN')}`;
+            orbTargetsEl.textContent = `T1: ${curr}${ind.orb.target_long_1?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | T2: ${curr}${ind.orb.target_long_2?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
 
         if (atrEl && ind.pivots) {
-            atrEl.textContent = `₹${ind.pivots.atr?.toLocaleString('en-IN') || '--'}`;
+            atrEl.textContent = `${curr}${ind.pivots.atr !== undefined && ind.pivots.atr !== null ? ind.pivots.atr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         }
         if (pivotFloorEl && ind.pivots) {
-            pivotFloorEl.textContent = `Pivot: ₹${ind.pivots.p?.toLocaleString('en-IN') || '--'}`;
+            pivotFloorEl.textContent = `Pivot: ${curr}${ind.pivots.p !== undefined && ind.pivots.p !== null ? ind.pivots.p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         }
 
         // 3. 3-Column Tactical Trade HUD Deck
@@ -454,9 +503,9 @@
         const buyRationaleEl = document.getElementById('commBuyRationale');
 
         if (buyEntryEl) buyEntryEl.textContent = buy.entry_zone || '--';
-        if (buySlEl) buySlEl.textContent = `₹${buy.stop_loss?.toLocaleString('en-IN') || '--'}`;
-        if (buyT1El) buyT1El.textContent = `₹${buy.target_1?.toLocaleString('en-IN') || '--'}`;
-        if (buyT2El) buyT2El.textContent = `₹${buy.target_2?.toLocaleString('en-IN') || '--'}`;
+        if (buySlEl) buySlEl.textContent = `${curr}${buy.stop_loss !== undefined && buy.stop_loss !== null ? buy.stop_loss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (buyT1El) buyT1El.textContent = `${curr}${buy.target_1 !== undefined && buy.target_1 !== null ? buy.target_1.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (buyT2El) buyT2El.textContent = `${curr}${buy.target_2 !== undefined && buy.target_2 !== null ? buy.target_2.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         if (buyRrBadge) buyRrBadge.textContent = `R:R ${buy.rr_ratio || 2.0}`;
         if (buyRationaleEl && buy.rationale) buyRationaleEl.textContent = buy.rationale;
 
@@ -468,9 +517,9 @@
         const sellRationaleEl = document.getElementById('commSellRationale');
 
         if (sellEntryEl) sellEntryEl.textContent = sell.entry_zone || '--';
-        if (sellSlEl) sellSlEl.textContent = `₹${sell.stop_loss?.toLocaleString('en-IN') || '--'}`;
-        if (sellT1El) sellT1El.textContent = `₹${sell.target_1?.toLocaleString('en-IN') || '--'}`;
-        if (sellT2El) sellT2El.textContent = `₹${sell.target_2?.toLocaleString('en-IN') || '--'}`;
+        if (sellSlEl) sellSlEl.textContent = `${curr}${sell.stop_loss !== undefined && sell.stop_loss !== null ? sell.stop_loss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (sellT1El) sellT1El.textContent = `${curr}${sell.target_1 !== undefined && sell.target_1 !== null ? sell.target_1.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (sellT2El) sellT2El.textContent = `${curr}${sell.target_2 !== undefined && sell.target_2 !== null ? sell.target_2.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         if (sellRrBadge) sellRrBadge.textContent = `R:R ${sell.rr_ratio || 2.0}`;
         if (sellRationaleEl && sell.rationale) sellRationaleEl.textContent = sell.rationale;
 

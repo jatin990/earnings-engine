@@ -26,8 +26,8 @@
                 <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;">Asset:</label>
                 <select id="commAssetSelect" onchange="commoditiesModule.switchCommodity(this.value)"
                     style="padding: 0.35rem 0.65rem; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #ededed; font-size: 0.8rem; font-family: var(--font-mono); outline: none;">
-                    <option value="GOLD" selected>🥇 Gold (GOLDBEES / GC=F)</option>
-                    <option value="SILVER">🥈 Silver (SILVERBEES / SI=F)</option>
+                    <option value="GOLD" selected>🥇 Gold (XAU/USD · GC=F)</option>
+                    <option value="SILVER">🥈 Silver (XAG/USD · SI=F)</option>
                     <option value="CRUDEOIL">🛢️ WTI Crude Oil (CL=F)</option>
                     <option value="NATGAS">🔥 Natural Gas (NG=F)</option>
                     <option value="COPPER">🧱 Copper (HG=F)</option>
@@ -102,7 +102,7 @@
     </div>
 
     <!-- 4. Main Interactive TradingView Lightweight Chart & Layers Deck -->
-    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+    <div id="commoditiesChartCard" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;">
                 <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin:0;display:flex;align-items:center;gap:0.4rem;">
@@ -128,11 +128,12 @@
                 <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:#f43f5e;cursor:pointer;font-weight:600;">
                     <input type="checkbox" id="commToggleTrendlines" checked onchange="commoditiesModule.toggleLayer('trendlines', this.checked)" /> Trendlines
                 </label>
+                <button type="button" class="btn btn-secondary btn-sm" id="commFullscreenBtn" onclick="commoditiesModule.toggleFullscreen()" title="Toggle Fullscreen" style="display:flex;align-items:center;gap:0.35rem;background:#18181b;border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:6px;padding:0.25rem 0.6rem;font-size:0.75rem;cursor:pointer;"><span>⛶</span> <span id="commFsText">Fullscreen</span></button>
             </div>
         </div>
 
         <!-- Chart Container -->
-        <div id="commoditiesChartCanvas" style="width:100%;height:460px;position:relative;border-radius:8px;overflow:hidden;background:#050505;">
+        <div id="commoditiesChartCanvas" style="width:100%;height:640px;min-height:640px;position:relative;border-radius:8px;overflow:hidden;background:#050505;">
             <div id="commChartLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,5,5,0.7);z-index:10;color:var(--text-secondary);font-size:0.85rem;font-weight:600;">
                 <span style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.5rem;">⏳</span> Loading quantitative commodity bars &amp; SMC levels...
             </div>

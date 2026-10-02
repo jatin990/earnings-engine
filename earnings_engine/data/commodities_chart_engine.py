@@ -31,41 +31,49 @@ _COMMODITIES_CACHE_TTL_SECONDS = 30.0  # 30 seconds TTL for fast updates
 SUPPORTED_COMMODITIES: list[dict[str, Any]] = [
     {
         "symbol": "GOLD",
-        "name": "Gold (Spot / ETF)",
+        "name": "Gold (COMEX · XAU/USD)",
         "category": "Precious Metals",
-        "domestic_ticker": "GOLDBEES.NS",
         "global_ticker": "GC=F",
-        "unit": "₹ / 10g",
+        "alt_ticker": "XAUUSD=X",
+        "domestic_ticker": "GOLDBEES.NS",
+        "unit": "$ / oz",
+        "currency_symbol": "$",
         "icon": "🥇",
-        "round_interval": 100.0,
+        "round_interval": 10.0,
     },
     {
         "symbol": "SILVER",
-        "name": "Silver (Spot / ETF)",
+        "name": "Silver (COMEX · XAG/USD)",
         "category": "Precious Metals",
-        "domestic_ticker": "SILVERBEES.NS",
         "global_ticker": "SI=F",
-        "unit": "₹ / 1kg",
+        "alt_ticker": "XAGUSD=X",
+        "domestic_ticker": "SILVERBEES.NS",
+        "unit": "$ / oz",
+        "currency_symbol": "$",
         "icon": "🥈",
-        "round_interval": 100.0,
+        "round_interval": 0.5,
     },
     {
         "symbol": "CRUDEOIL",
-        "name": "WTI Crude Oil",
+        "name": "WTI Light Sweet Crude Oil",
         "category": "Energy",
-        "domestic_ticker": "CRUDEOIL.NS",
         "global_ticker": "CL=F",
+        "alt_ticker": "CL=F",
+        "domestic_ticker": "CRUDEOIL.NS",
         "unit": "$ / bbl",
+        "currency_symbol": "$",
         "icon": "🛢️",
         "round_interval": 1.0,
     },
     {
         "symbol": "NATGAS",
-        "name": "Natural Gas",
+        "name": "Henry Hub Natural Gas",
         "category": "Energy",
-        "domestic_ticker": "NATURALGAS.NS",
         "global_ticker": "NG=F",
+        "alt_ticker": "NG=F",
+        "domestic_ticker": "NATURALGAS.NS",
         "unit": "$ / MMBtu",
+        "currency_symbol": "$",
         "icon": "🔥",
         "round_interval": 0.1,
     },
@@ -73,9 +81,11 @@ SUPPORTED_COMMODITIES: list[dict[str, Any]] = [
         "symbol": "COPPER",
         "name": "High Grade Copper",
         "category": "Industrial Metals",
-        "domestic_ticker": "COPPER.NS",
         "global_ticker": "HG=F",
+        "alt_ticker": "HG=F",
+        "domestic_ticker": "COPPER.NS",
         "unit": "$ / lb",
+        "currency_symbol": "$",
         "icon": "🧱",
         "round_interval": 0.05,
     },
@@ -83,19 +93,23 @@ SUPPORTED_COMMODITIES: list[dict[str, Any]] = [
         "symbol": "BRENT",
         "name": "Brent Crude Oil",
         "category": "Energy",
-        "domestic_ticker": "BRENT.NS",
         "global_ticker": "BZ=F",
+        "alt_ticker": "BZ=F",
+        "domestic_ticker": "BRENT.NS",
         "unit": "$ / bbl",
+        "currency_symbol": "$",
         "icon": "⛽",
         "round_interval": 1.0,
     },
     {
         "symbol": "PLATINUM",
-        "name": "Platinum",
+        "name": "Platinum (NYMEX)",
         "category": "Precious Metals",
-        "domestic_ticker": "PLATINUM.NS",
         "global_ticker": "PL=F",
+        "alt_ticker": "PL=F",
+        "domestic_ticker": "PLATINUM.NS",
         "unit": "$ / oz",
+        "currency_symbol": "$",
         "icon": "🪙",
         "round_interval": 10.0,
     },
@@ -113,10 +127,10 @@ def resolve_commodity_symbol(symbol: str) -> str:
     """Map user/dashboard commodity symbol to appropriate ticker symbol."""
     clean = symbol.strip().upper()
     if clean in COMMODITY_MAP:
-        return COMMODITY_MAP[clean]["domestic_ticker"]
-    if clean.endswith("=F") or clean.endswith(".NS"):
+        return COMMODITY_MAP[clean]["global_ticker"]
+    if clean.endswith("=F") or clean.endswith("=X") or clean.endswith(".NS"):
         return clean
-    return f"{clean}.NS"
+    return f"{clean}=F"
 
 
 def fetch_commodity_candles(
@@ -129,11 +143,18 @@ def fetch_commodity_candles(
     clean_sym = symbol.strip().upper()
     info = COMMODITY_MAP.get(clean_sym)
 
-    # Try domestic ticker first, then global ticker fallback
+    # Try global ticker first, then alt_ticker, then domestic ticker fallback
     tickers_to_try = []
     if info:
-        tickers_to_try.append(info["domestic_ticker"])
-        tickers_to_try.append(info["global_ticker"])
+        gt = info.get("global_ticker")
+        if gt:
+            tickers_to_try.append(gt)
+        at = info.get("alt_ticker")
+        if at and at not in tickers_to_try:
+            tickers_to_try.append(at)
+        dt = info.get("domestic_ticker")
+        if dt and dt not in tickers_to_try:
+            tickers_to_try.append(dt)
     else:
         tickers_to_try.append(resolve_commodity_symbol(clean_sym))
 
@@ -422,6 +443,7 @@ def _generate_tactical_signals(
     pivots: dict[str, float],
     orb: dict[str, Any],
     symbol: str,
+    currency_symbol: str = "$",
 ) -> dict[str, Any]:
     """Generate actionable 3-column tactical trade plan with exact entry, stop loss, and targets."""
     if df.empty:
@@ -431,6 +453,9 @@ def _generate_tactical_signals(
             "where_to_buy": {"entry_zone": "—", "stop_loss": 0.0, "target_1": 0.0, "target_2": 0.0, "rr_ratio": 1.5},
             "where_to_sell": {"entry_zone": "—", "stop_loss": 0.0, "target_1": 0.0, "target_2": 0.0, "rr_ratio": 1.5},
         }
+
+    meta = COMMODITY_MAP.get(symbol.strip().upper(), {})
+    curr = meta.get("currency_symbol", currency_symbol)
 
     spot = float(df["close"].iloc[-1])
     p = pivots.get("p", spot)
@@ -480,7 +505,7 @@ def _generate_tactical_signals(
         "regime": regime,
         "momentum_bias": momentum,
         "where_to_buy": {
-            "entry_zone": f"₹{buy_entry_low:,.1f} – ₹{buy_entry_high:,.1f}",
+            "entry_zone": f"{curr}{buy_entry_low:,.2f} – {curr}{buy_entry_high:,.2f}",
             "stop_loss": buy_sl,
             "target_1": buy_t1,
             "target_2": buy_t2,
@@ -488,7 +513,7 @@ def _generate_tactical_signals(
             "rationale": "Confluence of Demand Order Block, Session VWAP Floor, and S1 Support.",
         },
         "where_to_sell": {
-            "entry_zone": f"₹{sell_entry_low:,.1f} – ₹{sell_entry_high:,.1f}",
+            "entry_zone": f"{curr}{sell_entry_low:,.2f} – {curr}{sell_entry_high:,.2f}",
             "stop_loss": sell_sl,
             "target_1": sell_t1,
             "target_2": sell_t2,
@@ -519,7 +544,8 @@ def get_commodity_chart_intelligence(
         "symbol": clean_sym,
         "name": f"{clean_sym} Commodity",
         "category": "Commodities",
-        "unit": "₹",
+        "unit": "$",
+        "currency_symbol": "$",
         "icon": "💎",
     })
 
@@ -533,6 +559,7 @@ def get_commodity_chart_intelligence(
             "name": meta["name"],
             "category": meta["category"],
             "unit": meta["unit"],
+            "currency_symbol": meta.get("currency_symbol", "$"),
             "icon": meta["icon"],
             "status": "SNAPSHOT_EMPTY",
             "spot_price": 0.0,
@@ -585,7 +612,8 @@ def get_commodity_chart_intelligence(
     obs, fvgs = _detect_order_blocks_and_fvg(df)
     trendlines = _detect_trendlines(df)
     pivots = _calculate_classical_pivots(df)
-    tactical_hud = _generate_tactical_signals(df, pivots, orb, clean_sym)
+    currency_symbol = meta.get("currency_symbol", "$")
+    tactical_hud = _generate_tactical_signals(df, pivots, orb, clean_sym, currency_symbol=currency_symbol)
 
     # Calculate GSR if Silver is active or proxy ratio
     gsr = 84.5
@@ -604,6 +632,7 @@ def get_commodity_chart_intelligence(
         "name": meta["name"],
         "category": meta["category"],
         "unit": meta["unit"],
+        "currency_symbol": currency_symbol,
         "icon": meta["icon"],
         "status": "LIVE_FEED",
         "spot_price": spot_price,
