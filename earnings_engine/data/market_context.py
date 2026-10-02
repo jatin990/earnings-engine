@@ -849,6 +849,19 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         else:
                             channel_position_pct = 50.0
 
+            # Compute relative volume surge (5D average volume vs 63D baseline average)
+            rel_vol_5d_vs_63d = None
+            if not prices.empty and "volume" in prices.columns:
+                try:
+                    vols = pd.to_numeric(prices["volume"], errors="coerce").dropna()
+                    if len(vols) >= 5:
+                        v_5d = float(vols.tail(5).mean())
+                        v_63d = float(vols.tail(63).mean()) if len(vols) >= 63 else float(vols.mean())
+                        if v_63d > 0:
+                            rel_vol_5d_vs_63d = round(v_5d / v_63d, 2)
+                except Exception:
+                    rel_vol_5d_vs_63d = None
+
             if load_earnings is not _ORIGINAL_LOAD_EARNINGS:
                 earnings = load_earnings(ticker, settings)
             else:
@@ -873,6 +886,10 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             q2_week_low_date = None
             q3_week_high_date = None
             q3_week_low_date = None
+            beat_rate_pct = None
+            beat_count = 0
+            total_historical_quarters = 0
+            historical_quarters_list: list[dict[str, Any]] = []
 
             if not earnings.empty:
                 today = pd.Timestamp.today().normalize()
@@ -892,6 +909,47 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
                 declared_historical = earnings[(earnings["earnings_date"] < today) & declared_mask]
                 historical_earnings = declared_historical if not declared_historical.empty else earnings[earnings["earnings_date"] < today]
+
+                # Compute historical beat rate and 8-quarter history
+                if not historical_earnings.empty:
+                    sorted_hist = historical_earnings.sort_values("earnings_date")
+                    total_historical_quarters = len(sorted_hist)
+                    for _, h_row in sorted_hist.iterrows():
+                        surp_v = pd.to_numeric(h_row.get("surprise_pct"), errors="coerce")
+                        eps_r = pd.to_numeric(h_row.get("eps_reported"), errors="coerce")
+                        eps_e = pd.to_numeric(h_row.get("eps_estimate"), errors="coerce")
+                        is_beat = False
+                        if pd.notna(surp_v) and float(surp_v) > 0:
+                            is_beat = True
+                        elif pd.notna(eps_r) and pd.notna(eps_e) and float(eps_r) > float(eps_e):
+                            is_beat = True
+                        if is_beat:
+                            beat_count += 1
+
+                    if total_historical_quarters > 0:
+                        beat_rate_pct = round((beat_count / total_historical_quarters) * 100.0, 1)
+
+                    # Build detailed 8-quarter historical array for Inspector drawer
+                    for _, h_row in sorted_hist.tail(8).iterrows():
+                        h_date = h_row.get("earnings_date")
+                        h_date_str = pd.Timestamp(h_date).strftime("%Y-%m-%d") if pd.notna(h_date) else ""
+                        surp_v = pd.to_numeric(h_row.get("surprise_pct"), errors="coerce")
+                        eps_r = pd.to_numeric(h_row.get("eps_reported"), errors="coerce")
+                        eps_e = pd.to_numeric(h_row.get("eps_estimate"), errors="coerce")
+                        h_score = _score_surprise(float(surp_v)) if pd.notna(surp_v) else 5
+                        h_p7d = _price_after_earnings(prices, h_date, days=7) if not prices.empty and pd.notna(h_date) else None
+                        h_wk_data = _week_high_low_around(prices, h_date, current_price=current_price) if not prices.empty and pd.notna(h_date) else None
+                        historical_quarters_list.append({
+                            "date": h_date_str,
+                            "eps_estimate": round(float(eps_e), 2) if pd.notna(eps_e) else None,
+                            "eps_reported": round(float(eps_r), 2) if pd.notna(eps_r) else None,
+                            "surprise_pct": round(float(surp_v), 2) if pd.notna(surp_v) else None,
+                            "score": h_score,
+                            "price_7d": round(float(h_p7d), 2) if h_p7d is not None else None,
+                            "week_high_pct": round(float(h_wk_data[0]), 1) if h_wk_data and h_wk_data[0] is not None else None,
+                            "week_low_pct": round(float(h_wk_data[1]), 1) if h_wk_data and h_wk_data[1] is not None else None,
+                        })
+
                 recent_earnings = historical_earnings.sort_values("earnings_date").tail(3)  # last 3 past quarters
                 quarter_scores: list[int] = []
                 n_quarters = len(recent_earnings)
@@ -1070,6 +1128,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "next_resistance": next_resistance,
                 "current_support": current_support,
                 "swing_range": sr_map.get(ticker),
+                "rel_vol_5d_vs_63d": rel_vol_5d_vs_63d,
+                "beat_rate_pct": beat_rate_pct,
+                "beat_count": beat_count,
+                "total_historical_quarters": total_historical_quarters,
+                "historical_quarters": historical_quarters_list,
             }
             metrics_to_store[ticker] = metrics_payload
 
@@ -1092,6 +1155,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "thirty_day_return_pct": thirty_day_return_pct,
                 "seven_day_return_pct": seven_day_return_pct,
                 "three_day_return_pct": three_day_return_pct,
+                "rel_vol_5d_vs_63d": rel_vol_5d_vs_63d,
+                "beat_rate_pct": beat_rate_pct,
+                "beat_count": beat_count,
+                "total_historical_quarters": total_historical_quarters,
+                "historical_quarters": historical_quarters_list,
                 "channel_position_pct": channel_position_pct,
                 "earnings_week_move_pct": earnings_week_move_pct,
                 "earnings_week_high_pct": earnings_week_high_pct,

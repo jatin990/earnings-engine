@@ -130,3 +130,37 @@ def test_fund_portfolio_activity_three_metrics(test_settings):
     assert h["change_pct"] == 0.8
     assert h["increase_amount_cr"] == 192.31 or round(h["increase_amount_cr"], 1) == 192.3
     assert h["total_amount_cr"] == 1250.0
+
+
+def test_top_stake_additions_deduplication_and_quarter_order(test_settings):
+    """Verify historical surges deduplicate per ticker and sort multi-year quarters chronologically."""
+    conn = get_db_connection(test_settings)
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO tickers (ticker, name, market_cap) VALUES ('DEDUP.NS', 'Dedup Tech Ltd', 10000000000)"
+        )
+        # Multiple quarters across FY25 and FY26
+        conn.execute("""
+            INSERT OR REPLACE INTO shareholding_patterns 
+            (ticker, quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct, other_pct, updated_at)
+            VALUES 
+            ('DEDUP.NS', 'Q2 FY27', 40.0, 10.0, 10.0, 40.0, 0.0, '2026-08-20'),
+            ('DEDUP.NS', 'Q1 FY27', 40.0, 8.0, 8.0, 44.0, 0.0, '2026-05-20'),
+            ('DEDUP.NS', 'Q4 FY26', 40.0, 20.0, 15.0, 25.0, 0.0, '2026-02-20'),
+            ('DEDUP.NS', 'Q3 FY26', 40.0, 5.0, 5.0, 50.0, 0.0, '2025-11-20'),
+            ('DEDUP.NS', 'Q2 FY26', 40.0, 15.0, 15.0, 30.0, 0.0, '2025-08-20'),
+            ('DEDUP.NS', 'Q1 FY26', 40.0, 2.0, 2.0, 56.0, 0.0, '2025-05-20')
+        """)
+        conn.commit()
+
+    res = get_top_stake_additions(min_delta=3.0, settings=test_settings)
+    # Ticker DEDUP.NS should appear at most once in historical surges with its highest surge
+    dedup_hist = [x for x in res.get("historical_additions", []) if x["ticker"] == "DEDUP.NS"]
+    assert len(dedup_hist) == 1
+    # Q1 FY27 (16%) vs Q4 FY26 (35%) is -19% (unwind)
+    # Q4 FY26 (35%) vs Q3 FY26 (10%) is +25%
+    # Q3 FY26 (10%) vs Q2 FY26 (30%) is -20%
+    # Q2 FY26 (30%) vs Q1 FY26 (4%) is +26%
+    # Peak surge is Q2 FY26 vs Q1 FY26 (+26.0%)
+    assert dedup_hist[0]["quarter_comparison"] == "Q2 FY26 vs Q1 FY26"
+    assert dedup_hist[0]["inst_addition_pct"] == 26.0

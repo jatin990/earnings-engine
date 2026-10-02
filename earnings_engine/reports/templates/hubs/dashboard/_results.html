@@ -3,62 +3,64 @@
 
             <!-- ⚡ Top Month Summary Cards (Persistent Month Hub) -->
             <div id="resultsMonthCardsRow" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; margin-bottom: 0.6rem;">
-                <div class="card month-summary-card" onclick="app.onMonthCardClick('last')" style="background: #09090e; border: 1px solid rgba(255,255,255,0.08); border-top: 2px solid #64748b; border-radius: 0.5rem; padding: 0.6rem 0.85rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect Last Month">
+                <div class="card month-summary-card" onclick="app.onMonthCardClick('last')" style="background: rgba(9, 9, 14, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-top: 2px solid #64748b; border-radius: 0.5rem; padding: 0.55rem 0.8rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect Last Month">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
-                        <span id="resultsCardLastMonthLabel" style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Last Month</span>
+                        <span id="resultsCardLastMonthLabel" style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Last Month</span>
                         <div style="display: flex; gap: 0.25rem; align-items: center;">
-                            <span class="signal-badge" style="background: rgba(255,255,255,0.06); color: #cbd5e1; font-size: 0.6rem; font-weight: 600; padding: 0.08rem 0.35rem; border-radius: 4px;">Past</span>
-                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('last');" style="background: rgba(255,255,255,0.08); color: #94a3b8; border: none; padding: 0.08rem 0.35rem; font-size: 0.62rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
+                            <span class="signal-badge" style="background: rgba(255,255,255,0.06); color: #cbd5e1; font-size: 0.58rem; font-weight: 600; padding: 0.06rem 0.35rem; border-radius: 4px;">Past</span>
+                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('last');" style="background: rgba(255,255,255,0.08); color: #94a3b8; border: none; padding: 0.06rem 0.35rem; font-size: 0.6rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
                         </div>
                     </div>
-                    <div id="resultsCardLastMonthCount" style="font-size: 1.35rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
-                    <div id="resultsCardLastMonthSubtitle" style="font-size: 0.68rem; color: #64748b; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Reported Results</div>
+                    <div id="resultsCardLastMonthCount" style="font-size: 1.3rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
+                    <div id="resultsCardLastMonthSubtitle" style="font-size: 0.65rem; color: #64748b; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Reported Results</div>
                 </div>
 
-                <div class="card month-summary-card" onclick="app.onMonthCardClick('this')" style="background: #090a12; border: 1px solid rgba(59,130,246,0.25); border-top: 2px solid #3b82f6; border-radius: 0.5rem; padding: 0.6rem 0.85rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect This Month">
+                <div class="card month-summary-card" onclick="app.onMonthCardClick('this')" style="background: rgba(9, 10, 18, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(59,130,246,0.25); border-top: 2px solid #3b82f6; border-radius: 0.5rem; padding: 0.55rem 0.8rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect This Month">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
-                        <span id="resultsCardThisMonthLabel" style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">This Month</span>
+                        <span id="resultsCardThisMonthLabel" style="font-size: 0.68rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">This Month</span>
                         <div style="display: flex; gap: 0.25rem; align-items: center;">
-                            <span class="signal-badge" style="background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); font-size: 0.6rem; font-weight: 700; padding: 0.08rem 0.35rem; border-radius: 4px;">Active</span>
-                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('this');" style="background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.35); padding: 0.08rem 0.35rem; font-size: 0.62rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
+                            <span class="signal-badge" style="background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); font-size: 0.58rem; font-weight: 700; padding: 0.06rem 0.35rem; border-radius: 4px;">Active</span>
+                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('this');" style="background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.35); padding: 0.06rem 0.35rem; font-size: 0.6rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
                         </div>
                     </div>
-                    <div id="resultsCardThisMonthCount" style="font-size: 1.35rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
-                    <div id="resultsCardThisMonthSubtitle" style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Active Season Catalysts</div>
+                    <div id="resultsCardThisMonthCount" style="font-size: 1.3rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
+                    <div id="resultsCardThisMonthSubtitle" style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Active Season Catalysts</div>
                 </div>
 
-                <div class="card month-summary-card" onclick="app.onMonthCardClick('next')" style="background: #090b14; border: 1px solid rgba(6,182,212,0.25); border-top: 2px solid #06b6d4; border-radius: 0.5rem; padding: 0.6rem 0.85rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect Next Month">
+                <div class="card month-summary-card" onclick="app.onMonthCardClick('next')" style="background: rgba(9, 11, 20, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(6,182,212,0.25); border-top: 2px solid #06b6d4; border-radius: 0.5rem; padding: 0.55rem 0.8rem; cursor: pointer; transition: all 0.15s ease;" title="Click to filter ledger or inspect Next Month">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
-                        <span id="resultsCardNextMonthLabel" style="font-size: 0.7rem; color: #22d3ee; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Next Month</span>
+                        <span id="resultsCardNextMonthLabel" style="font-size: 0.68rem; color: #22d3ee; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Next Month</span>
                         <div style="display: flex; gap: 0.25rem; align-items: center;">
-                            <span class="signal-badge" style="background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); font-size: 0.6rem; font-weight: 700; padding: 0.08rem 0.35rem; border-radius: 4px;">Pipeline</span>
-                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('next');" style="background: rgba(6,182,212,0.2); color: #67e8f9; border: 1px solid rgba(6,182,212,0.35); padding: 0.08rem 0.35rem; font-size: 0.62rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
+                            <span class="signal-badge" style="background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); font-size: 0.58rem; font-weight: 700; padding: 0.06rem 0.35rem; border-radius: 4px;">Pipeline</span>
+                            <button type="button" class="btn-micro" onclick="event.stopPropagation(); app.openResultsMonthModal('next');" style="background: rgba(6,182,212,0.2); color: #67e8f9; border: 1px solid rgba(6,182,212,0.35); padding: 0.06rem 0.35rem; font-size: 0.6rem;" title="Open detailed month breakdown modal">🔍 Drilldown</button>
                         </div>
                     </div>
-                    <div id="resultsCardNextMonthCount" style="font-size: 1.35rem; font-weight: 800; color: #22d3ee; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
-                    <div id="resultsCardNextMonthSubtitle" style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scheduled Future Results</div>
+                    <div id="resultsCardNextMonthCount" style="font-size: 1.3rem; font-weight: 800; color: #22d3ee; font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.2;">—</div>
+                    <div id="resultsCardNextMonthSubtitle" style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scheduled Future Results</div>
                 </div>
             </div>
 
             <!-- 📊 Dynamic Window KPI Bar (Populated after report loads) -->
-            <div id="resultsWindowMetricsBar" style="display: none; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.45rem; margin-bottom: 0.6rem; padding: 0.45rem 0.65rem; background: #06070c; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;"></div>
+            <div id="resultsWindowMetricsBar" style="display: none; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.4rem; margin-bottom: 0.6rem; padding: 0.4rem 0.65rem; background: rgba(6, 7, 12, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;"></div>
 
             <!-- 📊 Main Results Terminal Section -->
-            <section class="card" style="padding: 0.6rem 0.8rem; border: 1px solid rgba(255,255,255,0.08); background: #030306; border-radius: 0.6rem;">
+            <section class="card" style="padding: 0.6rem 0.8rem; border: 1px solid rgba(255,255,255,0.08); background: rgba(3, 3, 6, 0.95); backdrop-filter: blur(16px); border-radius: 0.6rem;">
 
                 <!-- Header & Action Controls Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.4rem;">
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <h3 style="margin: 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.35rem; color: #ffffff;">
                             <span>📊 Results Ledger</span>
-                            <span id="resultsCount" class="signal-badge" style="font-size:0.65rem;display:none;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.08rem 0.4rem;"></span>
+                            <span id="resultsCount" class="signal-badge" style="font-size:0.65rem;display:none;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.06rem 0.35rem;"></span>
                         </h3>
                     </div>
 
                     <!-- Right Controls -->
-                    <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
-                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="height: 28px; padding: 0 0.5rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem; font-weight: 600; font-family: var(--font-sans); outline: none;">
-                            <option value="recent" selected>⚡ Recent (-4D to +7D)</option>
+                    <div style="display: flex; gap: 0.25rem; align-items: center; flex-wrap: wrap;">
+                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="height: 28px; padding: 0 0.45rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem; font-weight: 600; font-family: var(--font-sans); outline: none;">
+                            <option value="next3" selected>⚡ Upcoming 3 Days</option>
+                            <option value="next7">⚡ Upcoming 7 Days</option>
+                            <option value="recent">⚡ Recent (-4D to +7D)</option>
                             <option value="pm60">⚡ ±2 Months (Past 60D & Next 60D)</option>
                             <option value="pm30">📅 ±1 Month (Past 30D & Next 30D)</option>
                             <option value="next14">🔮 Upcoming 14 Days</option>
@@ -68,64 +70,91 @@
                             <option value="custom">⚙️ Custom Range</option>
                         </select>
                         <span id="resultsCustomInputs" style="display: none; align-items: center; gap: 0.2rem;">
-                            <input type="number" id="resultsPastDays" value="4" min="0" max="180" style="width: 48px; height: 28px; padding: 0 0.3rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem;" title="Days in past (lookback)">
+                            <input type="number" id="resultsPastDays" value="0" min="0" max="180" style="width: 46px; height: 28px; padding: 0 0.25rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem;" title="Days in past (lookback)">
                             <span style="font-size:0.65rem;color:var(--text-muted);">/</span>
-                            <input type="number" id="resultsDays" value="7" min="1" max="180" style="width: 48px; height: 28px; padding: 0 0.3rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem;" title="Days ahead (lookahead)">
+                            <input type="number" id="resultsDays" value="3" min="1" max="180" style="width: 46px; height: 28px; padding: 0 0.25rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem;" title="Days ahead (lookahead)">
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', 'app.onResultsMarketChange(this.value)') }}
-                        <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="height:28px;font-size:0.75rem;">▶ Load</button>
-                        <button type="button" onclick="app.recalculateAllVisibleResults(this)" id="resultsRecalcAllBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Recalculate live prices & metrics for all loaded window stocks">🔄 Recalc</button>
+                        <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="height:28px;font-size:0.75rem;padding:0 0.65rem;">▶ Load</button>
+                        <button type="button" onclick="app.recalculateAllVisibleResults(this)" id="resultsRecalcAllBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Recalculate live prices & metrics for all loaded window stocks">🔄 Recalc</button>
                         <button type="button" onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-danger btn-sm" style="height:28px;font-size:0.72rem;display:none;" title="Cancel pending load request">⏹ Cancel</button>
                         <button type="button" onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;display:none;">📅 Next Date</button>
-                        <button type="button" onclick="app.summarizeResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;">✨ AI Summary</button>
-                        <button type="button" onclick="app.refreshResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;">🔄 Sync</button>
+                        <button type="button" onclick="app.summarizeResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;">✨ AI Summary</button>
+                        <button type="button" onclick="app.refreshResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;">🔄 Sync</button>
                     </div>
                 </div>
 
                 <!-- 🛠️ Ultra-Clean Compact Operations Toolbar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; background: #07080e; border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.35rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; background: rgba(7, 8, 14, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.35rem;">
 
                     <!-- Search Input -->
-                    <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 220px; max-width: 440px;">
+                    <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 200px; max-width: 380px;">
                         <span style="font-size: 0.72rem; color: #71717a;">🔍</span>
                         <input type="text" id="resultsLiveSearch" oninput="app.filterResultsTable(this.value)" placeholder="Filter by symbol, company, industry, or signal..." style="width: 100%; height: 26px; padding: 0 0.45rem; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
                     </div>
 
-                    <!-- Toolbar Operations: Match count, Density, Export -->
-                    <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem;">
+                    <!-- Toolbar Operations: Match count, Cap filters, Split Toggle, Density, Export -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; flex-wrap: wrap;">
                         <span id="resultsFilterMatchCount" style="color: #38bdf8; font-family: var(--font-mono); font-weight: 700; font-size: 0.68rem;"></span>
+
+                        <!-- Cap Filter Toggle -->
+                        <div style="display: flex; align-items: center; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 1px;">
+                            <button type="button" onclick="app.setResultsCapFilter('all')" id="capFilterBtnAll" class="btn-micro" style="background:rgba(255,255,255,0.15);color:#ffffff;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Show all market cap tiers">All</button>
+                            <button type="button" onclick="app.setResultsCapFilter('large')" id="capFilterBtnLarge" class="btn-micro" style="background:transparent;color:#94a3b8;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Show Large Cap (>1000 Cr)">💎 Large</button>
+                            <button type="button" onclick="app.setResultsCapFilter('small')" id="capFilterBtnSmall" class="btn-micro" style="background:transparent;color:#94a3b8;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Show Small Cap (≤1000 Cr)">🌱 Small</button>
+                        </div>
+
+                        <!-- Split Inspector Toggle -->
+                        <button type="button" onclick="app.toggleResultsSplitView()" id="resultsSplitToggleBtn" class="btn-micro" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.4rem;font-size:0.62rem;font-weight:700;" title="Toggle 60-40 Split Quant Inspector Panel">⚡ Split View</button>
 
                         <!-- Density Toggle -->
                         <div style="display: flex; align-items: center; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 1px;">
-                            <button type="button" onclick="app.setResultsTableDensity('compact')" id="densityBtnCompact" class="btn-micro" style="background:rgba(255,255,255,0.15);color:#ffffff;font-size:0.62rem;padding:0.12rem 0.4rem;" title="Compact Data View">Dense</button>
-                            <button type="button" onclick="app.setResultsTableDensity('standard')" id="densityBtnStandard" class="btn-micro" style="background:transparent;color:#71717a;font-size:0.62rem;padding:0.12rem 0.4rem;" title="Standard Data View">Comfort</button>
+                            <button type="button" onclick="app.setResultsTableDensity('compact')" id="densityBtnCompact" class="btn-micro" style="background:rgba(255,255,255,0.15);color:#ffffff;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Compact Data View">Dense</button>
+                            <button type="button" onclick="app.setResultsTableDensity('standard')" id="densityBtnStandard" class="btn-micro" style="background:transparent;color:#71717a;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Standard Data View">Comfort</button>
                         </div>
 
                         <!-- Export Tools -->
-                        <button type="button" onclick="app.exportResultsToCsv()" class="btn-micro btn-micro-neutral" style="padding:0.12rem 0.45rem;font-size:0.65rem;" title="Export visible results to CSV spreadsheet">⤓ CSV</button>
-                        <button type="button" onclick="app.exportResultsToJson()" class="btn-micro btn-micro-neutral" style="padding:0.12rem 0.45rem;font-size:0.65rem;" title="Export visible results to JSON">⤓ JSON</button>
+                        <button type="button" onclick="app.exportResultsToCsv()" class="btn-micro btn-micro-neutral" style="padding:0.1rem 0.4rem;font-size:0.65rem;" title="Export visible results to CSV spreadsheet">⤓ CSV</button>
+                        <button type="button" onclick="app.exportResultsToJson()" class="btn-micro btn-micro-neutral" style="padding:0.1rem 0.4rem;font-size:0.65rem;" title="Export visible results to JSON">⤓ JSON</button>
                     </div>
                 </div>
 
                 <!-- 📅 Month Breakdown Sub-Tabs -->
-                <div id="resultsMonthTabs" style="display: none; gap: 0.3rem; margin: 0.3rem 0 0.5rem 0; flex-wrap: wrap; align-items: center; padding: 0.3rem 0.5rem; background: #06070c; border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem;"></div>
+                <div id="resultsMonthTabs" style="display: none; gap: 0.3rem; margin: 0.3rem 0 0.5rem 0; flex-wrap: wrap; align-items: center; padding: 0.3rem 0.5rem; background: rgba(6, 7, 12, 0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem;"></div>
 
-                <div id="resultsReportLegend" class="day-legend" style="margin-bottom:0.35rem;"></div>
+                <!-- 🎛️ Master-Detail Workspace: Table on Left + Sticky Quant Inspector on Right -->
+                <div id="resultsSplitWorkspace" style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr); gap: 0.6rem; align-items: start;">
 
-                <!-- Results Report Table Container -->
-                <div id="resultsReportSections">
-                    <div class="card" style="text-align:center;padding:2rem 1rem;color:var(--text-muted);background:#050508;border:1px dashed rgba(255,255,255,0.1);border-radius:0.6rem;margin:0.4rem 0;">
-                        <div style="font-size:1.8rem;margin-bottom:0.4rem;">📅</div>
-                        <h4 id="resultsCenterTitle" style="margin:0 0 0.3rem 0;color:var(--light);font-size:1rem;font-family:'Space Grotesk',sans-serif;">Corporate Earnings Ready to Load</h4>
-                        <p style="max-width:460px;margin:0 auto 0.85rem auto;font-size:0.75rem;line-height:1.5;color:var(--text-muted);">
-                            Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts and previous quarter performance.
-                        </p>
-                        <button type="button" onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.4rem 1.1rem;font-size:0.78rem;font-weight:700;">▶ Load Results Report</button>
+                    <!-- Left: Table Stream Container -->
+                    <div id="resultsTablePane" style="min-width: 0;">
+                        <div id="resultsReportLegend" class="day-legend" style="margin-bottom:0.35rem;"></div>
+
+                        <!-- Results Report Table Container -->
+                        <div id="resultsReportSections">
+                            <div class="card" style="text-align:center;padding:2rem 1rem;color:var(--text-muted);background:rgba(5, 5, 8, 0.7);border:1px dashed rgba(255,255,255,0.1);border-radius:0.6rem;margin:0.4rem 0;">
+                                <div style="font-size:1.8rem;margin-bottom:0.4rem;">📅</div>
+                                <h4 id="resultsCenterTitle" style="margin:0 0 0.3rem 0;color:var(--light);font-size:1rem;font-family:'Space Grotesk',sans-serif;">Corporate Earnings Ready to Load</h4>
+                                <p style="max-width:460px;margin:0 auto 0.85rem auto;font-size:0.75rem;line-height:1.5;color:var(--text-muted);">
+                                    Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts and previous quarter performance.
+                                </p>
+                                <button type="button" onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.4rem 1.1rem;font-size:0.78rem;font-weight:700;">▶ Load Results Report</button>
+                            </div>
+                        </div>
+                        <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.35rem; font-size: 0.7rem;"></div>
                     </div>
+
+                    <!-- Right: Sticky Glassmorphic Quant Catalyst Inspector -->
+                    <div id="resultsQuantInspectorPane" class="card sticky-inspector" style="position: sticky; top: 0.5rem; background: rgba(9, 10, 18, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 0.6rem; padding: 0.65rem 0.8rem; max-height: calc(100vh - 120px); overflow-y: auto;">
+                        <div id="resultsInspectorEmptyState" style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8;">
+                            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">🎯</div>
+                            <h4 style="margin: 0 0 0.25rem 0; color: #ffffff; font-size: 0.9rem; font-family: 'Space Grotesk', sans-serif;">Quant Catalyst Inspector</h4>
+                            <p style="font-size: 0.72rem; color: #64748b; margin: 0 auto; max-width: 280px; line-height: 1.4;">
+                                Click any stock row in the results ledger or use <kbd style="background:#1e293b;padding:0.1rem 0.3rem;border-radius:3px;font-size:0.65rem;color:#38bdf8;">↑</kbd> <kbd style="background:#1e293b;padding:0.1rem 0.3rem;border-radius:3px;font-size:0.65rem;color:#38bdf8;">↓</kbd> keyboard keys to inspect 8-quarter beat/miss history, technical channel geometry, and volume flow forensics.
+                            </p>
+                        </div>
+                        <div id="resultsInspectorContent" style="display: none;"></div>
+                    </div>
+
                 </div>
-                <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.35rem; font-size: 0.7rem;"></div>
             </section>
         </div>
-
-        <!-- ================= SWING TAB ================= -->
-

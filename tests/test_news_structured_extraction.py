@@ -9,6 +9,7 @@ Tests verification of:
 """
 
 import json
+from datetime import datetime, timezone
 import pytest
 from earnings_engine.config import Settings
 from earnings_engine.data.models import (
@@ -168,6 +169,7 @@ def test_extract_structured_news_data_model_wrapper(test_settings):
 
 def test_pipeline_ingestion_and_sqlite_persistence(test_settings):
     """Verify end-to-end news ingestion, structured verification, and database storage in SQLite."""
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     raw_items = [
         {
             "ticker": "TATAMOTORS.NS",
@@ -176,7 +178,7 @@ def test_pipeline_ingestion_and_sqlite_persistence(test_settings):
             "summary": "Tata Motors secures supply contract of ₹3,600 Cr for 2,500 EV buses. Margin projected at 12%.",
             "link": "https://example.com/news/tatamotors-ev-order",
             "publisher": "AutoNews",
-            "published_at": "2026-08-30 08:30:00",
+            "published_at": now_str,
             "source": "test_rss",
         }
     ]
@@ -226,6 +228,7 @@ def test_news_ai_deduplication_and_ondemand_pipeline(test_settings, monkeypatch)
 
     monkeypatch.setattr(analyzer_mod, "analyze_news_catalyst_ai", mock_analyze)
 
+    now_recent = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     item1 = {
         "ticker": "TATAMOTORS.NS",
         "stock_name": "Tata Motors Ltd",
@@ -233,7 +236,7 @@ def test_news_ai_deduplication_and_ondemand_pipeline(test_settings, monkeypatch)
         "summary": "Tata Motors bags landmark order from state logistics corporation.",
         "link": "https://example.com/tatamotors-fleet",
         "publisher": "AutoNews",
-        "published_at": "2026-08-30 11:00:00",
+        "published_at": now_recent,
         "source": "rss_feed",
     }
     item2 = {
@@ -243,7 +246,7 @@ def test_news_ai_deduplication_and_ondemand_pipeline(test_settings, monkeypatch)
         "summary": "Infosys expands financial services footprint across Europe.",
         "link": "https://example.com/infy-deal",
         "publisher": "TechDaily",
-        "published_at": "2026-08-30 12:00:00",
+        "published_at": now_recent,
         "source": "rss_feed",
     }
 

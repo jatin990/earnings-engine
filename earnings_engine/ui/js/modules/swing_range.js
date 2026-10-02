@@ -915,7 +915,8 @@ Object.assign(app, {
                         return;
                     }
 
-                    const dir = consensus.consensus_direction || 'NEUTRAL';
+                    const rawDir = typeof consensus === 'string' ? consensus : (consensus && typeof consensus === 'object' ? (consensus.consensus_direction || consensus.direction) : null);
+                    const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
                     const isBull = dir.includes('BUY') || dir.includes('BULL');
                     const isBear = dir.includes('SELL') || dir.includes('BEAR');
                     const str = consensus.consensus_strength != null ? Math.round(consensus.consensus_strength) : '—';

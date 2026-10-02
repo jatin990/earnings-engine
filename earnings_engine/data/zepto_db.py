@@ -6,6 +6,7 @@ spend-per-person metrics, hiring pipeline conversions, and 50-50 partner equity 
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -124,6 +125,7 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 rating REAL DEFAULT 5.0,
                 base_salary_monthly REAL NOT NULL DEFAULT 0.0,
                 current_month_bonus REAL DEFAULT 0.0,
+                is_hidden INTEGER DEFAULT 0,
                 aadhar_doc_url TEXT,
                 resume_doc_url TEXT,
                 photo_url TEXT,
@@ -243,6 +245,156 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_gmail_auth (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT,
+                token_expiry TEXT,
+                token_type TEXT DEFAULT 'Bearer',
+                scopes TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'CONNECTED',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_attendance_imports (
+                id TEXT PRIMARY KEY,
+                file_name TEXT NOT NULL,
+                store_name TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                total_records INTEGER NOT NULL DEFAULT 0,
+                total_employees INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT 'UPLOAD',
+                imported_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_attendance_records (
+                id TEXT PRIMARY KEY,
+                import_id TEXT NOT NULL,
+                store_name TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                designation TEXT NOT NULL,
+                shift_date TEXT NOT NULL,
+                shift_name TEXT,
+                shift_time TEXT,
+                punch_in TEXT,
+                punch_out TEXT,
+                work_duration_mins INTEGER DEFAULT 0,
+                break_duration_mins INTEGER DEFAULT 0,
+                raw_status TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(import_id) REFERENCES zepto_attendance_imports(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_store_metrics (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                metric_date TEXT NOT NULL,
+                sales_gmv REAL DEFAULT 0.0,
+                order_count INTEGER DEFAULT 0,
+                aov REAL DEFAULT 0.0,
+                inbound_hours REAL DEFAULT 0.0,
+                outbound_hours REAL DEFAULT 0.0,
+                packer_ipp REAL DEFAULT 0.0,
+                sla_adherence_pct REAL DEFAULT 100.0,
+                raw_source TEXT DEFAULT 'MANUAL',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_loss_records (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                record_date TEXT NOT NULL,
+                loss_type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL DEFAULT 0.0,
+                sku_count INTEGER DEFAULT 0,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_manpower_utilization (
+                id TEXT PRIMARY KEY,
+                store_name TEXT NOT NULL,
+                util_date TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                role TEXT,
+                items_picked INTEGER DEFAULT 0,
+                active_pick_hours REAL DEFAULT 0.0,
+                idle_hours REAL DEFAULT 0.0,
+                ipp REAL DEFAULT 0.0,
+                flex_labor_cost REAL DEFAULT 0.0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_gmail_messages (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT,
+                subject TEXT,
+                sender TEXT,
+                date_str TEXT,
+                iso_date TEXT,
+                month_ym TEXT,
+                snippet TEXT,
+                category TEXT NOT NULL DEFAULT 'OPERATIONAL',
+                category_label TEXT,
+                badge_color TEXT,
+                icon TEXT,
+                extracted_metrics TEXT,
+                attachments TEXT,
+                has_attachments INTEGER DEFAULT 0,
+                internal_date TEXT,
+                synced_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_offer_letters (
+                id TEXT PRIMARY KEY,
+                cand_id TEXT,
+                candidate_name TEXT NOT NULL,
+                title TEXT DEFAULT 'Mr.',
+                role TEXT NOT NULL,
+                department TEXT DEFAULT 'Operations',
+                work_location TEXT DEFAULT 'Sector F Sainik Colony Jammu',
+                date_of_joining TEXT NOT NULL,
+                employment_type TEXT DEFAULT 'Full - Time',
+                doc_ref TEXT,
+                basic_pay REAL DEFAULT 12000.0,
+                total_potential REAL DEFAULT 17000.0,
+                signatory_name TEXT DEFAULT 'Jatin',
+                signatory_title TEXT DEFAULT 'Authorized Signatory',
+                data_json TEXT,
+                html_snapshot TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_ol_cand ON zepto_offer_letters(cand_id);
+            CREATE INDEX IF NOT EXISTS idx_zepto_ol_created ON zepto_offer_letters(created_at);
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_store_date ON zepto_attendance_records(store_name, shift_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_emp ON zepto_attendance_records(employee_id, shift_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_att_status ON zepto_attendance_records(status);
+
+            CREATE INDEX IF NOT EXISTS idx_zepto_met_store_date ON zepto_store_metrics(store_name, metric_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_loss_store_date ON zepto_loss_records(store_name, record_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_util_store_date ON zepto_manpower_utilization(store_name, util_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_month ON zepto_gmail_messages(month_ym);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_date ON zepto_gmail_messages(iso_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_gmail_msg_cat ON zepto_gmail_messages(category);
+
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
             CREATE INDEX IF NOT EXISTS idx_zepto_sal_emp ON zepto_salaries(employee_id, year_month);
@@ -252,6 +404,14 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_inc_date ON zepto_store_income(income_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_inc_month ON zepto_store_income(year_month);
         """)
+
+        # Migration: Ensure is_hidden column exists on zepto_employees
+        emp_cols = _get_table_columns(conn, "zepto_employees")
+        if not emp_cols or "is_hidden" not in emp_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_employees ADD COLUMN is_hidden INTEGER DEFAULT 0")
+            except Exception:
+                pass
 
         # Migration: Ensure performance_rating column exists on zepto_salaries
         sal_cols = _get_table_columns(conn, "zepto_salaries")
@@ -275,6 +435,44 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             try:
                 conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
                 conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
+            except Exception:
+                pass
+
+        # Migration: Ensure zepto_gmail_messages columns exist
+        gmail_cols = _get_table_columns(conn, "zepto_gmail_messages")
+        if gmail_cols:
+            for col_name, col_type in [
+                ("store_name", "TEXT DEFAULT ''"),
+                ("body_text", "TEXT DEFAULT ''"),
+                ("body_html", "TEXT DEFAULT ''"),
+                ("parsed_status", "TEXT DEFAULT 'PENDING'"),
+                ("parsed_records_count", "INTEGER DEFAULT 0"),
+            ]:
+                if col_name not in gmail_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE zepto_gmail_messages ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
+
+        # Migration: Ensure source_email_id exists on domain tables
+        loss_cols = _get_table_columns(conn, "zepto_loss_records")
+        if loss_cols and "source_email_id" not in loss_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_loss_records ADD COLUMN source_email_id TEXT")
+            except Exception:
+                pass
+
+        met_cols = _get_table_columns(conn, "zepto_store_metrics")
+        if met_cols and "source_email_id" not in met_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_store_metrics ADD COLUMN source_email_id TEXT")
+            except Exception:
+                pass
+
+        att_imp_cols = _get_table_columns(conn, "zepto_attendance_imports")
+        if att_imp_cols and "source_email_id" not in att_imp_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_attendance_imports ADD COLUMN source_email_id TEXT")
             except Exception:
                 pass
 
@@ -325,24 +523,44 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
         conn.execute("UPDATE zepto_candidates SET target_role = 'SECURITY_GUARD' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND target_role LIKE '%SEC%'")
         conn.execute("UPDATE zepto_candidates SET target_role = 'PICKER' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING')")
 
-        # Check if seed data needed
-        row = conn.execute("SELECT COUNT(*) FROM zepto_employees").fetchone()
-        if row and row[0] == 0:
-            _seed_sample_data(conn)
+        # Mark all hidden staff as RESIGNED and ensure hidden flag is synchronized
+        conn.execute("UPDATE zepto_employees SET status = 'RESIGNED' WHERE is_hidden = 1")
+
+        # Clean up legacy bogus EMAIL_INGESTED loss rows where regex erroneously captured calendar year 2026 as amount
+        conn.execute(
+            """
+            DELETE FROM zepto_loss_records
+            WHERE (notes LIKE '%Auto-ingested from email%' OR notes LIKE '%EMAIL_INGESTED%')
+              AND amount = 2026.0
+            """
+        )
+
+        # Strict Anti-Fabrication: Do not automatically insert starter demo/mock records
+        # Schema initialization leaves tables pristine and ready for authentic imports or user entry.
 
 
 def _seed_sample_data(conn: sqlite3.Connection) -> None:
     """Insert initial starter seed records for store setup demonstration."""
+    now_dt = datetime.now()
     now_iso = datetime.now(timezone.utc).isoformat()
-    
+
+    # Dynamic temporal anchors relative to current date
+    cur_ym = now_dt.strftime("%Y-%m")
+    m1_dt = (now_dt.replace(day=1) - timedelta(days=1))
+    m1_ym = m1_dt.strftime("%Y-%m")
+    m2_dt = (m1_dt.replace(day=1) - timedelta(days=1))
+    m2_ym = m2_dt.strftime("%Y-%m")
+    m3_dt = (m2_dt.replace(day=1) - timedelta(days=1))
+    m3_ym = m3_dt.strftime("%Y-%m")
+
     # 1. Sample Staff (Only the 4 Store Roles)
     employees = [
-        ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", "2026-06-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
-        ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", "2026-06-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
-        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", "2026-07-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
-        ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", "2026-06-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
-        ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", "2026-05-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
-        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", "2026-06-20", "2026-08-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
+        ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", f"{m3_ym}-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
+        ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", f"{m3_ym}-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
+        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", f"{m2_ym}-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
+        ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", f"{m3_ym}-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
+        ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", f"{m3_ym}-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
+        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", f"{m3_ym}-20", f"{m1_ym}-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -355,13 +573,13 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         employees
     )
 
-        # 2. Sample Salaries (with performance rating)
+    # 2. Sample Salaries (with performance rating)
     salaries = [
-        (str(uuid.uuid4()), "emp_01", "2026-07", 32000.0, 2500.0, 0.0, 34500.0, 4.9, "2026-08-02", "PAID", "BANK_TRANSFER", "July performance reward included", now_iso),
-        (str(uuid.uuid4()), "emp_01", "2026-08", 32000.0, 3000.0, 0.0, 35000.0, 4.9, "2026-08-28", "PAID", "BANK_TRANSFER", "August on-time shift incentive", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-07", 18500.0, 1200.0, 0.0, 19700.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July picker speed bonus", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-08", 18500.0, 1500.0, 0.0, 20000.0, 4.8, "2026-08-28", "PAID", "BANK_TRANSFER", "August UPT bonus", now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-07", 16500.0, 1000.0, 0.0, 17500.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July security attendance bonus", now_iso),
+        (str(uuid.uuid4()), "emp_01", m2_ym, 32000.0, 2500.0, 0.0, 34500.0, 4.9, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Performance reward included", now_iso),
+        (str(uuid.uuid4()), "emp_01", m1_ym, 32000.0, 3000.0, 0.0, 35000.0, 4.9, f"{m1_ym}-28", "PAID", "BANK_TRANSFER", "On-time shift incentive", now_iso),
+        (str(uuid.uuid4()), "emp_02", m2_ym, 18500.0, 1200.0, 0.0, 19700.0, 4.7, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Picker speed bonus", now_iso),
+        (str(uuid.uuid4()), "emp_02", m1_ym, 18500.0, 1500.0, 0.0, 20000.0, 4.8, f"{m1_ym}-28", "PAID", "BANK_TRANSFER", "UPT bonus", now_iso),
+        (str(uuid.uuid4()), "emp_04", m2_ym, 16500.0, 1000.0, 0.0, 17500.0, 4.7, f"{m1_ym}-02", "PAID", "BANK_TRANSFER", "Security attendance bonus", now_iso),
     ]
     conn.executemany(
         """
@@ -375,16 +593,16 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 3. Sample Monthly Ratings (MoM Performance History)
     monthly_ratings = [
-        (str(uuid.uuid4()), "emp_01", "2026-07", 4.9, "Excellent night shift management and zero dispatch delays", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_01", "2026-08", 4.9, "Maintained 99.8% inventory accuracy during peak surge", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-07", 4.7, "Top picking speed: 46 items/hr", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-08", 4.8, "Achieved store record 52 items/hr UPT speed", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_03", "2026-07", 4.5, "Good picking consistency in morning shifts", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_03", "2026-08", 4.5, "Reliable shift attendance", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-07", 4.7, "Strict night surveillance and visitor logging", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-08", 4.8, "Prevented inventory shrinkage during off-hours", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_05", "2026-07", 5.0, "Flawless aisle hygiene and trash removal", now_iso, now_iso),
-        (str(uuid.uuid4()), "emp_05", "2026-08", 5.0, "Zero pest inspection violations", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_01", m2_ym, 4.9, "Excellent night shift management and zero dispatch delays", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_01", m1_ym, 4.9, "Maintained 99.8% inventory accuracy during peak surge", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", m2_ym, 4.7, "Top picking speed: 46 items/hr", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", m1_ym, 4.8, "Achieved store record 52 items/hr UPT speed", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", m2_ym, 4.5, "Good picking consistency in morning shifts", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", m1_ym, 4.5, "Reliable shift attendance", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", m2_ym, 4.7, "Strict night surveillance and visitor logging", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", m1_ym, 4.8, "Prevented inventory shrinkage during off-hours", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", m2_ym, 5.0, "Flawless aisle hygiene and trash removal", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", m1_ym, 5.0, "Zero pest inspection violations", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -397,11 +615,11 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 4. Sample Store Expenses
     expenses = [
-        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
-        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
-        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", PARTNER_1_NAME, None, "racks_bill.pdf", 0, "Aisle A-D high density racking system (Pending Reimbursement)", now_iso),
-        (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, "2026-08-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
-        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, "2026-08-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
+        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, f"{m3_ym}-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
+        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, f"{m3_ym}-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
+        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, f"{m2_ym}-18", PARTNER_1_NAME, None, "racks_bill.pdf", 0, "Aisle A-D high density racking system (Pending Reimbursement)", now_iso),
+        (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, f"{m1_ym}-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
+        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, f"{m1_ym}-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
     ]
     conn.executemany(
         """
@@ -415,9 +633,9 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 5. Sample Store Income (50-50 Partner Split)
     store_income = [
-        (str(uuid.uuid4()), "Zepto Dark Store Monthly Order Commission (July 2026)", "COMMISSION", 420000.0, 4200.0, 415800.0, "2026-08-05", "2026-07", 50.0, 50.0, 207900.0, 207900.0, None, "BANK_TRANSFER", "ZEPTO-COM-202607-9821", "Base dark store order commission payout directly from Zepto Escrow", now_iso, now_iso),
-        (str(uuid.uuid4()), "Zepto Peak Delivery & SLA Incentive Payout", "GROWTH_INCENTIVE", 180000.0, 1800.0, 178200.0, "2026-08-15", "2026-08", 50.0, 50.0, 89100.0, 89100.0, None, "BANK_TRANSFER", "ZEPTO-INC-202608-4412", "SLA < 10 mins dispatch reward for August week 1-2", now_iso, now_iso),
-        (str(uuid.uuid4()), "Brand Slotting & Warehouse End-Cap Promotion Fee", "ORDER_SLOTTING", 95000.0, 950.0, 94050.0, "2026-08-22", "2026-08", 50.0, 50.0, 47025.0, 47025.0, None, "BANK_TRANSFER", "ZEPTO-SLOT-202608-7711", "Beverage & FMCG priority shelf placement revenue", now_iso, now_iso),
+        (str(uuid.uuid4()), f"Zepto Dark Store Monthly Order Commission ({m2_ym})", "COMMISSION", 420000.0, 4200.0, 415800.0, f"{m1_ym}-05", m2_ym, 50.0, 50.0, 207900.0, 207900.0, None, "BANK_TRANSFER", f"ZEPTO-COM-{m2_ym.replace('-', '')}-9821", "Base dark store order commission payout directly from Zepto Escrow", now_iso, now_iso),
+        (str(uuid.uuid4()), "Zepto Peak Delivery & SLA Incentive Payout", "GROWTH_INCENTIVE", 180000.0, 1800.0, 178200.0, f"{m1_ym}-15", m1_ym, 50.0, 50.0, 89100.0, 89100.0, None, "BANK_TRANSFER", f"ZEPTO-INC-{m1_ym.replace('-', '')}-4412", "SLA < 10 mins dispatch reward", now_iso, now_iso),
+        (str(uuid.uuid4()), "Brand Slotting & Warehouse End-Cap Promotion Fee", "ORDER_SLOTTING", 95000.0, 950.0, 94050.0, f"{m1_ym}-22", m1_ym, 50.0, 50.0, 47025.0, 47025.0, None, "BANK_TRANSFER", f"ZEPTO-SLOT-{m1_ym.replace('-', '')}-7711", "Beverage & FMCG priority shelf placement revenue", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -433,8 +651,8 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 6. Sample Hiring Candidates (4 Strict Roles)
     candidates = [
-        (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", "2026-08-30", now_iso, now_iso),
-        (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", "2026-08-29", now_iso, now_iso),
+        (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", (now_dt - timedelta(days=1)).strftime("%Y-%m-%d"), now_iso, now_iso),
+        (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", (now_dt - timedelta(days=2)).strftime("%Y-%m-%d"), now_iso, now_iso),
         (str(uuid.uuid4()), "Balwan Singh", "+91 99223 34455", "balwan.s@gmail.com", "SECURITY_GUARD", 16500.0, 4.5, "APPLIED", None, None, "Ex-serviceman with physical verification badge", None, now_iso, now_iso),
         (str(uuid.uuid4()), "Sunita Soni", "+91 99334 45566", "sunita.s@gmail.com", "HOUSEKEEPING", 14000.0, 4.4, "APPLIED", None, None, "Experienced dark store sanitization worker", None, now_iso, now_iso),
     ]
@@ -450,10 +668,10 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 7. Sample Security Capital Tranches (50-50 Partner Equity Split)
     capital_tranches = [
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, "2026-05-15", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202605159812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, "2026-05-16", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202605161142", None, "50% equity matching tranche", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, "2026-06-10", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202606105521", None, "Second installment towards ₹75L commitment", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, "2026-06-12", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202606127891", None, "Matching second installment", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, f"{m3_ym}-15", PARTNER_1_NAME, "NEFT_RTGS", f"HDFC{m3_ym.replace('-', '')}9812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, f"{m3_ym}-16", PARTNER_2_NAME, "NEFT_RTGS", f"ICIC{m3_ym.replace('-', '')}1142", None, "50% equity matching tranche", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, f"{m2_ym}-10", PARTNER_1_NAME, "NEFT_RTGS", f"HDFC{m2_ym.replace('-', '')}5521", None, "Second installment towards ₹75L commitment", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, f"{m2_ym}-12", PARTNER_2_NAME, "NEFT_RTGS", f"ICIC{m2_ym.replace('-', '')}7891", None, "Matching second installment", now_iso),
     ]
     conn.executemany(
         """
@@ -604,7 +822,7 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         conn.row_factory = sqlite3.Row
 
         # Employee Headcount
-        emp_rows = conn.execute("SELECT role, status, COUNT(*) as cnt FROM zepto_employees GROUP BY role, status").fetchall()
+        emp_rows = conn.execute("SELECT role, status, COUNT(*) as cnt FROM zepto_employees WHERE (is_hidden = 0 OR is_hidden IS NULL) GROUP BY role, status").fetchall()
         active_count = 0
         resigned_count = 0
         probation_count = 0
@@ -662,11 +880,11 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         projected_payroll_target = round(projected_payroll_target, 2)
 
         # Average Rating
-        avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
+        avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE' AND (is_hidden = 0 OR is_hidden IS NULL)").fetchone()
         avg_rating = round(float(avg_rating_row["avg_r"] or 5.0), 1)
 
         # Monthly Payroll
-        payroll_row = conn.execute("SELECT SUM(base_salary_monthly + current_month_bonus) as total_pay FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
+        payroll_row = conn.execute("SELECT SUM(base_salary_monthly + current_month_bonus) as total_pay FROM zepto_employees WHERE status = 'ACTIVE' AND (is_hidden = 0 OR is_hidden IS NULL)").fetchone()
         current_monthly_payroll = float(payroll_row["total_pay"] or 0.0)
 
         # Total Store Expenses & Reimbursements
@@ -884,28 +1102,38 @@ def get_employees(
     role: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    include_hidden: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve employees with optional role, status, and name/phone search."""
+    """Retrieve employees with optional role, status, and name/phone search, enriched with last present shift date."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
-        query = "SELECT * FROM zepto_employees WHERE 1=1"
+        query = """
+            SELECT e.*, MAX(a.shift_date) as last_present_date
+            FROM zepto_employees e
+            LEFT JOIN zepto_attendance_records a
+                ON (e.id = a.employee_id OR e.name = a.employee_name)
+                AND a.status = 'PRESENT'
+            WHERE 1=1
+        """
         params: list[Any] = []
 
+        if not include_hidden:
+            query += " AND (e.is_hidden = 0 OR e.is_hidden IS NULL)"
         if role and role.upper() != "ALL":
-            query += " AND role = ?"
+            query += " AND e.role = ?"
             params.append(role.upper())
         if status and status.upper() != "ALL":
-            query += " AND status = ?"
+            query += " AND e.status = ?"
             params.append(status.upper())
         if search:
-            query += " AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)"
+            query += " AND (e.name LIKE ? OR e.phone LIKE ? OR e.email LIKE ? OR e.id LIKE ?)"
             term = f"%{search.strip()}%"
-            params.extend([term, term, term])
+            params.extend([term, term, term, term])
 
-        query += " ORDER BY status ASC, role ASC, name ASC"
+        query += " GROUP BY e.id ORDER BY e.is_hidden ASC, e.status ASC, e.role ASC, e.name ASC"
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
@@ -970,7 +1198,7 @@ def update_employee(emp_id: str, data: dict[str, Any], settings: Settings | None
     for key in (
         "name", "role", "phone", "email", "joining_date", "resignation_date",
         "resignation_reason", "status", "rating", "base_salary_monthly",
-        "current_month_bonus", "aadhar_doc_url", "resume_doc_url", "photo_url", "notes"
+        "current_month_bonus", "is_hidden", "aadhar_doc_url", "resume_doc_url", "photo_url", "notes"
     ):
         if key in data:
             fields.append(f"{key} = ?")
@@ -1161,12 +1389,188 @@ def record_employee_salary(emp_id: str, salary_data: dict[str, Any], settings: S
 
 
 def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
-    """Delete an employee and their associated salary history."""
+    """Delete an employee and their associated salary history, ratings, and utilization."""
     settings = settings or Settings()
     with _connect(settings) as conn:
         conn.execute("DELETE FROM zepto_salaries WHERE employee_id = ?", (emp_id,))
+        conn.execute("DELETE FROM zepto_monthly_ratings WHERE employee_id = ?", (emp_id,))
+        conn.execute("DELETE FROM zepto_manpower_utilization WHERE employee_id = ?", (emp_id,))
         conn.execute("DELETE FROM zepto_employees WHERE id = ?", (emp_id,))
     return True
+
+
+def toggle_employee_visibility(emp_id: str, is_hidden: bool | None = None, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Toggle or set the hidden status of an employee. Hiding aligns status to RESIGNED, restoring resets to ACTIVE."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        emp = conn.execute("SELECT id, is_hidden, status FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
+        if not emp:
+            return None
+        current_hidden = bool(emp["is_hidden"]) if emp["is_hidden"] is not None else False
+        new_hidden = int(is_hidden) if is_hidden is not None else int(not current_hidden)
+
+        # When hidden (is_hidden = 1), automatically align status to RESIGNED
+        # When unhidden/restored (is_hidden = 0), reset status back to ACTIVE if previously RESIGNED
+        if new_hidden == 1:
+            conn.execute(
+                "UPDATE zepto_employees SET is_hidden = 1, status = 'RESIGNED', updated_at = ? WHERE id = ?",
+                (now_iso, emp_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE zepto_employees SET is_hidden = 0, status = 'ACTIVE', updated_at = ? WHERE id = ?",
+                (now_iso, emp_id),
+            )
+    return get_employee_by_id(emp_id, settings)
+
+
+def sync_roster_from_attendance(settings: Settings | None = None) -> dict[str, Any]:
+    """Populate/sync zepto_employees master roster from unique attendance records."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    synced_count = 0
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        # Find all distinct employees in attendance records
+        att_emps = conn.execute(
+            """
+            SELECT employee_id, employee_name, designation, MIN(shift_date) as first_seen
+            FROM zepto_attendance_records
+            WHERE employee_id IS NOT NULL AND employee_id != ''
+            GROUP BY employee_id
+            """
+        ).fetchall()
+
+        for ae in att_emps:
+            emp_id = ae["employee_id"]
+            name = (ae["employee_name"] or emp_id).strip()
+            desig = (ae["designation"] or "").strip()
+            joining = ae["first_seen"] or datetime.now().strftime("%Y-%m-%d")
+
+            # Map designation to standardized store role
+            desig_lower = desig.lower()
+            if "incharge" in desig_lower or "lead" in desig_lower or "shift" in desig_lower:
+                role = "SHIFT_INCHARGE"
+                base_sal = 25000.0
+            elif "security" in desig_lower or "guard" in desig_lower:
+                role = "SECURITY_GUARD"
+                base_sal = 16000.0
+            elif "housekeeping" in desig_lower or "clean" in desig_lower:
+                role = "HOUSEKEEPING"
+                base_sal = 14000.0
+            else:
+                role = "PICKER"
+                base_sal = 18000.0
+
+            # Insert or update
+            existing = conn.execute("SELECT id FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
+            if not existing:
+                conn.execute(
+                    """
+                    INSERT INTO zepto_employees (
+                        id, name, role, phone, email, joining_date,
+                        status, rating, base_salary_monthly, current_month_bonus,
+                        is_hidden, notes, created_at, updated_at
+                    ) VALUES (?, ?, ?, '', '', ?, 'ACTIVE', 5.0, ?, 0.0, 0, ?, ?, ?)
+                    """,
+                    (emp_id, name, role, joining, base_sal, f"Auto-synced from Dark Store Attendance ({desig})", now_iso, now_iso),
+                )
+                synced_count += 1
+            else:
+                # Keep active and update name/role if unconfigured
+                conn.execute(
+                    """
+                    UPDATE zepto_employees SET
+                        name = CASE WHEN name LIKE 'emp_%' OR name = '' THEN ? ELSE name END,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (name, now_iso, emp_id),
+                )
+
+    return {"status": "success", "synced_new_employees": synced_count, "total_attendance_staff": len(att_emps)}
+
+
+def purge_mock_framed_employees(settings: Settings | None = None) -> dict[str, Any]:
+    """Purge synthetic/mock starter employees (emp_01 to emp_06), demo candidates, mock expenses, sample income, and demo capital tranches."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    purged_emp_count = 0
+    purged_expenses_count = 0
+    purged_candidates_count = 0
+    purged_income_count = 0
+    purged_capital_count = 0
+
+    with _connect(settings) as conn:
+        # 1. Purge framed starter employees
+        mock_ids = ["emp_01", "emp_02", "emp_03", "emp_04", "emp_05", "emp_06"]
+        placeholders = ",".join("?" for _ in mock_ids)
+        res_emp = conn.execute(f"DELETE FROM zepto_employees WHERE id IN ({placeholders}) OR id LIKE 'emp_0%'", mock_ids)
+        purged_emp_count = res_emp.rowcount
+        conn.execute(f"DELETE FROM zepto_salaries WHERE employee_id IN ({placeholders}) OR employee_id LIKE 'emp_0%'", mock_ids)
+        conn.execute(f"DELETE FROM zepto_monthly_ratings WHERE employee_id IN ({placeholders}) OR employee_id LIKE 'emp_0%'", mock_ids)
+
+        # 2. Purge framed starter expenses
+        mock_exp_titles = [
+            "Initial Picker Onboarding & Zepto Training Batch",
+            "Staff Uniforms, Thermal Bags & Reflective Vests",
+            "Heavy-Duty Warehouse Racks & Bins Installation",
+            "Staff Refreshment & Breakroom Tea/Snacks (Monthly)",
+            "Store Deep Cleaning & Pest Control Service",
+        ]
+        res_exp = conn.execute(
+            f"DELETE FROM zepto_expenses WHERE title IN ({','.join('?' for _ in mock_exp_titles)})",
+            mock_exp_titles,
+        )
+        purged_expenses_count = res_exp.rowcount
+
+        # 3. Purge framed demo candidates
+        mock_cand_names = ["Rohit Mehra", "Manish Tiwari", "Balwan Singh", "Sunita Soni"]
+        res_cand = conn.execute(
+            f"DELETE FROM zepto_candidates WHERE name IN ({','.join('?' for _ in mock_cand_names)})",
+            mock_cand_names,
+        )
+        purged_candidates_count = res_cand.rowcount
+
+        # 4. Purge framed demo store income
+        mock_income_titles = [
+            "Zepto Dark Store Monthly Order Commission (July 2026)",
+            "Zepto Peak Delivery & SLA Incentive Payout",
+            "Brand Slotting & Warehouse End-Cap Promotion Fee",
+        ]
+        res_inc = conn.execute(
+            f"DELETE FROM zepto_store_income WHERE title LIKE 'Zepto Dark Store Monthly Order Commission%' OR title IN ({','.join('?' for _ in mock_income_titles)})",
+            mock_income_titles,
+        )
+        purged_income_count = res_inc.rowcount
+
+        # 5. Purge framed demo capital tranches
+        mock_cap_titles = [
+            "Initial Franchise Security Tranche 1",
+            "Initial Franchise Security Tranche 1 Match",
+            "Dark Store Capex & Inventory Deposit Tranche 2",
+            "Dark Store Capex & Inventory Deposit Tranche 2 Match",
+        ]
+        res_cap = conn.execute(
+            f"DELETE FROM zepto_security_capital WHERE tranche_title IN ({','.join('?' for _ in mock_cap_titles)})",
+            mock_cap_titles,
+        )
+        purged_capital_count = res_cap.rowcount
+
+    return {
+        "status": "success",
+        "purged_count": purged_emp_count,
+        "purged_employees": purged_emp_count,
+        "purged_expenses": purged_expenses_count,
+        "purged_candidates": purged_candidates_count,
+        "purged_income": purged_income_count,
+        "purged_capital": purged_capital_count,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1919,3 +2323,2266 @@ def delete_store_income(income_id: str, settings: Settings | None = None) -> boo
     with _connect(settings) as conn:
         conn.execute("DELETE FROM zepto_store_income WHERE id = ?", (income_id,))
     return True
+
+
+# ---------------------------------------------------------------------------
+# Gmail OAuth 2.0 Auth State & Token Management DAL
+# ---------------------------------------------------------------------------
+
+def save_gmail_auth(
+    email: str,
+    access_token: str,
+    refresh_token: str | None = None,
+    token_expiry: str | None = None,
+    scopes: str = "https://www.googleapis.com/auth/gmail.readonly",
+    token_type: str = "Bearer",
+    auth_id: str = "primary",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Persist or update Gmail OAuth credentials in SQLite."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute("SELECT * FROM zepto_gmail_auth WHERE id = ?", (auth_id,)).fetchone()
+
+        # If no new refresh_token provided, preserve previous one
+        final_refresh_token = refresh_token
+        if not final_refresh_token and existing and existing["refresh_token"]:
+            final_refresh_token = existing["refresh_token"]
+
+        conn.execute(
+            """
+            INSERT INTO zepto_gmail_auth (
+                id, email, access_token, refresh_token, token_expiry,
+                token_type, scopes, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'CONNECTED', ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                email = excluded.email,
+                access_token = excluded.access_token,
+                refresh_token = COALESCE(excluded.refresh_token, zepto_gmail_auth.refresh_token),
+                token_expiry = excluded.token_expiry,
+                token_type = excluded.token_type,
+                scopes = excluded.scopes,
+                status = 'CONNECTED',
+                updated_at = excluded.updated_at
+            """,
+            (
+                auth_id, email.strip(), access_token.strip(), final_refresh_token,
+                token_expiry, token_type, scopes, now_iso, now_iso
+            )
+        )
+    return get_gmail_auth(auth_id, settings) or {
+        "id": auth_id,
+        "email": email,
+        "access_token": access_token,
+        "refresh_token": final_refresh_token,
+        "token_expiry": token_expiry,
+        "status": "CONNECTED",
+    }
+
+
+def get_gmail_auth(auth_id: str = "primary", settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve current Gmail OAuth connection credentials."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_gmail_auth WHERE id = ?", (auth_id,)).fetchone()
+        if not row:
+            return None
+        return dict(row)
+
+
+def delete_gmail_auth(auth_id: str = "primary", settings: Settings | None = None) -> bool:
+    """Delete Gmail OAuth credentials upon user disconnect."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.execute("DELETE FROM zepto_gmail_auth WHERE id = ?", (auth_id,))
+    return True
+
+
+def get_valid_gmail_token(auth_id: str = "primary", settings: Settings | None = None) -> str | None:
+    """Return a valid access token, auto-refreshing via refresh_token if expired or close to expiry."""
+    import httpx
+
+    auth_data = get_gmail_auth(auth_id, settings)
+    if not auth_data or not auth_data.get("access_token"):
+        return None
+
+    # Check expiration
+    token_expiry = auth_data.get("token_expiry")
+    needs_refresh = False
+
+    if token_expiry:
+        try:
+            exp_dt = datetime.fromisoformat(token_expiry.replace("Z", "+00:00"))
+            # If token expires within next 300 seconds (5 min), refresh it
+            now_utc = datetime.now(timezone.utc)
+            if (exp_dt - now_utc).total_seconds() < 300:
+                needs_refresh = True
+        except Exception:
+            needs_refresh = True
+
+    if not needs_refresh:
+        return str(auth_data["access_token"])
+
+    # Attempt refresh
+    refresh_token = auth_data.get("refresh_token")
+    if not refresh_token:
+        return str(auth_data["access_token"])
+
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return str(auth_data["access_token"])
+
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(token_url, data=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                new_access_token = data.get("access_token")
+                expires_in = data.get("expires_in", 3600)
+                from datetime import timedelta
+                new_expiry = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+
+                save_gmail_auth(
+                    email=auth_data["email"],
+                    access_token=new_access_token,
+                    refresh_token=data.get("refresh_token") or refresh_token,
+                    token_expiry=new_expiry,
+                    scopes=auth_data.get("scopes", ""),
+                    auth_id=auth_id,
+                    settings=settings,
+                )
+                return str(new_access_token)
+            else:
+                logger.warning("[GMAIL-AUTH] Failed to refresh token: %s %s", resp.status_code, resp.text)
+    except Exception as exc:
+        logger.error("[GMAIL-AUTH] Exception while refreshing token: %s", exc)
+
+    return str(auth_data["access_token"])
+
+
+def save_gmail_messages(
+    messages: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> int:
+    """Save or update parsed Gmail message records in SQLite for persistent caching and queries."""
+    if not messages:
+        return 0
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    rows = []
+    for msg in messages:
+        msg_id = str(msg.get("id") or "").strip()
+        if not msg_id:
+            continue
+
+        iso_date = msg.get("iso_date") or ""
+        if not iso_date:
+            date_str = msg.get("date") or msg.get("date_str") or ""
+            if date_str:
+                if len(date_str) >= 10 and date_str[4] == "-" and date_str[7] == "-":
+                    iso_date = date_str[:10]
+                else:
+                    try:
+                        from email.utils import parsedate_to_datetime
+                        dt = parsedate_to_datetime(date_str)
+                        iso_date = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        try:
+                            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                            iso_date = dt.strftime("%Y-%m-%d")
+                        except Exception:
+                            iso_date = datetime.now().strftime("%Y-%m-%d")
+            else:
+                iso_date = datetime.now().strftime("%Y-%m-%d")
+
+        month_ym = msg.get("month_ym") or iso_date[:7]
+
+        extracted_metrics = msg.get("extracted_metrics")
+        if isinstance(extracted_metrics, (dict, list)):
+            extracted_metrics_json = json.dumps(extracted_metrics)
+        else:
+            extracted_metrics_json = str(extracted_metrics or "{}")
+
+        attachments = msg.get("attachments")
+        if isinstance(attachments, (dict, list)):
+            attachments_json = json.dumps(attachments)
+        else:
+            attachments_json = str(attachments or "[]")
+
+        has_attachments = 1 if (msg.get("has_attachments") or (isinstance(attachments, list) and len(attachments) > 0)) else 0
+        store_name = str(msg.get("store_name") or "").strip()
+        body_text = str(msg.get("body_text") or "").strip()
+        body_html = str(msg.get("body_html") or "").strip()
+        parsed_status = str(msg.get("parsed_status") or "PENDING").strip().upper()
+        parsed_records_count = int(msg.get("parsed_records_count") or 0)
+
+        rows.append((
+            msg_id,
+            msg.get("thread_id") or "",
+            msg.get("subject") or "(No Subject)",
+            msg.get("from") or msg.get("sender") or "",
+            msg.get("date") or msg.get("date_str") or "",
+            iso_date,
+            month_ym,
+            msg.get("snippet") or "",
+            msg.get("category") or "OPERATIONAL",
+            msg.get("category_label") or "",
+            msg.get("badge_color") or "",
+            msg.get("icon") or "",
+            extracted_metrics_json,
+            attachments_json,
+            has_attachments,
+            str(msg.get("internal_date") or ""),
+            store_name,
+            body_text,
+            body_html,
+            parsed_status,
+            parsed_records_count,
+            now_iso,
+            now_iso,
+            now_iso,
+        ))
+
+    if not rows:
+        return 0
+
+    with _connect(settings) as conn:
+        conn.executemany(
+            """
+            INSERT INTO zepto_gmail_messages (
+                id, thread_id, subject, sender, date_str,
+                iso_date, month_ym, snippet, category, category_label,
+                badge_color, icon, extracted_metrics, attachments,
+                has_attachments, internal_date, store_name, body_text,
+                body_html, parsed_status, parsed_records_count,
+                synced_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                thread_id = excluded.thread_id,
+                subject = excluded.subject,
+                sender = excluded.sender,
+                date_str = excluded.date_str,
+                iso_date = excluded.iso_date,
+                month_ym = excluded.month_ym,
+                snippet = excluded.snippet,
+                category = excluded.category,
+                category_label = excluded.category_label,
+                badge_color = excluded.badge_color,
+                icon = excluded.icon,
+                extracted_metrics = excluded.extracted_metrics,
+                attachments = excluded.attachments,
+                has_attachments = excluded.has_attachments,
+                internal_date = excluded.internal_date,
+                store_name = CASE WHEN excluded.store_name != '' THEN excluded.store_name ELSE zepto_gmail_messages.store_name END,
+                body_text = CASE WHEN excluded.body_text != '' THEN excluded.body_text ELSE zepto_gmail_messages.body_text END,
+                body_html = CASE WHEN excluded.body_html != '' THEN excluded.body_html ELSE zepto_gmail_messages.body_html END,
+                parsed_status = CASE WHEN excluded.parsed_status != 'PENDING' THEN excluded.parsed_status ELSE zepto_gmail_messages.parsed_status END,
+                parsed_records_count = CASE WHEN excluded.parsed_records_count > 0 THEN excluded.parsed_records_count ELSE zepto_gmail_messages.parsed_records_count END,
+                synced_at = excluded.synced_at,
+                updated_at = excluded.updated_at
+            """,
+            rows,
+        )
+    return len(rows)
+
+
+def update_email_parsed_status(
+    msg_id: str,
+    parsed_status: str,
+    parsed_records_count: int = 0,
+    settings: Settings | None = None,
+) -> bool:
+    """Update email parsing status and translated records count."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            UPDATE zepto_gmail_messages SET
+                parsed_status = ?,
+                parsed_records_count = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (parsed_status.upper(), parsed_records_count, now_iso, msg_id),
+        )
+    return True
+
+
+def get_saved_gmail_message_by_id(
+    msg_id: str,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve a single saved email by ID along with its translated linked records."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_gmail_messages WHERE id = ?", (msg_id,)).fetchone()
+        if not row:
+            return None
+
+        d = dict(row)
+        d["from"] = d.get("sender", "")
+        d["date"] = d.get("date_str", "")
+        try:
+            d["extracted_metrics"] = json.loads(d.get("extracted_metrics") or "{}")
+        except Exception:
+            d["extracted_metrics"] = {}
+        try:
+            d["attachments"] = json.loads(d.get("attachments") or "[]")
+        except Exception:
+            d["attachments"] = []
+
+        # Find linked loss records
+        loss_rows = conn.execute(
+            "SELECT * FROM zepto_loss_records WHERE source_email_id = ? OR notes LIKE ? ORDER BY record_date DESC",
+            (msg_id, f"%{msg_id}%"),
+        ).fetchall()
+        d["linked_loss_records"] = [dict(lr) for lr in loss_rows]
+
+        # Find linked store metrics
+        metric_rows = conn.execute(
+            "SELECT * FROM zepto_store_metrics WHERE source_email_id = ? ORDER BY metric_date DESC",
+            (msg_id,),
+        ).fetchall()
+        d["linked_store_metrics"] = [dict(mr) for mr in metric_rows]
+
+        # Find linked attendance imports
+        att_rows = conn.execute(
+            "SELECT * FROM zepto_attendance_imports WHERE source_email_id = ? ORDER BY imported_at DESC",
+            (msg_id,),
+        ).fetchall()
+        d["linked_attendance_imports"] = [dict(ar) for ar in att_rows]
+
+        return d
+
+
+def get_saved_gmail_message_ids(
+    settings: Settings | None = None,
+) -> set[str]:
+    """Retrieve all existing Gmail message IDs already saved in local SQLite database."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        rows = conn.execute("SELECT id FROM zepto_gmail_messages").fetchall()
+        return {r[0] for r in rows if r[0]}
+
+
+def get_saved_gmail_messages(
+    month: str | None = None,
+    category: str | None = None,
+    store_name: str | None = None,
+    search: str | None = None,
+    limit: int = 1000,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve saved Gmail messages from SQLite database filtered by month, category, store, or search keyword."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    query = "SELECT * FROM zepto_gmail_messages WHERE 1=1"
+    params: list[Any] = []
+
+    if month and month != "ALL":
+        query += " AND month_ym = ?"
+        params.append(month)
+
+    if category and category != "ALL":
+        query += " AND category = ?"
+        params.append(category)
+
+    if store_name and store_name != "ALL":
+        query += " AND (store_name = ? OR store_name = '')"
+        params.append(store_name)
+
+    if search:
+        s_pat = f"%{search.strip().lower()}%"
+        query += " AND (LOWER(subject) LIKE ? OR LOWER(sender) LIKE ? OR LOWER(snippet) LIKE ? OR LOWER(store_name) LIKE ?)"
+        params.extend([s_pat, s_pat, s_pat, s_pat])
+
+    query += " ORDER BY CASE WHEN internal_date != '' THEN CAST(internal_date AS INTEGER) ELSE 0 END DESC, iso_date DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(query, params).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["from"] = d.get("sender", "")
+            d["date"] = d.get("date_str", "")
+            try:
+                d["extracted_metrics"] = json.loads(d.get("extracted_metrics") or "{}")
+            except Exception:
+                d["extracted_metrics"] = {}
+            try:
+                d["attachments"] = json.loads(d.get("attachments") or "[]")
+            except Exception:
+                d["attachments"] = []
+            result.append(d)
+        return result
+
+
+# ---------------------------------------------------------------------------
+# Attendance Reports & Muster Ingestion DAL
+# ---------------------------------------------------------------------------
+
+def save_attendance_batch(
+    parsed_data: dict[str, Any],
+    source: str = "UPLOAD",
+    source_email_id: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """
+    Persist parsed attendance records and metadata into SQLite cache.
+    Uses MD5 composite ID for records to ensure idempotent upsert.
+    """
+    import hashlib
+
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    file_name = parsed_data.get("file_name") or "attendance_report.xlsx"
+    store_name = parsed_data.get("store_name") or "Zepto Dark Store"
+    start_date = parsed_data.get("start_date") or ""
+    end_date = parsed_data.get("end_date") or ""
+    records = parsed_data.get("records") or []
+    total_records = len(records)
+    total_employees = parsed_data.get("total_employees") or len({r.get("employee_id") for r in records if r.get("employee_id")})
+    final_email_id = source_email_id or parsed_data.get("source_email_id")
+
+    import_id = f"imp_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    with _connect(settings) as conn:
+        # 1. Insert Import Record
+        conn.execute(
+            """
+            INSERT INTO zepto_attendance_imports (
+                id, file_name, store_name, start_date, end_date,
+                total_records, total_employees, source, source_email_id, imported_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                import_id,
+                file_name,
+                store_name,
+                start_date,
+                end_date,
+                total_records,
+                total_employees,
+                source,
+                final_email_id,
+                now_iso,
+                now_iso,
+                now_iso,
+            ),
+        )
+
+        # 2. Insert granular records
+        insert_rows = []
+        for r in records:
+            emp_id = str(r.get("employee_id") or "").strip()
+            shift_date = str(r.get("shift_date") or "").strip()
+            # Deterministic composite key
+            raw_key = f"{store_name}|{emp_id}|{shift_date}".encode("utf-8")
+            rec_id = f"att_{hashlib.md5(raw_key).hexdigest()[:16]}"
+
+            insert_rows.append((
+                rec_id,
+                import_id,
+                store_name,
+                emp_id,
+                str(r.get("employee_name") or emp_id).strip(),
+                str(r.get("designation") or "").strip(),
+                shift_date,
+                str(r.get("shift_name") or "").strip(),
+                str(r.get("shift_time") or "").strip(),
+                str(r.get("punch_in") or "").strip(),
+                str(r.get("punch_out") or "").strip(),
+                int(r.get("work_duration_mins") or 0),
+                int(r.get("break_duration_mins") or 0),
+                str(r.get("raw_status") or "P").strip(),
+                str(r.get("status") or "PRESENT").strip(),
+                now_iso,
+                now_iso,
+            ))
+
+        if insert_rows:
+            conn.executemany(
+                """
+                INSERT INTO zepto_attendance_records (
+                    id, import_id, store_name, employee_id, employee_name, designation,
+                    shift_date, shift_name, shift_time, punch_in, punch_out,
+                    work_duration_mins, break_duration_mins, raw_status, status,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    import_id = excluded.import_id,
+                    employee_name = excluded.employee_name,
+                    designation = excluded.designation,
+                    shift_name = excluded.shift_name,
+                    shift_time = excluded.shift_time,
+                    punch_in = excluded.punch_in,
+                    punch_out = excluded.punch_out,
+                    work_duration_mins = excluded.work_duration_mins,
+                    break_duration_mins = excluded.break_duration_mins,
+                    raw_status = excluded.raw_status,
+                    status = excluded.status,
+                    updated_at = excluded.updated_at
+                """,
+                insert_rows,
+            )
+
+    return {
+        "status": "success",
+        "import_id": import_id,
+        "store_name": store_name,
+        "imported_records": total_records,
+        "total_employees": total_employees,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+def get_attendance_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    year_month: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Calculate aggregated attendance KPIs, role distribution, status breakdown, and active staff monthly metrics."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where_clauses = [
+        "1=1",
+        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+    ]
+    params: list[Any] = []
+
+    if store_name:
+        where_clauses.append("store_name = ?")
+        params.append(store_name)
+    if year_month and year_month.upper() != "ALL":
+        where_clauses.append("shift_date LIKE ?")
+        params.append(f"{year_month.strip()}%")
+    else:
+        if start_date:
+            where_clauses.append("shift_date >= ?")
+            params.append(start_date)
+        if end_date:
+            where_clauses.append("shift_date <= ?")
+            params.append(end_date)
+
+    where_sql = " AND ".join(where_clauses)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # Overall counts & headcount
+        stats_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) as total_shifts,
+                COUNT(DISTINCT employee_id) as headcount,
+                MIN(shift_date) as min_date,
+                MAX(shift_date) as max_date,
+                SUM(work_duration_mins) as total_work_mins,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday_count,
+                SUM(CASE WHEN status = 'LEAVE' THEN 1 ELSE 0 END) as leave_count
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            """,
+            params,
+        ).fetchone()
+
+        total_shifts = stats_row["total_shifts"] if stats_row else 0
+        headcount = stats_row["headcount"] if stats_row else 0
+        present = stats_row["present_count"] or 0 if stats_row else 0
+        absent = stats_row["absent_count"] or 0 if stats_row else 0
+        week_off = stats_row["week_off_count"] or 0 if stats_row else 0
+        half_day = stats_row["half_day_count"] or 0 if stats_row else 0
+        holiday = stats_row["holiday_count"] or 0 if stats_row else 0
+        leave = stats_row["leave_count"] or 0 if stats_row else 0
+        total_work_mins = stats_row["total_work_mins"] or 0 if stats_row else 0
+
+        denominator = present + absent + half_day
+        attendance_rate = (
+            round(((present + 0.5 * half_day) / denominator) * 100.0, 2)
+            if denominator > 0
+            else 0.0
+        )
+
+        # Role breakdown
+        role_rows = conn.execute(
+            f"""
+            SELECT
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as role,
+                COUNT(DISTINCT employee_id) as headcount,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(work_duration_mins) as total_work_mins
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY role
+            ORDER BY total_shifts DESC
+            """,
+            params,
+        ).fetchall()
+
+        role_breakdown = []
+        for r in role_rows:
+            r_denom = (r["present_count"] or 0) + (r["absent_count"] or 0)
+            r_rate = round(((r["present_count"] or 0) / r_denom) * 100.0, 1) if r_denom > 0 else 100.0
+            role_breakdown.append({
+                "role": r["role"],
+                "headcount": r["headcount"],
+                "total_shifts": r["total_shifts"],
+                "present_count": r["present_count"] or 0,
+                "absent_count": r["absent_count"] or 0,
+                "attendance_rate_pct": r_rate,
+                "total_hours_worked": round((r["total_work_mins"] or 0) / 60.0, 1),
+            })
+
+        # Daily trend
+        daily_rows = conn.execute(
+            f"""
+            SELECT
+                shift_date,
+                COUNT(DISTINCT employee_id) as scheduled,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY shift_date
+            ORDER BY shift_date ASC
+            """,
+            params,
+        ).fetchall()
+
+        daily_trend = [
+            {
+                "date": d["shift_date"],
+                "scheduled": d["scheduled"],
+                "present": d["present"],
+                "absent": d["absent"],
+                "week_off": d["week_off"],
+                "half_day": d["half_day"],
+                "holiday": d["holiday"],
+            }
+            for d in daily_rows
+        ]
+
+        # Absenteeism Watchlist (employees with absences >= 2 or high absence rate)
+        emp_absent_rows = conn.execute(
+            f"""
+            SELECT
+                employee_id,
+                employee_name,
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as designation,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(work_duration_mins) as work_mins
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY employee_id, employee_name, designation
+            HAVING absent_count >= 1
+            ORDER BY absent_count DESC, total_shifts DESC
+            """,
+            params,
+        ).fetchall()
+
+        absenteeism_watchlist = []
+        for ea in emp_absent_rows:
+            e_denom = (ea["present_count"] or 0) + (ea["absent_count"] or 0) + (ea["half_day_count"] or 0)
+            e_rate = round((((ea["present_count"] or 0) + 0.5 * (ea["half_day_count"] or 0)) / e_denom) * 100.0, 1) if e_denom > 0 else 0.0
+            abs_count = ea["absent_count"] or 0
+            risk_tier = "CRITICAL" if abs_count >= 5 or e_rate < 50.0 else ("HIGH" if abs_count >= 3 else "MODERATE")
+            absenteeism_watchlist.append({
+                "employee_id": ea["employee_id"],
+                "employee_name": ea["employee_name"],
+                "designation": ea["designation"],
+                "total_shifts": ea["total_shifts"],
+                "present_count": ea["present_count"] or 0,
+                "absent_count": abs_count,
+                "half_day_count": ea["half_day_count"] or 0,
+                "week_off_count": ea["week_off_count"] or 0,
+                "attendance_rate_pct": e_rate,
+                "risk_tier": risk_tier,
+                "total_hours_worked": round((ea["work_mins"] or 0) / 60.0, 1),
+            })
+
+        # Operational Capacity Summary Buckets (Packers, Leadership, Inbound/Quality/NSO)
+        capacity_summary = {
+            "packers": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+            "leadership": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+            "inbound_quality_nso": {"scheduled": 0, "present": 0, "absent": 0, "rate": 0.0, "headcount": 0, "health": "HEALTHY"},
+        }
+
+        for r in role_breakdown:
+            role_lower = r["role"].lower()
+            if "packer" in role_lower or "picker" in role_lower:
+                bucket = capacity_summary["packers"]
+            elif "incharge" in role_lower or "lead" in role_lower or "technician" in role_lower:
+                bucket = capacity_summary["leadership"]
+            else:
+                bucket = capacity_summary["inbound_quality_nso"]
+
+            bucket["scheduled"] += r["total_shifts"]
+            bucket["present"] += r["present_count"]
+            bucket["absent"] += r["absent_count"]
+            bucket["headcount"] += r["headcount"]
+
+        for key, b in capacity_summary.items():
+            denom = b["present"] + b["absent"]
+            b["rate"] = round((b["present"] / denom) * 100.0, 1) if denom > 0 else 100.0
+            if b["rate"] < 70.0:
+                b["health"] = "ALERT"
+            elif b["rate"] < 88.0:
+                b["health"] = "WARNING"
+            else:
+                b["health"] = "OPTIMAL"
+
+        # Active Staff Roster Summary for the Selected Period
+        staff_summary_rows = conn.execute(
+            f"""
+            SELECT
+                employee_id,
+                employee_name,
+                COALESCE(NULLIF(designation, ''), 'Unassigned') as designation,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday_count,
+                SUM(work_duration_mins) as total_work_mins,
+                SUM(break_duration_mins) as total_break_mins,
+                MAX(shift_date) as last_shift_date
+            FROM zepto_attendance_records
+            WHERE {where_sql}
+            GROUP BY employee_id, employee_name, designation
+            ORDER BY present_count DESC, total_shifts DESC, employee_name ASC
+            """,
+            params,
+        ).fetchall()
+
+        staff_roster = []
+        for s in staff_summary_rows:
+            s_denom = (s["present_count"] or 0) + (s["absent_count"] or 0) + (s["half_day_count"] or 0)
+            s_rate = round((((s["present_count"] or 0) + 0.5 * (s["half_day_count"] or 0)) / s_denom) * 100.0, 1) if s_denom > 0 else 0.0
+            s_pres = s["present_count"] or 0
+            s_abs = s["absent_count"] or 0
+            s_mins = s["total_work_mins"] or 0
+            avg_daily_hrs = round((s_mins / 60.0) / s_pres, 1) if s_pres > 0 else 0.0
+
+            risk_tier = "LOW"
+            if s_abs >= 4 or (s_denom >= 5 and s_rate < 70.0):
+                risk_tier = "CRITICAL"
+            elif s_abs >= 2 or (s_denom >= 5 and s_rate < 85.0):
+                risk_tier = "HIGH"
+            elif s_abs >= 1:
+                risk_tier = "MODERATE"
+
+            staff_roster.append({
+                "employee_id": s["employee_id"],
+                "employee_name": s["employee_name"],
+                "designation": s["designation"],
+                "total_shifts": s["total_shifts"],
+                "present_count": s_pres,
+                "absent_count": s_abs,
+                "half_day_count": s["half_day_count"] or 0,
+                "week_off_count": s["week_off_count"] or 0,
+                "holiday_count": s["holiday_count"] or 0,
+                "attendance_rate_pct": s_rate,
+                "total_hours_worked": round(s_mins / 60.0, 1),
+                "avg_daily_hours": avg_daily_hrs,
+                "risk_tier": risk_tier,
+                "last_shift_date": s["last_shift_date"],
+            })
+
+        return {
+            "store_name": store_name or "All Stores",
+            "period": {
+                "start": stats_row["min_date"] or start_date or "",
+                "end": stats_row["max_date"] or end_date or "",
+            },
+            "headcount": headcount,
+            "total_shifts_scheduled": total_shifts,
+            "attendance_rate_pct": attendance_rate,
+            "total_hours_worked": round(total_work_mins / 60.0, 1),
+            "status_distribution": {
+                "PRESENT": present,
+                "ABSENT": absent,
+                "WEEK_OFF": week_off,
+                "HALF_DAY": half_day,
+                "HOLIDAY": holiday,
+                "LEAVE": leave,
+            },
+            "role_breakdown": role_breakdown,
+            "daily_trend": daily_trend,
+            "absenteeism_watchlist": absenteeism_watchlist,
+            "role_capacity_summary": capacity_summary,
+            "staff_roster": staff_roster,
+        }
+
+
+def get_attendance_records(
+    store_name: str | None = None,
+    employee_id: str | None = None,
+    designation: str | None = None,
+    status: str | None = None,
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    year_month: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve detailed attendance punch records with filtering and pagination."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where_clauses = [
+        "1=1",
+        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+    ]
+    params: list[Any] = []
+
+    if store_name:
+        where_clauses.append("store_name = ?")
+        params.append(store_name)
+    if employee_id:
+        where_clauses.append("(employee_id = ? OR employee_name LIKE ?)")
+        params.extend([employee_id, f"%{employee_id}%"])
+    if designation:
+        where_clauses.append("designation = ?")
+        params.append(designation)
+    if status:
+        where_clauses.append("status = ?")
+        params.append(status.upper())
+    if date:
+        where_clauses.append("shift_date = ?")
+        params.append(date)
+    if year_month and year_month.upper() != "ALL":
+        where_clauses.append("shift_date LIKE ?")
+        params.append(f"{year_month.strip()}%")
+    else:
+        if start_date:
+            where_clauses.append("shift_date >= ?")
+            params.append(start_date)
+        if end_date:
+            where_clauses.append("shift_date <= ?")
+            params.append(end_date)
+
+    where_sql = " AND ".join(where_clauses)
+    params.extend([limit, offset])
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_attendance_records
+            WHERE {where_sql}
+            ORDER BY shift_date DESC, employee_name ASC
+            LIMIT ? OFFSET ?
+            """,
+            params,
+        ).fetchall()
+
+        return [dict(r) for r in rows]
+
+
+def get_attendance_imports(limit: int = 20, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Fetch history of attendance report imports."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_imports
+            ORDER BY imported_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_attendance_import(import_id: str, settings: Settings | None = None) -> bool:
+    """Delete an attendance import batch and cascade delete its records."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.execute("DELETE FROM zepto_attendance_records WHERE import_id = ?", (import_id,))
+        conn.execute("DELETE FROM zepto_attendance_imports WHERE id = ?", (import_id,))
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Employee Attendance Detail (Slide Drawer DAL)
+# ---------------------------------------------------------------------------
+
+def get_employee_attendance_detail(
+    employee_id: str,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve 30-day comprehensive punch history, hours worked, and adherence scorecard for a single employee."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        records = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_records
+            WHERE employee_id = ? OR employee_name = ?
+            ORDER BY shift_date DESC
+            """,
+            (employee_id, employee_id),
+        ).fetchall()
+
+        if not records:
+            return None
+
+        records_list = [dict(r) for r in records]
+        first = records_list[0]
+
+        total_shifts = len(records_list)
+        present = sum(1 for r in records_list if r["status"] == "PRESENT")
+        absent = sum(1 for r in records_list if r["status"] == "ABSENT")
+        week_off = sum(1 for r in records_list if r["status"] == "WEEK_OFF")
+        half_day = sum(1 for r in records_list if r["status"] == "HALF_DAY")
+        holiday = sum(1 for r in records_list if r["status"] == "HOLIDAY")
+        total_work_mins = sum(r.get("work_duration_mins", 0) or 0 for r in records_list)
+        total_break_mins = sum(r.get("break_duration_mins", 0) or 0 for r in records_list)
+
+        denominator = present + absent + half_day
+        att_rate = round(((present + 0.5 * half_day) / denominator) * 100.0, 1) if denominator > 0 else 0.0
+
+        avg_shift_hours = round((total_work_mins / 60.0) / present, 1) if present > 0 else 0.0
+
+        risk_tier = "LOW"
+        if absent >= 4 or (denominator >= 5 and att_rate < 70.0):
+            risk_tier = "CRITICAL"
+        elif absent >= 2 or (denominator >= 5 and att_rate < 85.0):
+            risk_tier = "HIGH"
+        elif absent >= 1:
+            risk_tier = "MODERATE"
+
+        return {
+            "employee_id": first["employee_id"],
+            "employee_name": first["employee_name"],
+            "designation": first["designation"] or "Unassigned",
+            "store_name": first["store_name"],
+            "total_shifts": total_shifts,
+            "present_count": present,
+            "absent_count": absent,
+            "week_off_count": week_off,
+            "half_day_count": half_day,
+            "holiday_count": holiday,
+            "attendance_rate_pct": att_rate,
+            "total_hours_worked": round(total_work_mins / 60.0, 1),
+            "avg_shift_hours": avg_shift_hours,
+            "avg_break_mins": round(total_break_mins / present, 0) if present > 0 else 0,
+            "risk_tier": risk_tier,
+            "punch_history": records_list,
+        }
+
+
+def get_employee_profile_analytics(
+    emp_id: str,
+    year_month: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any] | None:
+    """Retrieve comprehensive employee profile analytics for the Staff & Payroll side drawer:
+    Employee bio, month-wise attendance scorecard, punch timeline, IPP productivity metrics,
+    MoM performance ratings, and salary payouts.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        emp_row = conn.execute(
+            "SELECT * FROM zepto_employees WHERE id = ? OR name = ?",
+            (emp_id, emp_id),
+        ).fetchone()
+
+        if not emp_row:
+            first_att = conn.execute(
+                "SELECT * FROM zepto_attendance_records WHERE employee_id = ? OR employee_name = ? LIMIT 1",
+                (emp_id, emp_id),
+            ).fetchone()
+            if not first_att:
+                return None
+            employee = {
+                "id": first_att["employee_id"],
+                "name": first_att["employee_name"],
+                "role": first_att["designation"] or "PICKER",
+                "phone": "",
+                "email": "",
+                "joining_date": first_att["shift_date"],
+                "resignation_date": None,
+                "resignation_reason": None,
+                "status": "ACTIVE",
+                "rating": 5.0,
+                "base_salary_monthly": 18000.0,
+                "current_month_bonus": 0.0,
+                "is_hidden": 0,
+                "aadhar_doc_url": None,
+                "resume_doc_url": None,
+                "photo_url": None,
+                "notes": "",
+            }
+        else:
+            employee = dict(emp_row)
+
+        emp_db_id = employee["id"]
+        emp_name = employee["name"]
+
+        # Available months from attendance records and salaries
+        months_rows = conn.execute(
+            """
+            SELECT DISTINCT SUBSTR(shift_date, 1, 7) as ym
+            FROM zepto_attendance_records
+            WHERE employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?
+            UNION
+            SELECT DISTINCT year_month as ym FROM zepto_salaries WHERE employee_id = ?
+            UNION
+            SELECT DISTINCT year_month as ym FROM zepto_monthly_ratings WHERE employee_id = ?
+            ORDER BY ym DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, emp_db_id, emp_db_id),
+        ).fetchall()
+
+        available_months = [r["ym"] for r in months_rows if r["ym"]]
+        if not available_months:
+            available_months = [datetime.now().strftime("%Y-%m")]
+
+        selected_month = year_month if (year_month and year_month in available_months) else available_months[0]
+
+        # Attendance punch history for selected month
+        att_records = conn.execute(
+            """
+            SELECT * FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND shift_date LIKE ?
+            ORDER BY shift_date DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, f"{selected_month}%"),
+        ).fetchall()
+
+        records_list = [dict(r) for r in att_records]
+        total_shifts = len(records_list)
+        present = sum(1 for r in records_list if r["status"] == "PRESENT")
+        absent = sum(1 for r in records_list if r["status"] == "ABSENT")
+        week_off = sum(1 for r in records_list if r["status"] == "WEEK_OFF")
+        half_day = sum(1 for r in records_list if r["status"] == "HALF_DAY")
+        holiday = sum(1 for r in records_list if r["status"] == "HOLIDAY")
+        total_work_mins = sum(r.get("work_duration_mins", 0) or 0 for r in records_list)
+        total_break_mins = sum(r.get("break_duration_mins", 0) or 0 for r in records_list)
+
+        denominator = present + absent + half_day
+        att_rate = round(((present + 0.5 * half_day) / denominator) * 100.0, 1) if denominator > 0 else 0.0
+        avg_shift_hours = round((total_work_mins / 60.0) / present, 1) if present > 0 else 0.0
+        avg_break_mins = round(total_break_mins / present, 0) if present > 0 else 0
+
+        risk_tier = "LOW"
+        if absent >= 4 or (denominator >= 5 and att_rate < 70.0):
+            risk_tier = "CRITICAL"
+        elif absent >= 2 or (denominator >= 5 and att_rate < 85.0):
+            risk_tier = "HIGH"
+        elif absent >= 1:
+            risk_tier = "MODERATE"
+
+        # Month-on-Month attendance trends (for sparkline / bar charts)
+        mom_att_rows = conn.execute(
+            """
+            SELECT
+                SUBSTR(shift_date, 1, 7) as ym,
+                COUNT(*) as total_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day_count,
+                SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off_count,
+                SUM(work_duration_mins) as work_mins
+            FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+            GROUP BY ym
+            ORDER BY ym ASC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id),
+        ).fetchall()
+
+        mom_attendance = []
+        for ma in mom_att_rows:
+            ma_pres = ma["present_count"] or 0
+            ma_abs = ma["absent_count"] or 0
+            ma_half = ma["half_day_count"] or 0
+            ma_denom = ma_pres + ma_abs + ma_half
+            ma_rate = round(((ma_pres + 0.5 * ma_half) / ma_denom) * 100.0, 1) if ma_denom > 0 else 0.0
+            mom_attendance.append({
+                "month": ma["ym"],
+                "total_shifts": ma["total_shifts"],
+                "present_count": ma_pres,
+                "absent_count": ma_abs,
+                "attendance_rate_pct": ma_rate,
+                "hours_worked": round((ma["work_mins"] or 0) / 60.0, 1),
+            })
+
+        # IPP / Manpower Utilization metrics for selected month
+        ipp_rows = conn.execute(
+            """
+            SELECT * FROM zepto_manpower_utilization
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND util_date LIKE ?
+            ORDER BY util_date DESC
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id, f"{selected_month}%"),
+        ).fetchall()
+
+        ipp_list = [dict(r) for r in ipp_rows]
+        total_items = sum(r.get("items_picked", 0) or 0 for r in ipp_list)
+        total_active_hrs = sum(r.get("active_pick_hours", 0.0) or 0.0 for r in ipp_list)
+        total_idle_hrs = sum(r.get("idle_hours", 0.0) or 0.0 for r in ipp_list)
+        avg_ipp = round(total_items / total_active_hrs, 1) if total_active_hrs > 0 else 0.0
+
+        # Latest physical presence across all shifts
+        last_pres_row = conn.execute(
+            """
+            SELECT MAX(shift_date) as last_present_date
+            FROM zepto_attendance_records
+            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
+              AND status = 'PRESENT'
+            """,
+            (emp_db_id, emp_name, emp_id, emp_id),
+        ).fetchone()
+        employee["last_present_date"] = last_pres_row["last_present_date"] if last_pres_row else None
+
+        # Salary history & ratings
+        salaries = get_employee_salaries(emp_db_id, settings)
+        ratings = get_employee_monthly_ratings(emp_db_id, settings)
+
+        return {
+            "employee": employee,
+            "selected_month": selected_month,
+            "available_months": available_months,
+            "attendance": {
+                "total_shifts": total_shifts,
+                "present_count": present,
+                "absent_count": absent,
+                "half_day_count": half_day,
+                "week_off_count": week_off,
+                "holiday_count": holiday,
+                "attendance_rate_pct": att_rate,
+                "total_hours_worked": round(total_work_mins / 60.0, 1),
+                "avg_shift_hours": avg_shift_hours,
+                "avg_break_mins": avg_break_mins,
+                "risk_tier": risk_tier,
+                "punch_history": records_list,
+                "mom_trend": mom_attendance,
+            },
+            "productivity": {
+                "avg_ipp": avg_ipp,
+                "total_items_picked": total_items,
+                "total_active_hours": round(total_active_hrs, 1),
+                "total_idle_hours": round(total_idle_hrs, 1),
+                "daily_ipp_logs": ipp_list,
+            },
+            "salaries": salaries,
+            "ratings": ratings,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Offer Letter Generation & Persistence DAL
+# ---------------------------------------------------------------------------
+
+def save_offer_letter(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Create or update an offer letter record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    letter_id = data.get("id") or f"ol_{uuid.uuid4().hex[:12]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute("SELECT created_at FROM zepto_offer_letters WHERE id = ?", (letter_id,)).fetchone()
+        created_at = existing["created_at"] if existing else now_iso
+
+        conn.execute(
+            """
+            INSERT INTO zepto_offer_letters (
+                id, cand_id, candidate_name, title, role, department, work_location,
+                date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                signatory_name, signatory_title, data_json, html_snapshot,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                cand_id = excluded.cand_id,
+                candidate_name = excluded.candidate_name,
+                title = excluded.title,
+                role = excluded.role,
+                department = excluded.department,
+                work_location = excluded.work_location,
+                date_of_joining = excluded.date_of_joining,
+                employment_type = excluded.employment_type,
+                doc_ref = excluded.doc_ref,
+                basic_pay = excluded.basic_pay,
+                total_potential = excluded.total_potential,
+                signatory_name = excluded.signatory_name,
+                signatory_title = excluded.signatory_title,
+                data_json = excluded.data_json,
+                html_snapshot = excluded.html_snapshot,
+                updated_at = excluded.updated_at
+            """,
+            (
+                letter_id,
+                data.get("cand_id"),
+                data.get("candidate_name", "").strip(),
+                data.get("title", "Mr.").strip(),
+                data.get("role", "Pickpackers").strip(),
+                data.get("department", "Operations").strip(),
+                data.get("work_location", "Sector F Sainik Colony Jammu").strip(),
+                str(data.get("date_of_joining", "")).strip(),
+                data.get("employment_type", "Full - Time").strip(),
+                data.get("doc_ref", "").strip(),
+                float(data.get("basic_pay", 12000.0) or 0.0),
+                float(data.get("total_potential", 17000.0) or 0.0),
+                data.get("signatory_name", "Jatin").strip(),
+                data.get("signatory_title", "Authorized Signatory").strip(),
+                data.get("data_json", "{}") if isinstance(data.get("data_json"), str) else json.dumps(data.get("data_json") or {}, ensure_ascii=False),
+                data.get("html_snapshot", ""),
+                created_at,
+                now_iso,
+            ),
+        )
+    res = get_offer_letter(letter_id, settings=settings)
+    return res if res else {"id": letter_id}
+
+
+def get_offer_letters(search: str | None = None, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """List all saved offer letters sorted by creation date descending."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        if search:
+            q = f"%{search.strip()}%"
+            rows = conn.execute(
+                """
+                SELECT id, cand_id, candidate_name, title, role, department, work_location,
+                       date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                       signatory_name, signatory_title, created_at, updated_at
+                FROM zepto_offer_letters
+                WHERE candidate_name LIKE ? OR doc_ref LIKE ? OR role LIKE ?
+                ORDER BY created_at DESC
+                """,
+                (q, q, q),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, cand_id, candidate_name, title, role, department, work_location,
+                       date_of_joining, employment_type, doc_ref, basic_pay, total_potential,
+                       signatory_name, signatory_title, created_at, updated_at
+                FROM zepto_offer_letters
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_offer_letter(letter_id: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve full detail and snapshot for a specific offer letter."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_offer_letters WHERE id = ?", (letter_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_offer_letter(letter_id: str, settings: Settings | None = None) -> bool:
+    """Delete a saved offer letter."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        cur = conn.execute("DELETE FROM zepto_offer_letters WHERE id = ?", (letter_id,))
+        return cur.rowcount > 0
+
+
+
+# ---------------------------------------------------------------------------
+# Store Metrics Scorecard DAL
+# ---------------------------------------------------------------------------
+
+def save_store_metrics(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist or replace a daily store metric record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("metric_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    rec_id = data.get("id") or f"met_{store}_{date_str}"
+    source_email_id = data.get("source_email_id")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_store_metrics (
+                id, store_name, metric_date, sales_gmv, order_count, aov,
+                inbound_hours, outbound_hours, packer_ipp, sla_adherence_pct,
+                raw_source, source_email_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                float(data.get("sales_gmv", 0.0)),
+                int(data.get("order_count", 0)),
+                float(data.get("aov", 0.0)),
+                float(data.get("inbound_hours", 0.0)),
+                float(data.get("outbound_hours", 0.0)),
+                float(data.get("packer_ipp", 0.0)),
+                float(data.get("sla_adherence_pct", 100.0)),
+                data.get("raw_source", "MANUAL"),
+                source_email_id,
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "store_name": store, "metric_date": date_str}
+
+
+def get_store_metrics_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    month: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve aggregated store metrics, daily trends, and SLA performance with monthly scoping."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+    if store_name and store_name != "ALL":
+        where.append("store_name = ?")
+        params.append(store_name)
+    if month and month != "ALL":
+        where.append("substr(metric_date, 1, 7) = ?")
+        params.append(month)
+    if start_date:
+        where.append("metric_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("metric_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_store_metrics
+            WHERE {where_sql}
+            ORDER BY metric_date DESC
+            """,
+            params,
+        ).fetchall()
+
+        items = [dict(r) for r in rows]
+        total_gmv = sum(i.get("sales_gmv", 0.0) for i in items)
+        total_orders = sum(i.get("order_count", 0) for i in items)
+        avg_aov = round(total_gmv / total_orders, 1) if total_orders > 0 else 0.0
+        avg_sla = round(sum(i.get("sla_adherence_pct", 100.0) for i in items) / len(items), 1) if items else 100.0
+        avg_ipp = round(sum(i.get("packer_ipp", 0.0) for i in items) / len(items), 1) if items else 0.0
+
+        return {
+            "total_gmv": round(total_gmv, 2),
+            "total_orders": total_orders,
+            "avg_aov": avg_aov,
+            "avg_sla_adherence_pct": avg_sla,
+            "avg_packer_ipp": avg_ipp,
+            "daily_metrics": items,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Loss, Expiry & Shrinkage DAL
+# ---------------------------------------------------------------------------
+
+def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist a dark store loss / shrinkage record."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    rec_id = data.get("id") or f"loss_{uuid.uuid4().hex[:12]}"
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("record_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    source_email_id = data.get("source_email_id")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_loss_records (
+                id, store_name, record_date, loss_type, category, amount,
+                sku_count, notes, source_email_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                data.get("loss_type", "DQ_LOSS").strip().upper(),
+                data.get("category", "GENERAL").strip().upper(),
+                float(data.get("amount", 0.0)),
+                int(data.get("sku_count", 0)),
+                data.get("notes", ""),
+                source_email_id,
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "amount": data.get("amount", 0.0)}
+
+
+def get_loss_summary(
+    month: str | None = None,
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    loss_type: str | None = None,
+    category: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve total store loss, category-wise DQ vs Shrinkage breakdown, email-vs-excel verification, and monthly index."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    # 1. Discover distinct available months
+    available_months: set[str] = set()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        m_rows = conn.execute(
+            """
+            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL AND length(record_date) >= 7
+            UNION
+            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL AND category IN ('DQ_LOSS', 'SHRINKAGE')
+            """
+        ).fetchall()
+        for mr in m_rows:
+            ym_val = str(mr["ym"] or "").strip()
+            if ym_val and len(ym_val) == 7 and ym_val.count("-") == 1:
+                available_months.add(ym_val)
+
+    sorted_months = sorted(list(available_months), reverse=True)
+
+    # 2. Build filter conditions for loss records
+    where = ["1=1"]
+    params: list[Any] = []
+
+    if month and month != "ALL":
+        where.append("substr(record_date, 1, 7) = ?")
+        params.append(month)
+    if store_name and store_name != "ALL":
+        where.append("store_name = ?")
+        params.append(store_name)
+    if start_date:
+        where.append("record_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("record_date <= ?")
+        params.append(end_date)
+    if loss_type and loss_type != "ALL":
+        where.append("loss_type = ?")
+        params.append(loss_type)
+    if category and category != "ALL":
+        where.append("category = ?")
+        params.append(category)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_loss_records
+            WHERE {where_sql}
+            ORDER BY record_date DESC, created_at DESC
+            """,
+            params,
+        ).fetchall()
+
+        all_items = [dict(r) for r in rows]
+
+        # Deduplication against generic EMAIL_INGESTED rollups when itemized Excel records exist for the same source_email_id
+        email_ids_with_itemized = {
+            it["source_email_id"] for it in all_items
+            if it.get("source_email_id") and it.get("category") != "EMAIL_INGESTED"
+        }
+
+        active_items = []
+        for it in all_items:
+            # Skip email-ingested rollup row if granular Excel rows exist for this email
+            if it.get("category") == "EMAIL_INGESTED" and it.get("source_email_id") in email_ids_with_itemized:
+                continue
+            active_items.append(it)
+
+        # Core metric calculations
+        total_loss = sum(float(i.get("amount") or 0.0) for i in active_items)
+        dq_total = sum(float(i.get("amount") or 0.0) for i in active_items if i.get("loss_type") == "DQ_LOSS")
+        shrinkage_total = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
+        )
+        spoilage_total = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
+        )
+        total_skus = sum(int(i.get("sku_count") or 0) for i in active_items)
+
+        # Category Matrix Breakdown (DQ vs Shrinkage vs Spoilage by Department)
+        cat_map: dict[str, dict[str, Any]] = {}
+        for it in active_items:
+            cat = (it.get("category") or "GENERAL").strip().upper()
+            l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
+            amt = float(it.get("amount") or 0.0)
+            sku_cnt = int(it.get("sku_count") or 0)
+
+            if cat not in cat_map:
+                cat_map[cat] = {
+                    "category": cat,
+                    "total_amount": 0.0,
+                    "dq_loss_amount": 0.0,
+                    "shrinkage_amount": 0.0,
+                    "spoilage_amount": 0.0,
+                    "total_skus": 0,
+                    "incident_count": 0,
+                    "pct_of_total": 0.0,
+                }
+
+            cat_map[cat]["total_amount"] += amt
+            cat_map[cat]["total_skus"] += sku_cnt
+            cat_map[cat]["incident_count"] += 1
+
+            if l_type == "DQ_LOSS":
+                cat_map[cat]["dq_loss_amount"] += amt
+            elif l_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
+                cat_map[cat]["shrinkage_amount"] += amt
+            else:
+                cat_map[cat]["spoilage_amount"] += amt
+
+        # Format and calculate percentage share
+        cat_list = []
+        for c_data in cat_map.values():
+            c_data["total_amount"] = round(c_data["total_amount"], 2)
+            c_data["dq_loss_amount"] = round(c_data["dq_loss_amount"], 2)
+            c_data["shrinkage_amount"] = round(c_data["shrinkage_amount"], 2)
+            c_data["spoilage_amount"] = round(c_data["spoilage_amount"], 2)
+            c_data["pct_of_total"] = round((c_data["total_amount"] / total_loss * 100), 1) if total_loss > 0 else 0.0
+            cat_list.append(c_data)
+
+        # Filter categories to only those where loss has occurred (total_amount > 0)
+        positive_cats = [c for c in cat_list if c["total_amount"] > 0]
+        positive_cats.sort(key=lambda x: x["total_amount"], reverse=True)
+
+        # Group categories below Top 10 as "OTHERS"
+        if len(positive_cats) > 10:
+            top_10_cats = positive_cats[:10]
+            tail_cats = positive_cats[10:]
+            others_total = round(sum(c["total_amount"] for c in tail_cats), 2)
+            others_dq = round(sum(c["dq_loss_amount"] for c in tail_cats), 2)
+            others_shrink = round(sum(c["shrinkage_amount"] for c in tail_cats), 2)
+            others_spoil = round(sum(c["spoilage_amount"] for c in tail_cats), 2)
+            others_skus = sum(c["total_skus"] for c in tail_cats)
+            others_incidents = sum(c["incident_count"] for c in tail_cats)
+            others_pct = round((others_total / total_loss * 100), 1) if total_loss > 0 else 0.0
+
+            grouped_category_breakdown = top_10_cats + [
+                {
+                    "category": "OTHERS",
+                    "total_amount": others_total,
+                    "dq_loss_amount": others_dq,
+                    "shrinkage_amount": others_shrink,
+                    "spoilage_amount": others_spoil,
+                    "total_skus": others_skus,
+                    "incident_count": others_incidents,
+                    "pct_of_total": others_pct,
+                    "is_composite": True,
+                }
+            ]
+        else:
+            grouped_category_breakdown = positive_cats
+
+        # 3. Email Body vs. Excel Verification / Reconciliation Ledger
+        recon_where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
+        recon_params: list[Any] = []
+        if month and month != "ALL":
+            recon_where.append("month_ym = ?")
+            recon_params.append(month)
+        if store_name and store_name != "ALL":
+            recon_where.append("(store_name = ? OR store_name = '')")
+            recon_params.append(store_name)
+        if start_date:
+            recon_where.append("iso_date >= ?")
+            recon_params.append(start_date)
+        if end_date:
+            recon_where.append("iso_date <= ?")
+            recon_params.append(end_date)
+
+        recon_where_sql = " AND ".join(recon_where)
+        email_rows = conn.execute(
+            f"""
+            SELECT id, subject, sender, iso_date, month_ym, store_name, snippet, extracted_metrics, attachments, parsed_status, parsed_records_count
+            FROM zepto_gmail_messages
+            WHERE {recon_where_sql}
+            ORDER BY iso_date DESC, id DESC
+            """,
+            recon_params,
+        ).fetchall()
+
+        recon_items = []
+        matched_count = 0
+        variance_count = 0
+
+        for er in email_rows:
+            e_dict = dict(er)
+            try:
+                metrics_obj = json.loads(e_dict.get("extracted_metrics") or "{}")
+            except Exception:
+                metrics_obj = {}
+            try:
+                attachments_list = json.loads(e_dict.get("attachments") or "[]")
+            except Exception:
+                attachments_list = []
+
+            email_stated_amount = float(metrics_obj.get("loss_amount") or 0.0)
+            msg_id = e_dict["id"]
+            msg_date = e_dict["iso_date"]
+            msg_store = e_dict["store_name"] or "JMU-Sainik Colony"
+
+            # Query all linked Excel items for this message: exact source_email_id match first, or unlinked date+store fallback
+            linked_excel_rows = conn.execute(
+                """
+                SELECT amount, sku_count, category, loss_type FROM zepto_loss_records
+                WHERE (source_email_id = ? OR (source_email_id IS NULL AND record_date = ? AND store_name = ?))
+                  AND category != 'EMAIL_INGESTED'
+                """,
+                (msg_id, msg_date, msg_store),
+            ).fetchall()
+
+            excel_sum = round(sum(float(lr["amount"] or 0.0) for lr in linked_excel_rows), 2)
+            excel_sku_count = sum(int(lr["sku_count"] or 0) for lr in linked_excel_rows)
+            excel_item_count = len(linked_excel_rows)
+
+            variance = round(excel_sum - email_stated_amount, 2)
+            status = "PENDING"
+
+            if excel_sum > 0 and email_stated_amount > 0:
+                if abs(variance) <= 1.0:
+                    status = "MATCHED"
+                    matched_count += 1
+                else:
+                    status = "VARIANCE"
+                    variance_count += 1
+            elif excel_sum > 0 and email_stated_amount == 0:
+                status = "EXCEL_ONLY"
+            elif excel_sum == 0 and email_stated_amount > 0:
+                status = "EMAIL_ONLY"
+
+            recon_items.append({
+                "email_id": msg_id,
+                "date": msg_date,
+                "store_name": msg_store,
+                "subject": e_dict["subject"],
+                "sender": e_dict["sender"],
+                "email_stated_amount": email_stated_amount,
+                "excel_parsed_sum": excel_sum,
+                "excel_item_count": excel_item_count,
+                "excel_sku_count": excel_sku_count,
+                "variance": variance,
+                "status": status,
+                "attachment_filename": attachments_list[0]["filename"] if attachments_list else None,
+            })
+
+        total_audits = len(recon_items)
+        match_rate_pct = round((matched_count / (matched_count + variance_count) * 100), 1) if (matched_count + variance_count) > 0 else 100.0
+
+        # 4. Monthly Trend aggregation
+        month_trend_rows = conn.execute(
+            """
+            SELECT substr(record_date, 1, 7) AS ym,
+                   SUM(amount) AS monthly_total,
+                   SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END) AS dq_total,
+                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END) AS shrink_total,
+                   SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN amount ELSE 0 END) AS spoil_total,
+                   COUNT(*) AS item_count,
+                   SUM(sku_count) AS sku_count
+            FROM zepto_loss_records
+            WHERE category != 'EMAIL_INGESTED' AND record_date IS NOT NULL AND length(record_date) >= 7
+            GROUP BY substr(record_date, 1, 7)
+            ORDER BY ym ASC
+            """
+        ).fetchall()
+
+        monthly_trends = [
+            {
+                "month_ym": mtr["ym"],
+                "total_loss": round(float(mtr["monthly_total"] or 0.0), 2),
+                "dq_loss": round(float(mtr["dq_total"] or 0.0), 2),
+                "shrinkage": round(float(mtr["shrink_total"] or 0.0), 2),
+                "spoilage": round(float(mtr["spoil_total"] or 0.0), 2),
+                "item_count": int(mtr["item_count"] or 0),
+                "sku_count": int(mtr["sku_count"] or 0),
+            }
+            for mtr in month_trend_rows
+        ]
+
+        # 5. Day-wise Trend aggregation (for the active filtered records)
+        daily_map: dict[str, dict[str, Any]] = {}
+        for it in active_items:
+            dt = str(it.get("record_date") or "").strip()
+            if not dt or len(dt) < 10:
+                continue
+            l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
+            amt = float(it.get("amount") or 0.0)
+            sku_cnt = int(it.get("sku_count") or 0)
+
+            if dt not in daily_map:
+                daily_map[dt] = {
+                    "date": dt,
+                    "total_loss": 0.0,
+                    "dq_loss": 0.0,
+                    "shrinkage": 0.0,
+                    "spoilage": 0.0,
+                    "item_count": 0,
+                    "sku_count": 0,
+                }
+            daily_map[dt]["total_loss"] += amt
+            daily_map[dt]["sku_count"] += sku_cnt
+            daily_map[dt]["item_count"] += 1
+            if l_type == "DQ_LOSS":
+                daily_map[dt]["dq_loss"] += amt
+            elif l_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
+                daily_map[dt]["shrinkage"] += amt
+            else:
+                daily_map[dt]["spoilage"] += amt
+
+        daily_trends = sorted(
+            [
+                {
+                    "date": d["date"],
+                    "total_loss": round(d["total_loss"], 2),
+                    "dq_loss": round(d["dq_loss"], 2),
+                    "shrinkage": round(d["shrinkage"], 2),
+                    "spoilage": round(d["spoilage"], 2),
+                    "item_count": d["item_count"],
+                    "sku_count": d["sku_count"],
+                }
+                for d in daily_map.values()
+            ],
+            key=lambda x: x["date"],
+        )
+
+        return {
+            "selected_month": month or "ALL",
+            "available_months": sorted_months,
+            "total_loss_amount": round(total_loss, 2),
+            "dq_loss_total": round(dq_total, 2),
+            "shrinkage_total": round(shrinkage_total, 2),
+            "spoilage_total": round(spoilage_total, 2),
+            "total_skus_affected": total_skus,
+            "total_sku_count": total_skus,
+            "total_loss_records": len(active_items),
+            "total_records": len(active_items),
+            "category_breakdown": grouped_category_breakdown,
+            "all_categories": positive_cats,
+            "reconciliation": {
+                "items": recon_items,
+                "total_audits": total_audits,
+                "matched_count": matched_count,
+                "variance_count": variance_count,
+                "match_rate_pct": match_rate_pct,
+            },
+            "monthly_trends": monthly_trends,
+            "daily_trends": daily_trends,
+            "records": active_items,
+        }
+
+
+def get_loss_records(
+    month: str | None = None,
+    store_name: str | None = None,
+    category: str | None = None,
+    loss_type: str | None = None,
+    search: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve paginated and searchable itemized stored Excel entries."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+
+    if month and month != "ALL":
+        where.append("substr(record_date, 1, 7) = ?")
+        params.append(month)
+    if store_name and store_name != "ALL":
+        where.append("store_name = ?")
+        params.append(store_name)
+    if category and category != "ALL":
+        where.append("category = ?")
+        params.append(category)
+    if loss_type and loss_type != "ALL":
+        where.append("loss_type = ?")
+        params.append(loss_type)
+    if search:
+        s_pat = f"%{search.strip().lower()}%"
+        where.append("(LOWER(notes) LIKE ? OR LOWER(category) LIKE ? OR LOWER(loss_type) LIKE ? OR LOWER(store_name) LIKE ?)")
+        params.extend([s_pat, s_pat, s_pat, s_pat])
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        total_count = conn.execute(f"SELECT COUNT(*) AS cnt FROM zepto_loss_records WHERE {where_sql}", params).fetchone()["cnt"]
+
+        query = f"""
+            SELECT * FROM zepto_loss_records
+            WHERE {where_sql}
+            ORDER BY record_date DESC, created_at DESC
+            LIMIT ? OFFSET ?
+        """
+        rows = conn.execute(query, params + [limit, offset]).fetchall()
+        return {
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+            "records": [dict(r) for r in rows],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Manpower Utilization & IPP DAL
+# ---------------------------------------------------------------------------
+
+def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Persist worker utilization and items-picked-per-hour metrics."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    rec_id = data.get("id") or f"util_{uuid.uuid4().hex[:12]}"
+    store = data.get("store_name", "JMU-Sainik Colony").strip()
+    date_str = data.get("util_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    items_picked = int(data.get("items_picked", 0))
+    active_hours = float(data.get("active_pick_hours", 0.0))
+    ipp = float(data.get("ipp", round(items_picked / active_hours, 1) if active_hours > 0 else 0.0))
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO zepto_manpower_utilization (
+                id, store_name, util_date, employee_id, employee_name, role,
+                items_picked, active_pick_hours, idle_hours, ipp,
+                flex_labor_cost, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                rec_id,
+                store,
+                date_str,
+                data.get("employee_id", "").strip(),
+                data.get("employee_name", "").strip(),
+                data.get("role", "Picker").strip(),
+                items_picked,
+                active_hours,
+                float(data.get("idle_hours", 0.0)),
+                ipp,
+                float(data.get("flex_labor_cost", 0.0)),
+                now_iso,
+                now_iso,
+            ),
+        )
+    return {"id": rec_id, "ipp": ipp}
+
+
+def get_manpower_utilization_summary(
+    store_name: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    month: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve aggregated picker IPP, labor utilization, and efficiency metrics with monthly scoping."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    where = ["1=1"]
+    params: list[Any] = []
+    if store_name and store_name != "ALL":
+        where.append("store_name = ?")
+        params.append(store_name)
+    if month and month != "ALL":
+        where.append("substr(util_date, 1, 7) = ?")
+        params.append(month)
+    if start_date:
+        where.append("util_date >= ?")
+        params.append(start_date)
+    if end_date:
+        where.append("util_date <= ?")
+        params.append(end_date)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f"""
+            SELECT * FROM zepto_manpower_utilization
+            WHERE {where_sql}
+            ORDER BY util_date DESC, ipp DESC
+            """,
+            params,
+        ).fetchall()
+
+        items = [dict(r) for r in rows]
+        total_items = sum(i.get("items_picked", 0) for i in items)
+        total_active_hours = sum(i.get("active_pick_hours", 0.0) for i in items)
+        total_idle_hours = sum(i.get("idle_hours", 0.0) for i in items)
+        total_flex_cost = sum(i.get("flex_labor_cost", 0.0) for i in items)
+        avg_ipp = round(total_items / total_active_hours, 1) if total_active_hours > 0 else 0.0
+
+        return {
+            "total_items_picked": total_items,
+            "total_active_hours": round(total_active_hours, 1),
+            "total_idle_hours": round(total_idle_hours, 1),
+            "avg_ipp": avg_ipp,
+            "total_flex_cost": round(total_flex_cost, 2),
+            "records": items,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Cross-Operational Analytics & Month-on-Month / Day-on-Day Master Ledger
+# ---------------------------------------------------------------------------
+
+def get_zepto_dashboard_analytics(
+    month: str | None = None,
+    store_name: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """
+    Retrieve unified Month-on-Month (MoM) and Day-on-Day (DoD) cross-subsystem metrics.
+    Merges Store Operations: Attendance (Headcount/Presents/Absents),
+    Financial Loss & DQ defects, Dispatched Orders, GMV, and Picker IPP into an executive ledger.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # 1. Available Months (distinct YYYY-MM across all operational domains)
+        q_months = """
+        SELECT DISTINCT ym FROM (
+            SELECT DISTINCT substr(shift_date, 1, 7) AS ym FROM zepto_attendance_records WHERE shift_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(metric_date, 1, 7) AS ym FROM zepto_store_metrics WHERE metric_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL
+            UNION
+            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL
+            UNION
+            SELECT DISTINCT year_month AS ym FROM zepto_store_income WHERE year_month IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(expense_date, 1, 7) AS ym FROM zepto_expenses WHERE expense_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(util_date, 1, 7) AS ym FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
+        ) WHERE ym IS NOT NULL AND length(ym) = 7
+        ORDER BY ym DESC
+        """
+        month_rows = conn.execute(q_months).fetchall()
+        available_months = [r["ym"] for r in month_rows if r["ym"]]
+        if not available_months:
+            available_months = [datetime.now().strftime("%Y-%m")]
+
+        active_month = month if (month and month in available_months) else (month or "ALL")
+
+        # 2. Month-on-Month (MoM) Historical Multi-Stream Trends
+        mom_trends = []
+        for ym in sorted(available_months, reverse=False):
+            # Financial Loss
+            l_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(amount), 0.0) AS loss_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COUNT(*) AS loss_incidents,
+                    COALESCE(SUM(sku_count), 0) AS skus_affected
+                FROM zepto_loss_records
+                WHERE substr(record_date, 1, 7) = ? AND category != 'EMAIL_INGESTED'
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Attendance & Headcount
+            att_row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS scheduled_shifts,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) AS present_count,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) AS absent_count,
+                    COUNT(DISTINCT employee_id) AS active_headcount,
+                    COALESCE(SUM(work_duration_mins), 0) AS total_work_mins
+                FROM zepto_attendance_records
+                WHERE substr(shift_date, 1, 7) = ?
+                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Orders & Scorecard
+            met_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(sales_gmv), 0.0) AS total_gmv,
+                    COALESCE(SUM(order_count), 0) AS total_orders,
+                    AVG(NULLIF(packer_ipp, 0.0)) AS avg_ipp,
+                    AVG(NULLIF(sla_adherence_pct, 0.0)) AS avg_sla
+                FROM zepto_store_metrics
+                WHERE substr(metric_date, 1, 7) = ?
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Manpower Utilization
+            util_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(items_picked), 0) AS total_picked,
+                    COALESCE(SUM(active_pick_hours), 0.0) AS active_hours,
+                    COALESCE(SUM(idle_hours), 0.0) AS idle_hours,
+                    AVG(NULLIF(ipp, 0.0)) AS avg_picker_ipp
+                FROM zepto_manpower_utilization
+                WHERE substr(util_date, 1, 7) = ?
+                """,
+                (ym,),
+            ).fetchone()
+
+            pres = att_row["present_count"] or 0
+            absn = att_row["absent_count"] or 0
+            denom = pres + absn
+            att_rate = round((pres / denom) * 100.0, 1) if denom > 0 else 0.0
+            tot_orders = met_row["total_orders"] or 0
+            tot_gmv = round(met_row["total_gmv"] or 0.0, 2)
+            aov = round(tot_gmv / tot_orders, 1) if tot_orders > 0 else 0.0
+
+            mom_trends.append({
+                "month_ym": ym,
+                "loss_total": round(l_row["loss_amt"] or 0.0, 2),
+                "dq_loss": round(l_row["dq_amt"] or 0.0, 2),
+                "shrinkage": round(l_row["shrink_amt"] or 0.0, 2),
+                "loss_incidents": l_row["loss_incidents"] or 0,
+                "skus_affected": l_row["skus_affected"] or 0,
+                "scheduled_shifts": att_row["scheduled_shifts"] or 0,
+                "present_count": pres,
+                "absent_count": absn,
+                "active_headcount": att_row["active_headcount"] or 0,
+                "attendance_rate_pct": att_rate,
+                "total_work_hours": round((att_row["total_work_mins"] or 0) / 60.0, 1),
+                "total_gmv": tot_gmv,
+                "total_orders": tot_orders,
+                "aov": aov,
+                "avg_ipp": round(met_row["avg_ipp"] or util_row["avg_picker_ipp"] or 0.0, 1),
+                "avg_sla_adherence_pct": round(met_row["avg_sla"] or 100.0, 1),
+                "items_picked": util_row["total_picked"] or 0,
+            })
+
+        # 3. Day-on-Day (DoD) Granular Timeline Breakdown
+        # Filtered by active_month if specified (e.g. 2026-09), or across all days
+        day_date_filter = "substr(dt, 1, 7) = ?" if (active_month and active_month != "ALL") else "1=1"
+        day_params = [active_month] if (active_month and active_month != "ALL") else []
+
+        q_days = f"""
+        SELECT DISTINCT dt FROM (
+            SELECT DISTINCT record_date AS dt FROM zepto_loss_records WHERE record_date IS NOT NULL
+            UNION
+            SELECT DISTINCT shift_date AS dt FROM zepto_attendance_records WHERE shift_date IS NOT NULL
+            UNION
+            SELECT DISTINCT metric_date AS dt FROM zepto_store_metrics WHERE metric_date IS NOT NULL
+            UNION
+            SELECT DISTINCT util_date AS dt FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
+        ) WHERE dt IS NOT NULL AND length(dt) = 10 AND {day_date_filter}
+        ORDER BY dt ASC
+        """
+        day_rows = conn.execute(q_days, day_params).fetchall()
+        distinct_dates = [r["dt"] for r in day_rows if r["dt"]]
+
+        dod_metrics = []
+        for dt in distinct_dates:
+            # Loss for day
+            l_d = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(amount), 0.0) AS loss_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COUNT(*) AS loss_incidents,
+                    COALESCE(SUM(sku_count), 0) AS skus_affected
+                FROM zepto_loss_records
+                WHERE record_date = ? AND category != 'EMAIL_INGESTED'
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Attendance for day
+            att_d = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_shifts,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) AS present_count,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) AS absent_count,
+                    SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) AS week_off_count,
+                    COALESCE(SUM(work_duration_mins), 0) AS total_mins
+                FROM zepto_attendance_records
+                WHERE shift_date = ?
+                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Store metrics for day
+            met_d = conn.execute(
+                """
+                SELECT
+                    sales_gmv, order_count, aov, packer_ipp, sla_adherence_pct
+                FROM zepto_store_metrics
+                WHERE metric_date = ?
+                LIMIT 1
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Utilization for day
+            util_d = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(items_picked), 0) AS total_picked,
+                    AVG(NULLIF(ipp, 0.0)) AS avg_ipp
+                FROM zepto_manpower_utilization
+                WHERE util_date = ?
+                """,
+                (dt,),
+            ).fetchone()
+
+            d_pres = att_d["present_count"] or 0
+            d_abs = att_d["absent_count"] or 0
+            d_denom = d_pres + d_abs
+            d_att_rate = round((d_pres / d_denom) * 100.0, 1) if d_denom > 0 else (100.0 if d_pres > 0 else 0.0)
+
+            d_orders = met_d["order_count"] if met_d else 0
+            d_gmv = met_d["sales_gmv"] if met_d else 0.0
+            d_ipp = met_d["packer_ipp"] if (met_d and met_d["packer_ipp"]) else (util_d["avg_ipp"] or 0.0)
+            d_sla = met_d["sla_adherence_pct"] if (met_d and met_d["sla_adherence_pct"]) else 100.0
+
+            dod_metrics.append({
+                "date": dt,
+                "loss_total": round(l_d["loss_amt"] or 0.0, 2),
+                "dq_loss": round(l_d["dq_amt"] or 0.0, 2),
+                "shrinkage": round(l_d["shrink_amt"] or 0.0, 2),
+                "loss_incidents": l_d["loss_incidents"] or 0,
+                "skus_affected": l_d["skus_affected"] or 0,
+                "shifts_scheduled": att_d["total_shifts"] or 0,
+                "shifts_present": d_pres,
+                "shifts_absent": d_abs,
+                "shifts_week_off": att_d["week_off_count"] or 0,
+                "attendance_rate_pct": d_att_rate,
+                "hours_worked": round((att_d["total_mins"] or 0) / 60.0, 1),
+                "orders_dispatched": d_orders or 0,
+                "sales_gmv": round(d_gmv or 0.0, 2),
+                "packer_ipp": round(d_ipp or 0.0, 1),
+                "sla_adherence_pct": round(d_sla or 100.0, 1),
+                "items_picked": util_d["total_picked"] or 0,
+            })
+
+        # Summary KPIs for the active scope
+        tot_loss = sum(d["loss_total"] for d in dod_metrics)
+        tot_shifts = sum(d["shifts_scheduled"] for d in dod_metrics)
+        tot_present = sum(d["shifts_present"] for d in dod_metrics)
+        tot_absent = sum(d["shifts_absent"] for d in dod_metrics)
+        tot_orders = sum(d["orders_dispatched"] for d in dod_metrics)
+        tot_gmv = sum(d["sales_gmv"] for d in dod_metrics)
+        avg_ipp = round(sum(d["packer_ipp"] for d in dod_metrics if d["packer_ipp"] > 0) / max(1, sum(1 for d in dod_metrics if d["packer_ipp"] > 0)), 1)
+        avg_att = round((tot_present / max(1, tot_present + tot_absent)) * 100.0, 1) if (tot_present + tot_absent) > 0 else 0.0
+
+        return {
+            "selected_month": active_month,
+            "available_months": available_months,
+            "summary_kpis": {
+                "total_loss": round(tot_loss, 2),
+                "total_shifts": tot_shifts,
+                "total_present": tot_present,
+                "total_absent": tot_absent,
+                "attendance_rate_pct": avg_att,
+                "total_orders": tot_orders,
+                "total_gmv": round(tot_gmv, 2),
+                "avg_packer_ipp": avg_ipp,
+                "days_count": len(dod_metrics),
+            },
+            "mom_trends": mom_trends,
+            "dod_metrics": dod_metrics,
+        }
+
+

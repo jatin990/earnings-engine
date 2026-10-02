@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -432,6 +433,9 @@ def _get_run_log_file(base_dir: Path) -> Path | None:
     return _RUN_LOG_FILES.get(base_key)
 
 
+_ERROR_LEDGER_EMIT_LOCK = threading.local()
+
+
 class ErrorLedgerLoggingHandler(logging.Handler):
     """Logging handler that captures ERROR and CRITICAL logs to the active error stream & ledger."""
 
@@ -439,9 +443,18 @@ class ErrorLedgerLoggingHandler(logging.Handler):
         super().__init__(level=logging.ERROR)
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.name.startswith("earnings_engine.data.error_ledger"):
+        if (
+            record.name.startswith("earnings_engine.data.error_ledger")
+            or record.name.startswith("earnings_engine.data.db")
+            or record.name.startswith("earnings_engine.data.turso")
+        ):
             return
+
+        if getattr(_ERROR_LEDGER_EMIT_LOCK, "active", False):
+            return
+
         try:
+            _ERROR_LEDGER_EMIT_LOCK.active = True
             from earnings_engine.data.error_ledger import append_to_error_stream, record_error
 
             stack_trace = None
@@ -476,6 +489,8 @@ class ErrorLedgerLoggingHandler(logging.Handler):
             )
         except Exception:
             pass
+        finally:
+            _ERROR_LEDGER_EMIT_LOCK.active = False
 
 
 class SafeStreamHandler(logging.StreamHandler):

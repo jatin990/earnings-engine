@@ -75,10 +75,28 @@
                     </div>
                 </div>
 
-                <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')">
-                    <span class="sidebar-icon">🔄</span>
-                    <span class="sidebar-label">Swing Ranges</span>
-                </a>
+                <!-- Swing Ranges with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-swing" data-parent-tab="swing">
+                    <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')">
+                        <span class="sidebar-icon">🔄</span>
+                        <span class="sidebar-label">Swing Ranges</span>
+                        <span id="sidebarSwingCountBadge" class="sidebar-pill" style="display:none;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarSwingSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubSwingSetups" onclick="app.switchTab('swing'); app.switchSwingSubTab('setups');">
+                            <span style="font-size:0.75rem;">⚡</span>
+                            <span>Active Setups</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubSwingTop" onclick="app.switchTab('swing'); app.switchSwingSubTab('top-swingers');">
+                            <span style="font-size:0.75rem;">🏆</span>
+                            <span>Best Top Swingers</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubSwingAudit" onclick="app.switchTab('swing'); app.switchSwingSubTab('audit');">
+                            <span style="font-size:0.75rem;">🔄</span>
+                            <span>Tier Audit Log</span>
+                        </a>
+                    </div>
+                </div>
 
                 <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')">
                     <span class="sidebar-icon">🔗</span>
@@ -90,6 +108,12 @@
                     <span class="sidebar-icon">⛓️</span>
                     <span class="sidebar-label">Option Chain &amp; F&amp;O</span>
                     <span class="sidebar-pill" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;">Live</span>
+                </a>
+
+                <a class="sidebar-nav-item" data-tab="commodities" onclick="app.switchTab('commodities')">
+                    <span class="sidebar-icon">🥇</span>
+                    <span class="sidebar-label">Commodities &amp; Energy</span>
+                    <span class="sidebar-pill" style="background:rgba(234,179,8,0.2);color:#eab308;border:1px solid rgba(234,179,8,0.35);font-weight:700;">SMC</span>
                 </a>
 
                 <!-- Gainers & Breakouts with Nested Subtabs -->

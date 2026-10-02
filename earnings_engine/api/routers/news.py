@@ -192,10 +192,11 @@ async def get_news_feeds_status():
     """Return all configured news, regulatory, and corporate filing feeds with health & last fetch telemetry."""
     try:
         from earnings_engine.data.news_sources import get_all_feed_metadata
-        from earnings_engine.data.catalysts_news import _connect
+        from earnings_engine.data.catalysts_news import _connect, get_latest_feed_runs
         import sqlite3
 
         feeds = get_all_feed_metadata()
+        latest_runs = await asyncio.to_thread(get_latest_feed_runs, settings=_settings)
 
         # Query harvester schedule status
         sched_info: dict[str, Any] = {}
@@ -228,9 +229,18 @@ async def get_news_feeds_status():
         for f in feeds:
             s_key = f.get("source_key")
             stat = src_stats.get(s_key) or {}
+            f_id = f.get("id")
+            run = latest_runs.get(f_id) or {}
+
             f["last_ingested_at"] = stat.get("last_ingested_at") or sched_info.get("last_run_at")
             f["last_published_at"] = stat.get("last_published_at")
             f["total_ingested_for_source"] = stat.get("count", 0)
+
+            f["last_scanned_at"] = run.get("scanned_at")
+            f["last_articles_fetched"] = run.get("articles_fetched", 0) if run else None
+            f["last_articles_added"] = run.get("articles_added", 0) if run else None
+            f["last_run_status"] = run.get("status") if run else "READY"
+            f["last_error_message"] = run.get("error_message")
 
         # Count groups
         groups_summary: dict[str, int] = {}
@@ -259,10 +269,13 @@ async def get_news_feeds_status():
 
 
 @router.get("/api/v1/news/activity")
-async def get_news_activity_stream(limit: int = Query(50, ge=1, le=200)):
+async def get_news_activity_stream(
+    limit: int = Query(50, ge=1, le=200),
+    days: int = Query(14, ge=0, le=365, description="Lookback window in days (1, 3, 7, 14, 0 for all)"),
+):
     """Retrieve real-time live activity stream of breaking market filings."""
     try:
-        activity = await asyncio.to_thread(get_recent_news_activity, limit=limit, settings=_settings)
+        activity = await asyncio.to_thread(get_recent_news_activity, limit=limit, days=days, settings=_settings)
         return {"success": True, "count": len(activity), "activity": activity}
     except Exception as e:
         logger.exception("Error in get_news_activity_stream: %s", e)

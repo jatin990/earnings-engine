@@ -37,18 +37,18 @@
         <!-- 3. Pending Partner Reimbursements -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Pending Reimbursements</span>
-                <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono" id="expSummaryPendingBadge">⏳ 0 Pending</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pending Reimbursements</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="expSummaryPendingBadge">⏳ 0 Pending</span>
             </div>
             <div class="my-1.5">
-                <div class="text-xl sm:text-2xl font-black font-mono text-amber-300 tracking-tight" id="expSummaryPendingAmount">₹0</div>
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="expSummaryPendingAmount">₹0</div>
                 <div class="text-[10px] text-slate-400 mt-0.5 truncate" id="expSummaryPendingBreakdown">
                     Awaiting payback from store cash
                 </div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Pending Ratio:</span>
-                <span class="font-mono font-bold text-amber-300" id="expSummaryPendingPct">0%</span>
+                <span class="font-mono font-bold text-slate-300" id="expSummaryPendingPct">0%</span>
             </div>
         </div>
     </div>
@@ -69,15 +69,51 @@
         </div>
         <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">☕ Snacks</div>
-            <div class="text-sm font-extrabold font-mono text-amber-300 mt-0.5" id="catSpend-SNACKS_WELFARE">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-SNACKS_WELFARE">₹--</div>
         </div>
         <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">🧹 Maintenance</div>
-            <div class="text-sm font-extrabold font-mono text-emerald-300 mt-0.5" id="catSpend-STORE_MAINTENANCE">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-STORE_MAINTENANCE">₹--</div>
         </div>
         <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">📦 Ops Supplies</div>
-            <div class="text-sm font-extrabold font-mono text-sky-300 mt-0.5" id="catSpend-OPERATIONAL">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-OPERATIONAL">₹--</div>
+        </div>
+    </div>
+
+    <!-- Active Staff Expense Claims & Direct Spend Matrix -->
+    <div class="glass-panel p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Spend & Claims Matrix</h4>
+                <p class="text-[10px] text-slate-400">Pantry purchases, store consumables, and reimbursement claims attributed across active store personnel.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="expActiveStaffBadge">
+                0 Active Staff
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2 px-3">Staff Member</th>
+                        <th class="py-2 px-3">Role Profile</th>
+                        <th class="py-2 px-3 text-center">Status</th>
+                        <th class="py-2 px-3 text-right">Base Salary</th>
+                        <th class="py-2 px-3 text-right">Spend Attributed</th>
+                        <th class="py-2 px-3 text-center">Out-of-Pocket Claims</th>
+                        <th class="py-2 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="expActiveStaffTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="7" class="text-center py-6 text-slate-500 text-xs">
+                            Loading staff spend & claims matrix...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 

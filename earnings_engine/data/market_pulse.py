@@ -54,6 +54,107 @@ def is_market_open(ts: float) -> bool:
     return 3.75 <= time_val < 10.0
 
 
+IST_OFFSET = timedelta(hours=5, minutes=30)
+IST_TZ = timezone(IST_OFFSET)
+
+
+def format_iso_to_ist(iso_str: str | None, include_seconds: bool = False) -> str:
+    """Format an ISO timestamp to human-readable IST string (e.g. '26 Sep 2026, 18:42 IST')."""
+    if not iso_str:
+        return "—"
+    try:
+        clean_str = str(iso_str).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        ist_dt = dt.astimezone(IST_TZ)
+        if include_seconds:
+            return ist_dt.strftime("%d %b %Y, %H:%M:%S IST")
+        return ist_dt.strftime("%d %b %Y, %H:%M IST")
+    except Exception:
+        return str(iso_str)
+
+
+def compute_fii_dii_release_schedule(latest_date_in_db: str | None = None, now_dt: datetime | None = None) -> dict[str, Any]:
+    """Calculate the expected next NSE FII/DII cash market settlement release time and countdown.
+
+    NSE publishes daily cash market FII & DII provisional settlement figures on trading days
+    (Monday - Friday) around 17:30 - 19:30 IST, with standard benchmark release target ~18:30 IST.
+    """
+    if now_dt is None:
+        now_dt = datetime.now(timezone.utc)
+
+    # Convert UTC to IST (+5:30)
+    ist_dt = now_dt + IST_OFFSET
+    weekday = ist_dt.weekday()  # 0=Mon, ..., 4=Fri, 5=Sat, 6=Sun
+    time_val = ist_dt.hour + ist_dt.minute / 60.0 + ist_dt.second / 3600.0
+
+    today_str = ist_dt.strftime("%Y-%m-%d")
+    is_today_settled = (latest_date_in_db == today_str)
+
+    # Target release time on trading day is 18:30 IST (18.5)
+    if weekday < 5:  # Monday - Friday
+        if time_val < 18.5:
+            target_date = ist_dt.date()
+            status = "pending_today"
+            label = "Today ~18:30 IST"
+        else:
+            if is_today_settled:
+                if weekday == 4:  # Friday -> Monday
+                    target_date = (ist_dt + timedelta(days=3)).date()
+                    status = "settled"
+                    label = "Monday ~18:30 IST"
+                else:  # Mon-Thu -> Tomorrow
+                    target_date = (ist_dt + timedelta(days=1)).date()
+                    status = "settled"
+                    label = f"{(ist_dt + timedelta(days=1)).strftime('%A')} ~18:30 IST"
+            else:
+                target_date = ist_dt.date()
+                status = "awaiting_settlement"
+                label = "Today (Awaiting NSE Release)"
+    elif weekday == 5:  # Saturday -> Monday
+        target_date = (ist_dt + timedelta(days=2)).date()
+        status = "weekend_pause"
+        label = "Monday ~18:30 IST"
+    else:  # Sunday -> Monday
+        target_date = (ist_dt + timedelta(days=1)).date()
+        status = "weekend_pause"
+        label = "Monday ~18:30 IST"
+
+    target_dt_ist = datetime.combine(target_date, datetime.min.time()).replace(hour=18, minute=30, second=0)
+    target_dt_utc = (target_dt_ist - IST_OFFSET).replace(tzinfo=timezone.utc)
+
+    eta_seconds = max(0, int((target_dt_utc - now_dt).total_seconds()))
+    hours = eta_seconds // 3600
+    minutes = (eta_seconds % 3600) // 60
+
+    if status == "awaiting_settlement":
+        countdown_text = "Awaiting Release (Due ~18:30 IST)"
+    elif eta_seconds == 0:
+        countdown_text = "Release Expected Now"
+    elif hours >= 24:
+        days = hours // 24
+        rem_hours = hours % 24
+        countdown_text = f"in {days}d {rem_hours}h"
+    elif hours > 0:
+        countdown_text = f"in {hours}h {minutes}m"
+    else:
+        countdown_text = f"in {minutes}m"
+
+    return {
+        "expected_release_utc": target_dt_utc.isoformat(),
+        "expected_release_ist": target_dt_ist.strftime("%d %b %Y, 18:30 IST"),
+        "release_label": label,
+        "label": label,
+        "countdown_text": countdown_text,
+        "countdown": countdown_text,
+        "eta_seconds": eta_seconds,
+        "status": status,
+        "is_today_settled": is_today_settled,
+        "latest_settled_date": latest_date_in_db or "",
+    }
+
+
 def get_expected_latest_trading_date(now_dt: datetime | None = None) -> str:
     """Calculate the expected latest trading day (ISO format YYYY-MM-DD) for which
     FII/DII cash market settlement figures should be published.
@@ -693,11 +794,41 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     try:
         rows = conn.execute("SELECT * FROM institutional_net_flows ORDER BY date DESC LIMIT 45").fetchall()
         for r in rows:
-            r_dict = dict(r) if hasattr(r, "keys") else {
-                "date": r[0], "day_label": r[1], "fii_buy_cr": r[2], "fii_sell_cr": r[3],
-                "fii_net_cr": r[4], "dii_buy_cr": r[5], "dii_sell_cr": r[6], "dii_net_cr": r[7],
-                "total_net_cr": r[8], "stance": r[9], "updated_at": r[10]
+            raw_updated_at = r[10] if (hasattr(r, "__len__") and len(r) > 10) else (r["updated_at"] if hasattr(r, "keys") else None)
+            fii_b = float(r[2] or 0.0) if hasattr(r, "__len__") else float(r.get("fii_buy_cr", 0.0))
+            fii_s = float(r[3] or 0.0) if hasattr(r, "__len__") else float(r.get("fii_sell_cr", 0.0))
+            fii_n = float(r[4] or 0.0) if hasattr(r, "__len__") else float(r.get("fii_net_cr", 0.0))
+            dii_b = float(r[5] or 0.0) if hasattr(r, "__len__") else float(r.get("dii_buy_cr", 0.0))
+            dii_s = float(r[6] or 0.0) if hasattr(r, "__len__") else float(r.get("dii_sell_cr", 0.0))
+            dii_n = float(r[7] or 0.0) if hasattr(r, "__len__") else float(r.get("dii_net_cr", 0.0))
+            tot_n = float(r[8] or 0.0) if hasattr(r, "__len__") else float(r.get("total_net_cr", 0.0))
+            st = str(r[9] if hasattr(r, "__len__") else r.get("stance", "Neutral"))
+            d_label = str(r[1] if hasattr(r, "__len__") else r.get("day_label", ""))
+            iso_d = str(r[0] if hasattr(r, "__len__") else r.get("date", ""))
+
+            gross_turn = round(fii_b + fii_s + dii_b + dii_s, 2)
+            f_bs = round(fii_b / max(1.0, fii_s), 2) if fii_s > 0 else 1.0
+            d_bs = round(dii_b / max(1.0, dii_s), 2) if dii_s > 0 else 1.0
+            tot_bs = round((fii_b + dii_b) / max(1.0, fii_s + dii_s), 2) if (fii_s + dii_s) > 0 else 1.0
+
+            r_dict = {
+                "date": iso_d,
+                "day_label": d_label,
+                "fii_buy_cr": fii_b,
+                "fii_sell_cr": fii_s,
+                "fii_net_cr": fii_n,
+                "dii_buy_cr": dii_b,
+                "dii_sell_cr": dii_s,
+                "dii_net_cr": dii_n,
+                "total_net_cr": tot_n,
+                "gross_turnover_cr": gross_turn,
+                "fii_bs_ratio": f_bs,
+                "dii_bs_ratio": d_bs,
+                "total_bs_ratio": tot_bs,
+                "stance": st,
+                "updated_at": raw_updated_at,
             }
+            r_dict["arrived_at_ist"] = format_iso_to_ist(r_dict.get("updated_at"))
             history_full.append(r_dict)
     except Exception as e:
         logger.warning("[LIQUIDITY] Error loading institutional flows: %s", e)
@@ -718,22 +849,52 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
                 "dii_net_cr": 0.0,
                 "total_net_cr": 0.0,
                 "stance": "BALANCED FLOWS",
+                "updated_at": None,
+                "arrived_at_ist": "—",
             })
 
     history_7d = history_full[:7]
     history_30d = history_full[:30]
 
-    fii_net_cr = history_7d[0]["fii_net_cr"] if history_7d else 0.0
-    dii_net_cr = history_7d[0]["dii_net_cr"] if history_7d else 0.0
+    latest_rec = history_7d[0] if history_7d else {}
+    fii_net_cr = float(latest_rec.get("fii_net_cr", 0.0))
+    dii_net_cr = float(latest_rec.get("dii_net_cr", 0.0))
     total_net_cr = round(fii_net_cr + dii_net_cr, 2)
 
-    fii_7d_total = round(sum(h["fii_net_cr"] for h in history_7d), 2)
-    dii_7d_total = round(sum(h["dii_net_cr"] for h in history_7d), 2)
-    combined_7d_total = round(sum(h["total_net_cr"] for h in history_7d), 2)
+    fii_buy_cr = float(latest_rec.get("fii_buy_cr", 0.0))
+    fii_sell_cr = float(latest_rec.get("fii_sell_cr", 0.0))
+    dii_buy_cr = float(latest_rec.get("dii_buy_cr", 0.0))
+    dii_sell_cr = float(latest_rec.get("dii_sell_cr", 0.0))
+    total_buy_cr = round(fii_buy_cr + dii_buy_cr, 2)
+    total_sell_cr = round(fii_sell_cr + dii_sell_cr, 2)
+    gross_turnover_cr = round(fii_buy_cr + fii_sell_cr + dii_buy_cr + dii_sell_cr, 2)
+    fii_bs_ratio = round(fii_buy_cr / max(1.0, fii_sell_cr), 2) if fii_sell_cr > 0 else 1.0
+    dii_bs_ratio = round(dii_buy_cr / max(1.0, dii_sell_cr), 2) if dii_sell_cr > 0 else 1.0
+    total_bs_ratio = round(total_buy_cr / max(1.0, total_sell_cr), 2) if total_sell_cr > 0 else 1.0
 
-    fii_30d_total = round(sum(h["fii_net_cr"] for h in history_30d), 2)
-    dii_30d_total = round(sum(h["dii_net_cr"] for h in history_30d), 2)
-    combined_30d_total = round(sum(h["total_net_cr"] for h in history_30d), 2)
+    # Classify granular flow regime
+    if fii_net_cr < -500 and dii_net_cr > 500:
+        flow_regime = "🏢 DII Absorption Wall (Counter-Cyclical)"
+    elif fii_net_cr > 500 and dii_net_cr > 500:
+        flow_regime = "🟢 Dual Institutional Surge (Coordinated Inflow)"
+    elif fii_net_cr < -500 and dii_net_cr < -500:
+        flow_regime = "🔴 Dual Institutional Exit (Coordinated Outflow)"
+    elif fii_net_cr > 500 and dii_net_cr < -500:
+        flow_regime = "🏛️ FII Momentum Surge (DII Profit Taking)"
+    elif total_net_cr > 300:
+        flow_regime = "🟢 Moderate Institutional Inflow"
+    elif total_net_cr < -300:
+        flow_regime = "🔴 Moderate Institutional Outflow"
+    else:
+        flow_regime = "⚪ Balanced Institutional Flow"
+
+    fii_7d_total = round(sum(h.get("fii_net_cr", 0.0) for h in history_7d), 2)
+    dii_7d_total = round(sum(h.get("dii_net_cr", 0.0) for h in history_7d), 2)
+    combined_7d_total = round(sum(h.get("total_net_cr", 0.0) for h in history_7d), 2)
+
+    fii_30d_total = round(sum(h.get("fii_net_cr", 0.0) for h in history_30d), 2)
+    dii_30d_total = round(sum(h.get("dii_net_cr", 0.0) for h in history_30d), 2)
+    combined_30d_total = round(sum(h.get("total_net_cr", 0.0) for h in history_30d), 2)
 
     if combined_7d_total > 500:
         regime_badge = "🟢 Institutional Accumulation"
@@ -746,13 +907,37 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
         bias_str = "BALANCED FLOWS"
 
     session_label = history_full[0]["day_label"] if history_full else today_str
+    latest_settled_date = history_full[0]["date"] if history_full else today_str
+    latest_updated_at = history_full[0].get("updated_at") if history_full else None
+    latest_arrived_at_ist = format_iso_to_ist(latest_updated_at)
+    release_schedule = compute_fii_dii_release_schedule(latest_date_in_db=latest_settled_date)
 
     liquidity_data = {
-        "as_of_date": history_full[0]["date"] if history_full else today_str,
+        "as_of_date": latest_settled_date,
         "session_label": session_label,
+        "latest_updated_at": latest_updated_at,
+        "latest_arrived_at_ist": latest_arrived_at_ist,
+        "arrived_at_ist": latest_arrived_at_ist,
+        "next_release_schedule": release_schedule,
+        "next_release_label": release_schedule["release_label"],
+        "next_release_countdown": release_schedule["countdown_text"],
+        "next_release_eta_seconds": release_schedule["eta_seconds"],
+        "next_release_status": release_schedule["status"],
+        "is_today_settled": release_schedule["is_today_settled"],
         "fii_net_cr": fii_net_cr,
         "dii_net_cr": dii_net_cr,
         "total_net_cr": total_net_cr,
+        "fii_buy_cr": fii_buy_cr,
+        "fii_sell_cr": fii_sell_cr,
+        "dii_buy_cr": dii_buy_cr,
+        "dii_sell_cr": dii_sell_cr,
+        "total_buy_cr": total_buy_cr,
+        "total_sell_cr": total_sell_cr,
+        "gross_turnover_cr": gross_turnover_cr,
+        "fii_bs_ratio": fii_bs_ratio,
+        "dii_bs_ratio": dii_bs_ratio,
+        "total_bs_ratio": total_bs_ratio,
+        "flow_regime": flow_regime,
         "bias": bias_str,
         "fii_7d_total": fii_7d_total,
         "dii_7d_total": dii_7d_total,
@@ -1093,15 +1278,47 @@ def sync_nse_participant_oi_data(
 
 
 def _classify_oi_regime(d_fi_net: int, d_fi_long: int, d_fi_short: int) -> tuple[str, str, str]:
-    """Classify derivatives positioning shift regime based on index futures day-over-day delta."""
-    if d_fi_net > 0 and d_fi_long >= d_fi_short:
+    """Classify derivatives positioning shift regime based on index futures day-over-day delta.
+
+    Follows standard 4-quadrant derivatives mechanics:
+    1. Long Build-up: Fresh long accumulation (ΔLong > 0 and ΔLong >= ΔShort, ΔNet > 0).
+    2. Short Build-up: Fresh short creation (ΔShort > 0 and ΔShort >= ΔLong, ΔNet < 0).
+    3. Short Covering: Shorts closing/covering (ΔShort < 0 and ΔNet > 0, or both dropping with ΔNet > 0).
+    4. Long Unwinding: Longs closing/unwinding (ΔLong < 0 and ΔNet < 0, or both dropping with ΔNet < 0).
+    5. Expiry Rollover: Both legs dropping symmetrically (ΔLong < 0 and ΔShort < 0 with ΔNet == 0).
+    """
+    # Case 1: Both legs dropping (Expiry Rollover / Gross OI contraction)
+    if d_fi_long < 0 and d_fi_short < 0:
+        if d_fi_net > 0:
+            # Shorts closed faster than longs
+            return ("Short Covering", "⚡ Short Covering", "Shorts squaring off / expiry unwinding; short covering momentum.")
+        elif d_fi_net < 0:
+            # Longs closed faster than shorts
+            return ("Long Unwinding", "⚠️ Long Unwinding", "Longs squaring off / expiry unwinding; profit taking / risk trimming.")
+        else:
+            return ("Expiry Rollover", "⚪ Expiry Rollover", "Symmetric expiry rollover / position closure across long and short contracts.")
+
+    # Case 2: Fresh long accumulation dominates
+    if d_fi_long > 0 and d_fi_net > 0 and d_fi_long >= d_fi_short:
         return ("Long Build-up", "🟢 Long Build-up", "Aggressive fresh long accumulation in index futures; bullish continuation bias.")
-    elif d_fi_net > 0 and d_fi_short < 0:
-        return ("Short Covering", "⚡ Short Covering", "Bear capitulation / shorts exiting; short squeeze momentum.")
-    elif d_fi_net < 0 and d_fi_short >= d_fi_long:
+
+    # Case 3: Fresh short accumulation dominates
+    if d_fi_short > 0 and d_fi_net < 0 and d_fi_short >= d_fi_long:
         return ("Short Build-up", "🔴 Short Build-up", "Fresh institutional short hedges added in index futures; overhead resistance.")
-    elif d_fi_net < 0 and d_fi_long < 0:
+
+    # Case 4: Shorts closing while longs flat or adding
+    if d_fi_short < 0 and d_fi_net > 0:
+        return ("Short Covering", "⚡ Short Covering", "Bear capitulation / shorts exiting; short squeeze momentum.")
+
+    # Case 5: Longs closing while shorts flat or adding
+    if d_fi_long < 0 and d_fi_net < 0:
         return ("Long Unwinding", "⚠️ Long Unwinding", "Longs taking profit / trimming risk; lack of aggressive buying.")
+
+    # Case 6: Delta is non-zero but one leg neutral
+    if d_fi_net > 0:
+        return ("Net Long Shift", "🟢 Long Add", "Moderate net long expansion in index futures.")
+    elif d_fi_net < 0:
+        return ("Net Short Shift", "🔴 Short Add", "Moderate net short expansion in index futures.")
     else:
         return ("Neutral / Balanced", "⚪ Neutral", "Balanced positioning shifts with minimal directional skew.")
 
@@ -1179,6 +1396,27 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         pro_stat = p_dict.get("PRO", {})
         client_stat = p_dict.get("CLIENT", {})
 
+        # Compute stock futures long % for each participant
+        fii_fs_tot = fii_stat.get("future_stock_long", 0) + fii_stat.get("future_stock_short", 0)
+        fii_fs_long_pct = round((fii_stat.get("future_stock_long", 0) / max(1, fii_fs_tot)) * 100.0, 1)
+
+        client_fs_tot = client_stat.get("future_stock_long", 0) + client_stat.get("future_stock_short", 0)
+        client_fs_long_pct = round((client_stat.get("future_stock_long", 0) / max(1, client_fs_tot)) * 100.0, 1)
+
+        pro_fs_tot = pro_stat.get("future_stock_long", 0) + pro_stat.get("future_stock_short", 0)
+        pro_fs_long_pct = round((pro_stat.get("future_stock_long", 0) / max(1, pro_fs_tot)) * 100.0, 1)
+
+        dii_fs_tot = dii_stat.get("future_stock_long", 0) + dii_stat.get("future_stock_short", 0)
+        dii_fs_long_pct = round((dii_stat.get("future_stock_long", 0) / max(1, dii_fs_tot)) * 100.0, 1)
+
+        # Compute net call and put options (Long - Short)
+        fii_c_net = fii_stat.get("calls_long", 0) - fii_stat.get("calls_short", 0)
+        fii_p_net = fii_stat.get("puts_long", 0) - fii_stat.get("puts_short", 0)
+        pro_c_net = pro_stat.get("calls_long", 0) - pro_stat.get("calls_short", 0)
+        pro_p_net = pro_stat.get("puts_long", 0) - pro_stat.get("puts_short", 0)
+        client_c_net = client_stat.get("calls_long", 0) - client_stat.get("calls_short", 0)
+        client_p_net = client_stat.get("puts_long", 0) - client_stat.get("puts_short", 0)
+
         history_30d.append({
             "date": d_str,
             "session_label": d_fmt,
@@ -1195,6 +1433,24 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "pro_future_index_long_pct": pro_stat.get("future_index_long_pct", 50.0),
             "dii_future_index_net": dii_stat.get("future_index_net", 0),
             "dii_future_index_long_pct": dii_stat.get("future_index_long_pct", 50.0),
+            # Stock Futures (Single Stock Alpha) Positioning
+            "fii_future_stock_long": fii_stat.get("future_stock_long", 0),
+            "fii_future_stock_short": fii_stat.get("future_stock_short", 0),
+            "fii_future_stock_net": fii_stat.get("future_stock_net", 0),
+            "fii_future_stock_long_pct": fii_fs_long_pct,
+            "dii_future_stock_net": dii_stat.get("future_stock_net", 0),
+            "dii_future_stock_long_pct": dii_fs_long_pct,
+            "pro_future_stock_net": pro_stat.get("future_stock_net", 0),
+            "pro_future_stock_long_pct": pro_fs_long_pct,
+            "client_future_stock_net": client_stat.get("future_stock_net", 0),
+            "client_future_stock_long_pct": client_fs_long_pct,
+            # Options Net Open Interest (Calls Net vs Puts Net)
+            "fii_calls_net": fii_c_net,
+            "fii_puts_net": fii_p_net,
+            "pro_calls_net": pro_c_net,
+            "pro_puts_net": pro_p_net,
+            "client_calls_net": client_c_net,
+            "client_puts_net": client_p_net,
             # Consolidated F&O Positioning
             "fii_net_contracts": fii_stat.get("net_contracts", 0),
             "fii_long_short_ratio": fii_stat.get("long_short_ratio", 1.0),
@@ -1228,11 +1484,73 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             d_fs_net = t_stat.get("future_stock_net", 0) - y_stat.get("future_stock_net", 0)
             d_fs_long = t_stat.get("future_stock_long", 0) - y_stat.get("future_stock_long", 0)
             d_fs_short = t_stat.get("future_stock_short", 0) - y_stat.get("future_stock_short", 0)
+            t_fs_tot = t_stat.get("future_stock_long", 0) + t_stat.get("future_stock_short", 0)
+            y_fs_tot = y_stat.get("future_stock_long", 0) + y_stat.get("future_stock_short", 0)
+            t_fs_long_pct = round((t_stat.get("future_stock_long", 0) / max(1, t_fs_tot)) * 100.0, 1)
+            y_fs_long_pct = round((y_stat.get("future_stock_long", 0) / max(1, y_fs_tot)) * 100.0, 1)
+            d_fs_long_pct = round(t_fs_long_pct - y_fs_long_pct, 1)
 
-            d_call_long = t_stat.get("opt_index_call_long", 0) - y_stat.get("opt_index_call_long", 0)
-            d_call_short = t_stat.get("opt_index_call_short", 0) - y_stat.get("opt_index_call_short", 0)
-            d_put_long = t_stat.get("opt_index_put_long", 0) - y_stat.get("opt_index_put_long", 0)
-            d_put_short = t_stat.get("opt_index_put_short", 0) - y_stat.get("opt_index_put_short", 0)
+            stock_regime, stock_badge, stock_desc = _classify_oi_regime(d_fs_net, d_fs_long, d_fs_short)
+
+            t_calls_long = t_stat.get("calls_long", 0)
+            t_calls_short = t_stat.get("calls_short", 0)
+            t_puts_long = t_stat.get("puts_long", 0)
+            t_puts_short = t_stat.get("puts_short", 0)
+
+            y_calls_long = y_stat.get("calls_long", 0)
+            y_calls_short = y_stat.get("calls_short", 0)
+            y_puts_long = y_stat.get("puts_long", 0)
+            y_puts_short = y_stat.get("puts_short", 0)
+
+            d_call_long = t_calls_long - y_calls_long
+            d_call_short = t_calls_short - y_calls_short
+            d_call_net = (t_calls_long - t_calls_short) - (y_calls_long - y_calls_short)
+
+            d_put_long = t_puts_long - y_puts_long
+            d_put_short = t_puts_short - y_puts_short
+            d_put_net = (t_puts_long - t_puts_short) - (y_puts_long - y_puts_short)
+
+            t_opt_pcr = round((t_puts_long + t_puts_short) / max(1, t_calls_long + t_calls_short), 2)
+            y_opt_pcr = round((y_puts_long + y_puts_short) / max(1, y_calls_long + y_calls_short), 2)
+            d_opt_pcr = round(t_opt_pcr - y_opt_pcr, 2)
+
+            # Option posture classification
+            if p_code == "PRO":
+                if t_puts_short > t_puts_long and t_calls_short > t_calls_long:
+                    opt_stance = "⚡ Strangle Writing (MM Corridor)"
+                    opt_badge = "⚡ Strangle Writing"
+                elif t_puts_short > t_puts_long:
+                    opt_stance = "🟢 Support Writing (Floor Defense)"
+                    opt_badge = "🟢 Support Writing"
+                elif t_calls_short > t_calls_long:
+                    opt_stance = "🔴 Resistance Writing (Overhead Cap)"
+                    opt_badge = "🔴 Resistance Writing"
+                else:
+                    opt_stance = "⚪ Balanced Options"
+                    opt_badge = "⚪ Balanced Options"
+            elif p_code == "FII":
+                if t_puts_long > t_puts_short and t_opt_pcr >= 1.2:
+                    opt_stance = "🛡️ Put Tail-Risk Hedging"
+                    opt_badge = "🛡️ Put Hedge"
+                elif t_calls_long > t_calls_short and t_opt_pcr <= 0.85:
+                    opt_stance = "🟢 Long Call Momentum Speculation"
+                    opt_badge = "🟢 Long Calls"
+                else:
+                    opt_stance = "⚪ Hedged Options Book"
+                    opt_badge = "⚪ Hedged Options"
+            elif p_code == "CLIENT":
+                if t_calls_long > t_calls_short * 1.3:
+                    opt_stance = "🟢 Retail Long Call Bias"
+                    opt_badge = "🟢 Long Calls"
+                elif t_puts_long > t_puts_short * 1.3:
+                    opt_stance = "🔴 Retail Long Put Bias"
+                    opt_badge = "🔴 Long Puts"
+                else:
+                    opt_stance = "⚪ Retail Balanced"
+                    opt_badge = "⚪ Retail Balanced"
+            else:
+                opt_stance = "⚪ Passive Derivatives Float"
+                opt_badge = "⚪ Passive"
 
             d_net = t_stat.get("net_contracts", 0) - y_stat.get("net_contracts", 0)
             d_long = t_stat.get("total_long", 0) - y_stat.get("total_long", 0)
@@ -1247,13 +1565,29 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 "delta_future_index_long": d_fi_long,
                 "delta_future_index_short": d_fi_short,
                 "delta_future_index_long_pct": d_fi_long_pct,
+                # Stock Futures
+                "future_stock_long_pct": t_fs_long_pct,
                 "delta_future_stock_net": d_fs_net,
                 "delta_future_stock_long": d_fs_long,
                 "delta_future_stock_short": d_fs_short,
+                "delta_future_stock_long_pct": d_fs_long_pct,
+                "stock_shift_regime": stock_regime,
+                "stock_shift_badge": stock_badge,
+                "stock_shift_desc": stock_desc,
+                # Options Anatomy
+                "calls_net": t_calls_long - t_calls_short,
+                "puts_net": t_puts_long - t_puts_short,
                 "delta_call_long": d_call_long,
                 "delta_call_short": d_call_short,
+                "delta_call_net": d_call_net,
                 "delta_put_long": d_put_long,
                 "delta_put_short": d_put_short,
+                "delta_put_net": d_put_net,
+                "option_pcr": t_opt_pcr,
+                "delta_option_pcr": d_opt_pcr,
+                "option_stance": opt_stance,
+                "option_stance_badge": opt_badge,
+                # Consolidated Totals
                 "delta_net_contracts": d_net,
                 "delta_long_contracts": d_long,
                 "delta_short_contracts": d_short,
@@ -1282,13 +1616,26 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 "delta_future_index_long": 0,
                 "delta_future_index_short": 0,
                 "delta_future_index_long_pct": 0.0,
+                "future_stock_long_pct": 50.0,
                 "delta_future_stock_net": 0,
                 "delta_future_stock_long": 0,
                 "delta_future_stock_short": 0,
+                "delta_future_stock_long_pct": 0.0,
+                "stock_shift_regime": "Baseline",
+                "stock_shift_badge": "⚪ Baseline",
+                "stock_shift_desc": "Baseline",
+                "calls_net": 0,
+                "puts_net": 0,
                 "delta_call_long": 0,
                 "delta_call_short": 0,
+                "delta_call_net": 0,
                 "delta_put_long": 0,
                 "delta_put_short": 0,
+                "delta_put_net": 0,
+                "option_pcr": 1.0,
+                "delta_option_pcr": 0.0,
+                "option_stance": "⚪ Baseline",
+                "option_stance_badge": "⚪ Baseline",
                 "delta_net_contracts": 0,
                 "delta_long_contracts": 0,
                 "delta_short_contracts": 0,
@@ -1330,12 +1677,16 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 d_fi_long_pct = round(c_stat.get("future_index_long_pct", 50.0) - n_stat.get("future_index_long_pct", 50.0), 1)
 
                 d_fs_net = c_stat.get("future_stock_net", 0) - n_stat.get("future_stock_net", 0)
+                d_fs_long = c_stat.get("future_stock_long", 0) - n_stat.get("future_stock_long", 0)
+                d_fs_short = c_stat.get("future_stock_short", 0) - n_stat.get("future_stock_short", 0)
+
                 d_net = c_stat.get("net_contracts", 0) - n_stat.get("net_contracts", 0)
                 d_long = c_stat.get("total_long", 0) - n_stat.get("total_long", 0)
                 d_short = c_stat.get("total_short", 0) - n_stat.get("total_short", 0)
                 d_ls = round(c_stat.get("long_short_ratio", 1.0) - n_stat.get("long_short_ratio", 1.0), 3)
 
                 regime, badge, desc = _classify_oi_regime(d_fi_net, d_fi_long, d_fi_short)
+                s_regime, s_badge, _ = _classify_oi_regime(d_fs_net, d_fs_long, d_fs_short)
             else:
                 d_fi_net = 0
                 d_fi_long = 0
@@ -1349,6 +1700,8 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 regime = "Baseline"
                 badge = "⚪ Baseline"
                 desc = "Initial observation baseline"
+                s_regime = "Baseline"
+                s_badge = "⚪ Baseline"
 
             p_delta_bundle = {
                 "delta_future_index_net": d_fi_net,
@@ -1357,6 +1710,9 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 "delta_future_index_short": d_fi_short,
                 "delta_future_index_long_pct": d_fi_long_pct,
                 "delta_future_stock_net": d_fs_net,
+                "future_stock_delta": d_fs_net,
+                "stock_shift_regime": s_regime,
+                "stock_shift_badge": s_badge,
                 "delta_net_contracts": d_net,
                 "delta_long_contracts": d_long,
                 "delta_short_contracts": d_short,
@@ -1374,20 +1730,25 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         curr_row["fii_delta_index_net"] = row_deltas["fii"]["delta_future_index_net"]
         curr_row["fii_future_index_delta"] = row_deltas["fii"]["delta_future_index_net"]
         curr_row["fii_delta_index_long_pct"] = row_deltas["fii"]["delta_future_index_long_pct"]
+        curr_row["fii_delta_stock_net"] = row_deltas["fii"]["delta_future_stock_net"]
         curr_row["fii_delta_net_contracts"] = row_deltas["fii"]["delta_net_contracts"]
         curr_row["fii_shift_regime"] = row_deltas["fii"]["shift_regime"]
         curr_row["fii_shift_badge"] = row_deltas["fii"]["shift_badge"]
+        curr_row["fii_stock_shift_badge"] = row_deltas["fii"]["stock_shift_badge"]
 
         curr_row["dii_delta_index_net"] = row_deltas["dii"]["delta_future_index_net"]
         curr_row["dii_future_index_delta"] = row_deltas["dii"]["delta_future_index_net"]
+        curr_row["dii_delta_stock_net"] = row_deltas["dii"]["delta_future_stock_net"]
         curr_row["dii_shift_badge"] = row_deltas["dii"]["shift_badge"]
 
         curr_row["pro_delta_index_net"] = row_deltas["pro"]["delta_future_index_net"]
         curr_row["pro_future_index_delta"] = row_deltas["pro"]["delta_future_index_net"]
+        curr_row["pro_delta_stock_net"] = row_deltas["pro"]["delta_future_stock_net"]
         curr_row["pro_shift_badge"] = row_deltas["pro"]["shift_badge"]
 
         curr_row["client_delta_index_net"] = row_deltas["client"]["delta_future_index_net"]
         curr_row["client_future_index_delta"] = row_deltas["client"]["delta_future_index_net"]
+        curr_row["client_delta_stock_net"] = row_deltas["client"]["delta_future_stock_net"]
         curr_row["client_shift_badge"] = row_deltas["client"]["shift_badge"]
 
     history_7d = history_30d[:7]
@@ -1594,6 +1955,25 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "pro_index_long_pct_delta": delta_metrics.get("PRO", {}).get("future_index_long_pct_delta", 0.0),
             "dii_index_long_pct_delta": delta_metrics.get("DII", {}).get("future_index_long_pct_delta", 0.0),
         },
+        "stock_futures_summary": {
+            "fii_stock_net": int(fii_p.get("future_stock_net", 0)),
+            "dii_stock_net": int(dii_p.get("future_stock_net", 0)),
+            "pro_stock_net": int(pro_p.get("future_stock_net", 0)),
+            "client_stock_net": int(client_p.get("future_stock_net", 0)),
+            "fii_stock_long_pct": delta_metrics.get("FII", {}).get("future_stock_long_pct", 50.0),
+            "client_stock_long_pct": delta_metrics.get("CLIENT", {}).get("future_stock_long_pct", 50.0),
+            "fii_stock_delta": delta_metrics.get("FII", {}).get("delta_future_stock_net", 0),
+            "client_stock_delta": delta_metrics.get("CLIENT", {}).get("delta_future_stock_net", 0),
+            "fii_stock_regime": delta_metrics.get("FII", {}).get("stock_shift_regime", "Baseline"),
+        },
+        "options_summary": {
+            "pro_stance": delta_metrics.get("PRO", {}).get("option_stance", "Balanced"),
+            "fii_stance": delta_metrics.get("FII", {}).get("option_stance", "Balanced"),
+            "client_stance": delta_metrics.get("CLIENT", {}).get("option_stance", "Balanced"),
+            "fii_pcr": delta_metrics.get("FII", {}).get("option_pcr", 1.0),
+            "pro_pcr": delta_metrics.get("PRO", {}).get("option_pcr", 1.0),
+            "client_pcr": delta_metrics.get("CLIENT", {}).get("option_pcr", 1.0),
+        },
         "history_7d": history_7d,
         "history_10d": history_10d,
         "history_30d": history_30d,
@@ -1621,6 +2001,10 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "commentary": commentary,
         "chart_series_10d": chart_series_10d,
         "chart_series_30d": chart_series_30d,
+        "as_of": latest_date_str,
+        "as_of_ist": format_iso_to_ist(next((p.get("updated_at") for p in participants_list if p.get("updated_at")), None)) or f"{session_label} (EOD)",
+        "updated_at": next((p.get("updated_at") for p in participants_list if p.get("updated_at")), None) or datetime.now(timezone.utc).isoformat(),
+        "data_freshness": "EOD_SETTLED",
     }
 
     _PARTICIPANT_OI_CACHE = {"ts": now_ts, "data": oi_payload}
@@ -1634,18 +2018,21 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
 def compute_market_sentiment_matrix(
     settings: Settings | None = None,
     indices_data: list[dict[str, Any]] | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Compute Fear & Greed score, Market Breadth, Volatility Matrix, and 30D macro time-series."""
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
     if indices_data is None:
-        indices_data = compute_indices_quotes(settings)
+        indices_data = compute_indices_quotes(settings=settings, force_refresh=force_refresh)
 
     vix_level = 13.8
+    vix_1d_pct = 0.0
     for idx in indices_data:
         if idx["symbol"] == "^INDIAVIX":
-            vix_level = idx["current_price"]
+            vix_level = float(idx["current_price"])
+            vix_1d_pct = float(idx.get("change_pct", 0.0))
 
     vix_regime = get_volatility_regime(vix_level)
     nifty_1d = indices_data[0]["change_pct"] if indices_data else 0.5
@@ -1743,19 +2130,54 @@ def compute_market_sentiment_matrix(
         "bank_nifty": [],
     }
 
+    change_7d = 0.0
+    target_dates: list[str] = []
     try:
-        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' ORDER BY date DESC LIMIT 30").fetchall()
-        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' ORDER BY date DESC LIMIT 30").fetchall()
-        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' ORDER BY date DESC LIMIT 30").fetchall()
+        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
 
-        vix_map = {r[0]: float(r[1]) for r in vix_rows if r[1] is not None}
-        nifty_map = {r[0]: float(r[1]) for r in nifty_rows if r[1] is not None}
-        bank_map = {r[0]: float(r[1]) for r in bank_rows if r[1] is not None}
+        expected_date = get_expected_latest_trading_date()
+        latest_nifty_date = nifty_rows[0][0] if nifty_rows else ""
+        latest_vix_date = vix_rows[0][0] if vix_rows else ""
+        needs_sync = (
+            force_refresh
+            or len(nifty_rows) < 10
+            or len(vix_rows) < 10
+            or (expected_date and latest_nifty_date < expected_date)
+            or (expected_date and latest_vix_date < expected_date)
+        )
 
-        chart_dates_raw = [r[0] for r in nifty_rows if r[0]]
-        if not chart_dates_raw:
-            chart_dates_raw = [datetime.now(timezone.utc).strftime("%Y-%m-%d")]
-        chart_dates = list(reversed(chart_dates_raw[:30]))
+        if needs_sync:
+            try:
+                from earnings_engine.data.prices import fetch_prices
+                if force_refresh or len(nifty_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                    fetch_prices("^NSEI", settings, force=True)
+                    nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                if force_refresh or len(vix_rows) < 10 or (expected_date and latest_vix_date < expected_date):
+                    fetch_prices("^INDIAVIX", settings, force=True)
+                    vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                if force_refresh or len(bank_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                    fetch_prices("^NSEBANK", settings, force=True)
+                    bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+            except Exception as e_fetch:
+                logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
+
+        nifty_chrono = list(reversed(nifty_rows))
+        vix_chrono = list(reversed(vix_rows))
+        bank_chrono = list(reversed(bank_rows))
+
+        vix_map = {r[0]: float(r[1]) for r in vix_chrono if r[1] is not None}
+        nifty_map = {r[0]: float(r[1]) for r in nifty_chrono if r[1] is not None}
+        bank_map = {r[0]: float(r[1]) for r in bank_chrono if r[1] is not None}
+
+        all_dates_chrono = [r[0] for r in nifty_chrono if r[0]]
+        if not all_dates_chrono:
+            all_dates_chrono = [r[0] for r in vix_chrono if r[0]]
+        if not all_dates_chrono:
+            all_dates_chrono = [datetime.now(timezone.utc).strftime("%Y-%m-%d")]
+
+        target_dates = all_dates_chrono[-30:] if len(all_dates_chrono) >= 30 else all_dates_chrono
 
         fg_series = []
         vix_series = []
@@ -1766,27 +2188,45 @@ def compute_market_sentiment_matrix(
         last_known_nifty = 24800.0
         last_known_bank = 53000.0
 
-        for dt_s in chart_dates:
+        for i, dt_s in enumerate(target_dates):
             v_val = vix_map.get(dt_s, last_known_vix)
             last_known_vix = v_val
-            vix_series.append({"date": dt_s, "value": v_val})
+            vix_series.append({"date": dt_s, "value": round(v_val, 2), "close": round(v_val, 2)})
 
             n_val = nifty_map.get(dt_s, last_known_nifty)
             last_known_nifty = n_val
-            nifty_series.append({"date": dt_s, "value": n_val})
+            nifty_series.append({"date": dt_s, "value": round(n_val, 2), "close": round(n_val, 2)})
 
             b_val = bank_map.get(dt_s, last_known_bank)
             last_known_bank = b_val
-            bank_series.append({"date": dt_s, "value": b_val})
+            bank_series.append({"date": dt_s, "value": round(b_val, 2), "close": round(b_val, 2)})
 
-            v_factor = max(10.0, min(95.0, 100.0 - (v_val - 10.0) * 4.5)) if v_val else 50.0
-            m_factor = 50.0 + ((n_val - 24500.0) / 24500.0) * 100.0 if n_val else 50.0
-            fg_val = round((v_factor * 0.4) + (m_factor * 0.4) + 60.0 * 0.2, 1)
-            fg_val = max(10.0, min(90.0, fg_val))
-            fg_series.append({"date": dt_s, "value": fg_val})
+            full_idx = next((idx for idx, r in enumerate(nifty_chrono) if r[0] == dt_s), -1)
+            if full_idx >= 5 and nifty_chrono[full_idx - 5][1]:
+                prev_n5 = float(nifty_chrono[full_idx - 5][1])
+                ret_5d = ((n_val - prev_n5) / prev_n5) * 100.0 if prev_n5 > 0 else 0.0
+            elif full_idx >= 1 and nifty_chrono[full_idx - 1][1]:
+                prev_n1 = float(nifty_chrono[full_idx - 1][1])
+                ret_5d = (((n_val - prev_n1) / prev_n1) * 100.0) * 2.2 if prev_n1 > 0 else 0.0
+            else:
+                ret_5d = 0.5
+
+            hist_mom_factor = max(15.0, min(90.0, 50.0 + ret_5d * 10.0))
+            hist_vix_factor = max(10.0, min(95.0, 100.0 - (v_val - 10.0) * 4.5)) if v_val else 50.0
+            hist_breadth_factor = max(20.0, min(85.0, 50.0 + ret_5d * 5.0))
+            hist_safe_haven = 58.0
+
+            hist_fg = round(
+                (hist_vix_factor * 0.35) + (hist_mom_factor * 0.35) + (hist_breadth_factor * 0.15) + (hist_safe_haven * 0.15),
+                1,
+            )
+            hist_fg = max(5.0, min(95.0, hist_fg))
+            fg_series.append({"date": dt_s, "value": hist_fg, "score": hist_fg})
+
+        change_7d = round(fg_series[-1]["value"] - fg_series[-7]["value"], 1) if len(fg_series) >= 7 else 0.0
 
         macro_charts = {
-            "dates": chart_dates,
+            "dates": target_dates,
             "fear_greed": fg_series,
             "vix": vix_series,
             "nifty": nifty_series,
@@ -1795,11 +2235,24 @@ def compute_market_sentiment_matrix(
     except Exception as e:
         logger.debug("[MARKET_PULSE] Macro charts generation issue: %s", e)
 
+    now_utc = datetime.now(timezone.utc)
+    as_of_iso = now_utc.isoformat()
+    as_of_ist = format_iso_to_ist(as_of_iso)
+    session_date = target_dates[-1] if target_dates else now_utc.strftime("%Y-%m-%d")
+    market_open_now = is_market_open(time.time())
+
     return {
+        "as_of": as_of_iso,
+        "as_of_ist": as_of_ist,
+        "session_date": session_date,
+        "data_freshness": "LIVE_INTRADAY" if market_open_now else "EOD_SETTLED",
+        "freshness_badge": "🟢 Live Tick" if market_open_now else "📊 EOD Snapshot",
+        "updated_at": as_of_iso,
         "fear_greed_score": fear_greed_score,
         "fear_greed_label": fear_greed_label,
         "fear_greed_color": fear_greed_color,
         "fear_greed_desc": fear_greed_desc,
+        "change_7d": change_7d,
         "sub_factors": {
             "vix_factor": round(vix_factor, 1),
             "momentum_factor": round(momentum_factor, 1),
@@ -1807,6 +2260,7 @@ def compute_market_sentiment_matrix(
             "safe_haven_factor": round(safe_haven_factor, 1),
         },
         "vix_level": round(vix_level, 2),
+        "vix_1d_pct": round(vix_1d_pct, 2),
         "vix_regime": vix_regime,
         "breadth": {
             "advances": advances,
@@ -2374,7 +2828,7 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     liquidity = compute_net_cash_liquidity(settings=settings, force_refresh=force_refresh)
 
     # 4. Modular Sentiment, VIX, and Breadth
-    sentiment_data = compute_market_sentiment_matrix(settings=settings, indices_data=indices_data)
+    sentiment_data = compute_market_sentiment_matrix(settings=settings, indices_data=indices_data, force_refresh=force_refresh)
 
     # 5. Modular Participant Derivatives OI & Long/Short Positioning Matrix
     participant_oi = compute_participant_oi_matrix(settings=settings, force_refresh=force_refresh)
@@ -2397,6 +2851,19 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "market_status": "OPEN" if is_market_open(now_ts) else "CLOSED",
         "market_status_label": "🟢 Market Open" if is_market_open(now_ts) else "🔴 Market Closed (EOD Data)",
+        "timestamps": {
+            "sentiment_as_of": sentiment_data.get("as_of"),
+            "sentiment_as_of_ist": sentiment_data.get("as_of_ist"),
+            "session_date": sentiment_data.get("session_date"),
+            "data_freshness": sentiment_data.get("data_freshness"),
+            "freshness_badge": sentiment_data.get("freshness_badge"),
+            "vix_as_of": sentiment_data.get("as_of"),
+            "vix_as_of_ist": sentiment_data.get("as_of_ist"),
+            "fii_dii_latest_arrival_ist": liquidity.get("latest_arrived_at_ist"),
+            "fii_dii_next_release": liquidity.get("next_release_schedule"),
+            "participant_oi_as_of": participant_oi.get("as_of_date"),
+            "participant_oi_as_of_ist": participant_oi.get("as_of_ist"),
+        },
         "indices": indices_data,
         "fear_greed_score": sentiment_data["fear_greed_score"],
         "fear_greed_label": sentiment_data["fear_greed_label"],
@@ -2419,6 +2886,9 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         "vix_regime": sentiment_data["vix_regime"],
         "breadth": sentiment_data["breadth"],
         "institutional_flows": liquidity,
+        "liquidity": liquidity,
+        "sentiment": sentiment_data,
+        "playbook": next_day_playbook,
         "fii_net_cr": liquidity["fii_net_cr"],
         "dii_net_cr": liquidity["dii_net_cr"],
         "total_net_cr": liquidity["total_net_cr"],

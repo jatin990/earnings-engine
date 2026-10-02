@@ -1,9 +1,89 @@
 // trips_detail.js — Task 6 render functions (auto-generated)
 
+let trekMap = null;
+let trekPolyline = null;
+
+// ---- Trek Route Map (Leaflet + OpenStreetMap) ----
+function initTrekMap() {
+    const mapEl = document.getElementById('trekMap');
+    if (!mapEl) return;
+    if (trekMap) { trekMap.remove(); trekMap = null; }
+
+    // Trek waypoints: [lat, lng, label, day]
+    const waypoints = [
+        [28.2096, 83.9855, "Pokhara (Start)", 1],
+        [28.3667, 83.7333, "Nayapul Trailhead", 2],
+        [28.4972, 83.7378, "Tikhedhunga", 2],
+        [28.5397, 83.7208, "Ghorepani", 3],
+        [28.5333, 83.7167, "Poon Hill (3210m)", 4],
+        [28.5583, 83.7167, "Tadapani", 4],
+        [28.5833, 83.7500, "Chhomrong", 5],
+        [28.6333, 83.7833, "Bamboo", 6],
+        [28.6667, 83.8167, "Deurali", 7],
+        [28.7089, 83.9583, "Machhapuchhre BC (MBC)", 8],
+        [28.7167, 84.0833, "Annapurna Base Camp (4130m)", 8],
+        [28.6333, 83.7833, "Bamboo (Return)", 9],
+        [28.3667, 83.7333, "Nayapul (Return)", 10],
+        [28.2096, 83.9855, "Pokhara", 10],
+        [28.4167, 83.7000, "Kushma Bungee (228m)", 11],
+    ];
+
+    // Remove old map container content and rebuild
+    mapEl.innerHTML = '';
+
+    // Add title above map
+    const title = document.createElement('p');
+    title.className = 'text-xs text-slate-400 mb-2 px-1';
+    title.textContent = 'Trek route — OpenStreetMap (click markers for day info)';
+    mapEl.appendChild(title);
+
+    const mapDiv = document.createElement('div');
+    mapDiv.style.height = '350px';
+    mapDiv.style.borderRadius = '12px';
+    mapEl.appendChild(mapDiv);
+
+    trekMap = L.map(mapDiv).setView([28.55, 83.88], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 17,
+    }).addTo(trekMap);
+
+    const routeCoords = waypoints.map(w => [w[0], w[1]]);
+
+    // Draw route polyline
+    trekPolyline = L.polyline(routeCoords, {
+        color: '#0ea5e9',
+        weight: 3,
+        opacity: 0.85,
+        dashArray: '6 4',
+    }).addTo(trekMap);
+
+    // Add numbered day markers
+    waypoints.forEach((w, i) => {
+        const isStart = i === 0;
+        const isEnd = i === waypoints.length - 1;
+        const isABC = w[2].includes('ABC');
+        const isBungee = w[2].includes('Bungee');
+        const color = isABC ? '#ef4444' : isBungee ? '#22c55e' : isStart || isEnd ? '#3b82f6' : '#6366f1';
+        const radius = isABC || isBungee ? 9 : 6;
+
+        L.circleMarker([w[0], w[1]], {
+            radius, color, fillColor: color, fillOpacity: 0.9, weight: 2,
+        }).addTo(trekMap)
+          .bindPopup(`<b>Day ${w[3]}:</b> ${w[2]}`);
+    });
+
+    trekMap.fitBounds(trekPolyline.getBounds(), { padding: [20, 20] });
+}
+
 // ---- Block 4 ----
 function renderItinerary() {
     const container = document.getElementById('detail-tab-itinerary');
     if (!container) return;
+
+    // Init Leaflet trek map
+    initTrekMap();
 
     // Day table
     const diffColors = {

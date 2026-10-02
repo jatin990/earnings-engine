@@ -164,7 +164,11 @@ class NSEDirectProvider(DataProvider):
                 logger.info("[JUGAAD:RESP] stock_df(%s) -> 0 rows (%.1fms)", clean_symbol, elapsed_ms)
         except Exception as e:
             elapsed_ms = (time.perf_counter() - t0_j) * 1000
-            logger.warning("[JUGAAD:FAIL] stock_df(%s) failed after %.1fms: %s", clean_symbol, elapsed_ms, e)
+            err_msg = str(e)
+            if "CH_TIMESTAMP" in err_msg and "are in the [columns]" in err_msg:
+                logger.warning("[JUGAAD:FAIL] stock_df(%s) returned no historical data on NSE (symbol may be invalid, delisted, or renamed) after %.1fms", clean_symbol, elapsed_ms)
+            else:
+                logger.warning("[JUGAAD:FAIL] stock_df(%s) failed after %.1fms: %s", clean_symbol, elapsed_ms, e)
 
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 

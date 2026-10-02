@@ -7,11 +7,11 @@
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Total Net Income</span>
-                <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="incCountBadge">0 Records</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="incCountBadge">0 Records</span>
             </div>
             <div class="my-1.5">
                 <div class="text-xl sm:text-2xl font-black font-mono text-emerald-400 tracking-tight" id="incTotalNet">₹0</div>
-                <div class="text-[11px] text-slate-400 mt-0.5 flex items-center justify-between">
+                <div class="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
                     <span>Gross: <strong class="text-white font-mono" id="incTotalGross">₹0</strong></span>
                     <span>TDS: <strong class="text-rose-400 font-mono" id="incTotalDeductions">₹0</strong></span>
                 </div>
@@ -25,32 +25,32 @@
         <!-- 2. Jatin Abrol's Share -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400" id="incPartner1Label">Jatin Abrol</span>
-                <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono" id="incPartner1PctBadge">50.0% Share</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300" id="incPartner1Label">Jatin Abrol</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="incPartner1PctBadge">50.0% Share</span>
             </div>
             <div class="my-1.5">
-                <div class="text-xl sm:text-2xl font-black font-mono text-amber-300 tracking-tight" id="incPartner1Total">₹0</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Partner 1 Net Distribution</div>
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="incPartner1Total">₹0</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Partner 1 Net Distribution</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between items-center">
                 <span>Status:</span>
-                <span class="font-mono font-bold text-amber-300">Live Calculated</span>
+                <span class="font-mono font-bold text-slate-300">Live Calculated</span>
             </div>
         </div>
 
         <!-- 3. Harshiv Bargotra's Share -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400" id="incPartner2Label">Harshiv Bargotra</span>
-                <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono" id="incPartner2PctBadge">50.0% Share</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300" id="incPartner2Label">Harshiv Bargotra</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="incPartner2PctBadge">50.0% Share</span>
             </div>
             <div class="my-1.5">
-                <div class="text-xl sm:text-2xl font-black font-mono text-sky-300 tracking-tight" id="incPartner2Total">₹0</div>
-                <div class="text-[11px] text-slate-400 mt-0.5">Partner 2 Net Distribution</div>
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="incPartner2Total">₹0</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Partner 2 Net Distribution</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between items-center">
                 <span>Status:</span>
-                <span class="font-mono font-bold text-sky-300">Live Calculated</span>
+                <span class="font-mono font-bold text-slate-300">Live Calculated</span>
             </div>
         </div>
 
@@ -58,18 +58,18 @@
         <div class="glass-panel p-3.5 flex flex-col justify-between col-span-2 md:col-span-2">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Profit Split Ratio</span>
-                <button type="button" onclick="zeptoApp.openIncomeSplitModal()" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white border border-white/15 transition flex items-center gap-1 shadow-sm">
+                <button type="button" onclick="zeptoApp.openIncomeSplitModal()" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-white border border-white/15 transition flex items-center gap-1 shadow-sm">
                     <span>⚙️</span> Customize %
                 </button>
             </div>
             <div class="my-1.5 space-y-1.5">
                 <div class="flex items-center justify-between text-xs font-bold font-mono">
-                    <span class="text-amber-300" id="splitBarLabel1">Jatin: 50%</span>
-                    <span class="text-sky-300" id="splitBarLabel2">Harshiv: 50%</span>
+                    <span class="text-white" id="splitBarLabel1">Jatin: 50%</span>
+                    <span class="text-slate-400" id="splitBarLabel2">Harshiv: 50%</span>
                 </div>
                 <div class="w-full bg-black rounded-full h-2 overflow-hidden flex border border-white/10">
-                    <div id="incSplitBarP1" class="bg-amber-400 h-2 transition-all duration-500" style="width: 50%"></div>
-                    <div id="incSplitBarP2" class="bg-sky-400 h-2 transition-all duration-500" style="width: 50%"></div>
+                    <div id="incSplitBarP1" class="bg-white/80 h-2 transition-all duration-500" style="width: 50%"></div>
+                    <div id="incSplitBarP2" class="bg-white/30 h-2 transition-all duration-500" style="width: 50%"></div>
                 </div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
@@ -93,10 +93,10 @@
             <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex items-center justify-between">
                     <span class="text-xs">🛍️</span>
-                    <span class="text-[10px] font-bold text-emerald-400">Commission</span>
+                    <span class="text-[10px] font-bold text-slate-300">Commission</span>
                 </div>
                 <div class="mt-2">
-                    <div class="text-sm font-black font-mono text-emerald-300" id="srcTotal-COMMISSION">₹0</div>
+                    <div class="text-sm font-black font-mono text-emerald-400" id="srcTotal-COMMISSION">₹0</div>
                     <div class="text-[9px] text-slate-400 truncate">Store Order Margin</div>
                 </div>
             </div>
@@ -105,7 +105,7 @@
             <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex items-center justify-between">
                     <span class="text-xs">🚀</span>
-                    <span class="text-[10px] font-bold text-white">Incentives</span>
+                    <span class="text-[10px] font-bold text-slate-300">Incentives</span>
                 </div>
                 <div class="mt-2">
                     <div class="text-sm font-black font-mono text-white" id="srcTotal-GROWTH_INCENTIVE">₹0</div>
@@ -117,10 +117,10 @@
             <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex items-center justify-between">
                     <span class="text-xs">🏷️</span>
-                    <span class="text-[10px] font-bold text-sky-300">Brand Slotting</span>
+                    <span class="text-[10px] font-bold text-slate-300">Brand Slotting</span>
                 </div>
                 <div class="mt-2">
-                    <div class="text-sm font-black font-mono text-sky-300" id="srcTotal-ORDER_SLOTTING">₹0</div>
+                    <div class="text-sm font-black font-mono text-white" id="srcTotal-ORDER_SLOTTING">₹0</div>
                     <div class="text-[9px] text-slate-400 truncate">Priority Placement</div>
                 </div>
             </div>
@@ -129,10 +129,10 @@
             <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex items-center justify-between">
                     <span class="text-xs">⚡</span>
-                    <span class="text-[10px] font-bold text-amber-300">Delivery Margin</span>
+                    <span class="text-[10px] font-bold text-slate-300">Delivery Margin</span>
                 </div>
                 <div class="mt-2">
-                    <div class="text-sm font-black font-mono text-amber-300" id="srcTotal-DELIVERY_SURCHARGE">₹0</div>
+                    <div class="text-sm font-black font-mono text-white" id="srcTotal-DELIVERY_SURCHARGE">₹0</div>
                     <div class="text-[9px] text-slate-400 truncate">Peak & Rain Margins</div>
                 </div>
             </div>
@@ -177,12 +177,13 @@
             </select>
 
             <!-- Month Filter -->
-            <select id="incMonthFilter" onchange="zeptoApp.filterIncome()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Scope:</span>
+                <span id="incActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
+            </div>
+            <!-- Legacy hidden select for compatibility with filterIncome() -->
+            <select id="incMonthFilter" onchange="zeptoApp.filterIncome()" class="hidden">
                 <option value="ALL" selected>All Months</option>
-                <option value="2026-08">August 2026</option>
-                <option value="2026-07">July 2026</option>
-                <option value="2026-06">June 2026</option>
-                <option value="2026-05">May 2026</option>
             </select>
 
             <button type="button" onclick="zeptoApp.resetIncomeFilters()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition">
@@ -211,9 +212,9 @@
                         <th class="p-2.5">Date & Month</th>
                         <th class="p-2.5 text-right">Gross (₹)</th>
                         <th class="p-2.5 text-right">TDS / Ded (₹)</th>
-                        <th class="p-2.5 text-right">Net Payout (₹)</th>
-                        <th class="p-2.5 text-right text-amber-300">Jatin's Share</th>
-                        <th class="p-2.5 text-right text-sky-300">Harshiv's Share</th>
+                        <th class="p-2.5 text-right text-emerald-400">Net Payout (₹)</th>
+                        <th class="p-2.5 text-right text-white">Jatin's Share</th>
+                        <th class="p-2.5 text-right text-slate-300">Harshiv's Share</th>
                         <th class="p-2.5">Reference UTR</th>
                         <th class="p-2.5 text-center">Proof / Invoice</th>
                         <th class="p-2.5 pr-3.5 text-center">Actions</th>

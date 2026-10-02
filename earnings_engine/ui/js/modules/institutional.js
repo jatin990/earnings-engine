@@ -16,6 +16,7 @@
 
 
 
+    app.institutionalModule = app;
     Object.assign(app, {
 
         // =========================================================================
@@ -44,7 +45,17 @@
 
         },
 
+        // ── Accumulation Table Sort State ──
+        _accSortColumn: null,
+        _accSortAsc: true,
 
+        // ── Distribution Table Sort State ──
+        _distSortColumn: null,
+        _distSortAsc: true,
+
+        // ── Funds Table Sort State ──
+        _fundsSortColumn: null,
+        _fundsSortAsc: true,
 
         switchInstitutionalView(view) {
 
@@ -778,6 +789,183 @@
 
         },
 
+        // ── Sort Accumulating / Distributing Tables (shared column set) ──
+
+        _sortInstitutionalEquities(col, which) {
+            const dataKey = which === 'acc' ? 'accumulating' : 'distributing';
+            const items = this.institutionalData[dataKey];
+            if (!items || !items.length) return;
+
+            const sortKey = which === 'acc' ? '_accSortColumn' : '_distSortColumn';
+            const ascKey  = which === 'acc' ? '_accSortAsc'    : '_distSortAsc';
+
+            if (this[sortKey] === col) {
+                this[ascKey] = !this[ascKey];
+            } else {
+                this[sortKey] = col;
+                this[ascKey]  = (col === 'ticker');
+            }
+
+            const asc = this[ascKey];
+            const factor = asc ? 1 : -1;
+
+            // Stable sort: remember original position for tie-breaking
+            items.forEach((item, idx) => { item._origIdx = idx; });
+
+            items.sort((a, b) => {
+                let vA, vB, cmp;
+                switch (col) {
+                    case 'ticker':
+                        cmp = (a.ticker || '').localeCompare(b.ticker || '');
+                        break;
+                    case 'score':
+                        vA = Number(a.accumulation_score || 0);
+                        vB = Number(b.accumulation_score || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'ret7d':
+                        vA = a.return_7d_pct != null ? Number(a.return_7d_pct) : -9999;
+                        vB = b.return_7d_pct != null ? Number(b.return_7d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'ret30d':
+                        vA = a.return_30d_pct != null ? Number(a.return_30d_pct) : -9999;
+                        vB = b.return_30d_pct != null ? Number(b.return_30d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'funds':
+                        vA = (Number(a.funds_accumulating_count || 0)) - (Number(a.funds_selling_count || 0));
+                        vB = (Number(b.funds_accumulating_count || 0)) - (Number(b.funds_selling_count || 0));
+                        cmp = vA - vB;
+                        break;
+                    case 'flow':
+                        vA = Number(a.increase_amount_cr != null ? a.increase_amount_cr : (a.net_flow_cr || 0));
+                        vB = Number(b.increase_amount_cr != null ? b.increase_amount_cr : (b.net_flow_cr || 0));
+                        cmp = vA - vB;
+                        break;
+                    case 'stake':
+                        vA = Number(a.total_institutional_stake || 0);
+                        vB = Number(b.total_institutional_stake || 0);
+                        cmp = vA - vB;
+                        break;
+                    default:
+                        cmp = 0;
+                }
+                if (cmp !== 0) return factor * cmp;
+                return a._origIdx - b._origIdx; // stable tie-break
+            });
+
+            const prefix = which === 'acc' ? 'acc' : 'dist';
+            ['ticker', 'score', 'ret7d', 'ret30d', 'funds', 'flow', 'stake'].forEach(c => {
+                const icon = document.getElementById(prefix + 'SortIcon-' + c);
+                if (icon) {
+                    if (c === col) {
+                        icon.textContent = asc ? '▲' : '▼';
+                        icon.style.color = '#38bdf8';
+                    } else {
+                        icon.textContent = '↕';
+                        icon.style.color = '#71717a';
+                    }
+                }
+            });
+
+            if (which === 'acc') {
+                this.renderInstitutionalAccumulatingTable(items);
+            } else {
+                this.renderInstitutionalDistributingTable(items);
+            }
+        },
+
+        sortAccumulatingTable(col) {
+            this._sortInstitutionalEquities(col, 'acc');
+        },
+
+        sortDistributingTable(col) {
+            this._sortInstitutionalEquities(col, 'dist');
+        },
+
+        // ── Sort Funds Table ──
+
+        sortFundsTable(col) {
+            const funds = this.institutionalData.funds;
+            if (!funds || !funds.length) return;
+
+            if (this._fundsSortColumn === col) {
+                this._fundsSortAsc = !this._fundsSortAsc;
+            } else {
+                this._fundsSortColumn = col;
+                this._fundsSortAsc = (col === 'name' || col === 'category');
+            }
+
+            const asc = this._fundsSortAsc;
+            const factor = asc ? 1 : -1;
+
+            // Stable sort: remember original position for tie-breaking
+            funds.forEach((f, idx) => { f._origIdx = idx; });
+
+            funds.sort((a, b) => {
+                let vA, vB, cmp;
+                switch (col) {
+                    case 'name':
+                        cmp = (a.fund_name || '').localeCompare(b.fund_name || '');
+                        break;
+                    case 'category':
+                        cmp = (a.fund_type || '').localeCompare(b.fund_type || '');
+                        break;
+                    case 'holdings':
+                        vA = Number(a.total_positions || 0);
+                        vB = Number(b.total_positions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'buying':
+                        vA = Number(a.buying_actions || 0);
+                        vB = Number(b.buying_actions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'selling':
+                        vA = Number(a.selling_actions || 0);
+                        vB = Number(b.selling_actions || 0);
+                        cmp = vA - vB;
+                        break;
+                    case 'ret30d':
+                        vA = a.return_30d_pct != null ? Number(a.return_30d_pct) : -9999;
+                        vB = b.return_30d_pct != null ? Number(b.return_30d_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'ret1y':
+                        vA = a.return_1y_pct != null ? Number(a.return_1y_pct) : -9999;
+                        vB = b.return_1y_pct != null ? Number(b.return_1y_pct) : -9999;
+                        cmp = vA - vB;
+                        break;
+                    case 'aum':
+                        vA = Number(a.total_aum_tracked_cr || 0);
+                        vB = Number(b.total_aum_tracked_cr || 0);
+                        cmp = vA - vB;
+                        break;
+                    default:
+                        cmp = 0;
+                }
+                if (cmp !== 0) return factor * cmp;
+                return a._origIdx - b._origIdx; // stable tie-break
+            });
+
+            ['name', 'category', 'holdings', 'buying', 'selling', 'ret30d', 'ret1y', 'aum'].forEach(c => {
+                const icon = document.getElementById('fundSortIcon-' + c);
+                if (icon) {
+                    if (c === col) {
+                        icon.textContent = asc ? '▲' : '▼';
+                        icon.style.color = '#38bdf8';
+                    } else {
+                        icon.textContent = '↕';
+                        icon.style.color = '#71717a';
+                    }
+                }
+            });
+
+            // Re-apply current investor filter after sorting
+            this.filterInvestors(this._currentInvestorFilter || 'ALL');
+        },
+
 
 
         renderInstitutionalFundsTable(funds) {
@@ -1376,6 +1564,257 @@
 
 
 
+                renderFetchStatusBadge(badgeEl, fetchObj) {
+            if (!badgeEl) return;
+            if (!fetchObj || fetchObj.status === 'UNTRACKED') {
+                badgeEl.textContent = '⚪ Ingestion: Untracked';
+                badgeEl.style.background = 'rgba(255,255,255,0.05)';
+                badgeEl.style.color = '#a1a1aa';
+                badgeEl.style.border = '1px solid rgba(255,255,255,0.15)';
+                badgeEl.title = 'No live filing fetch recorded for this stock yet.';
+                return;
+            }
+
+            const isSuccess = (fetchObj.status || '').toUpperCase() === 'SUCCESS';
+            const timeAgo = fetchObj.time_ago || 'Recently';
+            if (isSuccess) {
+                const src = fetchObj.source === 'EXCHANGE_REGULATORY_FILINGS' ? 'Filings' : (fetchObj.source === 'nse_api' ? 'NSE API' : fetchObj.source || 'Live');
+                const entCount = fetchObj.entities_count != null ? `${fetchObj.entities_count} entities` : 'Verified';
+                badgeEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Ingestion: Success · ${timeAgo} (${src}, ${entCount})`;
+                badgeEl.style.background = 'rgba(16,185,129,0.12)';
+                badgeEl.style.color = '#34d399';
+                badgeEl.style.border = '1px solid rgba(16,185,129,0.35)';
+                badgeEl.title = `Last verified fetch: ${fetchObj.fetched_at || ''} via ${fetchObj.source || ''}`;
+            } else {
+                const err = fetchObj.error_message || 'Fetch failed';
+                badgeEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Ingestion: Failed · ${timeAgo}`;
+                badgeEl.style.background = 'rgba(239,68,68,0.12)';
+                badgeEl.style.color = '#f87171';
+                badgeEl.style.border = '1px solid rgba(239,68,68,0.35)';
+                badgeEl.title = `Error: ${err}`;
+            }
+        },
+
+        loadStockInstitutionalDetails(ticker, autoSwitch = false) {
+            return this.searchInstitutionalStock(ticker, autoSwitch);
+        },
+
+        async triggerStockShareholdingFetch(ticker) {
+            if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnP1 = document.getElementById('btnInstRefreshFetchP1');
+            const btnP3 = document.getElementById('btnInstRefreshFetchP3');
+            const btnForensic = document.getElementById('btnForensicRefreshFetch');
+
+            const p1Err = document.getElementById('instP1IngestErrorBanner');
+            const p3Err = document.getElementById('instP3IngestErrorBanner');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+
+            if (p1Err) p1Err.style.display = 'none';
+            if (p3Err) p3Err.style.display = 'none';
+            if (fErr) fErr.style.display = 'none';
+
+            [btnP1, btnP3, btnForensic].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    if (typeof self.searchInstitutionalStock === 'function') {
+                        await self.searchInstitutionalStock(cleanTicker, false);
+                    }
+                    if (self._smartMoneyForensicDossier && self._smartMoneyForensicDossier.ticker === cleanTicker) {
+                        const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/forensics`);
+                        if (fRes.ok) {
+                            self._smartMoneyForensicDossier = await fRes.json();
+                            if (typeof self.renderForensicsTab === 'function') {
+                                self.renderForensicsTab(self._smartMoneyForensicTab || 'buyers');
+                            }
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Ingestion failed across all exchange & regulatory endpoints.';
+                    const errHtml = `<strong>⚠️ Ingestion Halted:</strong> ${errMsg}`;
+                    if (p1Err) { p1Err.innerHTML = errHtml; p1Err.style.display = 'block'; }
+                    if (p3Err) { p3Err.innerHTML = errHtml; p3Err.style.display = 'block'; }
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+                    const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+                    const fBadge = document.getElementById('instForensicFetchStatusBadge');
+                    if (typeof self.renderFetchStatusBadge === 'function') {
+                        self.renderFetchStatusBadge(p1FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                        self.renderFetchStatusBadge(p3FetchStatus, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                        self.renderFetchStatusBadge(fBadge, { status: 'FAILED', error_message: errMsg, time_ago: 'Just now' });
+                    }
+                }
+            } catch (err) {
+                console.error('[INST] Ingestion error:', err);
+                const errMsg = `Network exception during ingestion: ${err.message || err}`;
+                const errHtml = `<strong>⚠️ Ingestion Halted:</strong> ${errMsg}`;
+                if (p1Err) { p1Err.innerHTML = errHtml; p1Err.style.display = 'block'; }
+                if (p3Err) { p3Err.innerHTML = errHtml; p3Err.style.display = 'block'; }
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnP1, btnP3, btnForensic].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.textContent = b.id === 'btnForensicRefreshFetch' ? '🔄 Ingest Filings' : '🔄 Ingest';
+                        b.style.opacity = '1';
+                    }
+                });
+            }
+        },
+
+        async triggerStockFinancialsFetch(ticker) {
+            if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnForensic = document.getElementById('btnForensicQuarterlyFetch');
+            const btnTab = document.getElementById('btnForensicQuarterlyTabFetch');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+
+            if (fErr) fErr.style.display = 'none';
+
+            [btnForensic, btnTab].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/fetch-financials`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const count = data.quarters_count != null ? `${data.quarters_count} Quarters` : 'Verified';
+                    if (fBadge) {
+                        fBadge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Financials: Success · Just now (${data.source || 'Verified'}, ${count})`;
+                        fBadge.style.background = 'rgba(16,185,129,0.12)';
+                        fBadge.style.color = '#34d399';
+                        fBadge.style.border = '1px solid rgba(16,185,129,0.35)';
+                    }
+                    const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/forensics`);
+                    if (fRes.ok) {
+                        self._smartMoneyForensicDossier = await fRes.json();
+                        if (typeof self.renderForensicsTab === 'function') {
+                            self.renderForensicsTab(self._smartMoneyForensicTab || 'quarterly');
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Quarterly financial extraction failed across all sources.';
+                    const errHtml = `<strong>⚠️ Financials Ingestion Halted:</strong> ${errMsg}`;
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    if (fBadge) {
+                        fBadge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Financials: Failed · Just now`;
+                        fBadge.style.background = 'rgba(239,68,68,0.12)';
+                        fBadge.style.color = '#f87171';
+                        fBadge.style.border = '1px solid rgba(239,68,68,0.35)';
+                    }
+                }
+            } catch (err) {
+                console.error('[INST] Network error during financials ingest:', err);
+                const errMsg = err.message || 'Network connection failed.';
+                const errHtml = `<strong>⚠️ Network Error:</strong> ${errMsg}`;
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnForensic, btnTab].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.style.opacity = '1';
+                        b.textContent = '📊 Ingest Financials';
+                    }
+                });
+            }
+        },
+
+        async triggerStockBlockDealsFetch(ticker) {
+            if (!ticker) return;
+            const self = (this && typeof this.searchInstitutionalStock === 'function') ? this : (window.app || app);
+            const cleanTicker = (ticker || '').trim().toUpperCase();
+            const btnForensic = document.getElementById('btnForensicBlockFetch');
+            const btnTab = document.getElementById('btnForensicBlockTabFetch');
+            const fErr = document.getElementById('instForensicIngestErrorBanner');
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+
+            if (fErr) fErr.style.display = 'none';
+
+            [btnForensic, btnTab].forEach(b => {
+                if (b) {
+                    b.disabled = true;
+                    b.textContent = '⏳ Ingesting...';
+                    b.style.opacity = '0.6';
+                }
+            });
+
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/fetch-block-deals`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const count = data.deals_count != null ? `${data.deals_count} Deals` : 'Verified';
+                    if (fBadge) {
+                        fBadge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:0.25rem;"></span>Block Deals: Success · Just now (${data.source || 'Exchange'}, ${count})`;
+                        fBadge.style.background = 'rgba(16,185,129,0.12)';
+                        fBadge.style.color = '#34d399';
+                        fBadge.style.border = '1px solid rgba(16,185,129,0.35)';
+                    }
+                    if (typeof self.searchInstitutionalStock === 'function') {
+                        await self.searchInstitutionalStock(cleanTicker, false);
+                    }
+                    const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}/forensics`);
+                    if (fRes.ok) {
+                        self._smartMoneyForensicDossier = await fRes.json();
+                        if (typeof self.renderForensicsTab === 'function') {
+                            self.renderForensicsTab(self._smartMoneyForensicTab || 'blocks');
+                        }
+                    }
+                } else {
+                    const errMsg = data.detail || data.error || 'Block deals extraction failed across all exchange sources.';
+                    const errHtml = `<strong>⚠️ Block Deals Ingestion Halted:</strong> ${errMsg}`;
+                    if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+                    if (fBadge) {
+                        fBadge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f87171;margin-right:0.25rem;"></span>Block Deals: Failed · Just now`;
+                        fBadge.style.background = 'rgba(239,68,68,0.12)';
+                        fBadge.style.color = '#f87171';
+                        fBadge.style.border = '1px solid rgba(239,68,68,0.35)';
+                    }
+                }
+            } catch (err) {
+                console.error('[INST] Network error during block deals ingest:', err);
+                const errMsg = err.message || 'Network connection failed.';
+                const errHtml = `<strong>⚠️ Network Error:</strong> ${errMsg}`;
+                if (fErr) { fErr.innerHTML = errHtml; fErr.style.display = 'block'; }
+            } finally {
+                [btnForensic, btnTab].forEach(b => {
+                    if (b) {
+                        b.disabled = false;
+                        b.style.opacity = '1';
+                        b.textContent = '⚡ Ingest Block Deals';
+                    }
+                });
+            }
+        },
+
         renderStockInstitutionalDetails(data) {
 
             if (!data) return;
@@ -1421,6 +1860,10 @@
             // Populate Page 1 Header
 
             if (tickerEl) tickerEl.textContent = data.ticker;
+            const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+            const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+            this.renderFetchStatusBadge(p1FetchStatus, data.last_fetch);
+            this.renderFetchStatusBadge(p3FetchStatus, data.last_fetch);
 
             if (nameEl) nameEl.textContent = data.company_name || '';
 
@@ -1779,83 +2222,58 @@
 
 
             let holdingsRowsHtml = '';
-
             if (!holdings.length) {
-
                 holdingsRowsHtml = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:#71717a;">No fund positions recorded for this ticker yet.</td></tr>';
-
             } else {
-
                 holdingsRowsHtml = holdings.map(h => {
-
-                    const act = h.action;
-
+                    const act = (h.action || 'HOLD').toUpperCase();
                     const isBuy = act === 'NEW BUY';
-
                     const isAcc = act === 'ACCUMULATED';
-
-                    const isTrim = act === 'TRIMMED';
-
+                    const isTrim = act === 'TRIMMED' || act === 'PROFIT TAKING' || act === 'SOLD OUT';
+                    const isBase = act === 'BASELINE' || act === 'PRE-IPO';
                     const actBg = '#18181b';
-
-                    const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
-
-
+                    const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : isBase ? '#a78bfa' : '#a1a1aa';
 
                     const changePct = h.change_pct != null ? h.change_pct : 0;
-
-                    const changeStr = changePct > 0 ? `+${changePct}%` : `${changePct}%`;
-
-
+                    const changeStr = changePct > 0 ? `+${changePct}%` : (changePct < 0 ? `${changePct}%` : '0.0%');
 
                     const incAmountCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
-
-                    const incAmountCol = incAmountCr >= 0 ? '#34d399' : '#f87171';
-
-                    const incAmountStr = `${incAmountCr >= 0 ? '+' : ''}₹${Number(incAmountCr).toFixed(2)} Cr`;
-
+                    const incAmountCol = incAmountCr > 0 ? '#34d399' : (incAmountCr < 0 ? '#f87171' : '#71717a');
+                    const incAmountStr = incAmountCr !== 0 ? `${incAmountCr > 0 ? '+' : ''}₹${Number(incAmountCr).toFixed(2)} Cr` : '—';
                     const totAmountCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
 
+                    const avgPriceHtml = (h.avg_price != null && h.avg_price > 0)
+                        ? `₹${Number(h.avg_price).toFixed(2)}`
+                        : (isBase || (!h.avg_price && (h.fund_type && (h.fund_type.includes('AIF') || h.fund_type.includes('Institutional')))))
+                            ? '<span style="color:#a1a1aa;" title="Pre-IPO acquisition or unquoted baseline">Pre-IPO</span>'
+                            : '—';
 
+                    const txnPrice = h.recent_txn_price != null ? h.recent_txn_price : (h.recent_buy_price != null ? h.recent_buy_price : null);
+                    const txnType = (h.recent_txn_type || '').toUpperCase();
+                    const txnCol = txnType === 'BUY' ? '#34d399' : (txnType === 'SELL' ? '#f87171' : '#a1a1aa');
+                    const txnTypeBadge = txnType && txnType !== 'HOLD' ? ` <span style="font-size:0.58rem;font-weight:700;color:${txnCol};">[${txnType}]</span>` : '';
+                    const txnDateAttr = h.recent_txn_date ? ` title="${h.recent_txn_date}"` : '';
+                    const recentTxnHtml = txnPrice != null ? `<span${txnDateAttr}>₹${Number(txnPrice).toFixed(2)}${txnTypeBadge}</span>` : '—';
 
                     return `
-
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-
                             <td style="padding:0.5rem 0.6rem;font-weight:700;color:#ffffff;cursor:pointer;" onclick="app.inspectFundPortfolio('${h.fund_name}')">
-
                                 <span style="color:#ffffff;">${h.fund_name}</span>
-
                             </td>
-
                             <td style="padding:0.5rem 0.5rem;color:#a1a1aa;font-size:0.68rem;">${h.fund_type}</td>
-
                             <td style="padding:0.5rem 0.5rem;">
-
                                 <span class="signal-badge" style="background:${actBg};color:${actCol};border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.1rem 0.35rem;">${h.action}</span>
-
                             </td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${h.stake_pct}%</td>
-
-                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-
-                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.65rem;">${h.recent_buy_price ? `₹${Number(h.recent_buy_price).toFixed(2)}` : '—'}</td>
-
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">${avgPriceHtml}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.65rem;">${recentTxnHtml}</td>
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${incAmountCol};">${incAmountStr}</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
-
                             <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.68rem;">${h.reported_date || '—'}</td>
-
                         </tr>
-
                     `;
-
                 }).join('');
-
             }
 
             if (tbody) tbody.innerHTML = holdingsRowsHtml;
@@ -1958,6 +2376,11 @@
             const ret30dEl = document.getElementById('nexusInst30dVal');
             const ret1yEl = document.getElementById('nexusInst1yVal');
             const mcapEl = document.getElementById('nexusInstMcapVal');
+            // Returns strip uses distinct IDs so getElementById finds the right element
+            const ret7dStripEl = document.getElementById('nexusInstReturns7dVal');
+            const ret30dStripEl = document.getElementById('nexusInstReturns30dVal');
+            const ret1yStripEl = document.getElementById('nexusInstReturns1yVal');
+            const mcapStripEl = document.getElementById('nexusInstReturnsMcapVal');
             const scoreLineEl = document.getElementById('nexusInstScoreLine');
             const shContainer = document.getElementById('nexusInstShareholdingContainer');
             const shWrap = document.getElementById('nexusInstShareholdingWrap');
@@ -1975,6 +2398,10 @@
             // Identity
             const cleanVerdict = (data.verdict || 'Accumulating').replace(/^[^\w\s]+\s*/, '');
             if (tickerEl) tickerEl.textContent = data.ticker;
+            const p1FetchStatus = document.getElementById('instSelectedStockFetchStatus');
+            const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
+            this.renderFetchStatusBadge(p1FetchStatus, data.last_fetch);
+            this.renderFetchStatusBadge(p3FetchStatus, data.last_fetch);
             if (companyEl) companyEl.textContent = data.company_name || '';
             if (verdictEl) { verdictEl.textContent = cleanVerdict; verdictEl.style.background = '#18181b'; verdictEl.style.color = '#f4f4f5'; }
 
@@ -1989,9 +2416,13 @@
             const fmt = (v) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '—';
             const col = (v) => v != null ? (v >= 0 ? '#34d399' : '#f87171') : '#a1a1aa';
             if (ret7dEl) { ret7dEl.textContent = fmt(ret7d); ret7dEl.style.color = col(ret7d); }
+            if (ret7dStripEl) { ret7dStripEl.textContent = fmt(ret7d); ret7dStripEl.style.color = col(ret7d); }
             if (ret30dEl) { ret30dEl.textContent = fmt(ret30d); ret30dEl.style.color = col(ret30d); }
+            if (ret30dStripEl) { ret30dStripEl.textContent = fmt(ret30d); ret30dStripEl.style.color = col(ret30d); }
             if (ret1yEl) { ret1yEl.textContent = fmt(ret1y); ret1yEl.style.color = col(ret1y); }
+            if (ret1yStripEl) { ret1yStripEl.textContent = fmt(ret1y); ret1yStripEl.style.color = col(ret1y); }
             if (mcapEl) mcapEl.textContent = data.market_cap_cr ? `₹${Number(Math.round(data.market_cap_cr)).toLocaleString()} Cr` : '—';
+            if (mcapStripEl) mcapStripEl.textContent = data.market_cap_cr ? `₹${Number(Math.round(data.market_cap_cr)).toLocaleString()} Cr` : '—';
 
             // Score line
             const incAmtStr = data.increase_amount_cr != null
@@ -2073,22 +2504,25 @@
                     if (holdingsWrap) holdingsWrap.style.display = 'block';
                 } else {
                     holdingsBody.innerHTML = holdings.slice(0, 15).map(h => {
-                        const act = h.action;
-                        const isBuy = act === 'NEW BUY', isAcc = act === 'ACCUMULATED', isTrim = act === 'TRIMMED';
-                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
+                        const act = (h.action || 'HOLD').toUpperCase();
+                        const isBuy = act === 'NEW BUY', isAcc = act === 'ACCUMULATED', isTrim = act === 'TRIMMED' || act === 'PROFIT TAKING' || act === 'SOLD OUT';
+                        const isBase = act === 'BASELINE' || act === 'PRE-IPO';
+                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : isBase ? '#a78bfa' : '#a1a1aa';
                         const chgPct = h.change_pct != null ? h.change_pct : 0;
                         const incCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
-                        const incCol = incCr >= 0 ? '#34d399' : '#f87171';
+                        const incCol = incCr > 0 ? '#34d399' : (incCr < 0 ? '#f87171' : '#71717a');
+                        const incStr = incCr !== 0 ? `${incCr > 0 ? '+' : ''}₹${Number(incCr).toFixed(1)} Cr` : '—';
                         const totCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                                 <td style="padding:0.28rem 0.4rem;font-family:var(--font-mono);font-weight:700;color:#fff;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.fund_name}</td>
                                 <td style="padding:0.28rem 0.35rem;"><span style="font-size:0.58rem;background:#18181b;color:${actCol};border:1px solid rgba(255,255,255,0.1);padding:0.05rem 0.25rem;border-radius:3px;">${h.action}</span></td>
                                 <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#fff;font-weight:700;">${h.stake_pct}%</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${chgPct >= 0 ? '#34d399' : '#f87171'};">${chgPct > 0 ? '+' : ''}${chgPct}%</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${incCol};">${incCr >= 0 ? '+' : ''}₹${Number(incCr).toFixed(1)} Cr</td>
-                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;font-size:0.62rem;">₹${Number(totCr).toFixed(1)} Cr</td>
-                            </tr>`;
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${chgPct > 0 ? '#34d399' : chgPct < 0 ? '#f87171' : '#a1a1aa'};">${chgPct > 0 ? '+' : ''}${chgPct}%</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${incCol};">${incStr}</td>
+                                <td style="padding:0.28rem 0.35rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fff;">₹${Number(totCr).toFixed(1)} Cr</td>
+                            </tr>
+                        `;
                     }).join('');
                     if (holdingsWrap) holdingsWrap.style.display = 'block';
                 }
@@ -2394,6 +2828,8 @@
             const dossier = this._smartMoneyForensicDossier;
             if (!dossier) return;
             const container = document.getElementById('instForensicPane-' + tab);
+            const fBadge = document.getElementById('instForensicFetchStatusBadge');
+            if (fBadge) this.renderFetchStatusBadge(fBadge, dossier.last_fetch);
             if (!container) return;
             if (tab === 'quarters') tab = 'quarterly';
 
@@ -2947,72 +3383,6 @@
                     </tr>
                 `;
             }).join('');
-        },
-                const whalesHtml = whales.length ? whales.map(w => `<span style="display:inline-block;background:#18181b;color:#d4d4d8;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:0.08rem 0.3rem;font-size:0.62rem;margin-right:0.25rem;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${w}</span>`).join('') : '<span style="color:#71717a;font-size:0.65rem;">Exchange Flow</span>';
-
-                return `
-                    <tr id="smRow-${cleanTicker}" onclick="app.inspectSmartMoneyStock('${s.ticker}')" style="border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;background:${isSelected ? 'rgba(56,189,248,0.08)' : 'transparent'};transition:background 0.15s;" onmouseover="if(!this.dataset.selected) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!this.dataset.selected) this.style.background='transparent'">
-                        <td style="padding:0.45rem 0.6rem;">
-                            <div style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">
-                                <span>${cleanTicker}</span>
-                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${s.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${s.ticker}">↻</button>
-                                <span style="font-size:0.6rem;color:#71717a;font-weight:600;">${s.cap_category || ''}</span>
-                            </div>
-                            <div style="font-size:0.65rem;color:#a1a1aa;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                ${s.company_name || s.ticker}
-                            </div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="font-weight:700;color:#f4f4f5;font-size:0.75rem;">${priceStr}</div>
-                            <div style="font-size:0.65rem;font-weight:700;color:${ret30Col};">${ret30Str}</div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="display:flex;align-items:center;">
-                                <span style="font-weight:700;color:${retSigCol};font-size:0.75rem;">${retSigStr}</span>
-                                ${newBadgeHtml}
-                            </div>
-                            <div style="font-size:0.62rem;color:#71717a;" title="Signal Date: ${sigDate} @ ${sigPrice}">
-                                ${sigDate} @ ${sigPrice}
-                            </div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="font-weight:700;color:${epsCol};font-size:0.75rem;">${epsIcon}${epsYoYStr}</div>
-                            <div style="font-size:0.62rem;color:#71717a;">${epsSub}</div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="font-weight:800;color:#10b981;font-size:0.78rem;">+₹${smCr} Cr</div>
-                            <div style="font-size:0.62rem;color:#71717a;">${s.smart_money_buyers_count || 0} Whales</div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.72rem;font-weight:700;color:#38bdf8;margin-bottom:0.15rem;">
-                                <span>${domPct}%</span>
-                            </div>
-                            <div style="width:65px;height:4px;background:#27272a;border-radius:2px;overflow:hidden;">
-                                <div style="width:${domBarWidth}%;height:100%;background:${s.classification_category === 'domestic_absorption' ? '#f59e0b' : '#38bdf8'};border-radius:2px;"></div>
-                            </div>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;">
-                            ${whalesHtml}
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;">
-                            <span class="badge" style="background:${sigBg};color:${sigCol};border:1px solid ${sigBorder};font-size:0.62rem;padding:0.12rem 0.35rem;white-space:nowrap;font-weight:600;">
-                                ${s.accumulation_signal_badge || 'Accumulation'}
-                            </span>
-                        </td>
-                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-                            <div style="font-weight:800;color:${scoreCol};font-size:0.8rem;">${score}</div>
-                            <div style="font-size:0.6rem;color:#71717a;">/ 100</div>
-                        </td>
-                        <td style="padding:0.45rem 0.4rem;text-align:center;">
-                            <a href="/stock/${encodeURIComponent(s.ticker)}" target="_blank" onclick="event.stopPropagation();" title="Open Ticker Intel" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);padding:0.15rem 0.35rem;font-size:0.65rem;border-radius:4px;text-decoration:none;">
-                                ↗
-                            </a>
-                        </td>
-                    </tr>
-                `;
-
-            }).join('');
-
         },
 
 

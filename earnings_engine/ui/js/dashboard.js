@@ -36,7 +36,8 @@ const API_BASE = window.location.origin;
                 'coverage': ['/static/js/modules/coverage.js'],
                 'industries': ['/static/js/modules/industries.js'],
                 'patterns': ['/static/js/modules/consensus.js', '/static/js/modules/patterns.js'],
-                'options': ['/static/js/modules/options_hub.js']
+                'options': ['/static/js/modules/options_hub.js'],
+                'commodities': ['/static/js/modules/commodities.js']
             },
 
             loadScript(src) {
@@ -48,7 +49,7 @@ const API_BASE = window.location.origin;
                 if (this._scriptPromises && this._scriptPromises[cleanSrc]) {
                     return this._scriptPromises[cleanSrc];
                 }
-                const version = '20260914_v25_breakout_volfix';
+                const version = '20260915_v26_returns_strip';
                 const versionedSrc = cleanSrc + (cleanSrc.includes('?') ? '&' : '?') + 'v=' + version;
 
                 const p = new Promise((resolve, reject) => {
@@ -154,6 +155,26 @@ const API_BASE = window.location.origin;
                     return app.loadSwing(e);
                 }
             },
+            async setSwingSubTab(tabName) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.setSwingSubTab === 'function') {
+                    return app.setSwingSubTab(tabName);
+                }
+            },
+            async loadTopSwingers(e) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.loadTopSwingers === 'function') {
+                    return app.loadTopSwingers(e);
+                }
+            },
+            async setSwingTierFilter(tier) {
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.setSwingTierFilter === 'function') {
+                    return app.setSwingTierFilter(tier);
+                }
+            },
             async filterSwingTable(query) {
                 await this.loadScript('/static/js/modules/swing.js');
                 if (typeof app.filterSwingTable === 'function') {
@@ -246,10 +267,11 @@ const API_BASE = window.location.origin;
                 const safeSym = sym.replace(/'/g, "\\'");
                 const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
 
-                if (pred && pred.consensus_direction) {
-                    const dir = (pred.consensus_direction || 'NEUTRAL').toUpperCase();
-                    const isBull = dir.includes('BULL');
-                    const isBear = dir.includes('BEAR');
+                if (pred && (pred.consensus_direction || pred.direction || typeof pred === 'string')) {
+                    const rawDir = typeof pred === 'string' ? pred : (pred.consensus_direction || pred.direction);
+                    const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
+                    const isBull = dir.includes('BULL') || dir.includes('BUY');
+                    const isBear = dir.includes('BEAR') || dir.includes('SELL');
                     const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
                     const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
                     const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
@@ -572,6 +594,7 @@ const API_BASE = window.location.origin;
                 await this.initAuthAndPermissions();
                 this.initCustomizer();
                 this.bindKeyboardShortcuts();
+                this.setupResultsKeyboardNavigation?.();
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls?.();
                 this._restorePatternsControls?.();
@@ -935,7 +958,7 @@ const API_BASE = window.location.origin;
 
             async switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'options', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -966,7 +989,8 @@ const API_BASE = window.location.origin;
                         premarket: localStorage.getItem('subtab_premarket') || 'active',
                         gainers: localStorage.getItem('subtab_gainers') || 'gainers',
                         institutional: localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities',
-                        kronos: localStorage.getItem('subtab_kronos') || 'latest'
+                        kronos: localStorage.getItem('subtab_kronos') || 'latest',
+                        swing: localStorage.getItem('subtab_swing') || 'setups'
                     };
                 }
 
@@ -994,6 +1018,7 @@ const API_BASE = window.location.origin;
                         'catalysts': 'Catalysts & News',
                         'premarket': '🌅 Pre-Market Setups',
                         'options': '⚡ Option Chain & Derivatives',
+                        'commodities': '🥇 Commodities & Energy',
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
@@ -1122,6 +1147,11 @@ const API_BASE = window.location.origin;
                         app.initOptionsHub();
                     }
                 }
+                if (name === 'commodities') {
+                    if (window.commoditiesModule && typeof window.commoditiesModule.init === 'function') {
+                        window.commoditiesModule.init();
+                    }
+                }
                 if (name === 'gainers') {
                     const activeSub = (app._subtabState && app._subtabState['gainers']) || localStorage.getItem('subtab_gainers') || 'gainers';
                     if (typeof this.switchGainersSubTab === 'function') {
@@ -1173,6 +1203,10 @@ const API_BASE = window.location.origin;
                     }
                 }
                 if (name === 'swing') {
+                    const activeSub = (app._subtabState && app._subtabState['swing']) || localStorage.getItem('subtab_swing') || 'setups';
+                    if (typeof this.switchSwingSubTab === 'function') {
+                        this.switchSwingSubTab(activeSub);
+                    }
                     if (!this.swingData || !this.swingData.length) {
                         this.loadSwing();
                     }
@@ -1281,7 +1315,11 @@ const API_BASE = window.location.origin;
             },
 
             getResultsPresetDetails(preset) {
-                if (preset === 'recent') {
+                if (preset === 'next3') {
+                    return { pastDays: 0, days: 3, label: 'Upcoming 3 Days' };
+                } else if (preset === 'next7') {
+                    return { pastDays: 0, days: 7, label: 'Upcoming 7 Days' };
+                } else if (preset === 'recent') {
                     return { pastDays: 4, days: 7, label: 'Recent (-4D to +7D)' };
                 } else if (preset === 'pm60') {
                     return { pastDays: 60, days: 60, label: '±2 Months' };
@@ -1325,7 +1363,7 @@ const API_BASE = window.location.origin;
             },
 
             async loadResultsReport() {
-                const preset = document.getElementById('resultsRangePreset')?.value || 'recent';
+                const preset = document.getElementById('resultsRangePreset')?.value || 'next3';
                 const details = this.getResultsPresetDetails(preset);
                 const pastDays = details.pastDays;
                 const days = details.days;
@@ -1967,6 +2005,11 @@ const API_BASE = window.location.origin;
                 let bullConsensusCount = 0;
                 let bearConsensusCount = 0;
                 let imminentCount = 0;
+                let volSurgeCount = 0;
+                let beatRateSum = 0;
+                let beatRateCount = 0;
+                let largeCapCount = 0;
+                let smallCapCount = 0;
 
                 const today = new Date();
                 const next48h = new Date(today.getTime() + 48 * 3600 * 1000);
@@ -1975,6 +2018,19 @@ const API_BASE = window.location.origin;
 
                 tableRows.forEach(row => {
                     totalStocks++;
+                    const cap = row.getAttribute('data-cap');
+                    if (cap === 'large') largeCapCount++;
+                    else if (cap === 'small') smallCapCount++;
+
+                    const rvVal = parseFloat(row.getAttribute('data-rel-vol') || '0');
+                    if (rvVal >= 1.5) volSurgeCount++;
+
+                    const brVal = parseFloat(row.getAttribute('data-beat-rate') || '0');
+                    if (brVal > 0) {
+                        beatRateSum += brVal;
+                        beatRateCount++;
+                    }
+
                     const dateCell = row.querySelector('.cell-earnings-date');
                     if (dateCell) {
                         const dateText = dateCell.textContent.trim().slice(0, 10);
@@ -2013,29 +2069,33 @@ const API_BASE = window.location.origin;
 
                 const avg30D = count30D ? (sum30D / count30D).toFixed(1) : '0.0';
                 const avg30DCls = parseFloat(avg30D) >= 0 ? 'color:#34d399;' : 'color:#f87171;';
-                const beatPct = totalBeatEvalCount ? Math.round((positiveMovesCount / totalBeatEvalCount) * 100) : 0;
+                const avgBeatRate = beatRateCount ? Math.round(beatRateSum / beatRateCount) : (totalBeatEvalCount ? Math.round((positiveMovesCount / totalBeatEvalCount) * 100) : 0);
                 const winWindow = this.resultsActiveWindowName || 'Selected Window';
 
                 metricsBar.innerHTML = `
                     <div class="metric" style="padding:0.25rem 0.45rem;">
-                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Tracked Window</span>
-                        <strong style="color:#ffffff;font-size:0.95rem;">${totalStocks} <span style="font-size:0.68rem;color:#60a5fa;font-weight:600;">(${winWindow})</span></strong>
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Tracked Window</span>
+                        <strong style="color:#ffffff;font-size:0.9rem;">${totalStocks} <span style="font-size:0.65rem;color:#60a5fa;font-weight:600;">(${largeCapCount}💎 / ${smallCapCount}🌱)</span></strong>
                     </div>
                     <div class="metric" style="padding:0.25rem 0.45rem;">
-                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Avg 30D Momentum</span>
-                        <strong style="${avg30DCls}font-size:0.95rem;">${parseFloat(avg30D) > 0 ? '+' : ''}${avg30D}%</strong>
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Avg 30D Momentum</span>
+                        <strong style="${avg30DCls}font-size:0.9rem;">${parseFloat(avg30D) > 0 ? '+' : ''}${avg30D}%</strong>
                     </div>
                     <div class="metric" style="padding:0.25rem 0.45rem;">
-                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Quality Beat Rate</span>
-                        <strong style="color:#38bdf8;font-size:0.95rem;">${beatPct}% <span style="font-size:0.68rem;color:#71717a;font-weight:400;">(${positiveMovesCount}/${totalBeatEvalCount})</span></strong>
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Vol Surge (≥1.5x)</span>
+                        <strong style="color:#38bdf8;font-size:0.9rem;">${volSurgeCount} <span style="font-size:0.65rem;color:#7dd3fc;font-weight:400;">catalysts</span></strong>
                     </div>
                     <div class="metric" style="padding:0.25rem 0.45rem;">
-                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">AI Consensus</span>
-                        <strong style="color:#60a5fa;font-size:0.95rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Hist Beat Avg</span>
+                        <strong style="color:#34d399;font-size:0.9rem;">${avgBeatRate}% <span style="font-size:0.65rem;color:#71717a;font-weight:400;">(${beatRateCount} scored)</span></strong>
                     </div>
                     <div class="metric" style="padding:0.25rem 0.45rem;">
-                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Imminent (48h)</span>
-                        <strong style="color:#fbbf24;font-size:0.95rem;">${imminentCount} <span style="font-size:0.68rem;color:#a1a1aa;font-weight:400;">catalysts</span></strong>
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">AI Consensus</span>
+                        <strong style="color:#60a5fa;font-size:0.9rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
+                    </div>
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Imminent (48h)</span>
+                        <strong style="color:#fbbf24;font-size:0.9rem;">${imminentCount} <span style="font-size:0.65rem;color:#a1a1aa;font-weight:400;">catalysts</span></strong>
                     </div>
                 `;
                 metricsBar.style.display = 'grid';
@@ -2048,19 +2108,18 @@ const API_BASE = window.location.origin;
                 let matchCount = 0;
                 let totalCount = rows.length;
 
+                const activeCap = this.resultsActiveCap || 'all';
                 rows.forEach(row => {
                     const rowId = row.id;
                     const drawerId = rowId ? rowId.replace('row_', 'drawer_') : null;
                     const drawerRow = drawerId ? document.getElementById(drawerId) : null;
+                    const rowCap = row.getAttribute('data-cap') || 'large';
 
-                    if (!q) {
-                        row.style.display = '';
-                        matchCount++;
-                        return;
-                    }
-
+                    const capMatch = (activeCap === 'all' || rowCap === activeCap);
                     const text = row.textContent.toLowerCase();
-                    const isMatch = text.includes(q);
+                    const queryMatch = !q || text.includes(q);
+                    const isMatch = capMatch && queryMatch;
+
                     row.style.display = isMatch ? '' : 'none';
                     if (!isMatch && drawerRow) {
                         drawerRow.style.display = 'none';
@@ -2431,6 +2490,253 @@ const API_BASE = window.location.origin;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
+            },
+
+            setResultsCapFilter(cap) {
+                this.resultsActiveCap = cap || 'all';
+                const btnAll = document.getElementById('capFilterBtnAll');
+                const btnLarge = document.getElementById('capFilterBtnLarge');
+                const btnSmall = document.getElementById('capFilterBtnSmall');
+
+                if (btnAll) {
+                    btnAll.style.background = (cap === 'all') ? 'rgba(255,255,255,0.15)' : 'transparent';
+                    btnAll.style.color = (cap === 'all') ? '#ffffff' : '#94a3b8';
+                }
+                if (btnLarge) {
+                    btnLarge.style.background = (cap === 'large') ? 'rgba(56,189,248,0.2)' : 'transparent';
+                    btnLarge.style.color = (cap === 'large') ? '#38bdf8' : '#94a3b8';
+                }
+                if (btnSmall) {
+                    btnSmall.style.background = (cap === 'small') ? 'rgba(52,211,153,0.2)' : 'transparent';
+                    btnSmall.style.color = (cap === 'small') ? '#34d399' : '#94a3b8';
+                }
+
+                const q = (document.getElementById('resultsLiveSearch')?.value || '').toLowerCase().trim();
+                this.filterResultsTable(q);
+            },
+
+            toggleResultsSplitView() {
+                this.resultsSplitEnabled = (this.resultsSplitEnabled === undefined) ? false : !this.resultsSplitEnabled;
+                const grid = document.getElementById('resultsSplitWorkspace');
+                const pane = document.getElementById('resultsQuantInspectorPane');
+                const btn = document.getElementById('resultsSplitToggleBtn');
+
+                if (grid && pane) {
+                    if (this.resultsSplitEnabled) {
+                        grid.style.gridTemplateColumns = 'minmax(0, 1.35fr) minmax(0, 0.85fr)';
+                        pane.style.display = 'block';
+                        if (btn) {
+                            btn.style.background = 'rgba(56,189,248,0.15)';
+                            btn.style.color = '#38bdf8';
+                            btn.style.border = '1px solid rgba(56,189,248,0.3)';
+                            btn.textContent = '⚡ Split: ON';
+                        }
+                    } else {
+                        grid.style.gridTemplateColumns = '1fr';
+                        pane.style.display = 'none';
+                        if (btn) {
+                            btn.style.background = 'rgba(255,255,255,0.06)';
+                            btn.style.color = '#94a3b8';
+                            btn.style.border = '1px solid rgba(255,255,255,0.1)';
+                            btn.textContent = '⚡ Split: OFF';
+                        }
+                    }
+                }
+            },
+
+            selectResultsStock(ticker, rowEl, event) {
+                if (!rowEl) return;
+                document.querySelectorAll('#resultsReportSections tr.results-row').forEach(r => r.classList.remove('selected-stock-row'));
+                rowEl.classList.add('selected-stock-row');
+                this.resultsSelectedTicker = ticker;
+
+                const pane = document.getElementById('resultsQuantInspectorPane');
+                const emptyState = document.getElementById('resultsInspectorEmptyState');
+                const content = document.getElementById('resultsInspectorContent');
+                if (pane) pane.style.display = 'block';
+                if (emptyState) emptyState.style.display = 'none';
+                if (content) {
+                    content.style.display = 'block';
+                    this.renderResultsInspector(ticker, rowEl, content);
+                }
+            },
+
+            renderResultsInspector(ticker, rowEl, container) {
+                const company = rowEl.querySelector('.stock-company-sub')?.textContent.trim() || ticker;
+                const date = rowEl.querySelector('.cell-earnings-date')?.textContent.trim() || '—';
+                const mcap = rowEl.querySelector('.cell-market-cap')?.textContent.trim() || '—';
+                const price = rowEl.querySelector('.cell-current-price')?.textContent.trim() || '—';
+                const ret3d = rowEl.querySelector('.cell-three-day-return')?.textContent.trim() || '—';
+                const ret7d = rowEl.querySelector('.cell-seven-day-return')?.textContent.trim() || '—';
+                const ret30d = rowEl.querySelector('.cell-thirty-day-return')?.textContent.trim() || '—';
+                const relVol = rowEl.querySelector('.cell-rel-vol')?.innerHTML || '—';
+                const srStructure = rowEl.querySelector('.cell-sr-structure')?.innerHTML || '—';
+                const chanPos = rowEl.querySelector('.cell-channel-position')?.textContent.trim() || '—';
+                const pct52w = rowEl.querySelector('.cell-pct-52w-hl')?.innerHTML || '—';
+                const beatRate = rowEl.querySelector('.cell-beat-rate')?.innerHTML || '—';
+                const q1Wk = rowEl.querySelector('.cell-q1-week-hl')?.innerHTML || '—';
+                const qualityScores = rowEl.querySelector('.cell-quality-scores')?.innerHTML || '—';
+                const avg3q = rowEl.querySelector('.cell-prev-3q-score')?.textContent.trim() || '—';
+                const kronos = rowEl.querySelector('.cell-kronos')?.innerHTML || '—';
+                const consensus = rowEl.querySelector('.cell-ai-consensus')?.innerHTML || '—';
+                const rowTickerId = rowEl.id ? rowEl.id.replace('row_', '') : ticker.replace(/[^A-Za-z0-9]/g, '_');
+
+                const ret30dVal = parseFloat(ret30d.replace('%', '').replace('+', '')) || 0;
+                const ret30dCls = ret30dVal >= 0 ? '#34d399' : '#f87171';
+
+                container.innerHTML = `
+                    <div class="inspector-header" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.6rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(255,255,255,0.08);">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <h3 style="margin:0;font-size:1.1rem;color:#ffffff;font-family:var(--font-mono);font-weight:800;letter-spacing:0.02em;">${ticker}</h3>
+                                <a href="/stock/${ticker}" target="_blank" class="btn-micro" style="color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.08rem 0.35rem;font-size:0.65rem;" title="Open full research profile">↗ Full Profile</a>
+                            </div>
+                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.15rem;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${company}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:1.05rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${price}</div>
+                            <div style="font-size:0.68rem;color:${ret30dCls};font-weight:700;font-family:var(--font-mono);">30D: ${ret30d}</div>
+                        </div>
+                    </div>
+
+                    <!-- 1. Key Quant Catalyst Attributes Grid -->
+                    <div class="inspector-section">
+                        <div class="inspector-section-title">
+                            <span>⚡ Catalyst & Return Metrics</span>
+                            <span style="color:#38bdf8;">${date}</span>
+                        </div>
+                        <div class="inspector-grid" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">3D Return</div>
+                                <div class="inspector-metric-val" style="color:#93c5fd;">${ret3d}</div>
+                            </div>
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">7D Return</div>
+                                <div class="inspector-metric-val" style="color:#38bdf8;">${ret7d}</div>
+                            </div>
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">Market Cap</div>
+                                <div class="inspector-metric-val">${mcap}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Volume Flow Surge & Historical Beat Rate -->
+                    <div class="inspector-section">
+                        <div class="inspector-section-title">
+                            <span>📊 Volume Flow & Beat Quality</span>
+                            <span>Surge & Surprises</span>
+                        </div>
+                        <div class="inspector-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 0.35rem;">
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">5D vs 63D Rel Vol</div>
+                                <div class="inspector-metric-val" style="margin-top:0.1rem;">${relVol}</div>
+                            </div>
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">Hist Beat Rate</div>
+                                <div class="inspector-metric-val" style="margin-top:0.1rem;">${beatRate}</div>
+                            </div>
+                        </div>
+                        <div class="inspector-metric-card" style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div class="inspector-metric-label">Quality Scores (Q1|Q2|Q3)</div>
+                                <div style="font-size:0.72rem;margin-top:0.1rem;font-family:var(--font-mono);">${qualityScores}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div class="inspector-metric-label">3Q Avg</div>
+                                <div class="inspector-metric-val" style="color:#c084fc;">${avg3q}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Technical Channel Geometry -->
+                    <div class="inspector-section">
+                        <div class="inspector-section-title">
+                            <span>📐 Price Support & Resistance Channel</span>
+                            <span style="color:#a7f3d0;">Pos: ${chanPos}</span>
+                        </div>
+                        <div style="margin-bottom:0.35rem;">${srStructure}</div>
+                        <div class="inspector-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">52-Week High / Low</div>
+                                <div style="font-size:0.7rem;font-family:var(--font-mono);margin-top:0.1rem;">${pct52w}</div>
+                            </div>
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">Q1 Earnings Move</div>
+                                <div style="font-size:0.7rem;font-family:var(--font-mono);margin-top:0.1rem;">${q1Wk}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Neural AI Forecast & Multi-Model Consensus -->
+                    <div class="inspector-section">
+                        <div class="inspector-section-title">
+                            <span>🤖 AI Models & Consensus</span>
+                            <span>DeepSeek · Llama · Qwen</span>
+                        </div>
+                        <div class="inspector-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 0.35rem;">
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">Kronos 14D Forecast</div>
+                                <div style="font-size:0.72rem;margin-top:0.15rem;">${kronos}</div>
+                            </div>
+                            <div class="inspector-metric-card">
+                                <div class="inspector-metric-label">Consensus Signal</div>
+                                <div style="margin-top:0.15rem;display:flex;justify-content:center;">${consensus}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Operations Quick Action Buttons -->
+                    <div style="display:flex;gap:0.3rem;margin-top:0.5rem;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-sm" onclick="app.showStockNewsDrawer('${rowTickerId}', '${ticker}', event)" style="flex:1;background:rgba(255,255,255,0.06);color:#ffffff;font-size:0.7rem;padding:0.25rem 0.4rem;">📰 Live News</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="app.recalculateRow('${ticker}', this)" style="flex:1;font-size:0.7rem;padding:0.25rem 0.4rem;">⚡ Recalc Price</button>
+                        <button type="button" class="btn btn-sm" onclick="app.openAddToWatchlistModal('${ticker}')" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);font-size:0.7rem;padding:0.25rem 0.4rem;">⭐ Watchlist</button>
+                    </div>
+                `;
+            },
+
+            setupResultsKeyboardNavigation() {
+                if (this._resultsKeyNavBound) return;
+                this._resultsKeyNavBound = true;
+
+                window.addEventListener('keydown', (e) => {
+                    const resultsTab = document.getElementById('tab-results');
+                    if (!resultsTab || resultsTab.style.display === 'none' || !resultsTab.classList.contains('active')) {
+                        return;
+                    }
+
+                    // Ignore if user is currently typing in an input
+                    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+                        return;
+                    }
+
+                    const visibleRows = Array.from(document.querySelectorAll('#resultsReportSections table.results-table tbody tr.results-row:not([style*="display: none"])'));
+                    if (!visibleRows.length) return;
+
+                    const currentIndex = visibleRows.findIndex(r => r.classList.contains('selected-stock-row'));
+
+                    if (e.key === 'ArrowDown' || e.key === 'j') {
+                        e.preventDefault();
+                        const nextIdx = (currentIndex < 0 || currentIndex >= visibleRows.length - 1) ? 0 : currentIndex + 1;
+                        const targetRow = visibleRows[nextIdx];
+                        const ticker = targetRow.getAttribute('data-ticker');
+                        app.selectResultsStock(ticker, targetRow);
+                        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+                        e.preventDefault();
+                        const prevIdx = (currentIndex <= 0) ? visibleRows.length - 1 : currentIndex - 1;
+                        const targetRow = visibleRows[prevIdx];
+                        const ticker = targetRow.getAttribute('data-ticker');
+                        app.selectResultsStock(ticker, targetRow);
+                        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else if (e.key === 'Enter' && currentIndex >= 0) {
+                        e.preventDefault();
+                        const targetRow = visibleRows[currentIndex];
+                        const ticker = targetRow.getAttribute('data-ticker');
+                        const rowTickerId = targetRow.id ? targetRow.id.replace('row_', '') : '';
+                        app.toggleRowDrawer(rowTickerId, ticker);
+                    }
+                });
             }
         });
 

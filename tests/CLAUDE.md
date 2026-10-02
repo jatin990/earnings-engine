@@ -19,10 +19,10 @@ The test suite validates quantitative feature calculations, database replication
 ## 2. Core Testing Invariants
 
 ### 2.1 Targeted Execution Rule (Strict Efficiency)
-- **Always run targeted tests** during iterative development:
-  ```powershell
-  .\.venv\Scripts\python.exe -m pytest tests/test_new_listings.py -v
-  .\.venv\Scripts\python.exe -m pytest tests/test_db.py -k "test_turso_sync"
+- **Always run targeted tests** during iterative development (use forward slashes `./.venv/Scripts/python.exe` to prevent Git Bash escaping issues):
+  ```bash
+  ./.venv/Scripts/python.exe -m pytest tests/test_new_listings.py -v
+  ./.venv/Scripts/python.exe -m pytest tests/test_db.py -k "test_turso_sync"
   ```
 - **Prohibition**: Never run the full test suite or slow E2E suites (`test_stock_detail_e2e.py`) during incremental coding tasks.
 

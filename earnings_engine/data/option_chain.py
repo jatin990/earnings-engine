@@ -375,18 +375,44 @@ def _calculate_option_metrics_from_records(
     else:
         sentiment = "NEUTRAL"
 
-    # Identify Call Wall (Resistance) and Put Wall (Support)
+    # Identify Call Wall (Resistance) and Put Wall (Support) with Direction-Aware Partitioning
     sdf = pd.DataFrame(raw_strikes) if raw_strikes else pd.DataFrame()
-    high_call_strike = (
-        float(sdf.loc[sdf["call_oi"].idxmax()]["strike"])
-        if not sdf.empty and "call_oi" in sdf.columns and sdf["call_oi"].max() > 0
-        else None
-    )
-    high_put_strike = (
-        float(sdf.loc[sdf["put_oi"].idxmax()]["strike"])
-        if not sdf.empty and "put_oi" in sdf.columns and sdf["put_oi"].max() > 0
-        else None
-    )
+    high_call_strike = None
+    high_put_strike = None
+    pin_strike = None
+
+    if not sdf.empty:
+        curr_spot = float(spot_price or 0.0)
+
+        # 1. Global max OI strikes
+        global_call_strike = (
+            float(sdf.loc[sdf["call_oi"].idxmax()]["strike"])
+            if "call_oi" in sdf.columns and sdf["call_oi"].max() > 0
+            else None
+        )
+        global_put_strike = (
+            float(sdf.loc[sdf["put_oi"].idxmax()]["strike"])
+            if "put_oi" in sdf.columns and sdf["put_oi"].max() > 0
+            else None
+        )
+
+        # Check for Straddle Pinning Zone (Peak Call OI == Peak Put OI)
+        if global_call_strike and global_put_strike and global_call_strike == global_put_strike:
+            pin_strike = global_call_strike
+
+        # 2. Direction-Aware Resistance (Strikes >= Spot preferred)
+        calls_overhead = sdf[sdf["strike"] >= curr_spot] if curr_spot > 0 else sdf
+        if not calls_overhead.empty and "call_oi" in calls_overhead.columns and calls_overhead["call_oi"].max() > 0:
+            high_call_strike = float(calls_overhead.loc[calls_overhead["call_oi"].idxmax()]["strike"])
+        else:
+            high_call_strike = global_call_strike
+
+        # 3. Direction-Aware Support (Strikes <= Spot preferred)
+        puts_underfoot = sdf[sdf["strike"] <= curr_spot] if curr_spot > 0 else sdf
+        if not puts_underfoot.empty and "put_oi" in puts_underfoot.columns and puts_underfoot["put_oi"].max() > 0:
+            high_put_strike = float(puts_underfoot.loc[puts_underfoot["put_oi"].idxmax()]["strike"])
+        else:
+            high_put_strike = global_put_strike
 
     # Find ATM strike
     atm_strike = None
@@ -449,6 +475,7 @@ def _calculate_option_metrics_from_records(
         "put_oi_total": int(put_oi),
         "resistance_strike": high_call_strike,
         "support_strike": high_put_strike,
+        "pin_strike": pin_strike,
         "atm_strike": atm_strike,
         "records_count": len(formatted_strikes),
         "strikes": formatted_strikes,

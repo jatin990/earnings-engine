@@ -387,6 +387,8 @@ def process_and_verify_news_items(
             "volatility_est": ai_res.get("volatility_est") or scored["volatility_est"],
             "why_it_matters": ai_takeaway,
             "source": item.get("source", "verified_pipeline"),
+            "feed_id": item.get("feed_id", ""),
+            "feed_name": item.get("feed_name", ""),
             "created_at": now_str,
             "verification_status": "VERIFIED",
             "verification_flags": json.dumps(v_res.get("verification_flags", [])),
@@ -641,13 +643,13 @@ def save_verified_news_records(
                         affected_tickers = COALESCE(excluded.affected_tickers, news_catalysts.affected_tickers)
                     """,
                     (
-                        r["ticker"], r["stock_name"], r["title"], r["publisher"],
-                        r["link"], r["published_at"], r["summary"], r["impact_score"],
-                        r["impact_level"], r["category"], r["direction"],
-                        r["expected_horizon"], r["volatility_est"], r["why_it_matters"],
-                        r["source"], r.get("created_at", now_str), r["verification_status"],
-                        r["verification_flags"], r["verified_numbers"],
-                        r["entity_confidence"], r["canonical_hash"],
+                        r.get("ticker", ""), r.get("stock_name", ""), r.get("title", ""), r.get("publisher", ""),
+                        r.get("link", ""), r.get("published_at", now_str), r.get("summary", ""), r.get("impact_score", 50),
+                        r.get("impact_level", "MEDIUM"), r.get("category", "Order Wins & Contracts"), r.get("direction", "NEUTRAL"),
+                        r.get("expected_horizon", "1-3 Days"), r.get("volatility_est", "MODERATE"), r.get("why_it_matters", ""),
+                        r.get("source", "feed"), r.get("created_at", now_str), r.get("verification_status", "VERIFIED"),
+                        r.get("verification_flags", "[]"), r.get("verified_numbers", "{}"),
+                        r.get("entity_confidence", 1.0), r.get("canonical_hash", ""),
                         r.get("signal_price"), r.get("signal_date"),
                         r.get("current_price"), r.get("price_change_pct", 0.0),
                         r.get("ai_analysis"), r.get("ai_takeaway"),
@@ -709,6 +711,158 @@ def save_verified_news_records(
             pass
 
     return inserted_count
+
+
+def save_verified_news_records_with_feed_breakdown(
+    records: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> tuple[int, dict[str, int]]:
+    """Save verified news records, returning total net-new articles added and per-feed_id breakdown."""
+    settings = settings or Settings()
+    ensure_news_verification_schema(settings)
+
+    if not records:
+        return 0, {}
+
+    new_inserted_count = 0
+    feed_breakdown: dict[str, int] = {}
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    with _connect(settings) as conn:
+        for r in records:
+            try:
+                aff_tickers_json = r.get("affected_tickers") or json.dumps([r["ticker"]])
+                if isinstance(aff_tickers_json, list):
+                    aff_tickers_json = json.dumps(aff_tickers_json)
+
+                # Check if this record is brand new in news_catalysts
+                existing = conn.execute(
+                    "SELECT id FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+                    (r["ticker"], r["title"]),
+                ).fetchone()
+                is_net_new = existing is None
+
+                conn.execute(
+                    """
+                    INSERT INTO news_catalysts (
+                        ticker, stock_name, title, publisher, link, published_at,
+                        summary, impact_score, impact_level, category, direction,
+                        expected_horizon, volatility_est, why_it_matters, source, created_at,
+                        verification_status, verification_flags, verified_numbers,
+                        entity_confidence, canonical_hash, signal_price, signal_date,
+                        current_price, price_change_pct, ai_analysis, ai_takeaway,
+                        ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at,
+                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker, title) DO UPDATE SET
+                        stock_name = excluded.stock_name,
+                        publisher = excluded.publisher,
+                        link = excluded.link,
+                        published_at = excluded.published_at,
+                        summary = excluded.summary,
+                        impact_score = excluded.impact_score,
+                        impact_level = excluded.impact_level,
+                        category = excluded.category,
+                        direction = excluded.direction,
+                        expected_horizon = excluded.expected_horizon,
+                        volatility_est = excluded.volatility_est,
+                        why_it_matters = excluded.why_it_matters,
+                        verification_status = excluded.verification_status,
+                        verification_flags = excluded.verification_flags,
+                        verified_numbers = excluded.verified_numbers,
+                        entity_confidence = excluded.entity_confidence,
+                        canonical_hash = excluded.canonical_hash,
+                        signal_price = COALESCE(excluded.signal_price, news_catalysts.signal_price),
+                        signal_date = COALESCE(excluded.signal_date, news_catalysts.signal_date),
+                        current_price = COALESCE(excluded.current_price, news_catalysts.current_price),
+                        price_change_pct = COALESCE(excluded.price_change_pct, news_catalysts.price_change_pct),
+                        ai_analysis = COALESCE(excluded.ai_analysis, news_catalysts.ai_analysis),
+                        ai_takeaway = COALESCE(excluded.ai_takeaway, news_catalysts.ai_takeaway),
+                        ai_direction = COALESCE(excluded.ai_direction, news_catalysts.ai_direction),
+                        ai_target = COALESCE(excluded.ai_target, news_catalysts.ai_target),
+                        ai_stop_loss = COALESCE(excluded.ai_stop_loss, news_catalysts.ai_stop_loss),
+                        ai_model = COALESCE(excluded.ai_model, news_catalysts.ai_model),
+                        ai_analyzed_at = COALESCE(excluded.ai_analyzed_at, news_catalysts.ai_analyzed_at),
+                        financial_projections = COALESCE(excluded.financial_projections, news_catalysts.financial_projections),
+                        sentiment = COALESCE(excluded.sentiment, news_catalysts.sentiment),
+                        temporal_originality = COALESCE(excluded.temporal_originality, news_catalysts.temporal_originality),
+                        is_republication = COALESCE(excluded.is_republication, news_catalysts.is_republication),
+                        originality_rationale = COALESCE(excluded.originality_rationale, news_catalysts.originality_rationale),
+                        affected_tickers = COALESCE(excluded.affected_tickers, news_catalysts.affected_tickers)
+                    """,
+                    (
+                        r.get("ticker", ""), r.get("stock_name", ""), r.get("title", ""), r.get("publisher", ""),
+                        r.get("link", ""), r.get("published_at", now_str), r.get("summary", ""), r.get("impact_score", 50),
+                        r.get("impact_level", "MEDIUM"), r.get("category", "Order Wins & Contracts"), r.get("direction", "NEUTRAL"),
+                        r.get("expected_horizon", "1-3 Days"), r.get("volatility_est", "MODERATE"), r.get("why_it_matters", ""),
+                        r.get("source", "feed"), r.get("created_at", now_str), r.get("verification_status", "VERIFIED"),
+                        r.get("verification_flags", "[]"), r.get("verified_numbers", "{}"),
+                        r.get("entity_confidence", 1.0), r.get("canonical_hash", ""),
+                        r.get("signal_price"), r.get("signal_date"),
+                        r.get("current_price"), r.get("price_change_pct", 0.0),
+                        r.get("ai_analysis"), r.get("ai_takeaway"),
+                        r.get("ai_direction"), r.get("ai_target"),
+                        r.get("ai_stop_loss"), r.get("ai_model"),
+                        r.get("ai_analyzed_at"),
+                        r.get("financial_projections", "{}"),
+                        r.get("sentiment", "NEUTRAL"),
+                        r.get("temporal_originality", "NEW_PUBLICATION"),
+                        r.get("is_republication", 0),
+                        r.get("originality_rationale", ""),
+                        aff_tickers_json,
+                    ),
+                )
+
+                if is_net_new:
+                    new_inserted_count += 1
+                    feed_id = r.get("feed_id") or "general_news"
+                    feed_breakdown[feed_id] = feed_breakdown.get(feed_id, 0) + 1
+
+                # Populate relational news_catalysts_tickers table
+                try:
+                    cat_id_row = conn.execute(
+                        "SELECT id FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+                        (r["ticker"], r["title"]),
+                    ).fetchone()
+                    if cat_id_row:
+                        cat_id = cat_id_row[0]
+                        aff_details = r.get("affected_details")
+                        if not aff_details and r.get("affected_tickers"):
+                            try:
+                                t_list = json.loads(r["affected_tickers"]) if isinstance(r["affected_tickers"], str) else r["affected_tickers"]
+                                aff_details = [(t, "PRIMARY" if t == r["ticker"] else "SECONDARY") for t in t_list]
+                            except Exception:
+                                aff_details = [(r["ticker"], "PRIMARY")]
+                        if not aff_details:
+                            aff_details = [(r["ticker"], "PRIMARY")]
+
+                        for aff_t, imp_type in aff_details:
+                            conn.execute(
+                                """
+                                INSERT INTO news_catalysts_tickers (catalyst_id, ticker, impact_type, created_at)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(catalyst_id, ticker) DO UPDATE SET impact_type = excluded.impact_type
+                                """,
+                                (cat_id, aff_t, imp_type, r.get("created_at", now_str)),
+                            )
+                except Exception as inner_e:
+                    logger.debug("Failed saving news_catalysts_tickers for %s: %s", r.get("title"), inner_e)
+
+            except Exception as e:
+                logger.debug("Failed inserting verified record %s: %s", r.get("title"), e)
+
+        conn.commit()
+
+    if new_inserted_count > 0:
+        try:
+            high_70 = sum(1 for r in records if (r.get("impact_score") or 0) >= 70)
+            if high_70 > 0:
+                from earnings_engine.api.routers.system import increment_badge_counter
+                increment_badge_counter("high_impact_news_70", high_70, settings)
+        except Exception:
+            pass
+
+    return new_inserted_count, feed_breakdown
 
 
 def sanitize_legacy_database_news(settings: Settings | None = None) -> dict[str, int]:

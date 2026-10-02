@@ -59,6 +59,7 @@ SYNC_TABLES = [
     "news_catalysts",
     "news_catalysts_tickers",
     "news_catalyst_outcomes",
+    "news_feed_runs",
     "quarter_repeater_predictions",
     "tri_confluence_metrics",
     "option_chain_history",
@@ -82,6 +83,8 @@ SYNC_TABLES = [
     # Institutional & Market Universe
     "institutional_holdings",
     "institutional_block_deals",
+    "bulk_block_deals",
+    "reg30_disclosures",
     "shareholding_patterns",
     "institutional_accumulation_cache",
     "nse_shareholding_freshness",
@@ -118,6 +121,14 @@ SYNC_TABLES = [
     "zepto_candidates",
     "zepto_security_capital",
     "zepto_staffing_targets",
+    "zepto_gmail_auth",
+    "zepto_attendance_imports",
+    "zepto_attendance_records",
+    "zepto_store_metrics",
+    "zepto_loss_records",
+    "zepto_manpower_utilization",
+    "zepto_gmail_messages",
+    "zepto_offer_letters",
 ]
 
 
@@ -187,6 +198,11 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "last_seen_date",
     "fetch_date",
     "period_end_date",
+    "metric_date",
+    "record_date",
+    "util_date",
+    "synced_at",
+    "iso_date",
     "date",
     "timestamp",
 ]
@@ -203,6 +219,10 @@ DATE_ONLY_COLUMNS = {
     "period_end_date",
     "cycle_start",
     "cycle_end",
+    "metric_date",
+    "record_date",
+    "util_date",
+    "iso_date",
     "date",
 }
 

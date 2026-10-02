@@ -48,6 +48,11 @@
                     .then(data => {
                         const sectors = data.sectors || [];
                         this.renderSectors(sectors);
+                        const secTs = document.getElementById('pulseSectorsTimestamp');
+                        if (secTs) {
+                            const ts = data.as_of_ist || data.as_of || 'Live Tick';
+                            secTs.textContent = `Updated: ${ts}`;
+                        }
                         return { key: 'sectors', val: sectors };
                     })
                     .catch(err => {
@@ -69,7 +74,7 @@
                     }),
 
                 // 4. Macro Sentiment, Breadth & 30D Trend Charts
-                fetch(API_BASE + '/api/v1/market-pulse/sentiment')
+                fetch(API_BASE + '/api/v1/market-pulse/sentiment' + queryParam)
                     .then(r => r.ok ? r.json() : Promise.reject(r.status))
                     .then(data => {
                         const sent = data.sentiment || {};
@@ -82,13 +87,19 @@
                             vix_factor: sent.sub_factors?.vix_factor,
                             breadth_factor: sent.sub_factors?.breadth_factor,
                             change_7d: sent.change_7d || null,
+                            as_of_ist: sent.as_of_ist || sent.as_of,
+                            session_date: sent.session_date,
+                            data_freshness: sent.data_freshness,
                         };
                         this.renderFearAndGreed(fg);
                         this.renderVolatility({
                             vix_level: sent.vix_level,
-                            regime: sent.vix_regime?.regime || sent.vix_regime,
+                            change_1d: sent.vix_1d_pct != null ? sent.vix_1d_pct : null,
+                            regime: sent.vix_regime?.label || sent.vix_regime?.regime || sent.vix_regime,
                             description: sent.vix_regime?.description,
                             stance: sent.vix_regime?.stance,
+                            as_of_ist: sent.as_of_ist || sent.as_of,
+                            session_date: sent.session_date,
                         });
                         this.renderBreadth(sent.breadth || {});
                         if (sent.prediction) {
@@ -98,9 +109,25 @@
                                 conviction_pct: sent.prediction.conviction_pct,
                                 nifty_support: sent.prediction.support_level,
                                 nifty_resistance: sent.prediction.resistance_level,
+                                as_of_ist: sent.as_of_ist || sent.as_of,
+                                session_date: sent.session_date,
                             });
                         }
                         this.renderMacroCharts(sent.macro_charts || {}, this._lastOiData || {});
+
+                        // Card-level timestamp stamping
+                        const tsLabel = sent.as_of_ist || sent.as_of || (sent.session_date ? `Session ${sent.session_date}` : 'Updated: EOD');
+                        const fgTs = document.getElementById('pulseFgTimestamp');
+                        const vixTs = document.getElementById('pulseVixTimestamp');
+                        const niftyTs = document.getElementById('pulseNiftyTimestamp');
+                        const oiChartTs = document.getElementById('pulseOiChartTimestamp');
+                        const fiiLsTs = document.getElementById('pulseFiiLsTimestamp');
+                        if (fgTs) fgTs.textContent = `Updated: ${tsLabel}`;
+                        if (vixTs) vixTs.textContent = `Updated: ${tsLabel}`;
+                        if (niftyTs) niftyTs.textContent = `Updated: ${tsLabel}`;
+                        if (oiChartTs) oiChartTs.textContent = `Updated: ${tsLabel}`;
+                        if (fiiLsTs) fiiLsTs.textContent = `Updated: ${tsLabel}`;
+
                         return { key: 'sentiment', val: sent };
                     })
                     .catch(err => {
@@ -116,6 +143,11 @@
                         this.renderParticipantOI(oi);
                         if (this.pulseData?.sentiment?.macro_charts) {
                             this.renderMacroCharts(this.pulseData.sentiment.macro_charts, oi);
+                        }
+                        const oiTs = document.getElementById('pulseOiTimestamp');
+                        if (oiTs) {
+                            const ts = oi.as_of_ist || oi.as_of || (oi.session_label ? `Session ${oi.session_label}` : 'EOD');
+                            oiTs.textContent = `Updated: ${ts}`;
                         }
                         return { key: 'participant_oi', val: oi };
                     })
@@ -431,18 +463,35 @@
             const badgeEl = document.getElementById('pulseVixRegimeBadge');
             const descEl = document.getElementById('pulseVixDesc');
             const stanceEl = document.getElementById('pulseVixStance');
+            const stanceBadge = document.getElementById('pulseVixStanceBadge');
 
-            if (levelEl) levelEl.textContent = vix.vix_level != null ? vix.vix_level : '13.8';
-            if (changeEl && vix.change_1d != null) {
-                const s = vix.change_1d >= 0 ? '+' : '';
-                changeEl.textContent = `${s}${vix.change_1d}% 1D`;
-                changeEl.style.color = vix.change_1d <= 0 ? '#34d399' : '#f87171';
+            const vLevel = vix.vix_level != null ? Number(vix.vix_level) : 13.8;
+            const chg1d = vix.change_1d != null ? Number(vix.change_1d) : (vix.vix_1d_pct != null ? Number(vix.vix_1d_pct) : null);
+            const vColor = vLevel < 13 ? '#34d399' : vLevel <= 17 ? '#38bdf8' : vLevel <= 22 ? '#fbbf24' : '#f43f5e';
+
+            if (levelEl) {
+                levelEl.textContent = vLevel.toFixed(2);
+                levelEl.style.color = vColor;
             }
-            if (badgeEl && vix.regime) badgeEl.textContent = vix.regime;
+            if (changeEl && chg1d != null) {
+                const s = chg1d >= 0 ? '+' : '';
+                changeEl.textContent = `${s}${chg1d.toFixed(2)}% 1D`;
+                changeEl.style.color = chg1d <= 0 ? '#34d399' : '#f87171';
+            }
+            if (badgeEl) {
+                const rLabel = vix.regime || (vLevel < 13 ? '🟢 Low Vol (Bullish)' : vLevel <= 17 ? '🔵 Normal Vol' : vLevel <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike');
+                badgeEl.textContent = rLabel;
+                badgeEl.style.color = vColor;
+                badgeEl.style.background = vColor + '22';
+            }
             if (descEl && vix.description) descEl.textContent = vix.description;
             if (stanceEl && vix.stance) {
                 stanceEl.textContent = vix.stance.replace(/_/g, ' ');
                 stanceEl.style.color = vix.stance.includes('BULLISH') ? '#34d399' : vix.stance.includes('BEARISH') ? '#f87171' : '#fbbf24';
+            }
+            if (stanceBadge) {
+                stanceBadge.textContent = vLevel < 13 ? 'Trend Friendly' : vLevel <= 17 ? 'Safe Corridor' : vLevel <= 22 ? 'Hedge Advised' : 'High Risk';
+                stanceBadge.style.color = vColor;
             }
         },
 
@@ -503,6 +552,17 @@
             const countBadge = document.getElementById('pulseFlowHistoryCountBadge');
             const toggleBtn = document.getElementById('pulseToggleFlowHistoryBtn');
             const containerEl = document.getElementById('pulseFlowsTableContainer');
+            const arrivalBadge = document.getElementById('pulseLiqArrivalBadge');
+            const nextUpdatePill = document.getElementById('pulseLiqNextUpdatePill');
+
+            // Enriched Gross & Ratio elements
+            const fiiGrossSub = document.getElementById('pulseFiiGrossSub');
+            const fiiBsPill = document.getElementById('pulseFiiBsRatioPill');
+            const diiGrossSub = document.getElementById('pulseDiiGrossSub');
+            const diiBsPill = document.getElementById('pulseDiiBsRatioPill');
+            const turnoverSub = document.getElementById('pulseTurnoverSub');
+            const flowRegimeBadge = document.getElementById('pulseFlowRegimeBadge');
+            const flowRegimeSub = document.getElementById('pulseFlowRegimeSub');
 
             // Resolve robust flows data from whatever source is available
             if (!flows || Object.keys(flows).length === 0) {
@@ -515,6 +575,16 @@
 
             this._lastFlowsData = flows;
             if (window.app) window.app._lastFlowsData = flows;
+
+            // 1. Arrival Timestamp Badge & Schedule
+            if (arrivalBadge) {
+                const arrTime = flows.latest_arrived_at_ist || flows.arrived_at_ist || (flows.session_label ? `Session ${flows.session_label}` : 'Latest EOD');
+                arrivalBadge.textContent = `Arrived: ${arrTime}`;
+                arrivalBadge.title = `NSE Cash settlement finalized: ${arrTime}`;
+            }
+
+            // 2. Next Update Schedule & Countdown
+            this.updateLiquiditySchedulePill(flows);
 
             const sessionLabel = flows.session_label || flows.as_of_date || 'Latest Session';
             const fiiLbl = document.getElementById('pulseSessionFiiLabel');
@@ -529,16 +599,97 @@
                 fiiEl.textContent = `${s}₹${flows.fii_net_cr.toLocaleString()} Cr`;
                 fiiEl.style.color = flows.fii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
+            if (fiiGrossSub) {
+                if (flows.fii_buy_cr !== undefined && flows.fii_sell_cr !== undefined) {
+                    fiiGrossSub.textContent = `B: ₹${Math.round(flows.fii_buy_cr).toLocaleString()} | S: ₹${Math.round(flows.fii_sell_cr).toLocaleString()}`;
+                } else {
+                    fiiGrossSub.textContent = 'B: — | S: —';
+                }
+            }
+            if (fiiBsPill) {
+                const ratio = flows.fii_bs_ratio ?? 1.0;
+                fiiBsPill.textContent = `B/S: ${ratio.toFixed(2)}x`;
+                if (ratio >= 1.05) {
+                    fiiBsPill.style.background = 'rgba(52,211,153,0.15)';
+                    fiiBsPill.style.color = '#34d399';
+                } else if (ratio <= 0.95) {
+                    fiiBsPill.style.background = 'rgba(248,113,113,0.15)';
+                    fiiBsPill.style.color = '#f87171';
+                } else {
+                    fiiBsPill.style.background = 'rgba(255,255,255,0.06)';
+                    fiiBsPill.style.color = '#94a3b8';
+                }
+            }
+
             if (diiEl && flows.dii_net_cr !== undefined && flows.dii_net_cr !== null) {
                 const s = flows.dii_net_cr >= 0 ? '+' : '';
                 diiEl.textContent = `${s}₹${flows.dii_net_cr.toLocaleString()} Cr`;
                 diiEl.style.color = flows.dii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
+            if (diiGrossSub) {
+                if (flows.dii_buy_cr !== undefined && flows.dii_sell_cr !== undefined) {
+                    diiGrossSub.textContent = `B: ₹${Math.round(flows.dii_buy_cr).toLocaleString()} | S: ₹${Math.round(flows.dii_sell_cr).toLocaleString()}`;
+                } else {
+                    diiGrossSub.textContent = 'B: — | S: —';
+                }
+            }
+            if (diiBsPill) {
+                const ratio = flows.dii_bs_ratio ?? 1.0;
+                diiBsPill.textContent = `B/S: ${ratio.toFixed(2)}x`;
+                if (ratio >= 1.05) {
+                    diiBsPill.style.background = 'rgba(52,211,153,0.15)';
+                    diiBsPill.style.color = '#34d399';
+                } else if (ratio <= 0.95) {
+                    diiBsPill.style.background = 'rgba(248,113,113,0.15)';
+                    diiBsPill.style.color = '#f87171';
+                } else {
+                    diiBsPill.style.background = 'rgba(255,255,255,0.06)';
+                    diiBsPill.style.color = '#94a3b8';
+                }
+            }
+
             if (totEl && flows.total_net_cr !== undefined && flows.total_net_cr !== null) {
                 const s = flows.total_net_cr >= 0 ? '+' : '';
                 totEl.textContent = `${s}₹${flows.total_net_cr.toLocaleString()} Cr`;
                 totEl.style.color = flows.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
             }
+            if (turnoverSub) {
+                if (flows.gross_turnover_cr) {
+                    turnoverSub.textContent = `Turnover: ₹${Math.round(flows.gross_turnover_cr).toLocaleString()} Cr`;
+                } else {
+                    turnoverSub.textContent = 'Turnover: —';
+                }
+            }
+
+            // Flow Regime & Absorption
+            if (flowRegimeBadge) {
+                const regime = flows.flow_regime || flows.regime_badge || (flows.total_net_cr >= 0 ? '🟢 Inflow Expansion' : '🔴 Outflow Pressure');
+                flowRegimeBadge.textContent = regime;
+                if (regime.includes('🟢') || regime.includes('Accumulation') || regime.includes('Inflow')) {
+                    flowRegimeBadge.style.color = '#34d399';
+                } else if (regime.includes('⚡') || regime.includes('Absorption') || regime.includes('Counter')) {
+                    flowRegimeBadge.style.color = '#38bdf8';
+                } else if (regime.includes('🔴') || regime.includes('Distribution') || regime.includes('Outflow')) {
+                    flowRegimeBadge.style.color = '#f87171';
+                } else {
+                    flowRegimeBadge.style.color = '#fbbf24';
+                }
+            }
+            if (flowRegimeSub) {
+                const totalNet = flows.total_net_cr ?? 0;
+                const fiiNet = flows.fii_net_cr ?? 0;
+                const diiNet = flows.dii_net_cr ?? 0;
+                if (fiiNet < 0 && diiNet > 0 && diiNet >= Math.abs(fiiNet)) {
+                    flowRegimeSub.textContent = 'DII Buying Absorbs FII Outflows';
+                } else if (fiiNet > 0 && diiNet > 0) {
+                    flowRegimeSub.textContent = 'Twin Institutional Buying Expansion';
+                } else if (fiiNet < 0 && diiNet < 0) {
+                    flowRegimeSub.textContent = 'Unified Institutional Liquidation';
+                } else {
+                    flowRegimeSub.textContent = totalNet >= 0 ? 'Net Capital Inflow' : 'Net Capital Distribution';
+                }
+            }
+
             const biasText = flows.bias || flows.regime_badge;
             if (biasEl && biasText) {
                 biasEl.textContent = biasText;
@@ -574,7 +725,7 @@
 
             // Update Header & Controls
             if (titleEl) {
-                titleEl.textContent = isExpanded ? 'Past 30 Days Activity' : 'Past 7 Days Activity';
+                titleEl.textContent = isExpanded ? 'Past 30 Days Cash Activity & Turnovers' : 'Past 7 Days Cash Activity & Turnovers';
             }
             if (countBadge) {
                 countBadge.textContent = `${history.length} Sessions`;
@@ -591,7 +742,7 @@
             // Flow History Table Rows
             if (tbody7d) {
                 if (!history.length) {
-                    tbody7d.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
+                    tbody7d.innerHTML = '<tr><td colspan="7" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
                     return;
                 }
 
@@ -607,10 +758,23 @@
                     const fiiCol = fiiVal >= 0 ? '#34d399' : '#f87171';
                     const diiCol = diiVal >= 0 ? '#34d399' : '#f87171';
                     const totCol = totVal >= 0 ? '#38bdf8' : '#f87171';
-                    const isBull = totVal >= 0;
-                    const badgeCol = isBull ? '#34d399' : '#f87171';
-                    const badgeBg = isBull ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
-                    const badgeText = isBull ? '🟢 Inflow' : '🔴 Outflow';
+
+                    const turnover = row.gross_turnover_cr ? Math.round(row.gross_turnover_cr).toLocaleString() : '—';
+                    const fiiBs = row.fii_bs_ratio ? `${row.fii_bs_ratio.toFixed(2)}x` : '';
+                    const diiBs = row.dii_bs_ratio ? `${row.dii_bs_ratio.toFixed(2)}x` : '';
+
+                    const regime = row.flow_regime || (totVal >= 0 ? '🟢 Inflow' : '🔴 Outflow');
+                    let badgeCol = '#34d399';
+                    let badgeBg = 'rgba(52,211,153,0.12)';
+                    if (regime.includes('🔴') || regime.includes('Outflow') || regime.includes('Distribution')) {
+                        badgeCol = '#f87171';
+                        badgeBg = 'rgba(248,113,113,0.12)';
+                    } else if (regime.includes('⚡') || regime.includes('Absorption')) {
+                        badgeCol = '#38bdf8';
+                        badgeBg = 'rgba(56,189,248,0.12)';
+                    }
+
+                    const arrivalStr = row.arrived_at_ist || row.updated_at_ist || '—';
 
                     return `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg};">
@@ -618,23 +782,84 @@
                                 ${row.day_label || row.date}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${fiiCol};font-weight:600;">
-                                ${fiiSign}₹${fiiVal.toLocaleString()}
+                                <div>${fiiSign}₹${fiiVal.toLocaleString()}</div>
+                                ${fiiBs ? `<div style="font-size:0.55rem;color:#64748b;">${fiiBs} B/S</div>` : ''}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${diiCol};font-weight:600;">
-                                ${diiSign}₹${diiVal.toLocaleString()}
+                                <div>${diiSign}₹${diiVal.toLocaleString()}</div>
+                                ${diiBs ? `<div style="font-size:0.55rem;color:#64748b;">${diiBs} B/S</div>` : ''}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${totCol};font-weight:700;">
                                 ${totSign}₹${totVal.toLocaleString()}
                             </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                ₹${turnover}
+                            </td>
                             <td style="padding:0.35rem 0.5rem;text-align:center;">
-                                <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);">
-                                    ${badgeText}
+                                <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);white-space:nowrap;">
+                                    ${regime}
                                 </span>
+                            </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:center;font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);">
+                                ${arrivalStr}
                             </td>
                         </tr>
                     `;
                 }).join('');
             }
+        },
+
+        updateLiquiditySchedulePill(flows) {
+            const nextUpdatePill = document.getElementById('pulseLiqNextUpdatePill');
+            if (!nextUpdatePill) return;
+
+            const sched = flows.next_release_schedule || {};
+            const status = sched.status || flows.next_release_status || 'pending_today';
+            const label = sched.label || flows.next_release_label || 'Today ~18:30 IST';
+            let targetUtc = sched.next_release_target_utc;
+
+            const formatCountdown = (seconds) => {
+                if (seconds <= 0) return '0m';
+                const days = Math.floor(seconds / 86400);
+                const hrs = Math.floor((seconds % 86400) / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                if (days > 0) return `${days}d ${hrs}h`;
+                if (hrs > 0) return `${hrs}h ${mins}m`;
+                return `${mins}m`;
+            };
+
+            const renderPill = () => {
+                let countdownStr = sched.countdown || flows.next_release_countdown || '';
+                if (targetUtc) {
+                    const diffSec = Math.max(0, Math.floor((new Date(targetUtc).getTime() - Date.now()) / 1000));
+                    countdownStr = formatCountdown(diffSec);
+                }
+
+                if (status === 'awaiting_settlement') {
+                    nextUpdatePill.textContent = `Next Update: ${label}`;
+                    nextUpdatePill.style.background = 'rgba(239,68,68,0.12)';
+                    nextUpdatePill.style.color = '#f87171';
+                    nextUpdatePill.style.borderColor = 'rgba(239,68,68,0.25)';
+                } else if (status === 'weekend_pause') {
+                    nextUpdatePill.textContent = `Next Update: ${label} (in ${countdownStr || 'weekend'})`;
+                    nextUpdatePill.style.background = 'rgba(148,163,184,0.12)';
+                    nextUpdatePill.style.color = '#94a3b8';
+                    nextUpdatePill.style.borderColor = 'rgba(148,163,184,0.25)';
+                } else {
+                    const cStr = countdownStr ? ` (in ${countdownStr})` : '';
+                    nextUpdatePill.textContent = `Next Update: ${label}${cStr}`;
+                    nextUpdatePill.style.background = 'rgba(251,191,36,0.12)';
+                    nextUpdatePill.style.color = '#fbbf24';
+                    nextUpdatePill.style.borderColor = 'rgba(251,191,36,0.25)';
+                }
+            };
+
+            renderPill();
+
+            if (this._liquidityCountdownInterval) {
+                clearInterval(this._liquidityCountdownInterval);
+            }
+            this._liquidityCountdownInterval = setInterval(renderPill, 60000);
         },
 
         toggleFlowHistory() {
@@ -655,31 +880,36 @@
             this._currentOiView = viewMode;
             if (window.app) window.app._currentOiView = viewMode;
 
-            // Update tab button styles
+            // Update tab button styles for all 5 modes
             const btnIndex = document.getElementById('btnOiViewIndex');
+            const btnStock = document.getElementById('btnOiViewStock');
+            const btnOptions = document.getElementById('btnOiViewOptions');
             const btnConsolidated = document.getElementById('btnOiViewConsolidated');
             const btnHistory = document.getElementById('btnOiViewHistory');
 
-            [btnIndex, btnConsolidated, btnHistory].forEach(btn => {
-                if (btn) {
-                    btn.classList.remove('active');
-                    btn.style.background = 'transparent';
-                    btn.style.color = '#94a3b8';
+            const allButtons = [
+                { id: 'index_futures', btn: btnIndex },
+                { id: 'stock_futures', btn: btnStock },
+                { id: 'options_anatomy', btn: btnOptions },
+                { id: 'consolidated_fo', btn: btnConsolidated },
+                { id: 'history_matrix', btn: btnHistory },
+            ];
+
+            allButtons.forEach(item => {
+                if (item.btn) {
+                    item.btn.classList.remove('active');
+                    item.btn.style.background = 'rgba(255,255,255,0.04)';
+                    item.btn.style.color = '#94a3b8';
+                    item.btn.style.borderColor = 'rgba(255,255,255,0.08)';
                 }
             });
 
-            if (viewMode === 'index_futures' && btnIndex) {
-                btnIndex.classList.add('active');
-                btnIndex.style.background = 'rgba(56,189,248,0.18)';
-                btnIndex.style.color = '#38bdf8';
-            } else if (viewMode === 'consolidated_fo' && btnConsolidated) {
-                btnConsolidated.classList.add('active');
-                btnConsolidated.style.background = 'rgba(56,189,248,0.18)';
-                btnConsolidated.style.color = '#38bdf8';
-            } else if (viewMode === 'history_matrix' && btnHistory) {
-                btnHistory.classList.add('active');
-                btnHistory.style.background = 'rgba(56,189,248,0.18)';
-                btnHistory.style.color = '#38bdf8';
+            const activeItem = allButtons.find(item => item.id === viewMode);
+            if (activeItem && activeItem.btn) {
+                activeItem.btn.classList.add('active');
+                activeItem.btn.style.background = 'rgba(56,189,248,0.18)';
+                activeItem.btn.style.color = '#38bdf8';
+                activeItem.btn.style.borderColor = 'rgba(56,189,248,0.4)';
             }
 
             const snapContainer = document.getElementById('pulseOiSnapshotContainer');
@@ -815,10 +1045,34 @@
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Net Index Contracts</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">Index Long %</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">1D Shift (Δ)</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:left;">Shift &amp; Regime</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Macro Shift &amp; Regime</th>
+                        </tr>
+                    `;
+                } else if (currentView === 'stock_futures') {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Stock Fut Long</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Stock Fut Short</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Net Stock Contracts</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Stock Long %</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">1D Stock Shift (Δ)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Alpha Stance &amp; Regime</th>
+                        </tr>
+                    `;
+                } else if (currentView === 'options_anatomy') {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Calls (Long / Short / Net)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Puts (Long / Short / Net)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Option PCR</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Net Option Delta</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Desk Role &amp; Stance</th>
                         </tr>
                     `;
                 } else {
+                    // Consolidated F&O View
                     tableHead.innerHTML = `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
                             <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
@@ -923,6 +1177,155 @@
                                 <td style="padding:0.45rem 0.6rem;text-align:left;">
                                     <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
                                         ${shiftRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (currentView === 'stock_futures') {
+                        // Stock Futures (Alpha) View
+                        const fsLong = p.future_stock_long ?? 0;
+                        const fsShort = p.future_stock_short ?? 0;
+                        const fsNet = p.future_stock_net ?? (fsLong - fsShort);
+                        const fsLongPct = p.future_stock_long_pct ?? ((fsLong + fsShort) > 0 ? (fsLong / (fsLong + fsShort)) * 100 : 50);
+
+                        const netCol = fsNet > 0 ? '#34d399' : (fsNet < 0 ? '#f87171' : '#94a3b8');
+                        const netSign = fsNet > 0 ? '+' : '';
+
+                        const deltaVal = p.delta_future_stock_net ?? null;
+                        let deltaStr = '<span style="color:#64748b;">—</span>';
+                        if (deltaVal !== null && deltaVal !== undefined) {
+                            const dSign = deltaVal >= 0 ? '+' : '';
+                            const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
+                            const dArr = deltaVal >= 0 ? '▲' : '▼';
+                            deltaStr = `<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:${dCol}18;color:${dCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${dCol}33;">Δ ${dSign}${deltaVal.toLocaleString()} ${dArr}</span>`;
+                        }
+
+                        let pctCol = '#94a3b8';
+                        let pctBg = 'rgba(255,255,255,0.05)';
+                        if (fsLongPct >= 65) {
+                            pctCol = '#34d399';
+                            pctBg = 'rgba(16,185,129,0.12)';
+                        } else if (fsLongPct <= 35) {
+                            pctCol = '#f87171';
+                            pctBg = 'rgba(239,68,68,0.12)';
+                        }
+
+                        const stockRegime = p.stock_shift_regime || (fsNet >= 0 ? '🟢 Net Long Stock Alpha' : '🔴 Net Short Stock Alpha');
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (stockRegime.includes('🟢') || stockRegime.includes('Long')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
+                            stanceCol = '#34d399';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (stockRegime.includes('🔴') || stockRegime.includes('Short')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
+                            stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (stockRegime.includes('⚡') || stockRegime.includes('Covering')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#34d399;font-weight:600;">
+                                    ${fsLong.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#f87171;font-weight:600;">
+                                    ${fsShort.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                    ${netSign}${fsNet.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${pctBg};color:${pctCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pctCol}33;">
+                                        ${fsLongPct.toFixed(1)}% Long
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    ${deltaStr}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
+                                        ${stockRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    } else if (currentView === 'options_anatomy') {
+                        // Options Anatomy (CE / PE) View
+                        const cLong = p.calls_long || 0;
+                        const cShort = p.calls_short || 0;
+                        const cNet = p.calls_net ?? (cLong - cShort);
+                        const cNetSign = cNet >= 0 ? '+' : '';
+                        const cNetCol = cNet >= 0 ? '#34d399' : '#f87171';
+
+                        const pLong = p.puts_long || 0;
+                        const pShort = p.puts_short || 0;
+                        const pNet = p.puts_net ?? (pLong - pShort);
+                        const pNetSign = pNet >= 0 ? '+' : '';
+                        const pNetCol = pNet >= 0 ? '#f87171' : '#34d399'; // Net Long Puts is Bearish/Hedge, Net Short Puts is Bullish Floor
+
+                        const pcr = p.option_pcr ?? ((cLong + cShort) > 0 ? (pLong + pShort) / (cLong + cShort) : 1.0);
+                        let pcrCol = '#fbbf24';
+                        if (pcr >= 1.25) pcrCol = '#38bdf8';
+                        else if (pcr <= 0.80) pcrCol = '#34d399';
+
+                        const netOptDelta = cNet - pNet;
+                        const deltaSign = netOptDelta >= 0 ? '+' : '';
+                        const deltaCol = netOptDelta >= 0 ? '#34d399' : '#f87171';
+
+                        const optStance = p.option_stance || 'Balanced Options Book';
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (optStance.includes('🟢') || optStance.includes('Bullish') || optStance.includes('Support')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
+                            stanceCol = '#34d399';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (optStance.includes('🔴') || optStance.includes('Bearish') || optStance.includes('Resistance')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
+                            stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (optStance.includes('⚡') || optStance.includes('Strangle') || optStance.includes('Writing')) {
+                            stanceBg = 'rgba(168,85,247,0.12)';
+                            stanceCol = '#c084fc';
+                            stanceBorder = 'rgba(168,85,247,0.25)';
+                        } else if (optStance.includes('🛡️') || optStance.includes('Hedge')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);">
+                                    <span style="color:#34d399;">${cLong.toLocaleString()}</span> / <span style="color:#f87171;">${cShort.toLocaleString()}</span>
+                                    <div style="font-size:0.58rem;color:${cNetCol};font-weight:700;">Net: ${cNetSign}${cNet.toLocaleString()}</div>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);">
+                                    <span style="color:#34d399;">${pLong.toLocaleString()}</span> / <span style="color:#f87171;">${pShort.toLocaleString()}</span>
+                                    <div style="font-size:0.58rem;color:${pNetCol};font-weight:700;">Net: ${pNetSign}${pNet.toLocaleString()}</div>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:${pcrCol}18;color:${pcrCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pcrCol}33;">
+                                        ${pcr.toFixed(2)} PCR
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${deltaCol};">
+                                    ${deltaSign}${netOptDelta.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
+                                        ${optStance}
                                     </span>
                                 </td>
                             </tr>
@@ -1286,47 +1689,149 @@
         // =====================================================================
         renderMacroCharts(charts, participantOi = {}) {
             if (!charts) return;
+            this._lastMacroCharts = charts;
+            if (participantOi && (participantOi.history_10d || participantOi.history_7d || participantOi.participants)) {
+                this._lastOiData = participantOi;
+            }
 
             // 1. Fear & Greed 30D Trend Wave Chart
             const fgSeries = charts.fear_greed || [];
             if (fgSeries.length) {
-                this.drawSparklineChart('chartFearGreed', fgSeries.map(x => x.score), {
-                    color: '#34d399',
-                    gradientFrom: 'rgba(52, 211, 153, 0.28)',
-                    gradientTo: 'rgba(52, 211, 153, 0.01)',
+                const fgValues = fgSeries.map(x => (x.score !== undefined ? x.score : (x.value !== undefined ? x.value : 50)));
+                const fgDates = fgSeries.map(x => x.date || '');
+                const latestFg = fgValues[fgValues.length - 1];
+                const prevFg = fgValues.length >= 7 ? fgValues[fgValues.length - 7] : fgValues[0];
+                const fgDelta = Number((latestFg - prevFg).toFixed(1));
+
+                const fgColor = latestFg >= 75 ? '#10b981' : latestFg >= 55 ? '#34d399' : latestFg >= 45 ? '#fbbf24' : latestFg >= 25 ? '#f97316' : '#f43f5e';
+                const fgGrad = latestFg >= 55 ? 'rgba(52, 211, 153, 0.28)' : latestFg >= 45 ? 'rgba(251, 191, 36, 0.28)' : 'rgba(244, 63, 94, 0.28)';
+
+                this.drawSparklineChart('chartFearGreed', fgValues, {
+                    color: fgColor,
+                    gradientFrom: fgGrad,
+                    gradientTo: 'rgba(0, 0, 0, 0.01)',
                     minVal: 0,
                     maxVal: 100,
                     referenceLines: [25, 50, 75],
                     refLineColors: ['rgba(244,63,94,0.35)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.35)'],
-                    dates: fgSeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${Math.round(v)} / 100`,
+                    dates: fgDates,
+                    valueFormatter: (v) => {
+                        const s = Math.round(v);
+                        const label = s >= 75 ? 'Extreme Greed' : s >= 55 ? 'Greed' : s >= 45 ? 'Neutral' : s >= 25 ? 'Fear' : 'Extreme Fear';
+                        return `${s} / 100 (${label})`;
+                    },
                 });
+
+                const fgScoreEl = document.getElementById('pulseFgScore');
+                const fgBadgeEl = document.getElementById('pulseFgBadge');
+                const fgDeltaEl = document.getElementById('pulseFgDelta');
+                if (fgScoreEl) {
+                    fgScoreEl.textContent = Number(latestFg).toFixed(1);
+                    fgScoreEl.style.color = fgColor;
+                }
+                if (fgBadgeEl) {
+                    const label = latestFg >= 75 ? 'Extreme Greed' : latestFg >= 55 ? 'Greed / Bullish' : latestFg >= 45 ? 'Neutral Balance' : latestFg >= 25 ? 'Fear / Caution' : 'Extreme Fear';
+                    fgBadgeEl.textContent = label;
+                    fgBadgeEl.style.color = fgColor;
+                    fgBadgeEl.style.background = fgColor + '22';
+                }
+                if (fgDeltaEl) {
+                    const s = fgDelta >= 0 ? '+' : '';
+                    fgDeltaEl.textContent = `${s}${fgDelta} (7D)`;
+                    fgDeltaEl.style.color = fgDelta >= 0 ? '#34d399' : '#f87171';
+                }
             }
 
             // 2. India VIX Volatility Corridor Chart
             const vixSeries = charts.vix || [];
             if (vixSeries.length) {
-                this.drawSparklineChart('chartVix', vixSeries.map(x => x.value), {
-                    color: '#38bdf8',
-                    gradientFrom: 'rgba(56, 189, 248, 0.28)',
-                    gradientTo: 'rgba(56, 189, 248, 0.01)',
-                    referenceLines: [15, 20],
-                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(248,113,113,0.35)'],
-                    dates: vixSeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${v.toFixed(2)}`,
+                const vixValues = vixSeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 14.0)));
+                const vixDates = vixSeries.map(x => x.date || '');
+                const latestVix = vixValues[vixValues.length - 1];
+                const prevVix = vixValues.length >= 2 ? vixValues[vixValues.length - 2] : latestVix;
+                const vix1dChg = prevVix > 0 ? ((latestVix - prevVix) / prevVix) * 100 : 0;
+
+                const vixColor = latestVix < 13 ? '#34d399' : latestVix <= 17 ? '#38bdf8' : latestVix <= 22 ? '#fbbf24' : '#f43f5e';
+                const vixGrad = latestVix < 13 ? 'rgba(52, 211, 153, 0.28)' : latestVix <= 17 ? 'rgba(56, 189, 248, 0.28)' : 'rgba(244, 63, 94, 0.28)';
+
+                this.drawSparklineChart('chartVix', vixValues, {
+                    color: vixColor,
+                    gradientFrom: vixGrad,
+                    gradientTo: 'rgba(0, 0, 0, 0.01)',
+                    referenceLines: [13, 17, 22],
+                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(56,189,248,0.3)', 'rgba(244,63,94,0.35)'],
+                    dates: vixDates,
+                    valueFormatter: (v) => {
+                        const num = Number(v).toFixed(2);
+                        const reg = v < 13 ? 'Low Vol (Bullish)' : v <= 17 ? 'Normal' : v <= 22 ? 'Elevated Chop' : 'Panic';
+                        return `${num} (${reg})`;
+                    },
                 });
+
+                const vixLevelEl = document.getElementById('pulseVixLevel');
+                const vixChangeEl = document.getElementById('pulseVixChange');
+                const vixBadgeEl = document.getElementById('pulseVixRegimeBadge');
+                const vixStanceBadge = document.getElementById('pulseVixStanceBadge');
+                if (vixLevelEl) {
+                    vixLevelEl.textContent = Number(latestVix).toFixed(2);
+                    vixLevelEl.style.color = vixColor;
+                }
+                if (vixChangeEl) {
+                    const s = vix1dChg >= 0 ? '+' : '';
+                    vixChangeEl.textContent = `${s}${vix1dChg.toFixed(2)}% 1D`;
+                    vixChangeEl.style.color = vix1dChg <= 0 ? '#34d399' : '#f87171';
+                }
+                if (vixBadgeEl) {
+                    const regLabel = latestVix < 13 ? '🟢 Low Vol (Bullish)' : latestVix <= 17 ? '🔵 Normal Vol' : latestVix <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike';
+                    vixBadgeEl.textContent = regLabel;
+                    vixBadgeEl.style.color = vixColor;
+                    vixBadgeEl.style.background = vixColor + '22';
+                }
+                if (vixStanceBadge) {
+                    vixStanceBadge.textContent = latestVix < 13 ? 'Trend Friendly' : latestVix <= 17 ? 'Safe Corridor' : latestVix <= 22 ? 'Hedge Advised' : 'High Risk';
+                    vixStanceBadge.style.color = vixColor;
+                }
             }
 
             // 3. NIFTY 50 Benchmark Trajectory Chart
             const niftySeries = charts.nifty || [];
             if (niftySeries.length) {
-                this.drawSparklineChart('chartNifty', niftySeries.map(x => x.value), {
+                const niftyValues = niftySeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 24800)));
+                const niftyDates = niftySeries.map(x => x.date || '');
+                const latestNifty = niftyValues[niftyValues.length - 1];
+                const prevNifty = niftyValues.length >= 2 ? niftyValues[niftyValues.length - 2] : latestNifty;
+                const nifty1dChg = prevNifty > 0 ? ((latestNifty - prevNifty) / prevNifty) * 100 : 0;
+                const minNifty = Math.min(...niftyValues);
+                const maxNifty = Math.max(...niftyValues);
+                const mom30d = niftyValues.length > 1 ? ((latestNifty - niftyValues[0]) / niftyValues[0]) * 100 : 0;
+
+                this.drawSparklineChart('chartNifty', niftyValues, {
                     color: '#818cf8',
                     gradientFrom: 'rgba(129, 140, 248, 0.28)',
                     gradientTo: 'rgba(129, 140, 248, 0.01)',
-                    dates: niftySeries.map(x => x.date || ''),
-                    valueFormatter: (v) => `${Math.round(v).toLocaleString()}`,
+                    dates: niftyDates,
+                    valueFormatter: (v) => `${Math.round(v).toLocaleString('en-IN')}`,
                 });
+
+                const niftyLvl = document.getElementById('pulseNiftyLevel');
+                const niftyChg = document.getElementById('pulseNiftyChange');
+                const niftyLowEl = document.getElementById('pulseNifty30dLow');
+                const niftyHighEl = document.getElementById('pulseNifty30dHigh');
+                const niftyMomEl = document.getElementById('pulseNifty30dMom');
+
+                if (niftyLvl) niftyLvl.textContent = Number(latestNifty).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+                if (niftyChg) {
+                    const s = nifty1dChg >= 0 ? '+' : '';
+                    niftyChg.textContent = `${s}${nifty1dChg.toFixed(2)}% 1D`;
+                    niftyChg.style.color = nifty1dChg >= 0 ? '#34d399' : '#f87171';
+                }
+                if (niftyLowEl) niftyLowEl.textContent = `30D Low: ${Math.round(minNifty).toLocaleString('en-IN')}`;
+                if (niftyHighEl) niftyHighEl.textContent = `30D High: ${Math.round(maxNifty).toLocaleString('en-IN')}`;
+                if (niftyMomEl) {
+                    const s = mom30d >= 0 ? '+' : '';
+                    niftyMomEl.textContent = `Momentum: ${s}${mom30d.toFixed(1)}%`;
+                    niftyMomEl.style.color = mom30d >= 0 ? '#38bdf8' : '#f87171';
+                }
             }
 
             // 4. Participant OI 10D Net Contracts Trajectory (Multi-Line)
@@ -1533,7 +2038,11 @@
                     ctx.strokeStyle = options.color || '#38bdf8';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
-                    ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                    } else {
+                        ctx.rect(pillX, pillY, pillW, pillH);
+                    }
                     ctx.fill();
                     ctx.stroke();
 
@@ -2118,6 +2627,17 @@
             }
         }
     };
+
+    // Auto redraw charts on window resize or orientation change
+    let _resizePulseDebounce = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(_resizePulseDebounce);
+        _resizePulseDebounce = setTimeout(() => {
+            if (marketPulseModule._lastMacroCharts) {
+                marketPulseModule.renderMacroCharts(marketPulseModule._lastMacroCharts, marketPulseModule._lastOiData || {});
+            }
+        }, 200);
+    });
 
     window.marketPulseModule = marketPulseModule;
     window.app.marketPulse = marketPulseModule;

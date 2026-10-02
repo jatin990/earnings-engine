@@ -72,3 +72,102 @@ def test_get_stock_forensic_dossier(test_db):
     assert len(dossier["quarterly_income"]) == 2
     assert "block_deals" in dossier
     assert len(dossier["block_deals"]) >= 1
+
+
+def test_ingest_stock_quarterly_financials(test_db, monkeypatch):
+    s = test_db
+    conn = get_db_connection(s)
+    from earnings_engine.data.nse_shareholding import ingest_stock_quarterly_financials
+
+    class MockResponse:
+        status_code = 200
+        text = """
+        <html><body>
+        <section id="quarters">
+            <table>
+                <thead>
+                    <tr><th></th><th>Jun 2026</th><th>Mar 2026</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Sales +</td><td>10,500</td><td>9,800</td></tr>
+                    <tr><td>Expenses +</td><td>7,500</td><td>7,100</td></tr>
+                    <tr><td>Operating Profit</td><td>3,000</td><td>2,700</td></tr>
+                    <tr><td>OPM %</td><td>28.5%</td><td>27.5%</td></tr>
+                    <tr><td>Net Profit +</td><td>2,100</td><td>1,900</td></tr>
+                    <tr><td>EPS in Rs</td><td>15.50</td><td>14.00</td></tr>
+                </tbody>
+            </table>
+        </section>
+        </body></html>
+        """
+
+    class MockSession:
+        headers = {}
+        def get(self, url, **kwargs):
+            return MockResponse()
+
+    monkeypatch.setattr("earnings_engine.data.nse_shareholding.create_browser_session", lambda **k: MockSession())
+
+    res = ingest_stock_quarterly_financials("TATAMOTORS.NS", force=True, settings=s, conn=conn)
+    assert res["success"] is True
+    assert res["ticker"] == "TATAMOTORS.NS"
+    assert res["quarters_count"] == 2
+
+    rows = conn.execute("SELECT quarter, revenue_cr, net_profit_cr, operating_profit_cr, operating_margin_pct, eps FROM quarterly_financials WHERE ticker = 'TATAMOTORS.NS' ORDER BY period_end_date DESC").fetchall()
+    assert len(rows) == 2
+    assert rows[0][0] == "Jun 2026"
+    assert rows[0][1] == 10500.0
+    assert rows[0][2] == 2100.0
+    assert rows[0][3] == 3000.0
+    assert rows[0][4] == 28.5
+    assert rows[0][5] == 15.5
+
+
+def test_ingest_stock_block_deals(test_db, monkeypatch):
+    s = test_db
+    conn = get_db_connection(s)
+    from earnings_engine.data.nse_shareholding import ingest_stock_block_deals
+
+    class MockBlockResponse:
+        status_code = 200
+        def json(self):
+            return {
+                "marketStatus": {"tradeDate": "18-Sep-2026 15:30"},
+                "data": [
+                    {
+                        "session": "Session 2",
+                        "symbol": "TATAMOTORS",
+                        "totalTradedVolume": 500000,
+                        "totalTradedValue": 550000000,
+                        "lastPrice": 1100.0,
+                    }
+                ]
+            }
+
+    class MockBulkResponse:
+        status_code = 200
+        def json(self):
+            return {"data": []}
+
+    class MockSession:
+        headers = {}
+        def get(self, url, **kwargs):
+            if "block-deal" in url:
+                return MockBlockResponse()
+            return MockBulkResponse()
+
+    monkeypatch.setattr("earnings_engine.data.nse_shareholding.create_browser_session", lambda **k: MockSession())
+
+    res = ingest_stock_block_deals("TATAMOTORS.NS", force=True, settings=s, conn=conn)
+    assert res["success"] is True
+    assert res["ticker"] == "TATAMOTORS.NS"
+    assert res["deals_count"] == 1
+
+    deals = conn.execute("SELECT deal_date, ticker, client_name, quantity, price, value_cr FROM institutional_block_deals WHERE ticker = 'TATAMOTORS.NS'").fetchall()
+    assert len(deals) == 1
+    assert deals[0][0] == "2026-09-18"
+    assert deals[0][1] == "TATAMOTORS.NS"
+    assert "NSE Block Window" in deals[0][2]
+    assert deals[0][3] == 500000
+    assert deals[0][4] == 1100.0
+    assert deals[0][5] == 55.0

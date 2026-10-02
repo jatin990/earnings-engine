@@ -528,6 +528,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             updated_at = excluded.updated_at
         """
         rows_for_tracked = []
+        today_str = now_iso[:10]
         for r_tuple in rows_to_insert:
             # Tuple: ticker, strategy, tier, company_name, ..., updated_at (38 items)
             t_list = list(r_tuple)
@@ -538,7 +539,17 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             trig_p = t_list[14]
             cur_p = t_list[21]
             outcome = t_list[26]
-            is_breached = bool(t_list[25]) or (sig_p and trig_p and sig_p >= trig_p) or (cur_p and trig_p and cur_p >= trig_p) or (outcome not in ("PENDING", "ACTIVE", ""))
+            sig_date_str = str(t_list[11])[:10] if t_list[11] else ""
+
+            # Today's breakouts stay in the pool — do not move to traded history on day-0.
+            # Only mark as breached after at least one full trading day has elapsed.
+            is_today = (sig_date_str == today_str) if sig_date_str else False
+            is_breached = (
+                bool(t_list[25])
+                or (sig_p and trig_p and sig_p >= trig_p)
+                or (cur_p and trig_p and cur_p >= trig_p and not is_today)
+                or (outcome not in ("PENDING", "ACTIVE", "") and not is_today)
+            )
 
             if is_breached:
                 # Insert created_at (now_iso) before the final item (updated_at)
@@ -3124,6 +3135,12 @@ def compute_technical_decision_metrics(
         if avg_vol_20 > 0:
             volume_surge_ratio = round(today_vol / avg_vol_20, 2)
 
+    # 7D Return %
+    ret_7d_pct = None
+    if len(closes) >= 6:
+        idx_7 = max(0, len(closes) - 8)
+        ret_7d_pct = round(((current_price / float(closes.iloc[idx_7])) - 1.0) * 100.0, 2)
+
     # 30D Return %
     ret_30d_pct = None
     if len(closes) >= 20:
@@ -3158,6 +3175,7 @@ def compute_technical_decision_metrics(
         "rsi_14": rsi_14,
         "volume_surge_ratio": volume_surge_ratio,
         "ret_30d_pct": ret_30d_pct,
+        "ret_7d_pct": ret_7d_pct,
     }
 
 
@@ -4878,11 +4896,17 @@ def run_cold_scan(
 
     from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.logging_utils import BatchProgressLogger
-    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.prices import fetch_batch_live_quotes, load_prices_batch, load_price_metrics_batch
     from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
     from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
 
-    # Bulk pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    # Always refresh live quotes for the full universe first (batched), then bulk
+    # pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    try:
+        fetch_batch_live_quotes(ticker_list, settings=settings, sync_db=True, max_workers=8, force=True)
+    except Exception as e:
+        logger.debug("[BREAKOUT-COLD] Batch live quote fetch warning: %s", e)
+
     prices_map = load_prices_batch(ticker_list, settings=settings)
     metrics_map = load_price_metrics_batch(ticker_list, settings=settings)
     catalysts_map = get_recent_catalysts_batch(ticker_list, limit_per_ticker=3, settings=settings)
@@ -4979,10 +5003,10 @@ def run_warm_rescore(settings: Settings) -> None:
     from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
     from concurrent.futures import ThreadPoolExecutor
 
-    # 1. Extract tickers for live quote batch fetch
+    # 1. Extract tickers for live quote batch fetch (always live — bypass TTL cache)
     tickers_to_fetch = list({k.split("::")[0] for k in warm_keys})
     try:
-        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8, force=True)
     except Exception as e:
         logger.debug("[BREAKOUT-WARM] Batch live quote fetch warning: %s", e)
 
@@ -5068,7 +5092,7 @@ def run_hot_rescore(settings: Settings) -> None:
     # 1. Batch fetch latest live market quotes in parallel (single sub-second batch)
     tickers_to_fetch = list({k.split("::")[0] for k in hot_keys})
     try:
-        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8, force=True)
     except Exception as e:
         logger.debug("[BREAKOUT-HOT] Batch live quote fetch warning: %s", e)
 
@@ -5855,12 +5879,16 @@ def confirm_breakout_outcomes(settings: Settings | None = None) -> dict[str, Any
                 # 0.15% trigger confirmation buffer
                 breakout_fired = bool(post_high >= trigger * 1.0015 or cur_price >= trigger * 1.0015)
 
+                # Keep today's freshly-signaled breakouts in the active pool — do NOT resolve
+                # them on day-0. They should stay live so traders can still track/enter them.
+                is_today_signal = sig_clean == cur_date
+
                 if target and post_high >= target:
                     outcome = "TARGET_HIT"
                     outcome_label = f"Target Hit 🎯 (+{max_gain}%)"
                     outcome_badge = "emerald"
                     broke_happened = 1
-                elif breakout_fired:
+                elif breakout_fired and not is_today_signal:
                     if stop and (post_low <= stop or cur_price <= stop):
                         outcome = "STOP_LOSS_HIT"
                         outcome_label = f"Stop Hit 🛑 ({realized_ret:+0.1f}%)"

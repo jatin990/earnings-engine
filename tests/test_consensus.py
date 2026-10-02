@@ -261,17 +261,17 @@ def test_consensus_models_endpoint_and_rate_limits():
     from earnings_engine.rate_limits import get_models_rate_limits, record_request
 
     # Record some requests
-    record_request("deepseek/deepseek-r1")
-    record_request("meta-llama/llama-3.3-70b-instruct")
+    record_request("antigravityonly")
+    record_request("antigravity")
 
     models = get_models_rate_limits()
     assert len(models) >= 4
     model_ids = [m["id"] for m in models]
-    assert "deepseek/deepseek-r1" in model_ids
-    assert "meta-llama/llama-3.3-70b-instruct" in model_ids
-    assert "qwen/qwen-2.5-72b-instruct" in model_ids
-    assert "google/gemini-2.0-flash-001" in model_ids
-    assert "google/gemma-4-31b-it:free" in model_ids
+    assert "antigravityonly" in model_ids
+    assert "antigravity" in model_ids
+    assert "Smart Coding" in model_ids
+    assert "free only" in model_ids
+    assert "auto/best-free" in model_ids
 
     client = TestClient(app)
     res = client.get("/api/v1/consensus/models")

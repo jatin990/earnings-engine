@@ -198,9 +198,15 @@ def _find_child(node: ET.Element, tags: list[str]) -> ET.Element | None:
     return None
 
 
-def _fetch_rss_feed(url: str, publisher_name: str, timeout: float = 6.0) -> list[dict[str, Any]]:
+def _fetch_rss_feed(
+    url: str,
+    publisher_name: str,
+    timeout: float = 6.0,
+    feed_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Fetch and parse a generic RSS XML feed."""
     items: list[dict[str, Any]] = []
+    fid = feed_id or f"media_{re.sub(r'[^a-z0-9]', '_', publisher_name.lower())}"
     req = urllib.request.Request(url, headers=DEFAULT_HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -254,6 +260,8 @@ def _fetch_rss_feed(url: str, publisher_name: str, timeout: float = 6.0) -> list
                 "publisher": publisher_name,
                 "link": link,
                 "source": "broadband_rss",
+                "feed_id": fid,
+                "feed_name": publisher_name,
                 "raw_event": {
                     "feed_url": url,
                     "raw_pubDate": pub_date_str,
@@ -269,7 +277,8 @@ def fetch_moneycontrol_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across MoneyControl RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in MONEYCONTROL_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -278,7 +287,8 @@ def fetch_et_markets_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across Economic Times Markets RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in ET_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -287,7 +297,8 @@ def fetch_livemint_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across LiveMint RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in LIVEMINT_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -296,7 +307,8 @@ def fetch_business_standard_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across Business Standard RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in BUSINESS_STANDARD_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -305,7 +317,8 @@ def fetch_hindu_businessline_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across Hindu BusinessLine RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in HINDU_BUSINESSLINE_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -314,7 +327,8 @@ def fetch_ndtv_profit_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across NDTV Profit RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in NDTV_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -323,7 +337,8 @@ def fetch_business_today_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent market, corporate, and stock headlines from Business Today RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in BUSINESS_TODAY_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id=f"media_{slug}")
         results.extend(items)
     return results
 
@@ -332,10 +347,12 @@ def fetch_rbi_press_releases_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch authoritative central bank press releases and policy circulars from RBI RSS."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in RBI_FEEDS:
-        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout, feed_id="rbi_press_releases")
         for it in items:
             it["category"] = "banking_regulatory"
             it["source"] = "rbi_rss"
+            it["feed_id"] = "rbi_press_releases"
+            it["feed_name"] = pub_name
         results.extend(items)
     return results
 
@@ -344,9 +361,10 @@ def fetch_google_news_broadband(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch market-wide Google News RSS feeds for Indian equity catalysts."""
     results: list[dict[str, Any]] = []
     for q, pub_name in GOOGLE_BROADBAND_QUERIES:
+        slug = re.sub(r"[^a-z0-9]", "_", pub_name.lower())
         encoded_q = urllib.parse.quote(q)
         url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en-IN&gl=IN&ceid=IN:en"
-        items = _fetch_rss_feed(url, pub_name, timeout=timeout)
+        items = _fetch_rss_feed(url, pub_name, timeout=timeout, feed_id=f"topic_{slug}")
         for it in items:
             # Google news publisher extraction e.g. "Title - The Economic Times"
             t = it["title"]
@@ -355,6 +373,8 @@ def fetch_google_news_broadband(timeout: float = 6.0) -> list[dict[str, Any]]:
                 it["title"] = parts[0].strip()
                 if len(parts) > 1 and parts[1].strip():
                     it["publisher"] = parts[1].strip()
+            it["feed_id"] = f"topic_{slug}"
+            it["feed_name"] = pub_name
         results.extend(items)
     return results
 
@@ -408,6 +428,8 @@ def fetch_bse_filings(lookback_days: int = 1, timeout: float = 6.0) -> list[dict
                     "publisher": "BSE Corporate Disclosures",
                     "link": f"https://www.bseindia.com/corporates/ann.html?scrip={scrip}",
                     "source": "bse_filings",
+                    "feed_id": "bse_announcements_api",
+                    "feed_name": "BSE Corporate Announcements API",
                     "raw_event": row,
                 })
     except Exception as e:
@@ -458,6 +480,8 @@ def fetch_nse_announcements(lookback_days: int = 1, timeout: float = 6.0) -> lis
                 "publisher": "NSE Corporate Disclosures",
                 "link": f"https://www.nseindia.com/get-quotes/equity?symbol={symbol}" if symbol else "https://www.nseindia.com",
                 "source": "nse_announcements",
+                "feed_id": "nse_announcements_api",
+                "feed_name": "NSE Corporate Announcements API",
                 "raw_event": row,
             })
     except Exception as e:
@@ -609,6 +633,7 @@ def fetch_nse_static_rss_feeds(
                     headline = raw_title or raw_desc
 
                 summary_text = raw_desc if raw_desc else raw_title
+                feed_slug = feed_url.split("/")[-1].replace(".xml", "").lower()
                 feed_items.append({
                     "title": headline[:250],
                     "summary": summary_text[:1000],
@@ -616,6 +641,8 @@ def fetch_nse_static_rss_feeds(
                     "publisher": pub_name,
                     "link": link if link else "https://www.nseindia.com",
                     "source": "nse_rss",
+                    "feed_id": f"nse_rss_{feed_slug}",
+                    "feed_name": pub_name,
                     "category": feed_category,
                     "ticker": sym,
                     "raw_event": {
@@ -647,6 +674,139 @@ def fetch_nse_static_rss_feeds(
     return results
 
 
+def fetch_all_broadband_news_with_feed_telemetry(
+    timeout: float = 7.0,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Execute parallel harvesting across all registered feeds while capturing per-feed telemetry.
+
+    Returns:
+        tuple (all_raw_items, feed_telemetry_list)
+        where feed_telemetry_list contains:
+        [
+            {
+                "feed_id": "media_moneycontrol_latest",
+                "feed_name": "MoneyControl",
+                "source_key": "rss",
+                "scanned_at": "2026-09-14 12:00:00",
+                "articles_fetched": 15,
+                "status": "SUCCESS",
+                "error_message": None,
+            },
+            ...
+        ]
+    """
+    all_metadata = get_all_feed_metadata()
+    feed_dict = {f["id"]: f for f in all_metadata}
+
+    tasks = []
+
+    # 1. NSE Static XML Feeds
+    for url, name, cat in NSE_STATIC_RSS_FEEDS:
+        slug = url.split("/")[-1].replace(".xml", "").lower()
+        fid = f"nse_rss_{slug}"
+        tasks.append((
+            fid,
+            name,
+            "nse_rss",
+            lambda u=url, n=name, c=cat: fetch_nse_static_rss_feeds([(u, n, c)], timeout=timeout),
+        ))
+
+    # 2. Media Portal Feeds
+    portal_groups = [
+        ("MoneyControl", MONEYCONTROL_FEEDS),
+        ("Economic Times", ET_FEEDS),
+        ("LiveMint", LIVEMINT_FEEDS),
+        ("Business Standard", BUSINESS_STANDARD_FEEDS),
+        ("Hindu BusinessLine", HINDU_BUSINESSLINE_FEEDS),
+        ("NDTV Profit", NDTV_FEEDS),
+        ("Business Today", BUSINESS_TODAY_FEEDS),
+    ]
+    for publisher, feed_list in portal_groups:
+        for url, name in feed_list:
+            slug = re.sub(r"[^a-z0-9]", "_", name.lower())
+            fid = f"media_{slug}"
+            tasks.append((
+                fid,
+                name,
+                "rss",
+                lambda u=url, n=name, fid=fid: _fetch_rss_feed(u, n, timeout=timeout, feed_id=fid),
+            ))
+
+    # 3. Regulatory Feeds
+    for url, name in RBI_FEEDS:
+        fid = "rbi_press_releases"
+        tasks.append((
+            fid,
+            name,
+            "rbi_rss",
+            lambda: fetch_rbi_press_releases_rss(timeout=timeout),
+        ))
+
+    tasks.append((
+        "bse_announcements_api",
+        "BSE Corporate Announcements API",
+        "bse_filings",
+        lambda: fetch_bse_filings(lookback_days=1, timeout=timeout),
+    ))
+
+    tasks.append((
+        "nse_announcements_api",
+        "NSE Corporate Announcements API",
+        "nse_announcements",
+        lambda: fetch_nse_announcements(lookback_days=1, timeout=timeout),
+    ))
+
+    # 4. Google News Streams
+    for query, name in GOOGLE_BROADBAND_QUERIES:
+        slug = re.sub(r"[^a-z0-9]", "_", name.lower())
+        fid = f"topic_{slug}"
+        encoded_q = urllib.parse.quote(query)
+        feed_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en-IN&gl=IN&ceid=IN:en"
+        def _fetch_gnews(u=feed_url, n=name, fid=fid):
+            g_items = _fetch_rss_feed(u, n, timeout=timeout, feed_id=fid)
+            for it in g_items:
+                t = it.get("title", "")
+                if " - " in t:
+                    parts = t.rsplit(" - ", 1)
+                    it["title"] = parts[0].strip()
+                    if len(parts) > 1 and parts[1].strip():
+                        it["publisher"] = parts[1].strip()
+                it["feed_id"] = fid
+                it["feed_name"] = n
+            return g_items
+        tasks.append((fid, name, "google_rss", _fetch_gnews))
+
+    all_raw_items: list[dict[str, Any]] = []
+    telemetry: list[dict[str, Any]] = []
+
+    def _execute_feed_task(fid: str, name: str, source_key: str, fn: Any) -> tuple[str, str, str, str, list[dict[str, Any]], str, str | None]:
+        scan_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            items = fn() or []
+            return fid, name, source_key, scan_time, items, "SUCCESS", None
+        except Exception as e:
+            return fid, name, source_key, scan_time, [], "ERROR", str(e)[:250]
+
+    with ThreadPoolExecutor(max_workers=min(12, len(tasks))) as pool:
+        futures = [pool.submit(_execute_feed_task, fid, name, skey, fn) for fid, name, skey, fn in tasks]
+        for fut in as_completed(futures):
+            fid, name, skey, scan_time, items, status, err_msg = fut.result()
+            telemetry.append({
+                "feed_id": fid,
+                "feed_name": name,
+                "source_key": skey,
+                "scanned_at": scan_time,
+                "articles_fetched": len(items),
+                "status": status,
+                "error_message": err_msg,
+            })
+            if items:
+                all_raw_items.extend(items)
+
+    logger.info("[NEWS-SOURCES] Harvested %d items across %d feeds with per-feed telemetry", len(all_raw_items), len(telemetry))
+    return all_raw_items, telemetry
+
+
 def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
     """Execute parallel harvesting across all broadband financial news and filing feeds.
 
@@ -665,33 +825,7 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
 
     Returns a deduplicated list of standardized raw news event items.
     """
-    fetchers = [
-        ("MoneyControl", lambda: fetch_moneycontrol_rss(timeout=timeout)),
-        ("EconomicTimes", lambda: fetch_et_markets_rss(timeout=timeout)),
-        ("LiveMint", lambda: fetch_livemint_rss(timeout=timeout)),
-        ("BusinessStandard", lambda: fetch_business_standard_rss(timeout=timeout)),
-        ("HinduBusinessLine", lambda: fetch_hindu_businessline_rss(timeout=timeout)),
-        ("NDTVProfit", lambda: fetch_ndtv_profit_rss(timeout=timeout)),
-        ("BusinessToday", lambda: fetch_business_today_rss(timeout=timeout)),
-        ("RBIPressReleases", lambda: fetch_rbi_press_releases_rss(timeout=timeout)),
-        ("GoogleNewsBroadband", lambda: fetch_google_news_broadband(timeout=timeout)),
-        ("BSEFilings", lambda: fetch_bse_filings(lookback_days=1, timeout=timeout)),
-        ("NSEAnnouncements", lambda: fetch_nse_announcements(lookback_days=1, timeout=timeout)),
-        ("NSEStaticRSS", lambda: fetch_nse_static_rss_feeds(timeout=timeout)),
-    ]
-
-    all_items: list[dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=min(8, len(fetchers))) as pool:
-        future_map = {pool.submit(fn): name for name, fn in fetchers}
-        for fut in as_completed(future_map):
-            name = future_map[fut]
-            try:
-                res = fut.result()
-                if res:
-                    logger.debug("[NEWS-SOURCES] %s fetched %d items", name, len(res))
-                    all_items.extend(res)
-            except Exception as e:
-                logger.debug("[NEWS-SOURCES] %s execution failed: %s", name, e)
+    all_items, _ = fetch_all_broadband_news_with_feed_telemetry(timeout=timeout)
 
     # Basic in-memory deduplication by normalized headline string
     deduped: list[dict[str, Any]] = []

@@ -837,11 +837,12 @@
             const modalEl = document.getElementById('modalDashboardRawOutput');
             if (!modalEl) return;
 
-            const mName = m.model_name || m.model_id || 'AI Model';
-            const mid = m.model_id || mName;
-            const dir = (m.direction || 'NEUTRAL').toUpperCase();
-            const isBull = dir.includes('BULL');
-            const isBear = dir.includes('BEAR');
+            const mName = String(m.model_name || m.model_id || 'AI Model');
+            const mid = String(m.model_id || mName);
+            const rawDir = typeof m === 'string' ? m : (m && typeof m === 'object' ? (m.direction || m.consensus_direction) : null);
+            const dir = (typeof rawDir === 'string' ? rawDir : (rawDir != null ? String(rawDir) : 'NEUTRAL')).toUpperCase();
+            const isBull = dir.includes('BULL') || dir.includes('BUY');
+            const isBear = dir.includes('BEAR') || dir.includes('SELL');
             const dirCol = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
             const dirBg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(244,63,94,0.15)' : 'rgba(251,191,36,0.15)';
 

@@ -19,22 +19,22 @@ The scripts directory contains operational and maintenance CLI scripts for error
 ### 2.1 Error Ledger Self-Healing Protocol
 To maintain zero-error hygiene across all development cycles:
 1. **Pre-Task Check**:
-   ```powershell
-   .\.venv\Scripts\python.exe scripts/error_ledger.py open
+   ```bash
+   ./.venv/Scripts/python.exe scripts/error_ledger.py open
    ```
 2. **Post-Task Verification**:
-   ```powershell
-   .\.venv\Scripts\python.exe scripts/error_ledger.py scan
+   ```bash
+   ./.venv/Scripts/python.exe scripts/error_ledger.py scan
    ```
    Confirm no unhandled exceptions or new errors were introduced.
 3. **Resolution Logging**:
-   ```powershell
-   .\.venv\Scripts\python.exe scripts/error_ledger.py resolve <error_id> "<resolution details>"
+   ```bash
+   ./.venv/Scripts/python.exe scripts/error_ledger.py resolve <error_id> "<resolution details>"
    ```
 
 ### 2.2 Script Execution Environment
-- On Windows, always invoke scripts using the virtual environment interpreter:
-  ```powershell
-  .\.venv\Scripts\python.exe scripts/<script_name>.py [args]
+- Always invoke scripts using the virtual environment interpreter with forward slashes (`./.venv/Scripts/python.exe`) to prevent Git Bash path collapsing (`Exit code 127: ..venvScriptspython.exe`):
+  ```bash
+  ./.venv/Scripts/python.exe scripts/<script_name>.py [args]
   ```
 - Scripts must operate non-interactively and exit with standard return codes (`0` for success, non-zero for failures).

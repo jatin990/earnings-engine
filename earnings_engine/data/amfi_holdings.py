@@ -165,7 +165,7 @@ def save_discovered_fund_holdings(
         action = (h.get("action") or "HOLD").upper()
         change_shares = int(h.get("change_shares", 0) or 0)
         change_pct = round(float(h.get("change_pct", 0.0) or 0.0), 2)
-        avg_price = round(float(h.get("avg_price", 0.0) or 0.0), 2)
+        avg_price = round(float(h.get("avg_price")), 2) if h.get("avg_price") is not None and float(h.get("avg_price") or 0.0) > 0 else None
         recent_buy = round(float(h.get("recent_buy_price", 0.0) or 0.0), 2) if h.get("recent_buy_price") else None
         recent_txn_p = round(float(h.get("recent_txn_price", 0.0) or 0.0), 2) if h.get("recent_txn_price") else None
         recent_txn_d = h.get("recent_txn_date")

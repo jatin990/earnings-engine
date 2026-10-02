@@ -100,3 +100,43 @@ def test_ui_institutional_endpoints():
     # Tab 4: Signal Lifecycle Timeline
     assert "signal_timeline" in fdata
     assert len(fdata["signal_timeline"]) >= 1
+
+
+def test_api_trigger_financials_and_block_deals_endpoints(monkeypatch):
+    client = TestClient(app)
+
+    # Mock ingestion functions
+    monkeypatch.setattr(
+        "earnings_engine.data.nse_shareholding.ingest_stock_quarterly_financials",
+        lambda ticker, **k: {"success": True, "ticker": ticker, "quarters_count": 4, "source": "EXCHANGE_REGULATORY_FILINGS"},
+    )
+    monkeypatch.setattr(
+        "earnings_engine.data.nse_shareholding.ingest_stock_block_deals",
+        lambda ticker, **k: {"success": True, "ticker": ticker, "deals_count": 2, "source": "NSE_EXCHANGE_DISCLOSURES"},
+    )
+
+    res_fin = client.post("/api/v1/institutional/stock/KAYNES.NS/fetch-financials")
+    assert res_fin.status_code == 200
+    data_fin = res_fin.json()
+    assert data_fin["success"] is True
+    assert data_fin["quarters_count"] == 4
+
+    res_blk = client.post("/api/v1/institutional/stock/KAYNES.NS/fetch-block-deals")
+    assert res_blk.status_code == 200
+    data_blk = res_blk.json()
+    assert data_blk["success"] is True
+    assert data_blk["deals_count"] == 2
+
+
+def test_ui_smart_money_ingest_buttons_in_templates():
+    with open("earnings_engine/reports/templates/dashboard/_institutional.html", "r", encoding="utf-8") as f:
+        html = f.read()
+
+    assert "btnForensicRefreshFetch" in html
+    assert "btnForensicBlockFetch" in html
+    assert "btnForensicQuarterlyFetch" in html
+    assert "btnForensicQuarterlyTabFetch" in html
+    assert "btnForensicBlockTabFetch" in html
+    assert "triggerStockBlockDealsFetch" in html
+    assert "triggerStockFinancialsFetch" in html
+    assert "triggerStockShareholdingFetch" in html

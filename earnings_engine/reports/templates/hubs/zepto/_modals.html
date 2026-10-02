@@ -512,7 +512,7 @@
     class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
     <div class="glass-panel max-w-lg w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
-            <h3 id="modalTrancheTitle" class="text-base font-extrabold text-amber-300 flex items-center gap-2">
+            <h3 id="modalTrancheTitle" class="text-base font-extrabold text-white flex items-center gap-2">
                 <span>💰</span> Record Zepto Security Capital Tranche
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
@@ -533,7 +533,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Amount Sent (₹) *</label>
                     <input type="number" step="1000" id="trancheFormAmount" required placeholder="1000000"
-                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold focus:outline-none focus:border-white/30 transition">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Date *</label>
@@ -570,9 +570,9 @@
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Transfer Slip / Receipt Proof (PDF/Image)</label>
-                <div id="trancheCurrentProof" style="display: none;" class="mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-                    <span class="text-[11px] text-amber-200">📄 Attached Transfer Slip:</span>
-                    <a id="trancheCurrentProofLink" href="#" target="_blank" class="text-[11px] font-bold text-amber-400 hover:underline">View Current Slip</a>
+                <div id="trancheCurrentProof" style="display: none;" class="mb-2 p-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-300">📄 Attached Transfer Slip:</span>
+                    <a id="trancheCurrentProofLink" href="#" target="_blank" class="text-[11px] font-bold text-white hover:underline">View Current Slip</a>
                 </div>
                 <input type="file" id="trancheFormProofFile" accept=".pdf,.png,.jpg,.jpeg"
                     class="w-full text-slate-400 text-xs">
@@ -648,11 +648,11 @@
                         <div class="flex items-center gap-2">
                             <span class="text-lg">⚡</span>
                             <div>
-                                <div class="text-xs font-bold text-sky-300">Shift Incharges</div>
+                                <div class="text-xs font-bold text-white">Shift Incharges</div>
                                 <div class="text-[10px] text-slate-400">Shift supervision, dispatch & accuracy lead</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-sky-300 font-bold" id="roleProjected-SHIFT_INCHARGE">₹75,000/mo</span>
+                        <span class="text-[11px] font-mono text-white font-bold" id="roleProjected-SHIFT_INCHARGE">₹75,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
@@ -680,11 +680,11 @@
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🛡️</span>
                             <div>
-                                <div class="text-xs font-bold text-amber-300">Security Guards</div>
+                                <div class="text-xs font-bold text-white">Security Guards</div>
                                 <div class="text-[10px] text-slate-400">Store gate security & 24/7 inventory safety</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-amber-300 font-bold" id="roleProjected-SECURITY_GUARD">₹32,000/mo</span>
+                        <span class="text-[11px] font-mono text-white font-bold" id="roleProjected-SECURITY_GUARD">₹32,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
@@ -712,11 +712,11 @@
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🧹</span>
                             <div>
-                                <div class="text-xs font-bold text-emerald-300">House Keeping</div>
+                                <div class="text-xs font-bold text-white">House Keeping</div>
                                 <div class="text-[10px] text-slate-400">Warehouse floor sanitation & spill cleaning</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-emerald-300 font-bold" id="roleProjected-HOUSEKEEPING">₹14,000/mo</span>
+                        <span class="text-[11px] font-mono text-white font-bold" id="roleProjected-HOUSEKEEPING">₹14,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
@@ -835,25 +835,25 @@
                             <span class="text-[10px] text-slate-400">Jatin %:</span>
                             <input type="number" id="incFormP1Pct" min="0" max="100" step="0.5" value="50"
                                 oninput="zeptoApp.onFormP1PctChange(this.value)"
-                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
+                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-white font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
                             <span class="text-[10px] text-slate-400">Harshiv %:</span>
                             <input type="number" id="incFormP2Pct" min="0" max="100" step="0.5" value="50"
                                 oninput="zeptoApp.onFormP2PctChange(this.value)"
-                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-sky-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
+                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-white font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3 text-xs">
-                        <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex justify-between items-center">
+                        <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 flex justify-between items-center">
                             <div>
                                 <span class="text-[10px] text-slate-400 block font-semibold">Jatin Abrol (<span id="incModalP1PctLabel">50%</span>)</span>
-                                <span class="font-mono font-black text-amber-300 text-sm" id="incModalP1Amt">₹0</span>
+                                <span class="font-mono font-black text-white text-sm" id="incModalP1Amt">₹0</span>
                             </div>
                             <span class="text-sm">👑</span>
                         </div>
-                        <div class="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/25 flex justify-between items-center">
+                        <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 flex justify-between items-center">
                             <div>
                                 <span class="text-[10px] text-slate-400 block font-semibold">Harshiv Bargotra (<span id="incModalP2PctLabel">50%</span>)</span>
-                                <span class="font-mono font-black text-sky-300 text-sm" id="incModalP2Amt">₹0</span>
+                                <span class="font-mono font-black text-slate-200 text-sm" id="incModalP2Amt">₹0</span>
                             </div>
                             <span class="text-sm">⚡</span>
                         </div>
@@ -941,11 +941,11 @@
             <!-- Two-tone split visual -->
             <div class="space-y-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/10">
                 <div class="flex items-center justify-between text-sm font-bold font-mono">
-                    <div class="text-amber-300">
+                    <div class="text-white">
                         <span>Jatin Abrol: </span>
                         <span id="splitModalP1Display">50.0%</span>
                     </div>
-                    <div class="text-sky-300">
+                    <div class="text-slate-300">
                         <span>Harshiv Bargotra: </span>
                         <span id="splitModalP2Display">50.0%</span>
                     </div>
@@ -953,11 +953,11 @@
 
                 <input type="range" id="splitModalSlider" min="0" max="100" step="0.5" value="50"
                     oninput="zeptoApp.onSplitSliderChange(this.value)"
-                    class="w-full accent-amber-400 cursor-pointer h-2 bg-black rounded-lg border border-white/10">
+                    class="w-full accent-white cursor-pointer h-2 bg-black rounded-lg border border-white/10">
 
                 <div class="w-full bg-black rounded-full h-2.5 overflow-hidden flex border border-white/10 mt-2">
-                    <div id="splitModalBarP1" class="bg-amber-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
-                    <div id="splitModalBarP2" class="bg-sky-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                    <div id="splitModalBarP1" class="bg-white/80 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                    <div id="splitModalBarP2" class="bg-white/30 h-2.5 transition-all duration-300" style="width: 50%"></div>
                 </div>
             </div>
 
@@ -967,13 +967,13 @@
                     <label class="block text-slate-300 font-semibold mb-1">Jatin Abrol (%)</label>
                     <input type="number" id="splitInputP1" min="0" max="100" step="0.1" value="50" required
                         oninput="zeptoApp.onSplitInputP1Change(this.value)"
-                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Harshiv Bargotra (%)</label>
                     <input type="number" id="splitInputP2" min="0" max="100" step="0.1" value="50" required
                         oninput="zeptoApp.onSplitInputP2Change(this.value)"
-                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-sky-300 font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-slate-200 font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 

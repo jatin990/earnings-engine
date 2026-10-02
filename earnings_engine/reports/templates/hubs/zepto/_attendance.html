@@ -1,0 +1,505 @@
+<!-- Zepto Dark Store Attendance & Shift Muster Partial Template -->
+<div class="space-y-4">
+    <!-- Top Action & Filter Toolbar -->
+    <section class="glass-panel p-3.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <!-- Store / Date Range Info -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-lg">
+                📅
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-extrabold text-white" id="attStoreTitle">Zepto Dark Store Attendance</h3>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="attDateRangeBadge">
+                        All Records
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400">Daily punch muster, shift adherence, and absenteeism intelligence</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons & Month Picker -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Active Month Badge Indicator -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Scope:</span>
+                <span id="attActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
+            </div>
+
+            <button
+                type="button"
+                onclick="zeptoApp.syncAttendanceFromGmail()"
+                id="btnSyncAttGmail"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-slate-200 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                title="Search linked Gmail for new attendance Excel attachments"
+            >
+                <span id="btnSyncAttGmailIcon">⚡</span>
+                <span id="btnSyncAttGmailText">Sync Gmail</span>
+            </button>
+
+            <button
+                type="button"
+                onclick="document.getElementById('attendanceFileInput').click()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-slate-200 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+            >
+                <span>📤</span> Upload (.xlsx)
+            </button>
+            <input
+                type="file"
+                id="attendanceFileInput"
+                accept=".xlsx,.xlsm"
+                style="display: none;"
+                onchange="zeptoApp.handleAttendanceFileUpload(event)"
+            />
+
+            <button
+                type="button"
+                onclick="zeptoApp.exportAttendanceCSV()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5"
+                title="Export filtered records to CSV"
+            >
+                <span>📥</span> CSV
+            </button>
+        </div>
+    </section>
+
+    <!-- KPI Summary Metric Cards -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <!-- 1. Present Rate -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance Rate</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attRateBadge">
+                    --%
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="attRateValue">--%</div>
+                <div class="w-full bg-black rounded-full h-1.5 mt-1.5 overflow-hidden flex border border-white/10">
+                    <div id="attRateBar" class="bg-emerald-400 h-1.5 transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Total Present Shifts:</span>
+                <span class="font-mono font-bold text-emerald-400" id="attPresentCount">0</span>
+            </div>
+        </div>
+
+        <!-- 2. Active Staff Headcount & Total Shifts -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Muster Headcount</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="attShiftsBadge">
+                    0 Shifts
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="attHeadcount">--</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate" id="attHeadcountSub">
+                    Unique Staff Tracked
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Scheduled Shifts:</span>
+                <span class="font-mono font-bold text-slate-200" id="attTotalShifts">0</span>
+            </div>
+        </div>
+
+        <!-- 3. Absenteeism Breakdown -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Absenteeism</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="attAbsentBadge">
+                    0 Absences
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-rose-400 tracking-tight" id="attAbsentCount">0</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 flex items-center justify-between">
+                    <span>Half-Day: <strong class="text-slate-300 font-mono" id="attHalfDayCount">0</strong></span>
+                    <span>Week-Off: <strong class="text-slate-400 font-mono" id="attWeekOffCount">0</strong></span>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Dark Store Holidays:</span>
+                <span class="font-mono font-bold text-slate-300" id="attHolidayCount">0</span>
+            </div>
+        </div>
+
+        <!-- 4. Total Man-Hours & Punctuality -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Man-Hours</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                    Log Hours
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="attTotalHours">0 hrs</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate" id="attAvgHoursSub">
+                    Avg ~8.0 hrs / shift
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Roster Compliance:</span>
+                <span class="font-mono font-bold text-emerald-400">Normal</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Operational Capacity & Throughput Cards (Packers, Leadership, Inbound/Quality/NSO) -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        <!-- 1. Packers Capacity -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-2 border-l-white/30">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🛒</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Packer Fulfillment Force</h4>
+                        <p class="text-[10px] text-slate-400">Picking, packing & sub-10m dispatch</p>
+                    </div>
+                </div>
+                <span id="attCapPackersBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-white" id="attCapPackersPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapPackersTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapPackersAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapPackersBar" class="bg-white/80 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 2. Store Leadership & Tech -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-2 border-l-white/30">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">⚡</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Shift Leadership & Ops</h4>
+                        <p class="text-[10px] text-slate-400">Shift Incharges & Maintenance Techs</p>
+                    </div>
+                </div>
+                <span id="attCapLeadBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-white" id="attCapLeadPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapLeadTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapLeadAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapLeadBar" class="bg-white/80 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 3. Inbound, Quality & NSO -->
+        <div class="glass-panel p-3.5 space-y-2 border-l-2 border-l-white/30">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">📦</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase">Inbound, QA & NSO</h4>
+                        <p class="text-[10px] text-slate-400">Receiving, QA audit & launch associates</p>
+                    </div>
+                </div>
+                <span id="attCapInboundBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                    --% Adherence
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <div>
+                    <span class="text-xl font-mono font-black text-white" id="attCapInboundPresent">0</span>
+                    <span class="text-xs text-slate-400 font-mono" id="attCapInboundTotal"> / 0 shifts</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] text-rose-400 font-mono font-bold" id="attCapInboundAbsent">0 Absences</span>
+                </div>
+            </div>
+            <div class="w-full bg-black/60 rounded-full h-1.5 overflow-hidden flex border border-white/10">
+                <div id="attCapInboundBar" class="bg-white/80 h-1.5 transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Daily Staffing Timeline & Heatmap Bar -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📊</span> Daily Staffing Timeline & Roster Coverage
+                </h4>
+                <p class="text-[10px] text-slate-500">Day-by-day scheduled capacity. Click any day bar to filter ledger.</p>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Present</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span> Absent</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span> Week Off</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Holiday</span>
+            </div>
+        </div>
+        <!-- Horizontal Scrollable Timeline Bar Chart -->
+        <div class="overflow-x-auto custom-scrollbar pb-1">
+            <div id="attDailyTimelineContainer" class="flex items-end gap-1.5 min-w-[720px] h-32 pt-6 px-1">
+                <!-- Populated via JavaScript -->
+                <div class="text-xs text-slate-500 text-center w-full py-8">Loading daily staffing heatmap...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Split Grid: Absenteeism Watchlist & Role Distribution -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        <!-- Left: Absenteeism & Attrition Watchlist (7 cols) -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-7">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>⚠️</span> Absenteeism & Churn Risk Watchlist
+                    </h4>
+                    <p class="text-[10px] text-slate-400">Staff with repeated unannounced absences and low shift reliability</p>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="attWatchlistCount">
+                    0 Flagged
+                </span>
+            </div>
+            <div class="overflow-x-auto custom-scrollbar max-h-64">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase bg-white/[0.02]">
+                            <th class="py-2 px-2.5">Employee</th>
+                            <th class="py-2 px-2.5">Role</th>
+                            <th class="py-2 px-2.5 text-center">Absences</th>
+                            <th class="py-2 px-2.5 text-center">Attendance %</th>
+                            <th class="py-2 px-2.5 text-center">Risk Tier</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attWatchlistTableBody" class="divide-y divide-white/5 font-sans">
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-slate-500 text-xs">
+                                No chronic absenteeism detected.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right: Role Composition Breakdown (5 cols) -->
+        <div class="glass-panel p-4 space-y-3 lg:col-span-5">
+            <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Role Breakdown</h4>
+                <span class="text-[10px] text-slate-500 font-mono">By Designation</span>
+            </div>
+            <div id="attRoleDistributionGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                <!-- Populated via JavaScript -->
+                <div class="text-xs text-slate-500 py-3 text-center col-span-full">Loading role metrics...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Staff Monthly Attendance & Time Inspector Table -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pb-2 border-b border-white/5">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Attendance & Work Log</h4>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attRecordCountBadge">
+                        0 Active Employees
+                    </span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-0.5">Click any employee row to open the side drawer for full shift timings, scheduled duration & work logs.</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Search input -->
+                <div class="relative min-w-[200px]">
+                    <input
+                        type="text"
+                        id="attSearchInput"
+                        placeholder="Search employee / code..."
+                        oninput="zeptoApp.filterAttendance()"
+                        class="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                    />
+                </div>
+
+                <!-- Role Filter -->
+                <select
+                    id="attRoleFilter"
+                    onchange="zeptoApp.filterAttendance()"
+                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+                >
+                    <option value="">All Roles</option>
+                </select>
+
+                <!-- Risk Filter -->
+                <select
+                    id="attRiskFilter"
+                    onchange="zeptoApp.filterAttendance()"
+                    class="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500/50"
+                >
+                    <option value="">All Risk Tiers</option>
+                    <option value="LOW">Low Risk</option>
+                    <option value="MODERATE">Moderate Risk</option>
+                    <option value="HIGH">High Risk</option>
+                    <option value="CRITICAL">Critical Risk</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Employee Name</th>
+                        <th class="py-2.5 px-3">Role Profile</th>
+                        <th class="py-2.5 px-3 text-center">Scheduled Shifts</th>
+                        <th class="py-2.5 px-3 text-center">Present / Absent</th>
+                        <th class="py-2.5 px-3 text-center">Attendance %</th>
+                        <th class="py-2.5 px-3 text-right">Total Hours</th>
+                        <th class="py-2.5 px-3 text-right">Avg Daily Hrs</th>
+                        <th class="py-2.5 px-3 text-center">Reliability Tier</th>
+                        <th class="py-2.5 px-3 text-center">Shift Drilldown</th>
+                    </tr>
+                </thead>
+                <tbody id="attTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="9" class="text-center py-8 text-slate-500 text-xs">
+                            Loading monthly staff attendance...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Slide-Out Employee Attendance & Shift Drawer (Desktop App Master-Detail) -->
+    <div
+        id="attEmployeeDrawerBackdrop"
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 ease-out"
+        onclick="zeptoApp.closeEmployeeDrawer()"
+    ></div>
+
+    <aside
+        id="attEmployeeDrawer"
+        class="fixed top-0 right-0 z-50 h-full w-full max-w-lg glass-panel !rounded-none border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-out flex flex-col overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawerEmpName"
+    >
+        <!-- Drawer Header -->
+        <div class="p-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-200 font-bold font-mono text-xs" id="drawerEmpAvatar">
+                    --
+                </div>
+                <div>
+                    <h3 class="text-sm font-black text-white flex items-center gap-2" id="drawerEmpName">
+                        Employee Profile
+                    </h3>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                        <span id="drawerEmpCode">EMP-XXXX</span>
+                        <span class="text-slate-500">•</span>
+                        <span id="drawerEmpRole" class="text-slate-300 font-sans font-medium text-xs">Role</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <span id="drawerRiskBadge" class="text-[9px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                    --
+                </span>
+                <button
+                    onclick="zeptoApp.closeEmployeeDrawer()"
+                    class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition focus:outline-none"
+                    aria-label="Close drawer"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Drawer Body Scrollable Container -->
+        <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+            <!-- Metric KPI Highlights -->
+            <div class="grid grid-cols-3 gap-2">
+                <div class="glass-panel-sub p-2.5 space-y-0.5">
+                    <span class="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Attendance Rate</span>
+                    <span class="text-base font-black text-white font-mono" id="drawerAttRate">--%</span>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerTotalShifts">0 total shifts</div>
+                </div>
+                <div class="glass-panel-sub p-2.5 space-y-0.5">
+                    <span class="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Present / Absent</span>
+                    <div class="text-base font-black font-mono">
+                        <span class="text-emerald-400" id="drawerPresentCount">0</span>
+                        <span class="text-slate-600">/</span>
+                        <span class="text-rose-400" id="drawerAbsentCount">0</span>
+                    </div>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerWOLeaves">0 WO · 0 Leave</div>
+                </div>
+                <div class="glass-panel-sub p-2.5 space-y-0.5">
+                    <span class="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">Avg Daily Hours</span>
+                    <span class="text-base font-black text-white font-mono" id="drawerAvgHours">-- hrs</span>
+                    <div class="text-[9px] text-slate-500 font-mono" id="drawerTotalHours">0 hrs total</div>
+                </div>
+            </div>
+
+            <!-- 30-Day Shift History Timeline & Ledger -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Shift & Attendance Ledger (30 Days)
+                    </h4>
+                    <span class="text-[10px] text-slate-500 font-mono" id="drawerHistoryCount">0 shifts</span>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-white/5 bg-black/20">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400 font-semibold text-[10px] uppercase bg-white/[0.02]">
+                                <th class="py-2 px-2.5">Date</th>
+                                <th class="py-2 px-2.5">Shift Name</th>
+                                <th class="py-2 px-2.5">Shift Timing</th>
+                                <th class="py-2 px-2.5 text-right">Work Duration</th>
+                                <th class="py-2 px-2.5 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drawerPunchHistoryBody" class="divide-y divide-white/5 font-sans">
+                            <tr>
+                                <td colspan="5" class="text-center py-6 text-slate-500 text-xs">
+                                    Loading employee shift history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drawer Footer -->
+        <div class="p-4 border-t border-white/10 bg-white/[0.01] flex items-center justify-between shrink-0">
+            <span class="text-[10px] text-slate-500 font-mono">Store: JMU-Sainik Colony</span>
+            <button
+                onclick="zeptoApp.closeEmployeeDrawer()"
+                class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 border border-white/10 transition-colors"
+            >
+                Close Drawer
+            </button>
+        </div>
+    </aside>
+</div>

@@ -73,9 +73,9 @@ class TestGetAverageLatency:
 
     def test_returns_benchmark_default_when_no_records(self):
         tracker = _make_tracker()
-        # deepseek-r1 has benchmark_avg_s=2.8 -> 2800ms
-        avg = tracker.get_average_latency("deepseek/deepseek-r1", window_seconds=3600)
-        assert avg == pytest.approx(2800.0, abs=1.0)
+        # antigravityonly has benchmark_avg_s=1.2 -> 1200ms
+        avg = tracker.get_average_latency("antigravityonly", window_seconds=3600)
+        assert avg == pytest.approx(1200.0, abs=1.0)
 
     def test_module_wrapper_delegates(self):
         # Module-level helper should not raise and return a float

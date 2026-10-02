@@ -41,9 +41,9 @@ The data subsystem manages local SQLite persistence (`prices.sqlite3`, `earnings
 
 ## 3. Targeted Testing & Verification
 
-```powershell
+```bash
 # Run data and sync tests
-.\.venv\Scripts\python.exe -m pytest tests/test_db.py -v
-.\.venv\Scripts\python.exe -m pytest tests/test_turso_sync.py -v
-.\.venv\Scripts\python.exe -m pytest tests/test_new_listings.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_db.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_turso_sync.py -v
+./.venv/Scripts/python.exe -m pytest tests/test_new_listings.py -v
 ```

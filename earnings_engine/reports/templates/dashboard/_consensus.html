@@ -1,242 +1,220 @@
-        <!-- ================= MULTI-MODEL AI CONSENSUS & OMNIROUTE INTELLIGENCE TAB ================= -->
+        <!-- ================= REDESIGNED MULTI-MODEL AI CONSENSUS SUITE ================= -->
         <div id="tab-consensus" class="tab-content" style="width: 100%; max-width: 100%;">
 
-            <!-- ⚡ Top Summary KPI Cards with Soft Under-Glow -->
-            <div id="consensusKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
-                <div class="card card-glow-blue" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Total Predictions</span>
-                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">OmniRoute</span>
-                    </div>
-                    <div style="font-size: 1.45rem; font-weight: 800; color: var(--light); font-family: var(--font-heading);"><strong id="consensusStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Forecasts</span></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Multi-Model Intelligence</div>
-                </div>
-
-                <div class="card card-glow-emerald" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #34d399; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">🏆 Win Rate (Settled)</span>
-                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Target Hit</span>
-                    </div>
-                    <div style="font-size: 1.45rem; font-weight: 800; color: #10b981; font-family: var(--font-heading);"><strong id="consensusStatWinRate">0.0%</strong></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Settled trade outcomes</div>
-                </div>
-
-                <div class="card card-glow-blue" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">🎯 Directional Accuracy</span>
-                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Trend Call</span>
-                    </div>
-                    <div style="font-size: 1.45rem; font-weight: 800; color: #38bdf8; font-family: var(--font-heading);"><strong id="consensusStatDirAcc">0.0%</strong></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Predicted price vector</div>
-                </div>
-
-                <div class="card card-glow-amber" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #fbbf24; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">⏳ Pending Settlement</span>
-                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.62rem;">In Flight</span>
-                    </div>
-                    <div style="font-size: 1.45rem; font-weight: 800; color: #fbbf24; font-family: var(--font-heading);"><strong id="consensusStatPending">0</strong> <span style="font-size:0.85rem;color:#fde68a;font-weight:500;">Active</span></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Awaiting timeframe maturity</div>
-                </div>
-
-                <div class="card" style="padding: 0.75rem 0.9rem; margin-bottom: 0; border: 1px solid rgba(239,68,68,0.25); box-shadow: 0 8px 30px -4px rgba(0,0,0,0.85), 0 0 20px -2px rgba(239,68,68,0.12);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #f87171; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">⚠️ Top Failure Cause</span>
-                        <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.62rem;">Diagnostic</span>
-                    </div>
-                    <div style="font-size: 1.05rem; font-weight: 800; color: #f87171; font-family: var(--font-heading); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><strong id="consensusStatTopFail">—</strong></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Automated post-mortem</div>
-                </div>
-            </div>
-
-            <!-- ================= OMNIROUTE TOP CONTROL DECK ================= -->
-            <section class="card" style="margin-bottom: 0.75rem; padding: 1rem 1.1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem;">
+            <!-- ⚡ Header Banner & Gateway Live Status -->
+            <div style="background: linear-gradient(135deg, rgba(17,24,39,0.95), rgba(15,23,42,0.98)); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.1rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.5rem; color: #ffffff;">
-                            <span>🧠 OmniRoute Market Intelligence</span>
-                            <span class="signal-badge" style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.65rem;">Claude Code Engine</span>
-                            <span id="omniRouteGatewayStatusBadge" style="font-size: 0.65rem; color: #34d399; font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; border: 1px solid rgba(16,185,129,0.25);">
-                                🟢 OmniRoute: Active (Port 20128)
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <span style="font-size: 1.4rem;">🧠</span>
+                            <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; font-family: 'Space Grotesk', var(--font-heading), sans-serif; letter-spacing: -0.02em; background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 50%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                                Multi-Model AI Consensus Engine
+                            </h2>
+                            <span class="signal-badge" style="background: rgba(139,92,246,0.15); color: #c084fc; border: 1px solid rgba(139,92,246,0.3); font-size: 0.68rem; font-weight: 700; text-transform: uppercase;">CCR &amp; OmniRoute Gateway</span>
+                            <span id="omniRouteGatewayStatusBadge" style="font-size: 0.68rem; font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.1); color: #34d399; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px solid rgba(16,185,129,0.25);">
+                                🟢 Gateway Active (Port 20128)
                             </span>
-                        </h3>
-                        <p style="margin: 0.2rem 0 0 0; font-size: 0.74rem; color: var(--text-muted);">
-                            Point-in-Time quantitative analysis, multi-horizon price targets, and transparent reasoning stream with customizable prompt sections.
+                        </div>
+                        <p style="margin: 0.35rem 0 0 0; font-size: 0.8rem; color: #94a3b8; max-width: 800px; line-height: 1.4;">
+                            Frontier quantitative synthesis orchestrating <strong>Antigravity-Only</strong>, <strong>OmniRoute Antigravity</strong>, <strong>Smart Coding</strong>, <strong>Free-Only</strong>, and <strong>Auto-Best-Free</strong> for institutional swing predictions, risk-reward modeling, and chain-of-thought post-mortems.
                         </p>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                        <button type="button" onclick="app.loadConsensusOmniRouteModels(true)" class="btn btn-sm" style="font-size: 0.68rem; padding: 0.2rem 0.55rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.35); color: #d8b4fe; border-radius: 4px;" title="Scan OmniRoute Gateway Models & Reachability">
-                            🔄 Scan Models
-                        </button>
-                        <span id="omniModelTelemetryBadge" style="font-size: 0.68rem; color: #38bdf8; font-family: var(--font-mono); font-weight: 700; background: rgba(56,189,248,0.08); padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.2);">
-                            ⚡ antigravityonly · Ready
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Main Input & Controls Row -->
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <!-- Row 1: Ticker Input, Watchlist, Model, Timeframe, Action Button -->
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <!-- Ticker Input -->
-                        <div style="position: relative; min-width: 160px; flex: 1; max-width: 220px;">
-                            <input type="text" id="omniTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="width: 100%; height: 32px; padding: 0 0.6rem; font-size: 0.78rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; text-transform: uppercase; font-family: var(--font-mono); outline: none;">
-                        </div>
-
-                        <!-- Quick Watchlist Dropdown -->
-                        <select id="omniWatchlistSelect" onchange="app.onOmniWatchlistSelect(this.value)" style="height: 32px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-family: var(--font-sans); outline: none; max-width: 170px;">
-                            <option value="">-- Quick Watchlist --</option>
-                            <option value="NSE_TOP">NSE Top 50</option>
-                            <option value="BREAKOUT_HOT">Breakout Radar Hot</option>
-                            <option value="RECENT_IPO">Recent Additions / IPO</option>
-                            <option value="SWING_SETUPS">Swing Candidates</option>
-                        </select>
-
-                        <!-- OmniRoute 4-Model Catalog Selector -->
-                        <select id="omniModelSelect" onchange="app.updateOmniModelTelemetry()" style="height: 32px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); border-radius: 6px; font-family: var(--font-mono); font-weight: 600; outline: none; min-width: 230px;">
-                            <option value="antigravityonly" selected>⚡ antigravityonly (Default · Workhorse)</option>
-                            <option value="claude only">🧠 claude only (Architecture & Reasoning)</option>
-                            <option value="free only">💎 free only (Fast & Free Tier)</option>
-                            <option value="claude">🤖 claude (All-Purpose Orchestrator)</option>
-                        </select>
-
-                        <!-- Timeframe Selector Pill Group -->
-                        <div class="timeframe-pill-group" style="display: inline-flex; align-items: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px; gap: 2px;">
-                            <span style="font-size: 0.68rem; color: #94a3b8; padding: 0 0.35rem; font-weight: 700;">⏱️</span>
-                            <button type="button" id="omniTf-3" class="btn btn-sm btn-timeframe" onclick="app.setOmniTimeframe(3)" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">3D</button>
-                            <button type="button" id="omniTf-7" class="btn btn-sm btn-timeframe" onclick="app.setOmniTimeframe(7)" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">7D</button>
-                            <button type="button" id="omniTf-14" class="btn btn-sm btn-timeframe active" onclick="app.setOmniTimeframe(14)" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; font-weight: 700; border: none; cursor: pointer; border-radius: 4px;">14D</button>
-                            <button type="button" id="omniTf-30" class="btn btn-sm btn-timeframe" onclick="app.setOmniTimeframe(30)" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">30D</button>
-                            <button type="button" id="omniTf-90" class="btn btn-sm btn-timeframe" onclick="app.setOmniTimeframe(90)" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">90D</button>
-                        </div>
-
-                        <!-- Run OmniRoute Button -->
-                        <button type="button" onclick="app.runOmniAnalysis()" id="omniRunAnalysisBtn" class="btn btn-primary btn-sm" style="height: 32px; font-weight: 700; padding: 0 0.85rem; font-size: 0.78rem; white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; background: linear-gradient(135deg, #2563eb, #7c3aed); border: 1px solid rgba(124,58,237,0.4); box-shadow: 0 2px 10px rgba(37,99,235,0.25);">
-                            <span>⚡</span> Run OmniRoute Analysis
+                        <button type="button" onclick="app.loadConsensusOmniRouteModels(true)" class="btn btn-sm" style="font-size: 0.72rem; padding: 0.35rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer;" title="Refresh live rate limits and probed gateway status">
+                            🔄 Refresh Gateway
                         </button>
-                        <button type="button" onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary btn-sm" style="height: 32px; font-size: 0.75rem; white-space: nowrap;">
-                            <span>🔄</span> Settle Trades
+                        <button type="button" onclick="app.settleConsensusPredictions()" class="btn btn-sm" style="font-size: 0.72rem; padding: 0.35rem 0.75rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35); color: #93c5fd; border-radius: 6px; font-weight: 600; cursor: pointer;" title="Settle matured predictions against actual post-earnings price outcomes">
+                            ⚖️ Settle Past Predictions
                         </button>
-                    </div>
-
-                    <!-- Row 2: Data Inclusion Toggles & Expandable Custom Directives -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.06);">
-                        <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
-                            <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">Data Inclusions:</span>
-                            <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
-                                <input type="checkbox" id="chkIncludeTechnicals" checked style="accent-color: #38bdf8; cursor: pointer;">
-                                <span>📈 Technical Structure</span>
-                            </label>
-                            <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
-                                <input type="checkbox" id="chkIncludeNews" checked style="accent-color: #38bdf8; cursor: pointer;">
-                                <span>📰 Corporate News &amp; Catalysts</span>
-                            </label>
-                            <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
-                                <input type="checkbox" id="chkIncludeInstitutional" checked style="accent-color: #38bdf8; cursor: pointer;">
-                                <span>🏛️ Institutional Flows</span>
-                            </label>
-                        </div>
-
-                        <!-- Quick Directive Preset Chips -->
-                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                            <span style="font-size: 0.7rem; color: #94a3b8;">Preset Focus:</span>
-                            <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Evaluate swing entry on pullback to 20 EMA, support floor, and 14-day risk-reward.')" style="font-size: 0.68rem; padding: 0.15rem 0.45rem; background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.25); border-radius: 4px;">
-                                🎯 Swing Setup
-                            </button>
-                            <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Verify breakout volume confirmation, resistance clearance, and false breakout risk.')" style="font-size: 0.68rem; padding: 0.15rem 0.45rem; background: rgba(16,185,129,0.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.25); border-radius: 4px;">
-                                🚀 Breakout Verification
-                            </button>
-                            <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Prioritize capital preservation, maximum adverse excursion, and stop-loss placement.')" style="font-size: 0.68rem; padding: 0.15rem 0.45rem; background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); border-radius: 4px;">
-                                🛡️ Risk Assessment
-                            </button>
-                            <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('')" style="font-size: 0.68rem; padding: 0.15rem 0.35rem; background: transparent; color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;" title="Clear custom directive">
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Custom Directives Input Box -->
-                    <div style="position: relative;">
-                        <textarea id="omniCustomDirectives" rows="2" placeholder="Custom Focus Directives (e.g., Look for 20 EMA bounce, calculate strict 1:2.5 risk-reward, check FII selling impact)..." style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.76rem; background: #000000; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; font-family: var(--font-sans); resize: vertical; outline: none; line-height: 1.4;"></textarea>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- ================= RESULTS DECK (RESPONSIVE SPLIT WINDOW) ================= -->
-            <div id="omniResultsSplitDeck" style="display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 0.85rem; align-items: start; margin-bottom: 1rem;">
+            <!-- ⚡ Top Summary KPI Cards with Clean Modern Elevation -->
+            <div id="consensusKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="card" style="background: rgba(15,23,42,0.75); border: 1px solid rgba(59,130,246,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Total Predictions</span>
+                        <span class="signal-badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 0.62rem;">OmniRoute</span>
+                    </div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #f8fafc; font-family: var(--font-heading);"><strong id="consensusStatTotal">0</strong> <span style="font-size:0.8rem;color:#94a3b8;font-weight:500;">Forecasts</span></div>
+                    <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem;">Multi-Model Intelligence</div>
+                </div>
 
-                <!-- LEFT PANE: STRUCTURED VERDICT CARD -->
-                <div class="card" style="margin-bottom: 0; padding: 1rem 1.15rem; border: 1px solid rgba(59,130,246,0.25); background: #060609; border-radius: 0.75rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                    <!-- Header with Direction Bias Badge & Conviction -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 0.5rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 1.25rem;">🎯</span>
-                            <div>
-                                <h4 id="omniResultTicker" style="margin: 0; font-size: 1.1rem; color: #ffffff; font-family: var(--font-mono); font-weight: 800;">RELIANCE.NS</h4>
-                                <div id="omniResultTimestamp" style="font-size: 0.68rem; color: var(--text-muted);">Ready to analyze</div>
+                <div class="card" style="background: rgba(15,23,42,0.75); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: #34d399; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">🏆 Win Rate (Settled)</span>
+                        <span class="signal-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.62rem;">Direction</span>
+                    </div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #34d399; font-family: var(--font-heading);"><strong id="consensusStatWinRate">—</strong></div>
+                    <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem;"><span id="consensusStatSettled">0</span> Settled Out of Target</div>
+                </div>
+
+                <div class="card" style="background: rgba(15,23,42,0.75); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: #c084fc; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">⚡ Primary Model</span>
+                        <span class="signal-badge" style="background: rgba(139,92,246,0.15); color: #c084fc; font-size: 0.62rem;">CCR Priority</span>
+                    </div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: #e2e8f0; font-family: var(--font-heading);">Antigravity-Only</div>
+                    <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem;">Claude Sonnet &amp; DeepMind</div>
+                </div>
+
+                <div class="card" style="background: rgba(15,23,42,0.75); border: 1px solid rgba(245,158,11,0.25); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: #fbbf24; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">⏳ Pending Settlement</span>
+                        <span class="signal-badge" style="background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 0.62rem;">Live</span>
+                    </div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #fbbf24; font-family: var(--font-heading);"><strong id="consensusStatPending">0</strong> <span style="font-size:0.8rem;color:#94a3b8;font-weight:500;">Active</span></div>
+                    <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.2rem;">Awaiting Horizon Evaluation</div>
+                </div>
+            </div>
+
+            <!-- ================= INTERACTIVE WORKBENCH DECK ================= -->
+            <section class="card" style="margin-bottom: 1rem; padding: 1.15rem 1.25rem; border: 1px solid rgba(255,255,255,0.08); background: rgba(10,15,30,0.85); border-radius: 12px; backdrop-filter: blur(12px);">
+                <!-- Workbench Controls -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    
+                    <!-- Left: Ticker, Horizon, & Model Tier Selector -->
+                    <div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
+                            <div style="position: relative; flex: 1;">
+                                <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: #94a3b8;">🔍</span>
+                                <input type="text" id="omniTickerInput" placeholder="Enter NSE Ticker (e.g. RELIANCE, TCS, INFY)" style="width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.2rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">
+                            </div>
+                            <button type="button" id="omniRunBtn" onclick="app.runOmniRouteAnalysis()" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-weight: 700; font-size: 0.85rem; border-radius: 8px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border: none; color: #ffffff; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; box-shadow: 0 2px 10px rgba(99,102,241,0.35);">
+                                <span>⚡</span> Run AI Consensus
+                            </button>
+                        </div>
+
+                        <!-- Horizon Pills -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                            <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">Horizon:</span>
+                            <div class="timeframe-pill-group" style="display: inline-flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 2px;">
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniTimeframe(3)" id="omniTfBtn-3" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">3D Scalp</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniTimeframe(7)" id="omniTfBtn-7" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">7D Swing</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniTimeframe(14)" id="omniTfBtn-14" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; background: #3b82f6; color: #ffffff; font-weight: 700; border: none; cursor: pointer; border-radius: 4px;">14D Momentum</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniTimeframe(30)" id="omniTfBtn-30" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">30D Channel</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniTimeframe(90)" id="omniTfBtn-90" style="padding: 0.2rem 0.55rem; font-size: 0.72rem; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-radius: 4px;">90D Macro</button>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <span id="omniBiasBadge" class="signal-badge" style="font-size: 0.8rem; font-weight: 800; padding: 0.25rem 0.65rem; background: rgba(148,163,184,0.15); color: #cbd5e1; border: 1px solid rgba(148,163,184,0.3);">
-                                NEUTRAL
-                            </span>
-                            <span class="signal-badge" style="background: rgba(59,130,246,0.15); color: #93c5fd; font-size: 0.78rem; font-weight: 700; border: 1px solid rgba(59,130,246,0.3);">
-                                Conviction: <strong id="omniConvictionVal" style="color: #ffffff;">—</strong>
-                            </span>
+                        <!-- Model Selection Dropdown -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">Model Engine:</span>
+                            <select id="omniModelSelect" style="flex: 1; max-width: 320px; padding: 0.35rem 0.6rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #f8fafc; font-size: 0.75rem; font-weight: 600;">
+                                <option value="antigravityonly" selected>⚡ Antigravity Only (Priority Tier)</option>
+                                <option value="antigravity">✨ OmniRoute Antigravity (Ensemble)</option>
+                                <option value="Smart Coding">🧠 Smart Coding (Quant Math)</option>
+                                <option value="free only">🚀 Free Only (Fast Tier)</option>
+                                <option value="auto/best-free">🔮 Auto Best Free (Dynamic Smart)</option>
+                            </select>
                         </div>
                     </div>
 
-                    <!-- Target Price, Stop Loss, Risk-Reward Matrix -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 0.55rem; margin-bottom: 0.85rem;">
-                        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 6px; padding: 0.55rem 0.7rem;">
-                            <div style="font-size: 0.66rem; color: #34d399; text-transform: uppercase; font-weight: 700;">🎯 Target Price</div>
-                            <div id="omniTargetPrice" style="font-size: 1.2rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
-                        </div>
+                    <!-- Right: Data Inclusion Checkboxes & Presets -->
+                    <div>
+                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.75rem 0.9rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em;">Data Inclusions:</span>
+                                <span style="font-size: 0.68rem; color: #38bdf8; font-family: var(--font-mono);">Strict Point-in-Time (PIT)</span>
+                            </div>
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
+                                    <input type="checkbox" id="chkIncludeTechnicals" checked style="accent-color: #38bdf8; cursor: pointer;">
+                                    <span>📈 Technicals</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
+                                    <input type="checkbox" id="chkIncludeNews" checked style="accent-color: #38bdf8; cursor: pointer;">
+                                    <span>📰 News &amp; Catalysts</span>
+                                </label>
+                                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #cbd5e1; cursor: pointer;">
+                                    <input type="checkbox" id="chkIncludeInstitutional" checked style="accent-color: #38bdf8; cursor: pointer;">
+                                    <span>🏛️ Institutional Flows</span>
+                                </label>
+                            </div>
 
-                        <div style="background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 0.55rem 0.7rem;">
-                            <div style="font-size: 0.66rem; color: #f87171; text-transform: uppercase; font-weight: 700;">🛑 Stop Loss</div>
-                            <div id="omniStopLoss" style="font-size: 1.2rem; font-weight: 800; color: #fca5a5; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
+                            <!-- Custom Directives Presets -->
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                <span style="font-size: 0.68rem; color: #94a3b8; font-weight: 600;">Presets:</span>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Focus strictly on margin expansion catalysts and order book intake for upcoming earnings.')" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Margin Upside</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Strictly calculate tight risk-reward for swing breakout entry near support floor.')" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Tight R:R Scalp</button>
+                                <button type="button" class="btn btn-sm" onclick="app.setOmniDirective('Evaluate delivery volume surge vs promoter shareholding changes.')" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; border-radius: 4px; cursor: pointer;">Delivery Flows</button>
+                            </div>
                         </div>
-
-                        <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.25); border-radius: 6px; padding: 0.55rem 0.7rem;">
-                            <div style="font-size: 0.66rem; color: #60a5fa; text-transform: uppercase; font-weight: 700;">⚖️ Risk / Reward</div>
-                            <div id="omniRiskReward" style="font-size: 1.2rem; font-weight: 800; color: #93c5fd; font-family: var(--font-mono); margin-top: 0.15rem;">—</div>
-                        </div>
-                    </div>
-
-                    <!-- Catalyst Summary Ribbon -->
-                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 0.55rem 0.75rem; margin-bottom: 0.85rem; font-size: 0.76rem;">
-                        <strong style="color: #c084fc;">💡 Catalyst Summary: </strong>
-                        <span id="omniCatalystSummary" style="color: #e2e8f0;">No catalyst evaluated yet.</span>
-                    </div>
-
-                    <!-- Detailed Trade Thesis -->
-                    <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem 0.85rem; margin-bottom: 0.85rem;">
-                        <div style="font-size: 0.72rem; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
-                            📜 Synthesized Trade Thesis
-                        </div>
-                        <div id="omniThesis" style="font-size: 0.82rem; color: #e2e8f0; line-height: 1.55; white-space: pre-wrap;">Select a stock ticker and click "Run OmniRoute Analysis" to generate an institutional-grade thesis.</div>
-                    </div>
-
-                    <!-- Key Identified Risks & Invalidation -->
-                    <div style="background: rgba(239,68,68,0.04); border: 1px solid rgba(239,68,68,0.18); border-radius: 6px; padding: 0.65rem 0.85rem;">
-                        <div style="font-size: 0.72rem; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.3rem;">
-                            ⚠️ Invalidation Triggers & Key Risks
-                        </div>
-                        <ul id="omniRisksList" style="margin: 0; padding-left: 1.2rem; font-size: 0.78rem; color: #fca5a5; line-height: 1.45;">
-                            <li>Awaiting analysis execution...</li>
-                        </ul>
                     </div>
                 </div>
 
-                <!-- RIGHT PANE: 3-TAB INSPECTOR (RAW, THINKING, PROMPT SENT) -->
-                <div class="card" style="margin-bottom: 0; padding: 1rem 1.15rem; border: 1px solid rgba(255,255,255,0.1); background: #060609; border-radius: 0.75rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; min-height: 480px;">
-                    <!-- Inspector Header & Tab Navigation -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 0.5rem;">
-                        <div id="omniInspectorTabs" style="display: flex; background: #000000; padding: 2px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); gap: 2px;">
-                            <button type="button" id="omniTabBtnRaw" class="btn btn-sm active" onclick="app.switchOmniInspectorTab('raw')" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; background: #2563eb; color: #ffffff; font-weight: 700; border: none; border-radius: 4px; cursor: pointer;">
+                <!-- Custom Directives Textarea (Expandable) -->
+                <div style="margin-top: 0.5rem;">
+                    <textarea id="omniCustomPrompt" placeholder="Optional custom analytical directives, specific catalysts, or risk evaluation guidelines..." rows="2" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #f8fafc; font-size: 0.75rem; resize: vertical;"></textarea>
+                </div>
+            </section>
+
+            <!-- ================= DUAL SPLIT DECK: SYNTHESIZED VERDICT & LIVE INSPECTOR ================= -->
+            <div style="display: grid; grid-template-columns: minmax(340px, 1fr) minmax(420px, 1.25fr); gap: 1rem; align-items: stretch; margin-bottom: 1.5rem;">
+                
+                <!-- Left Pane: Synthesized AI Verdict Card -->
+                <div id="omniStructuredVerdictPane" class="card" style="margin-bottom: 0; background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+                        <div>
+                            <span id="omniVerdictTicker" style="font-size: 1.25rem; font-weight: 800; font-family: var(--font-heading); color: #f8fafc;">SELECT TICKER</span>
+                            <span id="omniVerdictTimeframe" style="font-size: 0.72rem; color: #94a3b8; margin-left: 0.5rem;">—</span>
+                        </div>
+                        <div id="omniVerdictBadgeContainer">
+                            <span id="omniVerdictBadge" class="signal-badge" style="font-size: 0.85rem; font-weight: 800; padding: 0.3rem 0.75rem; border-radius: 6px; background: rgba(255,255,255,0.05); color: #94a3b8;">
+                                AWAITING ANALYSIS
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Price Targets & Risk/Reward Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.6rem; margin-bottom: 1rem;">
+                        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.6rem 0.75rem;">
+                            <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Target Price</div>
+                            <div id="omniTargetPrice" style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; font-family: var(--font-heading); margin-top: 0.2rem;">—</div>
+                            <div id="omniTargetReturn" style="font-size: 0.68rem; color: #94a3b8;">—</div>
+                        </div>
+
+                        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.6rem 0.75rem;">
+                            <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Stop Loss</div>
+                            <div id="omniStopLoss" style="font-size: 1.15rem; font-weight: 800; color: #f43f5e; font-family: var(--font-heading); margin-top: 0.2rem;">—</div>
+                            <div style="font-size: 0.68rem; color: #94a3b8;">Technical Invalidation</div>
+                        </div>
+
+                        <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.6rem 0.75rem;">
+                            <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Risk / Reward</div>
+                            <div id="omniRiskReward" style="font-size: 1.15rem; font-weight: 800; color: #34d399; font-family: var(--font-heading); margin-top: 0.2rem;">—</div>
+                            <div id="omniConviction" style="font-size: 0.68rem; color: #94a3b8;">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Core Synthesis & Drivers -->
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.75rem 0.85rem;">
+                            <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 0.35rem;">💡 Thesis &amp; Strategic Action</div>
+                            <div id="omniThesis" style="font-size: 0.8rem; color: #e2e8f0; line-height: 1.45;">Enter a ticker above and click 'Run AI Consensus' to synthesize multi-model quantitative deliberations.</div>
+                        </div>
+
+                        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.75rem 0.85rem;">
+                            <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 0.35rem;">🎯 Key Drivers &amp; Catalysts</div>
+                            <div id="omniKeyDrivers" style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.4;">—</div>
+                        </div>
+
+                        <div style="background: rgba(244,63,94,0.05); border: 1px solid rgba(244,63,94,0.2); border-radius: 8px; padding: 0.75rem 0.85rem;">
+                            <div style="font-size: 0.68rem; color: #f43f5e; text-transform: uppercase; font-weight: 700; margin-bottom: 0.35rem;">⚠️ Invalidation &amp; Primary Risk</div>
+                            <div id="omniPrimaryRisk" style="font-size: 0.78rem; color: #fecdd3; line-height: 1.4;">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Pane: Telemetry & Live Chain-of-Thought Inspector -->
+                <div class="card" style="margin-bottom: 0; background: #050811; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column;">
+                    
+                    <!-- Inspector Header & Tab Switcher -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.6rem;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem; background: rgba(255,255,255,0.05); padding: 2px; border-radius: 6px;">
+                            <button type="button" id="omniTabBtnRaw" class="btn btn-sm" onclick="app.switchOmniInspectorTab('raw')" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; background: #2563eb; color: #fff; font-weight: 700; border: none; border-radius: 4px; cursor: pointer;">
                                 📄 Raw Output
                             </button>
                             <button type="button" id="omniTabBtnThinking" class="btn btn-sm" onclick="app.switchOmniInspectorTab('thinking')" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; background: transparent; color: #94a3b8; font-weight: 500; border: none; border-radius: 4px; cursor: pointer;">
@@ -247,79 +225,77 @@
                             </button>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <span id="omniExecutionMeta" style="font-size: 0.68rem; font-family: var(--font-mono); color: #94a3b8;">
                                 Latency: — · Tokens: —
                             </span>
-                            <button type="button" id="omniCopyRawBtn" onclick="app.copyOmniRawOutput()" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 0.2rem 0.55rem;">
+                            <button type="button" id="omniCopyRawBtn" onclick="app.copyOmniRawOutput()" class="btn btn-secondary btn-sm" style="font-size: 0.68rem; padding: 0.2rem 0.55rem; border-radius: 4px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; cursor: pointer;">
                                 📋 Copy
                             </button>
                         </div>
                     </div>
 
-                    <!-- Inspector Tab Panes Container -->
+                    <!-- Inspector Tab Content Areas -->
                     <div style="flex: 1; position: relative; min-height: 380px;">
-                        <!-- Tab 1: Raw Output -->
-                        <div id="omniTabPaneRaw" style="display: block; height: 100%;">
-                            <pre id="omniRawOutputContent" style="margin: 0; padding: 0.75rem; background: #020307; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem; color: #e2e8f0; line-height: 1.5; overflow-y: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word;">Raw LLM response markdown from OmniRoute will appear here after execution...</pre>
+                        <!-- Raw Output -->
+                        <div id="omniTabPaneRaw" style="position: absolute; inset: 0; overflow-y: auto; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 0.75rem; font-family: var(--font-mono); font-size: 0.75rem; color: #e2e8f0; white-space: pre-wrap; word-break: break-word;">
+                            Awaiting analysis...
                         </div>
 
-                        <!-- Tab 2: Chain of Thought -->
-                        <div id="omniTabPaneThinking" style="display: none; height: 100%;">
-                            <pre id="omniThinkingContent" style="margin: 0; padding: 0.75rem; background: #030712; border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem; color: #d8b4fe; line-height: 1.5; overflow-y: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word;">No reasoning stream captured. Chain of thought (&lt;think&gt;) text will be displayed here when generated by reasoning models.</pre>
+                        <!-- Thinking / Chain of Thought -->
+                        <div id="omniTabPaneThinking" style="position: absolute; inset: 0; overflow-y: auto; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 0.75rem; font-family: var(--font-mono); font-size: 0.75rem; color: #cbd5e1; white-space: pre-wrap; word-break: break-word; display: none;">
+                            No chain-of-thought tokens recorded yet.
                         </div>
 
-                        <!-- Tab 3: Prompt Sent -->
-                        <div id="omniTabPanePrompt" style="display: none; height: 100%;">
-                            <pre id="omniPromptSentContent" style="margin: 0; padding: 0.75rem; background: #020307; border: 1px solid rgba(56,189,248,0.2); border-radius: 6px; font-family: var(--font-mono); font-size: 0.72rem; color: #bae6fd; line-height: 1.45; overflow-y: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word;">Full compiled system and user prompt dispatched to OmniRoute gateway will be viewable here for complete transparency and verification.</pre>
+                        <!-- Prompt Sent -->
+                        <div id="omniTabPanePrompt" style="position: absolute; inset: 0; overflow-y: auto; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 0.75rem; font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8; white-space: pre-wrap; word-break: break-word; display: none;">
+                            No prompt captured.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ================= FILTER & HISTORICAL PREDICTIONS FEED ================= -->
-            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.45rem;">
-                        <h4 style="margin: 0; font-size: 0.95rem; color: var(--light); font-family: 'Space Grotesk', sans-serif;">📜 Consensus Predictions &amp; Post-Mortem Audit</h4>
-                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 records</span>
+            <!-- ================= HISTORICAL PREDICTIONS & AUDIT LOG TABLE ================= -->
+            <div class="card" style="padding: 1rem 1.25rem; border: 1px solid rgba(255,255,255,0.08); background: rgba(10,15,30,0.8); border-radius: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
+                            <span>📜</span> Consensus Audit &amp; Settlement Ledger
+                        </h4>
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.15rem;">Complete historical audit log of multi-model predictions with post-mortem settlement resolution.</div>
                     </div>
 
-                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="consensusSearchFilter" oninput="app.filterConsensus()" placeholder="🔍 Filter by ticker..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:140px;font-family:var(--font-mono);outline:none;">
-                        <select id="consensusDirectionFilter" onchange="app.filterConsensus()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
-                            <option value="ALL">All Directions</option>
-                            <option value="BULLISH">🟢 Bullish</option>
-                            <option value="BEARISH">🔴 Bearish</option>
-                            <option value="NEUTRAL">🟡 Neutral</option>
-                        </select>
-                        <select id="consensusStatusFilter" onchange="app.filterConsensus()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
-                            <option value="ALL">All Statuses</option>
-                            <option value="PENDING">⏳ Pending</option>
-                            <option value="SUCCESS">✅ Success</option>
-                            <option value="PARTIAL">🟡 Partial</option>
-                            <option value="FAILURE">❌ Failure (Post-Mortems)</option>
-                        </select>
-                        <button type="button" onclick="app.loadConsensusTab()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="text" id="omniAuditSearchInput" oninput="app.filterConsensusAuditTable()" placeholder="Filter symbol..." style="padding: 0.25rem 0.55rem; font-size: 0.72rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: #f8fafc;">
+                        <button type="button" onclick="app.loadConsensusAuditLedger()" class="btn btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.65rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #cbd5e1; border-radius: 4px; cursor: pointer;">
+                            🔄 Reload
+                        </button>
                     </div>
                 </div>
 
-                <!-- Predictions Grid Container -->
-                <div id="consensusListGrid" style="display: flex; flex-direction: column; gap: 0.65rem;">
-                    <div style="text-align: center; color: var(--muted); padding: 2rem;">Loading consensus predictions...</div>
-                </div>
-            </section>
-        </div>
-
-        <!-- ================= CONSENSUS DETAIL / POST-MORTEM MODAL ================= -->
-        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(3,7,18,0.85); backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 1rem;">
-            <div style="background: #0b1120; border: 1px solid rgba(59,130,246,0.35); border-radius: 1.15rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 50px rgba(59,130,246,0.2); padding: 1.75rem; position: relative;">
-                <!-- Close button -->
-                <button type="button" onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 50%; width: 32px; height: 32px; color: #93c5fd; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
-
-                <!-- Modal Content Hook -->
-                <div id="consensusModalBody">
-                    <div style="text-align: center; padding: 2rem; color: var(--muted);">Loading details...</div>
+                <div class="table-container" style="max-height: 420px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
+                    <table class="table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                        <thead>
+                            <tr style="background: rgba(0,0,0,0.4); color: #94a3b8; text-align: left; position: sticky; top: 0; z-index: 2;">
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Date</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Symbol</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Horizon</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Verdict</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Target Price</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">As-Of Price</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Settlement</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700;">Outcome Return</th>
+                                <th style="padding: 0.6rem 0.75rem; font-weight: 700; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="consensusAuditTableBody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;">
+                                    Loading historical consensus audit records...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

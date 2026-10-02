@@ -1,0 +1,425 @@
+<!-- ================= GMAIL OAUTH INTEGRATION TAB ================= -->
+<div class="space-y-4">
+    <!-- Integration Overview Header Banner -->
+    <div class="glass-panel p-5 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-36 h-36 bg-gradient-to-br from-red-500/10 to-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xl">📧</span>
+                    <h2 class="text-base font-extrabold text-white tracking-tight">Gmail Account Integration</h2>
+                    <span id="gmailStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/10 font-mono">
+                        Checking...
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 max-w-2xl leading-relaxed">
+                    Link your store's Gmail account via secure Google OAuth 2.0 to read operational updates, payout summaries, and invoice attachments directly within Nexus.
+                </p>
+            </div>
+            <div id="gmailHeaderActionBtnContainer" class="flex items-center gap-2">
+                <!-- Action button injected dynamically via zepto.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- State 1: Configuration Missing Warning (when GOOGLE_CLIENT_ID / SECRET not in .env) -->
+    <div id="gmailUnconfiguredBox" style="display: none;" class="glass-panel border-amber-500/30 bg-amber-500/5 p-4 rounded-xl">
+        <div class="flex items-start gap-3">
+            <span class="text-lg text-amber-400">⚠️</span>
+            <div class="space-y-1 text-xs">
+                <h4 class="font-bold text-amber-300">Google OAuth Credentials Required</h4>
+                <p class="text-slate-300">
+                    To link a Gmail account, please configure your Google Cloud Console OAuth 2.0 Client credentials in your root <code class="px-1.5 py-0.5 rounded bg-black/60 text-amber-200 border border-amber-500/20 font-mono">.env</code> file:
+                </p>
+                <div class="bg-black/80 p-2.5 rounded-lg border border-white/10 font-mono text-[11px] text-slate-300 space-y-0.5 mt-2">
+                    <div><span class="text-slate-500"># Google Cloud Console -> Credentials -> OAuth 2.0 Client ID</span></div>
+                    <div><span class="text-sky-300">GOOGLE_CLIENT_ID</span>=<span class="text-emerald-300">"your-client-id.apps.googleusercontent.com"</span></div>
+                    <div><span class="text-sky-300">GOOGLE_CLIENT_SECRET</span>=<span class="text-emerald-300">"your-client-secret"</span></div>
+                    <div><span class="text-sky-300">GOOGLE_REDIRECT_URI</span>=<span class="text-emerald-300">"http://localhost:8000/api/v1/zepto/gmail/callback"</span></div>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">
+                    Ensure the Authorized Redirect URI in Google Cloud Console is set to <code class="text-slate-200 font-mono">http://localhost:8000/api/v1/zepto/gmail/callback</code> (or your deployment domain).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- State 2: Disconnected State Card (Configured in .env, but not linked yet) -->
+    <div id="gmailDisconnectedBox" style="display: none;" class="glass-panel p-8 text-center max-w-xl mx-auto space-y-4">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-red-500/20 to-amber-500/20 border border-red-500/30 flex items-center justify-center text-3xl mx-auto shadow-lg">
+            📧
+        </div>
+        <div class="space-y-1">
+            <h3 class="text-sm font-extrabold text-white">Connect Dark Store Gmail</h3>
+            <p class="text-xs text-slate-400 max-w-sm mx-auto">
+                Authenticate with Google to grant read-only access to store correspondence, invoices, and performance emails.
+            </p>
+        </div>
+        <div class="pt-2">
+            <button
+                type="button"
+                onclick="zeptoApp.connectGmail()"
+                id="btnConnectGmail"
+                class="btn-zepto bg-white text-black hover:bg-slate-200 px-5 py-2.5 text-xs font-extrabold inline-flex items-center gap-2 shadow-xl hover:scale-[1.02] transition"
+            >
+                <svg class="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                Sign in with Google
+            </button>
+        </div>
+        <div class="text-[10px] text-slate-500 flex items-center justify-center gap-1.5 pt-2">
+            <span>🔒 Read-only access requested</span>
+            <span>•</span>
+            <span>Zero modification permissions</span>
+        </div>
+    </div>
+
+    <!-- State 3: Connected State Card -->
+    <div id="gmailConnectedBox" style="display: none;" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- Account Summary Card -->
+            <div class="glass-panel p-4 space-y-3 md:col-span-2">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-lg">
+                            ✅
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">Connected Gmail Account</div>
+                            <div class="text-sm font-extrabold text-white font-mono" id="gmailAccountEmail">
+                                loading...
+                            </div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono">
+                        Active & Verified
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[11px]">
+                    <div>
+                        <span class="text-slate-500 block text-[10px] uppercase font-bold">Granted Scope</span>
+                        <span class="text-slate-300 font-mono font-medium">gmail.readonly</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block text-[10px] uppercase font-bold">Access Token</span>
+                        <span class="text-emerald-400 font-mono font-medium">Auto-Refreshing</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block text-[10px] uppercase font-bold">Last Synced</span>
+                        <span class="text-slate-300 font-mono font-medium" id="gmailLastSynced">Just now</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Disconnect Action Card -->
+            <div class="glass-panel p-4 flex flex-col justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-slate-300 mb-1">Manage Connection</h4>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        Disconnecting will revoke active Google tokens and clear local credentials from the engine.
+                    </p>
+                </div>
+                <div class="pt-3">
+                    <button
+                        type="button"
+                        onclick="zeptoApp.disconnectGmail()"
+                        id="btnDisconnectGmail"
+                        class="w-full px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 hover:text-rose-200 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                    >
+                        <span>🔌</span> Disconnect Gmail
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ingested Category Breakdown Metrics Header Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" id="gmailCategoryCountCards">
+            <!-- 1. Store Metrics -->
+            <div onclick="zeptoApp.selectGmailCategory('STORE_METRICS')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">📊 Metrics</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-STORE_METRICS">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-STORE_METRICS">GMV & Orders</div>
+            </div>
+
+            <!-- 2. Attendance -->
+            <div onclick="zeptoApp.selectGmailCategory('ATTENDANCE')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">👥 Attendance</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-ATTENDANCE">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-ATTENDANCE">Muster Sheets</div>
+            </div>
+
+            <!-- 3. Utilization -->
+            <div onclick="zeptoApp.selectGmailCategory('MANPOWER_UTILIZATION')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">⚡ Utilization</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-MANPOWER_UTILIZATION">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-MANPOWER_UTILIZATION">Picker IPP</div>
+            </div>
+
+            <!-- 4. DQ Loss -->
+            <div onclick="zeptoApp.selectGmailCategory('DQ_LOSS')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">⚠️ DQ Loss</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-DQ_LOSS">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-DQ_LOSS">Defects & Waste</div>
+            </div>
+
+            <!-- 5. Shrinkage -->
+            <div onclick="zeptoApp.selectGmailCategory('SHRINKAGE')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">📉 Shrinkage</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-SHRINKAGE">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-SHRINKAGE">Cycle Variance</div>
+            </div>
+
+            <!-- 6. Manpower Plan -->
+            <div onclick="zeptoApp.selectGmailCategory('MANPOWER_PLAN')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">📋 Plan</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-MANPOWER_PLAN">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-MANPOWER_PLAN">Headcount Plan</div>
+            </div>
+
+            <!-- 7. Operational -->
+            <div onclick="zeptoApp.selectGmailCategory('OPERATIONAL')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">📧 Ops Updates</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-OPERATIONAL">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-OPERATIONAL">Notices & Payouts</div>
+            </div>
+
+            <!-- 8. Security Alerts -->
+            <div onclick="zeptoApp.selectGmailCategory('SECURITY_ALERT')" class="glass-panel-sub p-2.5 text-center cursor-pointer hover:border-white/30 hover:bg-white/5 transition select-none group">
+                <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-white">🔒 Security</div>
+                <div class="text-base font-extrabold font-mono text-white mt-0.5" id="gmailCatCount-SECURITY_ALERT">0</div>
+                <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailCatSub-SECURITY_ALERT">Google Alerts</div>
+            </div>
+        </div>
+
+        <!-- Live Operational Mailbox & Intelligence Feed (Tabular Ledger & Direct Extraction) -->
+        <div class="glass-panel p-4 sm:p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">📥</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Store Mailbox Intelligence & Reports Feed</h4>
+                        <p class="text-[11px] text-slate-400">Operational email reports ledger with extracted KPI metrics, category filtering, and visibility controls</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onclick="zeptoApp.syncGmailDelta()"
+                        id="btnSyncGmailDelta"
+                        class="px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/25 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+                        title="Check Gmail for new incoming emails and fetch only the delta into local database"
+                    >
+                        <span id="btnSyncGmailDeltaIcon">⚡</span>
+                        <span id="btnSyncGmailDeltaText">Sync Delta</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick="zeptoApp.loadRecentEmails()"
+                        id="btnRefreshGmailFeed"
+                        class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5 shadow-sm"
+                        title="Reload instantly from local database"
+                    >
+                        <span id="btnRefreshGmailFeedIcon">🔄</span>
+                        <span id="btnRefreshGmailFeedText">Reload DB</span>
+                    </button>
+                    <span id="gmailFeedCountBadge" class="text-[10px] font-bold px-2 py-1 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                        0 Emails
+                    </span>
+                </div>
+            </div>
+
+            <!-- Filter & Visibility Control Toolbar -->
+            <div class="glass-panel-sub p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2 flex-wrap flex-1">
+                    <!-- Search Input -->
+                    <div class="relative min-w-[200px] flex-1">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+                        <input
+                            type="text"
+                            id="gmailSearchInput"
+                            oninput="zeptoApp.filterGmailEmails()"
+                            placeholder="Search email subject, sender, metrics..."
+                            class="w-full bg-black/60 border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-white/30 transition"
+                        >
+                    </div>
+
+                    <!-- Month Filter Dropdown -->
+                    <select
+                        id="gmailMonthFilter"
+                        onchange="zeptoApp.loadRecentEmails()"
+                        class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    >
+                        <option value="CURRENT" selected>Current Month</option>
+                        <option value="ALL">All Months</option>
+                    </select>
+
+                    <!-- Category Filter Dropdown -->
+                    <select
+                        id="gmailCategoryFilter"
+                        onchange="zeptoApp.highlightSelectedGmailCategory(this.value); zeptoApp.filterGmailEmails()"
+                        class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-white/30"
+                    >
+                        <option value="ALL" selected>⚡ All Categories</option>
+                        <option value="STORE_METRICS">📊 Store Metrics & GMV</option>
+                        <option value="ATTENDANCE">👥 Attendance & Shifts</option>
+                        <option value="MANPOWER_UTILIZATION">⚡ Utilization & IPP</option>
+                        <option value="DQ_LOSS">⚠️ DQ Loss & Spoilage</option>
+                        <option value="SHRINKAGE">📉 Shrinkage & Variance</option>
+                        <option value="MANPOWER_PLAN">📋 Manpower Plan</option>
+                        <option value="OPERATIONAL">📧 Operational Updates</option>
+                        <option value="SECURITY_ALERT">🔒 Security Alerts</option>
+                    </select>
+
+                    <!-- Quick Hide Security Alerts Toggle -->
+                    <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white/5 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white cursor-pointer select-none transition">
+                        <input
+                            type="checkbox"
+                            id="gmailHideSecurityAlertsCheckbox"
+                            onchange="zeptoApp.toggleHideSecurityAlerts(this.checked)"
+                            checked
+                            class="w-3.5 h-3.5 rounded bg-black/60 border-white/20 text-emerald-500 focus:ring-0 focus:ring-offset-0"
+                        >
+                        <span>Hide Security Alerts</span>
+                    </label>
+
+                    <!-- Show Hidden Emails Toggle -->
+                    <button
+                        type="button"
+                        id="btnToggleHiddenGmail"
+                        onclick="zeptoApp.toggleShowHiddenEmails()"
+                        class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5"
+                    >
+                        <span id="btnToggleHiddenGmailIcon">👁️</span>
+                        <span id="btnToggleHiddenGmailText">Show Hidden (0)</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick="zeptoApp.resetGmailFilters()"
+                        class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition"
+                    >
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Aggregated Store Intelligence & Operational Metrics Deck -->
+            <div id="gmailAggregatesDeck" class="glass-panel-sub p-3 space-y-2 border border-white/10 rounded-lg">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm">📈</span>
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-200">Key Metrics & Intelligence Aggregates</span>
+                            <span class="text-[9px] text-slate-400 font-mono ml-1.5" id="gmailAggFilterLabel">Active Filter: Current Month</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono font-bold" id="gmailAggRealizationRate">Live Computed</span>
+                        <span class="text-[9px] text-slate-400 font-mono" id="gmailAggEmailsAnalyzed">0 Emails Analyzed</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                    <!-- 1. Total GMV -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Sales GMV</span>
+                        <div class="text-base font-black font-mono text-emerald-400 mt-1" id="gmailAggTotalGmv">₹0</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailAggGmvCount">0 Reports</div>
+                    </div>
+
+                    <!-- 2. Total Orders -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Orders Dispatched</span>
+                        <div class="text-base font-black font-mono text-sky-300 mt-1" id="gmailAggTotalOrders">0</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailAggOrdersCount">0 Reports</div>
+                    </div>
+
+                    <!-- 3. Average Basket (AOV) -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Avg Basket (AOV)</span>
+                        <div class="text-base font-black font-mono text-amber-300 mt-1" id="gmailAggAvgAov">₹0</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate">Mean / Basket</div>
+                    </div>
+
+                    <!-- 4. Dispatch SLA -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Avg 10-Min SLA</span>
+                        <div class="text-base font-black font-mono text-purple-300 mt-1" id="gmailAggAvgSla">0.0%</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate">On-Time Dispatches</div>
+                    </div>
+
+                    <!-- 5. Picker Speed (IPP) -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Avg Picker IPP</span>
+                        <div class="text-base font-black font-mono text-cyan-300 mt-1" id="gmailAggAvgIpp">0.0</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate">Items / Person / Hr</div>
+                    </div>
+
+                    <!-- 6. Total Spoilage & Loss -->
+                    <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 flex flex-col justify-between">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total DQ Loss & Variance</span>
+                        <div class="text-base font-black font-mono text-rose-400 mt-1" id="gmailAggTotalLoss">₹0</div>
+                        <div class="text-[8px] text-slate-500 mt-0.5 truncate" id="gmailAggLossCount">0 Damage Logs</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Feed Loading & Empty States -->
+            <div id="gmailEmailsLoading" class="text-center py-8 text-slate-400 text-xs flex items-center justify-center gap-2">
+                <span class="animate-spin text-base">⏳</span> Fetching latest store emails from Gmail...
+            </div>
+
+            <div id="gmailEmailsEmpty" style="display: none;" class="text-center py-8 text-slate-500 text-xs">
+                No recent emails found matching your filters.
+            </div>
+
+            <!-- Tabular View Container -->
+            <div id="gmailTableContainer" class="overflow-hidden border border-white/10 rounded-lg" style="display: none;">
+                <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-white/[0.02]">
+                                <th class="p-2.5 pl-3.5 whitespace-nowrap">Date / Time</th>
+                                <th class="p-2.5 whitespace-nowrap">Category</th>
+                                <th class="p-2.5 min-w-[220px]">Subject & Sender</th>
+                                <th class="p-2.5 min-w-[180px]">Key Metrics & Intelligence</th>
+                                <th class="p-2.5 whitespace-nowrap">Attachments</th>
+                                <th class="p-2.5 pr-3.5 text-center whitespace-nowrap">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gmailEmailsTableBody" class="divide-y divide-white/5 font-sans">
+                            <!-- Populated dynamically via zepto.js -->
+                        </tbody>
+                        <tfoot id="gmailTableFooter" class="border-t border-white/15 bg-white/[0.03] font-bold text-xs sticky bottom-0 backdrop-blur-md">
+                            <tr>
+                                <td class="p-2.5 pl-3.5 font-mono text-[10px] text-slate-400 uppercase whitespace-nowrap align-top">
+                                    <span>Totals & Avg</span>
+                                </td>
+                                <td class="p-2.5 whitespace-nowrap align-top">
+                                    <span class="text-[10px] font-mono text-slate-400" id="gmailFootCats">--</span>
+                                </td>
+                                <td class="p-2.5 align-top">
+                                    <div class="text-[11px] font-mono text-slate-300" id="gmailFootMsgCount">-- emails</div>
+                                    <div class="text-[9px] text-slate-500 font-mono">Aggregated Active View</div>
+                                </td>
+                                <td class="p-2.5 align-top" id="gmailFootMetricsAggregates">
+                                    <span class="text-[10px] text-slate-500 font-mono">Calculating aggregates...</span>
+                                </td>
+                                <td class="p-2.5 whitespace-nowrap align-top font-mono text-[10px] text-slate-400" id="gmailFootAttCount">
+                                    -- files
+                                </td>
+                                <td class="p-2.5 pr-3.5 text-center whitespace-nowrap align-top font-mono text-[10px] text-emerald-400" id="gmailFootParsedCount">
+                                    -- synced
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

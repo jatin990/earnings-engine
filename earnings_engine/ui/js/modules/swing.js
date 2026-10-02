@@ -1,52 +1,126 @@
 // =========================================================================
-// 📈 Swing Ranges, Trading Channels, Setups & AI Forecasts Module
+// 📈 Swing Ranges, Trading Channels, Setups, Top Swingers & AI Forecasts Module
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin || '';
 
     const swingModule = {
+        swingSubTab: 'setups', // 'setups' | 'top-swingers' | 'audit'
         swingData: [],
+        topSwingersData: [],
         swingView: 'table',
         swingFilter: 'all',
         swingTierFilter: 'ALL',
         swingSortKey: 'ticker',
         swingSortDir: 'asc',
+        topSwingersSortKey: 'rank',
+        topSwingersSortDir: 'asc',
+        topSwingersMinCycles: 1,
         _swingAuditOpen: false,
+
+        // -------------------------------------------------------------------------
+        // Stock Intelligence Slide-Out Drawer Integration
+        // -------------------------------------------------------------------------
+        openStockDrawer(ticker) {
+            if (!ticker) return;
+            const clean = String(ticker).trim().toUpperCase();
+            const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : (clean.includes('.') ? clean : clean + '.NS');
+            if (typeof app.openStockIntelligencePanel === 'function') {
+                app.openStockIntelligencePanel(cleanTicker);
+            } else if (typeof app.openBreakoutInspectorDrawer === 'function') {
+                app.openBreakoutInspectorDrawer(cleanTicker);
+            } else if (typeof app.selectBreakoutCandidate === 'function') {
+                app.selectBreakoutCandidate(cleanTicker, false, true);
+            } else {
+                window.open('/stock/' + encodeURIComponent(cleanTicker), '_blank');
+            }
+        },
+
+        // -------------------------------------------------------------------------
+        // Sub-Tab Navigation Controller (Synced with Sidebar Tree & Context Label)
+        // -------------------------------------------------------------------------
+        switchSwingSubTab(tabName) {
+            this.swingSubTab = tabName || 'setups';
+            try {
+                localStorage.setItem('subtab_swing', this.swingSubTab);
+                if (!app._subtabState) app._subtabState = {};
+                app._subtabState['swing'] = this.swingSubTab;
+            } catch (e) {}
+
+            const tabIds = ['setups', 'top-swingers', 'audit'];
+            tabIds.forEach(t => {
+                const btn = document.getElementById(`swingSubTabBtn-${t}`);
+                const panel = document.getElementById(`swingSubTabContent-${t}`);
+                const isActive = t === this.swingSubTab;
+
+                if (btn) {
+                    btn.classList.toggle('active', isActive);
+                    btn.style.background = isActive ? 'rgba(255,255,255,0.12)' : 'transparent';
+                    btn.style.color = isActive ? '#ffffff' : '#94a3b8';
+                    btn.style.fontWeight = isActive ? '700' : '500';
+                }
+                if (panel) {
+                    panel.style.display = isActive ? 'block' : 'none';
+                }
+            });
+
+            // Update sidebar sub-items highlight
+            const sideSetups = document.getElementById('sidebarSubSwingSetups');
+            const sideTop = document.getElementById('sidebarSubSwingTop');
+            const sideAudit = document.getElementById('sidebarSubSwingAudit');
+            if (sideSetups) sideSetups.classList.toggle('active', this.swingSubTab === 'setups');
+            if (sideTop) sideTop.classList.toggle('active', this.swingSubTab === 'top-swingers');
+            if (sideAudit) sideAudit.classList.toggle('active', this.swingSubTab === 'audit');
+
+            // Update contextual header badge
+            const ctxLabel = document.getElementById('swingSubtabContextLabel');
+            if (ctxLabel) {
+                if (this.swingSubTab === 'top-swingers') ctxLabel.textContent = '🏆 Best Top Swingers (Harmonic Cycle Matrix)';
+                else if (this.swingSubTab === 'audit') ctxLabel.textContent = '🔄 Tier Movement Audit Log';
+                else ctxLabel.textContent = '⚡ Active Trading Channels & Setups';
+            }
+
+            if (this.swingSubTab === 'top-swingers') {
+                if (!this.topSwingersData || !this.topSwingersData.length) {
+                    this.loadTopSwingers();
+                } else {
+                    this.renderTopSwingers();
+                }
+            } else if (this.swingSubTab === 'audit') {
+                this.loadSwingAuditLog();
+            } else {
+                this.renderSwing();
+            }
+        },
+
+        setSwingSubTab(tabName) {
+            this.switchSwingSubTab(tabName);
+        },
 
         // -------------------------------------------------------------------------
         // View & Filter Controllers
         // -------------------------------------------------------------------------
         setSwingTierFilter(tier) {
             this.swingTierFilter = (tier || 'ALL').toUpperCase();
-            ['ALL', 'HOT', 'WARM'].forEach(t => {
+            ['ALL', 'HOT', 'WARM', 'COLD'].forEach(t => {
                 const btn = document.getElementById(`swingTierPill-${t}`);
                 if (btn) {
                     const isActive = t === this.swingTierFilter;
                     btn.className = `btn-micro ${isActive ? 'btn-primary' : ''}`;
                     btn.style.fontWeight = isActive ? '700' : '500';
                     btn.style.background = isActive
-                        ? (t === 'HOT' ? '#dc2626' : t === 'WARM' ? '#d97706' : '#2563eb')
+                        ? (t === 'HOT' ? '#dc2626' : t === 'WARM' ? '#d97706' : t === 'COLD' ? '#475569' : '#2563eb')
                         : 'transparent';
                     btn.style.color = isActive
                         ? '#ffffff'
-                        : (t === 'HOT' ? '#f87171' : t === 'WARM' ? '#fbbf24' : '#94a3b8');
+                        : (t === 'HOT' ? '#f87171' : t === 'WARM' ? '#fbbf24' : t === 'COLD' ? '#cbd5e1' : '#94a3b8');
                 }
             });
             this.renderSwing();
         },
 
         toggleSwingAuditLog() {
-            const container = document.getElementById('swingAuditContainer');
-            const toggleIcon = document.getElementById('swingAuditToggleIcon');
-            if (!container) return;
-
-            this._swingAuditOpen = !this._swingAuditOpen;
-            container.style.display = this._swingAuditOpen ? 'block' : 'none';
-            if (toggleIcon) toggleIcon.textContent = this._swingAuditOpen ? '▲ Hide Log' : '▼ Show Log';
-
-            if (this._swingAuditOpen) {
-                this.loadSwingAuditLog();
-            }
+            this.setSwingSubTab('audit');
         },
 
         async loadSwingAuditLog(ticker = null) {
@@ -63,6 +137,9 @@
                         exits: 'swingAuditExits'
                     }
                 });
+            } else {
+                const el = document.getElementById('swingAuditList');
+                if (el) el.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.75rem;padding:1rem;">Tier audit history synchronizing from SQLite...</div>';
             }
         },
 
@@ -198,27 +275,50 @@
         },
 
         // -------------------------------------------------------------------------
-        // Data Ingestion & Rendering
+        // Data Ingestion & Rendering: Active Setups
         // -------------------------------------------------------------------------
         async loadSwing(e) {
             const marketEl = document.getElementById('swingMarket');
             const market = marketEl ? marketEl.value : 'ALL';
             const url = API_BASE + '/api/v1/dashboard/swing?limit=150' + (market ? '&market=' + encodeURIComponent(market) : '');
             const statsUrl = API_BASE + '/api/v1/dashboard/swing/pool-stats';
+            const topUrl = API_BASE + '/api/v1/dashboard/swing/top-swingers?min_cycles=1&limit=50' + (market ? '&market=' + encodeURIComponent(market) : '');
             const btn = (e && e.target) ? e.target : (typeof window !== 'undefined' && window.event ? window.event.target : null);
             if (btn && btn.tagName === 'BUTTON') { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span> Loading...'; }
+
             try {
-                const [res, statsRes] = await Promise.all([
-                    fetch(url),
-                    fetch(statsUrl).catch(() => null)
+                const [res, statsRes, topRes] = await Promise.all([
+                    fetch(url).catch(err => { console.warn('Swing fetch error:', err); return null; }),
+                    fetch(statsUrl).catch(() => null),
+                    fetch(topUrl).catch(() => null)
                 ]);
-                const data = await res.json();
+
+                let data = [];
+                if (res && res.ok) {
+                    try {
+                        data = await res.json();
+                    } catch (_) {
+                        data = [];
+                    }
+                }
                 this.swingData = Array.isArray(data) ? data : [];
 
                 let poolStats = null;
                 if (statsRes && statsRes.ok) {
-                    const statsJson = await statsRes.json();
-                    poolStats = statsJson.stats || statsJson;
+                    try {
+                        const statsJson = await statsRes.json();
+                        poolStats = statsJson.stats || statsJson;
+                    } catch (_) {}
+                }
+
+                let topData = [];
+                if (topRes && topRes.ok) {
+                    try {
+                        topData = await topRes.json();
+                    } catch (_) {}
+                }
+                if (Array.isArray(topData) && topData.length) {
+                    this.topSwingersData = topData;
                 }
 
                 // Update summary counts
@@ -233,30 +333,43 @@
                 const countWarm = (poolStats && poolStats.warm_count !== undefined)
                     ? poolStats.warm_count
                     : this.swingData.filter(r => (r.tier || '').toUpperCase() === 'WARM').length;
+                const countCold = (poolStats && poolStats.cold_count !== undefined)
+                    ? poolStats.cold_count
+                    : Math.max(0, countAll - countHot - countWarm);
+
+                const countTop = (this.topSwingersData && this.topSwingersData.length)
+                    ? this.topSwingersData.length
+                    : this.swingData.filter(r => (r.cycles && r.cycles >= 1) || (r.avg_cycle_days && r.avg_cycle_days > 0)).length;
 
                 const elAll = document.getElementById('count-all'); if (elAll) elAll.textContent = countAll;
+                const elTop = document.getElementById('count-top-swingers'); if (elTop) elTop.textContent = countTop;
+                const elHot = document.getElementById('count-hot-pool'); if (elHot) elHot.textContent = countHot;
+                const elWarm = document.getElementById('count-warm-pool'); if (elWarm) elWarm.textContent = countWarm;
+                const elCold = document.getElementById('count-cold-pool'); if (elCold) elCold.textContent = countCold;
                 const elBz = document.getElementById('count-buyzone'); if (elBz) elBz.textContent = countBuyZone;
                 const elSb = document.getElementById('count-strongbuy'); if (elSb) elSb.textContent = countStrongBuy;
                 const elCust = document.getElementById('count-custom'); if (elCust) elCust.textContent = countCustom;
 
-                const elHot = document.getElementById('count-hot-pool'); if (elHot) elHot.textContent = countHot;
-                const elWarm = document.getElementById('count-warm-pool'); if (elWarm) elWarm.textContent = countWarm;
-
                 const pAll = document.getElementById('count-all-pill'); if (pAll) pAll.textContent = countAll;
+                const pHot = document.getElementById('count-hot-pill'); if (pHot) pHot.textContent = countHot;
+                const pWarm = document.getElementById('count-warm-pill'); if (pWarm) pWarm.textContent = countWarm;
+                const pCold = document.getElementById('count-cold-pill'); if (pCold) pCold.textContent = countCold;
                 const pBz = document.getElementById('count-buyzone-pill'); if (pBz) pBz.textContent = countBuyZone;
                 const pSb = document.getElementById('count-strongbuy-pill'); if (pSb) pSb.textContent = countStrongBuy;
                 const pCust = document.getElementById('count-custom-pill'); if (pCust) pCust.textContent = countCustom;
 
-                const pHot = document.getElementById('count-hot-pill'); if (pHot) pHot.textContent = countHot;
-                const pWarm = document.getElementById('count-warm-pill'); if (pWarm) pWarm.textContent = countWarm;
+                const subSetups = document.getElementById('swingSubTabCount-setups'); if (subSetups) subSetups.textContent = countAll;
+                const subTop = document.getElementById('swingSubTabCount-top'); if (subTop) subTop.textContent = countTop;
 
-                this.renderSwing();
+                if (this.swingSubTab === 'top-swingers') {
+                    this.renderTopSwingers();
+                } else {
+                    this.renderSwing();
+                }
             } catch (e) {
-                console.error('Error loading swing setups:', e);
+                console.error('Error in loadSwing:', e);
                 const tbody = document.getElementById('swingTableBody');
-                if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--red);">Error loading swing setups. Check server logs.</td></tr>';
-                const el = document.getElementById('swingWidgets');
-                if (el) el.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0;color:var(--red)">Error loading swing setups</div>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--red);">Error loading swing setups. Retrying with local cache...</td></tr>';
             } finally {
                 if (btn && btn.tagName === 'BUTTON') { btn.disabled = false; btn.textContent = '🔄 Refresh Setups'; }
             }
@@ -281,11 +394,13 @@
             // Filter
             let list = [...this.swingData];
 
-            // Tier Filter (Hot / Warm / All)
+            // Tier Filter (Hot / Warm / Cold / All)
             if (this.swingTierFilter === 'HOT') {
                 list = list.filter(r => (r.tier || '').toUpperCase() === 'HOT' || this.isSwingInBuyZone(r));
             } else if (this.swingTierFilter === 'WARM') {
                 list = list.filter(r => (r.tier || '').toUpperCase() === 'WARM');
+            } else if (this.swingTierFilter === 'COLD') {
+                list = list.filter(r => (r.tier || '').toUpperCase() === 'COLD');
             }
 
             // Strategy / Setup archetype Filter
@@ -350,102 +465,61 @@
                     const curPriceStr = curPrice !== null && curPrice !== undefined ? ('₹' + Number(curPrice).toFixed(2)) : '—';
                     const supp = r.current_support;
                     const resis = r.next_resistance;
-                    const suppStr = supp !== null && supp !== undefined ? ('₹' + Number(supp).toFixed(2)) : '—';
-                    const resisStr = resis !== null && resis !== undefined ? ('₹' + Number(resis).toFixed(2)) : '—';
 
                     // Distance to support & channel position %
                     let distToSupp = '—';
                     let distCls = 'timestamp';
                     let posPct = r.channel_position_pct != null ? r.channel_position_pct : 50;
                     if (curPrice != null && supp != null && supp > 0) {
-                        const diffPct = ((curPrice - supp) / supp) * 100;
-                        if (Math.abs(diffPct) < 0.5) {
-                            distToSupp = '🎯 At Support';
-                            distCls = 'price-positive';
-                        } else if (diffPct > 0) {
-                            distToSupp = '+' + diffPct.toFixed(1) + '% to Floor';
-                            distCls = isBz ? 'price-positive' : 'timestamp';
-                        } else {
-                            distToSupp = diffPct.toFixed(1) + '% Below Floor';
-                            distCls = 'price-negative';
-                        }
-                        if (resis != null && resis > supp) {
-                            posPct = Math.max(0, Math.min(100, ((curPrice - supp) / (resis - supp)) * 100));
-                        }
+                        const d = ((curPrice - supp) / supp) * 100;
+                        distToSupp = (d >= 0 ? '+' : '') + d.toFixed(1) + '% from floor';
+                        distCls = d <= 3.0 ? 'price-positive' : (d <= 7.0 ? 'color-warning' : 'timestamp');
                     }
-                    const posColor = posPct <= 25 ? '#10b981' : (posPct >= 80 ? '#f87171' : '#38bdf8');
 
-                    // Swing Range bounds
+                    // 30D Momentum return
+                    const mom = r.thirty_day_return_pct;
+                    const momStr = mom !== null && mom !== undefined ? ((mom >= 0 ? '+' : '') + Number(mom).toFixed(1) + '%') : '—';
+                    const momCls = (mom !== null && mom >= 0) ? 'price-positive' : (mom !== null ? 'price-negative' : 'timestamp');
+
+                    // Support / Resistance consolidated info
                     const sr = r.swing_range || {};
                     const hasSr = sr.lower_bound != null && sr.upper_bound != null;
                     const srLower = hasSr ? Number(sr.lower_bound).toFixed(2) : (supp ? Number(supp).toFixed(2) : '—');
                     const srUpper = hasSr ? Number(sr.upper_bound).toFixed(2) : (resis ? Number(resis).toFixed(2) : '—');
-                    const isUser = (sr.source === 'user') || (r.source === 'user');
-                    const srSource = isUser ? 'Custom 🔒' : 'Auto';
-                    const srSourceCls = isUser ? 'background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
-                    const spreadStr = r.spread_pct ? `${r.spread_pct}% spread` : (hasSr && sr.lower_bound > 0 ? `${(((sr.upper_bound - sr.lower_bound)/sr.lower_bound)*100).toFixed(1)}% spread` : '');
+                    const isUser = sr.source === 'user';
+                    const srSource = isUser ? 'Custom' : 'Auto';
+                    const srSourceCls = isUser ? 'background:rgba(59,130,246,0.25);color:#60a5fa;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
+                    const spreadStr = (sr.lower_bound && sr.upper_bound)
+                        ? ((sr.upper_bound - sr.lower_bound) / sr.lower_bound * 100).toFixed(1) + '% spread'
+                        : (supp && resis ? ((resis - supp) / supp * 100).toFixed(1) + '% spread' : '');
 
-                    // Tier Pill
-                    const tier = (r.tier || (isBz ? 'HOT' : 'WARM')).toUpperCase();
-                    const tierBadge = window.TierPoolUI
-                        ? window.TierPoolUI.renderTierBadge(tier)
-                        : (tier === 'HOT'
-                            ? '<span class="signal-badge" style="background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;">🔥 HOT</span>'
-                            : '<span class="signal-badge" style="background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;">⚡ WARM</span>');
+                    // Signal & Tier Badges
+                    const tierName = (r.tier || (isBz ? 'HOT' : 'WARM')).toUpperCase();
+                    const tierBadge = tierName === 'HOT'
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.08);color:#ffffff;border:1px solid rgba(255,255,255,0.18);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:600;"><span style="color:#f87171;margin-right:2px;">●</span> HOT</span>'
+                        : (tierName === 'WARM'
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#cbd5e1;border:1px solid rgba(255,255,255,0.09);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:500;"><span style="color:#fbbf24;margin-right:2px;">●</span> WARM</span>'
+                            : '<span class="signal-badge" style="background:rgba(255,255,255,0.02);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;font-weight:400;"><span style="color:#64748b;margin-right:2px;">○</span> COLD</span>');
 
-                    // Signal Badge
-                    let signalBadge = '';
-                    if (r.swing_signal === 'Strong Buy') {
-                        signalBadge = '<span class="signal-badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid #38bdf8;padding:0.15rem 0.5rem;font-size:0.72rem;font-weight:800;">⭐ STRONG BUY</span>';
-                    } else if (isBz || r.swing_signal === 'Buy Zone') {
-                        signalBadge = '<span class="signal-badge" style="background:rgba(16,185,129,0.25);color:#34d399;border:1px solid #10b981;padding:0.15rem 0.5rem;font-size:0.72rem;font-weight:700;">🟢 BUY ZONE</span>';
-                    } else if (r.swing_signal === 'Overbought' || r.swing_signal === 'Sell Zone') {
-                        signalBadge = '<span class="signal-badge" style="background:rgba(251,146,60,0.2);color:#fb923c;border:1px solid rgba(251,146,60,0.4);padding:0.15rem 0.5rem;font-size:0.72rem;font-weight:600;">🟠 SELL ZONE</span>';
-                    } else if (r.swing_signal === 'Breakdown') {
-                        signalBadge = '<span class="signal-badge" style="background:rgba(239,68,68,0.25);color:#ef4444;border:1px solid #ef4444;padding:0.15rem 0.5rem;font-size:0.72rem;font-weight:700;">🔴 BREAKDOWN</span>';
-                    } else {
-                        signalBadge = '<span class="signal-badge" style="background:rgba(148,163,184,0.15);color:#94a3b8;padding:0.15rem 0.5rem;font-size:0.72rem;">Neutral</span>';
-                    }
+                    const sigBadgeStyle = isBz ? 'background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.22);font-weight:600;' :
+                        r.swing_signal === 'Strong Buy' ? 'background:rgba(255,255,255,0.06);color:#ffffff;border:1px solid rgba(255,255,255,0.14);font-weight:600;' :
+                        r.swing_signal === 'Overbought' ? 'background:rgba(248,113,113,0.08);color:#f87171;border:1px solid rgba(248,113,113,0.2);' :
+                        r.swing_signal === 'Sell Zone' ? 'background:rgba(251,146,60,0.08);color:#fb923c;border:1px solid rgba(251,146,60,0.2);' :
+                        r.swing_signal === 'Breakdown' ? 'background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);' :
+                        r.swing_signal === 'Buy' ? 'background:rgba(52,211,153,0.06);color:#6ee7b7;border:1px solid rgba(52,211,153,0.15);' :
+                        'background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.07);';
+                    const sigBadgeText = isBz ? '● BUY ZONE' : (r.swing_signal || 'Neutral');
+                    const signalBadge = `<span class="signal-badge" style="${sigBadgeStyle}font-size:0.62rem;padding:0.06rem 0.35rem;">${sigBadgeText}</span>`;
 
-                    // 30D Return
-                    const mom = r.thirty_day_return_pct;
-                    const momCls = mom !== null && mom !== undefined ? (mom >= 0 ? 'price-positive' : 'price-negative') : '';
-                    const momStr = mom !== null && mom !== undefined ? ((mom >= 0 ? '+' : '') + Number(mom).toFixed(1) + '%') : '—';
-
-                    // AI Intelligence Cell (Consolidated 4-Model + Kronos + News)
-                    const kp = r.kronos_prediction || {};
-                    const kpTrend = kp.trend || '—';
-                    const kpRet = (kp.return_pct != null) ? `${kp.return_pct >= 0 ? '+' : ''}${kp.return_pct.toFixed(1)}%` : '';
-                    const pConsensus = (this.consensusMap && this.consensusMap[(r.ticker || '').toUpperCase()]) || r.consensus || {};
-                    const cDir = pConsensus.consensus_direction || 'NEUTRAL';
-                    const isCBull = cDir.includes('BUY') || cDir.includes('BULL');
-                    const isCBear = cDir.includes('SELL') || cDir.includes('BEAR');
-                    const cColor = isCBull ? '#34d399' : isCBear ? '#f87171' : '#fbbf24';
-
-                    const aiColHtml = `
-                        <div onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="cursor:pointer;display:flex;flex-direction:column;gap:0.15rem;" title="Click to view full AI Thesis & Intelligence">
-                            <div style="display:flex;align-items:center;gap:0.35rem;">
-                                <span class="signal-badge" style="background:rgba(255,255,255,0.06);color:${cColor};font-size:0.68rem;font-weight:700;padding:0.1rem 0.4rem;border:1px solid rgba(255,255,255,0.1);">
-                                    🤖 ${cDir}
-                                </span>
-                                ${kpRet ? `<span style="font-size:0.68rem;color:#38bdf8;font-family:var(--font-mono);font-weight:600;">🔮 ${kpRet}</span>` : ''}
-                            </div>
-                            <div style="font-size:0.65rem;color:#94a3b8;">
-                                Kronos: ${kpTrend} · <span style="color:#60a5fa;text-decoration:underline;">Thesis ↗</span>
-                            </div>
-                        </div>
-                    `;
-
-                    // Row styling
-                    const rowStyle = isBz ? 'background:rgba(16,185,129,0.06);border-left:3px solid #10b981;' : '';
-                    const hoverBg = isBz ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)';
-                    const origBg = isBz ? 'rgba(16,185,129,0.06)' : '';
+                    // AI & Kronos Column Data
+                    // Position bar color
+                    const posColor = posPct <= 25 ? '#34d399' : (posPct <= 60 ? '#38bdf8' : '#fb923c');
 
                     return `
-                        <tr style="${rowStyle}cursor:pointer;" data-ticker="${r.ticker || ''}" onmouseenter="this.style.background='${hoverBg}'" onmouseleave="this.style.background='${origBg}'" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" title="Click to open Support/Resistance Channel Editor">
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
                             <!-- Col 1: Ticker -->
-                            <td style="padding:0.55rem 0.65rem;">
-                                <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <td class="cell-ticker" style="padding:0.55rem 0.65rem;">
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
                                     <strong style="color:#ffffff;font-size:0.92rem;font-family:var(--font-heading);">${r.ticker || '?'}</strong>
                                     <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${r.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price & technical metrics for ${r.ticker}">↻</button>
                                     <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;" title="Open profile">↗</a>
@@ -490,16 +564,10 @@
                                 </div>
                             </td>
 
-                            <!-- Col 6: AI Intelligence & Thesis -->
-                            <td style="padding:0.55rem 0.65rem;">
-                                ${aiColHtml}
-                            </td>
-
-                            <!-- Col 7: Actions -->
+                            <!-- Col 6: Actions -->
                             <td style="padding:0.55rem 0.65rem;text-align:right;">
                                 <div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">
                                     <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Edit Support & Resistance bounds">✎ Range</button>
-                                    <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingAiModal('${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View unified AI Thesis">🧠 AI</button>
                                     <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;">📊 Chart</a>
                                 </div>
                             </td>
@@ -519,67 +587,304 @@
                         r.swing_signal === 'Sell Zone' ? 'background:rgba(251,146,60,0.2);color:#fb923c;border:1px solid rgba(251,146,60,0.4);' :
                         r.swing_signal === 'Breakdown' ? 'background:rgba(239,68,68,0.25);color:#ef4444;border:1px solid #ef4444;' :
                         r.swing_signal === 'Buy' ? 'background:rgba(16,185,129,0.15);color:#6ee7b7;' :
-                        r.swing_signal === 'Cautious' ? 'background:rgba(239,68,68,0.2);color:#ef4444;' :
                         'background:rgba(148,163,184,0.2);color:#94a3b8;';
-                    const badgeText = isBz ? '🟢 BUY ZONE' : (r.swing_signal === 'Overbought' ? '⚠️ Above Resistance' : (r.swing_signal === 'Sell Zone' ? '🟠 Sell Zone' : (r.swing_signal === 'Breakdown' ? '🔴 Below Support' : r.swing_signal)));
+                    const badgeText = isBz ? '🟢 BUY ZONE' : (r.swing_signal || 'Neutral');
                     const earningsDate = r.earnings_date || 'N/A';
-                    const kp = r.kronos_prediction || {};
-                    const hasKp = kp && kp.trend && kp.trend !== '—' && kp.trend !== 'N/A';
-                    const trend = kp.trend || 'N/A';
-                    const trendCls = trend === 'Bullish' ? 'price-positive' : trend === 'Bearish' ? 'price-negative' : '';
-
-                    const ai = r.ai_synthesis || {};
-                    const hasAi = ai && ai.ai_signal;
-
-                    const sr = r.swing_range || {};
-                    const hasSr = sr.lower_bound != null && sr.upper_bound != null;
-                    const srLower = hasSr ? Number(sr.lower_bound).toFixed(2) : (r.current_support ? Number(r.current_support).toFixed(2) : '—');
-                    const srUpper = hasSr ? Number(sr.upper_bound).toFixed(2) : (r.next_resistance ? Number(r.next_resistance).toFixed(2) : '—');
-                    const isUser = sr.source === 'user';
-                    const srSource = isUser ? 'Custom' : 'Auto';
-                    const srSourceCls = isUser ? 'background:rgba(59,130,246,0.25);color:#60a5fa;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
-                    const srCycles = (sr.cycles != null && sr.cycles > 0) ? (sr.cycles + ' cyc' + (sr.avg_cycle_days ? ' · ~' + Math.round(sr.avg_cycle_days) + 'd' : '')) : '';
                     const curPriceStr = r.current_price !== null && r.current_price !== undefined ? ('₹' + Number(r.current_price).toFixed(2)) : 'N/A';
 
-                    const cardBorder = isBz ? 'border-color:#10b981;background:rgba(16,185,129,0.05);' : '';
-
-                    return '<div class="widget-card" onclick="app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="' + cardBorder + 'cursor:pointer;transition:transform 0.15s ease, border-color 0.15s ease;" onmouseenter="this.style.borderColor=\'rgba(59,130,246,0.8)\'" onmouseleave="this.style.borderColor=\'' + (isBz ? '#10b981' : '') + '\'" title="Click anywhere to view 3-month range history & customize swing range">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                        '<h4>' + (r.ticker || '?') + '</h4>' +
-                        '<span class="signal-badge" style="' + badgeStyle + '">' + badgeText + '</span></div>' +
-                        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:0.25rem 0 0.45rem 0;">' +
-                        '<span style="font-size:0.8rem;color:var(--muted);">Current Price</span>' +
-                        '<strong style="font-size:1.1rem;' + (isBz ? 'color:#34d399;' : 'color:var(--light);') + '">' + curPriceStr + '</strong>' +
-                        '</div>' +
-                        '<div class="metric" style="margin-bottom:0.4rem"><span>Next Earnings</span><strong>' + earningsDate + '</strong></div>' +
-                        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">' +
-                        '<div class="metric"><span>Support (Buy Zone)</span><strong style="' + (isBz ? 'color:#34d399;' : '') + '">' + (r.current_support ? '₹' + Number(r.current_support).toFixed(2) : 'N/A') + '</strong></div>' +
-                        '<div class="metric"><span>Resistance (Sell Zone)</span><strong>' + (r.next_resistance ? '₹' + Number(r.next_resistance).toFixed(2) : 'N/A') + '</strong></div>' +
-                        '<div class="metric"><span>30D Return</span><strong class="' + cls + '">' + (r.thirty_day_return_pct !== null ? r.thirty_day_return_pct.toFixed(2) + '%' : 'N/A') + '</strong></div>' +
-                        '<div class="metric"><span>Quality (LQ)</span><strong>' + (r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : 'N/A') + '</strong></div>' +
-                        '</div>' +
-                        '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.45rem 0.6rem;margin-top:0.5rem;">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">' +
-                        '<span style="font-size:0.72rem;color:var(--muted);font-weight:600;">SWING RANGE</span>' +
-                        '<span class="signal-badge" style="' + srSourceCls + 'font-size:0.68rem;padding:0.08rem 0.35rem;">' + srSource + '</span>' +
-                        '</div>' +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                        '<div><strong style="font-size:0.92rem;">₹' + srLower + ' – ₹' + srUpper + '</strong>' +
-                        (srCycles ? '<span class="timestamp" style="display:block;font-size:0.72rem;">' + srCycles + '</span>' : '') +
-                        '</div>' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.2rem 0.5rem;font-size:0.75rem;">✎ Range</button>' +
-                        '</div>' +
-                        '</div>' +
-                        (hasAi ? ('<div class="metric" style="margin-top:0.4rem;cursor:pointer;" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)"><span>AI Synthesis</span><strong style="color:#60a5fa;">' + ai.ai_signal + ' (' + (ai.sentiment_score >= 0 ? '+' : '') + Number(ai.sentiment_score).toFixed(2) + ') 🔍</strong></div>') : '') +
-                        (hasKp ? ('<div class="metric" style="margin-top:0.2rem"><span>Kronos 14D Return</span><strong class="' + trendCls + '">' + (kp.return_pct != null ? kp.return_pct.toFixed(2) + '%' : '—') + ' (' + trend + ')</strong></div>') : '') +
-                        (kp.explanation ? '<p class="timestamp" style="margin-top:0.5rem;font-size:0.75rem;">' + kp.explanation + '</p>' : '') +
-                        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">' + (hasAi ? '🔍 Reasons & News' : '🧠 AI Thesis') + '</button>' +
-                        '</div>' +
-                        '</div>';
+                    return `
+                        <div class="widget-card" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')" style="cursor:pointer;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h4>${r.ticker || '?'}</h4>
+                                <span class="signal-badge" style="${badgeStyle}">${badgeText}</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:baseline;margin:0.25rem 0 0.45rem 0;">
+                                <span style="font-size:0.8rem;color:var(--muted);">Current Price</span>
+                                <strong style="font-size:1.1rem;${isBz ? 'color:#34d399;' : 'color:var(--light);'}">${curPriceStr}</strong>
+                            </div>
+                            <div class="metric" style="margin-bottom:0.4rem"><span>Next Earnings</span><strong>${earningsDate}</strong></div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">
+                                <div class="metric"><span>Support</span><strong>${r.current_support ? '₹' + Number(r.current_support).toFixed(2) : 'N/A'}</strong></div>
+                                <div class="metric"><span>Resistance</span><strong>${r.next_resistance ? '₹' + Number(r.next_resistance).toFixed(2) : 'N/A'}</strong></div>
+                                <div class="metric"><span>30D Return</span><strong class="${cls}">${r.thirty_day_return_pct !== null ? r.thirty_day_return_pct.toFixed(2) + '%' : 'N/A'}</strong></div>
+                                <div class="metric"><span>Quality</span><strong>${r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : 'N/A'}</strong></div>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">
+                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('ALL', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">✎ Range</button>
+                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;text-align:center;">📊 Chart</a>
+                            </div>
+                        </div>
+                    `;
                 }).join('');
             }
+        },
+
+        // =========================================================================
+        // 🏆 SUB-TAB 2: Best Top Swingers & Harmonic Cycle Matrix
+        // =========================================================================
+        async loadTopSwingers(e) {
+            const marketEl = document.getElementById('swingMarket');
+            const market = marketEl ? marketEl.value : 'ALL';
+            const minCyclesEl = document.getElementById('swingTopMinCycles');
+            const minCycles = minCyclesEl ? (parseInt(minCyclesEl.value, 10) || 1) : (this.topSwingersMinCycles || 1);
+            this.topSwingersMinCycles = minCycles;
+            const url = API_BASE + `/api/v1/dashboard/swing/top-swingers?min_cycles=${minCycles}&limit=100` + (market ? `&market=${encodeURIComponent(market)}` : '');
+
+            const btn = (e && e.target) ? e.target : null;
+            if (btn && btn.tagName === 'BUTTON') {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner"></span> Ranking...';
+            }
+
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.topSwingersData = Array.isArray(data) ? data : [];
+                } else {
+                    this.topSwingersData = [];
+                }
+
+                // Update subtab badge count
+                const badge = document.getElementById('swingSubTabCount-top');
+                if (badge) badge.textContent = this.topSwingersData.length;
+                const kpiTop = document.getElementById('count-top-swingers');
+                if (kpiTop) kpiTop.textContent = this.topSwingersData.length;
+
+                this.renderTopSwingers();
+            } catch (err) {
+                console.error('Error loading top swingers:', err);
+                const tbody = document.getElementById('swingTopSwingersTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--red);">Error loading Top Swingers matrix. Please check server logs.</td></tr>';
+                }
+            } finally {
+                if (btn && btn.tagName === 'BUTTON') {
+                    btn.disabled = false;
+                    btn.textContent = '🏆 Refresh Top Swingers';
+                }
+            }
+        },
+
+        onTopSwingersMinCyclesChange(val) {
+            this.topSwingersMinCycles = parseInt(val, 10) || 1;
+            this.loadTopSwingers();
+        },
+
+        filterTopSwingersTable(query) {
+            this.renderTopSwingers();
+        },
+
+        sortTopSwingers(key) {
+            if (this.topSwingersSortKey === key) {
+                this.topSwingersSortDir = this.topSwingersSortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.topSwingersSortKey = key;
+                this.topSwingersSortDir = 'asc';
+            }
+            this.renderTopSwingers();
+        },
+
+        renderTopSwingers() {
+            const tbody = document.getElementById('swingTopSwingersTableBody');
+            if (!tbody) return;
+
+            const marketEl = document.getElementById('swingMarket');
+            const currentMarket = marketEl ? marketEl.value : 'ALL';
+            const minCycles = this.topSwingersMinCycles || 1;
+
+            if (!this.topSwingersData || !this.topSwingersData.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
+                            <div style="font-size:2rem;margin-bottom:0.5rem;">🏆</div>
+                            <h4 style="margin:0 0 0.3rem 0;color:#facc15;font-size:1.05rem;">No Top Swing Candidates Match Criteria</h4>
+                            <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Try lowering the minimum cycle filter or selecting another market universe.</p>
+                            <button type="button" onclick="app.loadTopSwingers(event)" class="btn btn-primary btn-sm btn-tactile" style="font-weight:700;background:#eab308;color:#000000;">↻ Refresh Top Swingers</button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let list = [...this.topSwingersData];
+
+            // Strict client-side filter by minimum cycles
+            list = list.filter(r => (parseInt(r.cycles, 10) || 0) >= minCycles);
+
+            // Filter by search text
+            const searchInp = document.getElementById('swingTopSearchInput');
+            if (searchInp && searchInp.value.trim()) {
+                const q = searchInp.value.trim().toUpperCase();
+                list = list.filter(r =>
+                    (r.ticker || '').toUpperCase().includes(q) ||
+                    (r.industry || '').toUpperCase().includes(q) ||
+                    (r.cycle_health || '').toUpperCase().includes(q) ||
+                    (r.swing_signal || '').toUpperCase().includes(q)
+                );
+            }
+
+            // Sort
+            list.sort((a, b) => {
+                let va, vb;
+                if (this.topSwingersSortKey === 'rank' || this.topSwingersSortKey === 'swing_rank_score') {
+                    va = a.swing_rank_score != null ? a.swing_rank_score : -Infinity;
+                    vb = b.swing_rank_score != null ? b.swing_rank_score : -Infinity;
+                } else if (this.topSwingersSortKey === 'ticker') {
+                    va = (a.ticker || '').toUpperCase();
+                    vb = (b.ticker || '').toUpperCase();
+                } else if (this.topSwingersSortKey === 'current_price') {
+                    va = a.current_price != null ? a.current_price : -Infinity;
+                    vb = b.current_price != null ? b.current_price : -Infinity;
+                } else if (this.topSwingersSortKey === 'cycles') {
+                    va = a.cycles != null ? a.cycles : -Infinity;
+                    vb = b.cycles != null ? b.cycles : -Infinity;
+                } else if (this.topSwingersSortKey === 'avg_cycle_days') {
+                    va = a.avg_cycle_days != null ? a.avg_cycle_days : -Infinity;
+                    vb = b.avg_cycle_days != null ? b.avg_cycle_days : -Infinity;
+                } else if (this.topSwingersSortKey === 'spread_pct') {
+                    va = a.spread_pct != null ? a.spread_pct : -Infinity;
+                    vb = b.spread_pct != null ? b.spread_pct : -Infinity;
+                } else if (this.topSwingersSortKey === 'dist_to_support_pct') {
+                    va = a.dist_to_support_pct != null ? a.dist_to_support_pct : Infinity;
+                    vb = b.dist_to_support_pct != null ? b.dist_to_support_pct : Infinity;
+                } else {
+                    va = a[this.topSwingersSortKey] || -Infinity;
+                    vb = b[this.topSwingersSortKey] || -Infinity;
+                }
+
+                if (this.topSwingersSortKey === 'dist_to_support_pct') {
+                    // For distance, smaller is usually preferred (closer to floor)
+                    return this.topSwingersSortDir === 'asc' ? (va - vb) : (vb - va);
+                }
+
+                if (va < vb) return this.topSwingersSortDir === 'asc' ? 1 : -1;
+                if (va > vb) return this.topSwingersSortDir === 'asc' ? -1 : 1;
+                return 0;
+            });
+
+            if (!list.length) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">No swingers match your search filter.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = list.map((r, idx) => {
+                const rankNum = idx + 1;
+                const rankBadge = rankNum === 1
+                    ? '<span class="signal-badge" style="background:rgba(255,255,255,0.12);color:#ffffff;border:1px solid rgba(255,255,255,0.22);font-weight:700;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#1</span>'
+                    : (rankNum === 2
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#2</span>'
+                        : (rankNum === 3
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.68rem;padding:0.08rem 0.4rem;font-family:var(--font-mono);">#3</span>'
+                            : `<span style="font-weight:600;color:#64748b;font-family:var(--font-mono);font-size:0.75rem;">#${rankNum}</span>`));
+
+                const curPrice = r.current_price;
+                const curPriceStr = curPrice !== null && curPrice !== undefined ? ('₹' + Number(curPrice).toFixed(2)) : '—';
+                const mom = r.thirty_day_return_pct;
+                const momStr = mom !== null && mom !== undefined ? ((mom >= 0 ? '+' : '') + Number(mom).toFixed(1) + '%') : '—';
+                const momCls = (mom !== null && mom >= 0) ? 'price-positive' : (mom !== null ? 'price-negative' : 'timestamp');
+
+                const cycles = r.cycles || 0;
+                const cycleHealth = r.cycle_health || (cycles >= 4 ? 'High Frequency' : (cycles >= 2 ? 'Established' : 'Emerging'));
+                const cycleHealthBg = 'rgba(255,255,255,0.03)';
+                const cycleHealthClr = cycles >= 4 ? '#e2e8f0' : (cycles >= 2 ? '#cbd5e1' : '#94a3b8');
+
+                const avgDays = r.avg_cycle_days || 0;
+                const avgDaysStr = avgDays > 0 ? `~${avgDays.toFixed(1)}d` : '—';
+                const velocityTier = (avgDays >= 10 && avgDays <= 30)
+                    ? '<span class="signal-badge" style="background:rgba(255,255,255,0.05);color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.60rem;padding:0.04rem 0.32rem;">● Sweet Spot (10-30d)</span>'
+                    : (avgDays > 0 && avgDays < 10
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.03);color:#94a3b8;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Rapid (&lt;10d)</span>'
+                        : (avgDays > 30
+                            ? '<span class="signal-badge" style="background:rgba(255,255,255,0.03);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Extended (&gt;30d)</span>'
+                            : ''));
+
+                const supp = r.current_support;
+                const resis = r.next_resistance;
+                const srLower = supp ? Number(supp).toFixed(2) : '—';
+                const srUpper = resis ? Number(resis).toFixed(2) : '—';
+                const spreadPct = r.spread_pct != null ? r.spread_pct : (supp && resis ? ((resis - supp) / supp * 100) : 0);
+                const spreadStr = spreadPct > 0 ? `${spreadPct.toFixed(1)}% Spread` : '—';
+
+                const distPct = r.dist_to_support_pct != null ? r.dist_to_support_pct : (curPrice && supp ? ((curPrice - supp) / supp * 100) : null);
+                const distStr = distPct !== null ? `${distPct >= 0 ? '+' : ''}${distPct.toFixed(1)}%` : '—';
+                const isNearFloor = distPct !== null && distPct <= 3.5;
+                const floorBadge = isNearFloor
+                    ? '<span class="signal-badge" style="background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.22);font-size:0.60rem;font-weight:600;padding:0.04rem 0.32rem;">● Floor (0-3%)</span>'
+                    : (distPct !== null && distPct <= 8.0
+                        ? '<span class="signal-badge" style="background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);font-size:0.60rem;padding:0.04rem 0.32rem;">Mid-Range</span>'
+                        : '<span class="signal-badge" style="background:rgba(255,255,255,0.02);color:#64748b;border:1px solid rgba(255,255,255,0.06);font-size:0.60rem;padding:0.04rem 0.32rem;">Upper Band</span>');
+
+                const rankScore = r.swing_rank_score != null ? Number(r.swing_rank_score).toFixed(1) : '—';
+                const scoreColor = rankScore >= 75 ? '#ffffff' : (rankScore >= 55 ? '#cbd5e1' : '#94a3b8');
+
+                return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'" onclick="app.openStockDrawer('${(r.ticker || '').replace(/'/g, "\\'")}')">
+                        <!-- Col 1: Rank -->
+                        <td style="padding:0.55rem 0.65rem;">${rankBadge}</td>
+
+                        <!-- Col 2: Ticker & Sector -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <strong style="color:#ffffff;font-size:0.92rem;font-family:var(--font-heading);">${r.ticker || '?'}</strong>
+                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${r.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;" title="Refresh live price">↻</button>
+                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;" title="Open profile">↗</a>
+                            </div>
+                            <div style="font-size:0.65rem;color:#64748b;margin-top:0.1rem;">${r.industry || 'NSE Equity'}</div>
+                        </td>
+
+                        <!-- Col 3: Price & 30D Move -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="font-weight:800;font-size:0.92rem;${isNearFloor ? 'color:#34d399;' : 'color:#f8fafc;'}font-family:var(--font-mono);">${curPriceStr}</div>
+                            <div class="${momCls}" style="font-size:0.68rem;font-weight:600;margin-top:0.1rem;">30D: ${momStr}</div>
+                        </td>
+
+                        <!-- Col 4: Cycles & Frequency -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="display:flex;align-items:center;gap:0.35rem;">
+                                <span style="font-size:0.90rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${cycles} Cycle${cycles !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div style="margin-top:0.15rem;">
+                                <span class="signal-badge" style="background:${cycleHealthBg};color:${cycleHealthClr};font-size:0.60rem;padding:0.05rem 0.35rem;">${cycleHealth}</span>
+                            </div>
+                        </td>
+
+                        <!-- Col 5: Avg Cycle Duration -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="font-size:0.88rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${avgDaysStr} <span style="font-size:0.65rem;color:#64748b;">/ cycle</span></div>
+                            <div style="margin-top:0.15rem;">${velocityTier}</div>
+                        </td>
+
+                        <!-- Col 6: Trading Channel & Spread -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="font-weight:700;color:#f8fafc;font-family:var(--font-mono);font-size:0.80rem;">₹${srLower} – ₹${srUpper}</div>
+                            <div style="font-size:0.68rem;color:#38bdf8;font-weight:600;margin-top:0.1rem;">${spreadStr}</div>
+                        </td>
+
+                        <!-- Col 7: Floor Proximity -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="font-size:0.82rem;font-weight:700;color:${isNearFloor ? '#34d399' : '#cbd5e1'};font-family:var(--font-mono);">${distStr}</div>
+                            <div style="margin-top:0.15rem;">${floorBadge}</div>
+                        </td>
+
+                        <!-- Col 8: Swing Score -->
+                        <td style="padding:0.55rem 0.65rem;">
+                            <div style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.06);padding:0.18rem 0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.1);">
+                                <span style="font-size:0.92rem;font-weight:800;color:${scoreColor};font-family:var(--font-mono);">${rankScore}</span>
+                                <span style="font-size:0.62rem;color:#64748b;margin-left:0.2rem;">/100</span>
+                            </div>
+                        </td>
+
+                        <!-- Col 9: Actions -->
+                        <td style="padding:0.55rem 0.65rem;text-align:right;">
+                            <div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">
+                                <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);" title="Edit Support & Resistance bounds">✎ Range</button>
+                                <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" class="btn btn-sm" style="padding:0.2rem 0.45rem;font-size:0.70rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);text-decoration:none;">📊 Chart</a>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         },
 
         // -------------------------------------------------------------------------
@@ -607,13 +912,12 @@
                     if (item) {
                         item.kronos_prediction = data.prediction;
                     }
-                    this.renderSwing();
-
-                    // If modal is open for this ticker, update its Kronos section
-                    const modalTicker = document.getElementById('srModalTicker')?.value;
-                    if (modalTicker === ticker && typeof this._renderModalKronos === 'function') {
-                        this._renderModalKronos(data.prediction);
+                    const topItem = (this.topSwingersData || []).find(x => x.ticker === ticker);
+                    if (topItem) {
+                        topItem.kronos_prediction = data.prediction;
                     }
+                    this.renderSwing();
+                    if (this.swingSubTab === 'top-swingers') this.renderTopSwingers();
                 } else {
                     alert('Kronos prediction failed: ' + (data.error || 'Unknown error'));
                 }
@@ -669,6 +973,7 @@
                     });
 
                     this.renderSwing();
+                    if (this.swingSubTab === 'top-swingers') this.renderTopSwingers();
                 } else {
                     alert('Failed to generate predictions: ' + (forecasts.detail || forecasts.error || 'Server error'));
                 }
@@ -765,8 +1070,9 @@
             }
 
             try {
-                // Look up cached stock item from swing data
-                const stock = (this.swingData || []).find(r => (r.ticker || '').toUpperCase() === ticker) || {};
+                // Look up cached stock item from swing data or top swingers data
+                const stock = (this.swingData || []).find(r => (r.ticker || '').toUpperCase() === ticker) ||
+                              (this.topSwingersData || []).find(r => (r.ticker || '').toUpperCase() === ticker) || {};
                 const consensusData = (this.consensusMap && this.consensusMap[ticker]) || stock.consensus || {};
                 const kronosData = stock.kronos_prediction || {};
                 const aiSynthesis = stock.ai_synthesis || {};
@@ -796,9 +1102,10 @@
             const bodyEl = document.getElementById('swingAiModalBody');
             if (!bodyEl) return;
 
-            const models = consensus.model_predictions || {};
-            const dir = consensus.consensus_direction || 'NEUTRAL';
-            const str = consensus.consensus_strength != null ? consensus.consensus_strength : 50;
+            const models = (consensus && consensus.model_predictions) || {};
+            const rawDir = typeof consensus === 'string' ? consensus : (consensus && typeof consensus === 'object' ? (consensus.consensus_direction || consensus.direction) : null);
+            const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
+            const str = consensus && consensus.consensus_strength != null ? consensus.consensus_strength : 50;
             const isBull = dir.includes('BUY') || dir.includes('BULL');
             const isBear = dir.includes('SELL') || dir.includes('BEAR');
             const badgeBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)';
@@ -845,8 +1152,9 @@
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;">
                             ${['deepseek-r1', 'llama-3.3-70b', 'qwen-2.5-72b', 'mistral-large'].map(mKey => {
                                 const m = models[mKey] || {};
-                                const mDir = m.direction || 'PENDING';
-                                const mConf = m.confidence != null ? `${m.confidence}%` : '—';
+                                const rawMDir = typeof m === 'string' ? m : (m && typeof m === 'object' ? (m.direction || m.consensus_direction) : null);
+                                const mDir = (typeof rawMDir === 'string' ? rawMDir : (rawMDir != null ? String(rawMDir) : 'PENDING')).toUpperCase();
+                                const mConf = m && m.confidence != null ? `${m.confidence}%` : '—';
                                 const mIsBuy = mDir.includes('BUY') || mDir.includes('BULL');
                                 const mIsSell = mDir.includes('SELL') || mDir.includes('BEAR');
                                 const mClr = mIsBuy ? '#34d399' : mIsSell ? '#f87171' : '#94a3b8';

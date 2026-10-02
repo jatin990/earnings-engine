@@ -126,23 +126,23 @@
 
                         <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
 
-                            <thead>
+                            <thead style="user-select:none;">
 
                                 <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
 
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+                                    <th onclick="app.sortAccumulatingTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;">TICKER <span id="accSortIcon-ticker" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+                                    <th onclick="app.sortAccumulatingTable('score')" style="padding:0.45rem 0.5rem;cursor:pointer;">SCORE <span id="accSortIcon-score" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th onclick="app.sortAccumulatingTable('ret7d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="7-Day Price Change">7D <span id="accSortIcon-ret7d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th onclick="app.sortAccumulatingTable('ret30d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="30-Day Price Change">30D <span id="accSortIcon-ret30d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
+                                    <th onclick="app.sortAccumulatingTable('funds')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ) <span id="accSortIcon-funds" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+                                    <th onclick="app.sortAccumulatingTable('flow')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW <span id="accSortIcon-flow" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+                                    <th onclick="app.sortAccumulatingTable('stake')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Total Institutional Stake from Latest Filing">STAKE <span id="accSortIcon-stake" style="color:#71717a;margin-left:2px;">↕</span></th>
 
                                     <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
 
@@ -194,23 +194,23 @@
 
                         <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
 
-                            <thead>
+                            <thead style="user-select:none;">
 
                                 <tr style="background:#180d14;color:#fca5a5;border-bottom:1px solid rgba(239,68,68,0.15);font-family:var(--font-mono);font-size:0.66rem;">
 
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+                                    <th onclick="app.sortDistributingTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;">TICKER <span id="distSortIcon-ticker" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+                                    <th onclick="app.sortDistributingTable('score')" style="padding:0.45rem 0.5rem;cursor:pointer;">SCORE <span id="distSortIcon-score" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th onclick="app.sortDistributingTable('ret7d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="7-Day Price Change">7D <span id="distSortIcon-ret7d" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th onclick="app.sortDistributingTable('ret30d')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="30-Day Price Change">30D <span id="distSortIcon-ret30d" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
+                                    <th onclick="app.sortDistributingTable('funds')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ) <span id="distSortIcon-funds" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+                                    <th onclick="app.sortDistributingTable('flow')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW <span id="distSortIcon-flow" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+                                    <th onclick="app.sortDistributingTable('stake')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Total Institutional Stake from Latest Filing">STAKE <span id="distSortIcon-stake" style="color:#fca5a5;margin-left:2px;">↕</span></th>
 
                                     <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
 
@@ -277,12 +277,17 @@
                                 Point-in-Time Intelligence · Synced Live
 
                             </div>
+                            <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.25rem;flex-wrap:wrap;">
+                                <span id="instSelectedStockFetchStatus" class="badge" style="font-size:0.62rem;padding:0.12rem 0.45rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);">⚪ Ingestion: Untracked</span>
+                                <button type="button" id="btnInstRefreshFetchP1" onclick="app.triggerStockShareholdingFetch(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Trigger verified multi-tier exchange & regulatory filing extraction">🔄 Ingest</button>
+                            </div>
+                            <div id="instP1IngestErrorBanner" style="display:none;margin-top:0.4rem;padding:0.35rem 0.55rem;border-radius:4px;font-size:0.68rem;font-family:var(--font-mono);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;"></div>
 
                         </div>
 
                         <div style="display:flex;align-items:center;gap:0.35rem;">
 
-                            <button type="button" onclick="app.openAddToWatchlistModal(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app.institutionalModule._selectedTicker || 'ALLCARGO.NS')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-size:0.68rem;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;">
+                            <button type="button" onclick="app.openAddToWatchlistModal(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app._selectedTicker || 'ALLCARGO.NS')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-size:0.68rem;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;">
 
                                 ⭐ Watchlist
 
@@ -436,7 +441,7 @@
 
                                     <th style="padding:0.45rem 0.5rem;">STAKE %</th>
 
-                                    <th style="padding:0.45rem 0.5rem;">AVG PRICE</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Volume-weighted average purchase price or baseline reference">AVG PRICE</th>
 
                                     <th style="padding:0.45rem 0.5rem;">RECENT TXN (PRICE & DATE)</th>
 
@@ -552,25 +557,25 @@
 
                 <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
 
-                    <thead>
+                    <thead style="user-select:none;">
 
                         <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
 
-                            <th style="padding:0.6rem 0.8rem;">INVESTOR / FUND NAME</th>
+                            <th onclick="app.sortFundsTable('name')" style="padding:0.6rem 0.8rem;cursor:pointer;">INVESTOR / FUND NAME <span id="fundSortIcon-name" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">CATEGORY</th>
+                            <th onclick="app.sortFundsTable('category')" style="padding:0.6rem 0.8rem;cursor:pointer;">CATEGORY <span id="fundSortIcon-category" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">TRACKED HOLDINGS</th>
+                            <th onclick="app.sortFundsTable('holdings')" style="padding:0.6rem 0.8rem;cursor:pointer;">TRACKED HOLDINGS <span id="fundSortIcon-holdings" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
+                            <th onclick="app.sortFundsTable('buying')" style="padding:0.6rem 0.8rem;cursor:pointer;">BUYING ACTIONS <span id="fundSortIcon-buying" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
+                            <th onclick="app.sortFundsTable('selling')" style="padding:0.6rem 0.8rem;cursor:pointer;">SELLING ACTIONS <span id="fundSortIcon-selling" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">30D RETURN</th>
+                            <th onclick="app.sortFundsTable('ret30d')" style="padding:0.6rem 0.8rem;cursor:pointer;">30D RETURN <span id="fundSortIcon-ret30d" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">1Y RETURN</th>
+                            <th onclick="app.sortFundsTable('ret1y')" style="padding:0.6rem 0.8rem;cursor:pointer;">1Y RETURN <span id="fundSortIcon-ret1y" style="color:#71717a;margin-left:2px;">↕</span></th>
 
-                            <th style="padding:0.6rem 0.8rem;">TRACKED VALUE (₹ CR)</th>
+                            <th onclick="app.sortFundsTable('aum')" style="padding:0.6rem 0.8rem;cursor:pointer;">TRACKED VALUE (₹ CR) <span id="fundSortIcon-aum" style="color:#71717a;margin-left:2px;">↕</span></th>
 
                             <th style="padding:0.6rem 0.8rem;text-align:center;">ACTIONS</th>
 
@@ -855,6 +860,11 @@
                                 Comparison: Q1 FY27 vs Q4 FY26 · Synced Live
 
                             </div>
+                            <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.25rem;flex-wrap:wrap;">
+                                <span id="instTopSelectedStockFetchStatus" class="badge" style="font-size:0.62rem;padding:0.12rem 0.45rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);">⚪ Ingestion: Untracked</span>
+                                <button type="button" id="btnInstRefreshFetchP3" onclick="app.triggerStockShareholdingFetch(document.getElementById('instTopSelectedTicker')?.innerText?.split(' ')[0] || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Trigger verified multi-tier exchange & regulatory filing extraction">🔄 Ingest</button>
+                            </div>
+                            <div id="instP3IngestErrorBanner" style="display:none;margin-top:0.4rem;padding:0.35rem 0.55rem;border-radius:4px;font-size:0.68rem;font-family:var(--font-mono);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;"></div>
 
                         </div>
 
@@ -982,9 +992,9 @@
 
                                     <th style="padding:0.4rem 0.5rem;">STAKE %</th>
 
-                                    <th style="padding:0.4rem 0.5rem;">AVG PRICE</th>
+                                    <th style="padding:0.4rem 0.5rem;" title="Volume-weighted average purchase price or baseline reference">AVG PRICE</th>
 
-                                    <th style="padding:0.4rem 0.5rem;">RECENT TXN</th>
+                                    <th style="padding:0.4rem 0.5rem;" title="Most recent transaction executed by fund (Price, Date & Direction)">RECENT TXN</th>
 
                                     <th style="padding:0.4rem 0.5rem;">CHG %</th>
 
@@ -1268,6 +1278,13 @@
                     <div id="instSmSelectedSubtitle" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
                         Select any tracked signal from the table to inspect forensic dossier.
                     </div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap;">
+                        <span id="instForensicFetchStatusBadge" class="badge" style="font-size:0.64rem;padding:0.15rem 0.5rem;border-radius:4px;font-family:var(--font-mono);font-weight:600;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);">⚪ Ingestion: Untracked</span>
+                        <button type="button" id="btnForensicRefreshFetch" onclick="app.triggerStockShareholdingFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger verified multi-tier exchange & regulatory filing extraction">🔄 Ingest Filings</button>
+                        <button type="button" id="btnForensicBlockFetch" onclick="app.triggerStockBlockDealsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger live exchange block & bulk deals extraction">⚡ Ingest Block Deals</button>
+                        <button type="button" id="btnForensicQuarterlyFetch" onclick="app.triggerStockFinancialsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;cursor:pointer;" title="Trigger authentic quarterly financial statements and growth extraction">📊 Ingest Financials</button>
+                    </div>
+                    <div id="instForensicIngestErrorBanner" style="display:none;margin-top:0.4rem;padding:0.35rem 0.55rem;border-radius:4px;font-size:0.68rem;font-family:var(--font-mono);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;"></div>
                 </div>
 
                 <!-- 4-Tab Navigation Strip -->
@@ -1318,7 +1335,10 @@
                     <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
                         <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
                             <span>Quarterly Income Statement & Growth Trajectory</span>
-                            <span id="instSmQuarterlyCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Quarters Logged</span>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span id="instSmQuarterlyCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Quarters Logged</span>
+                                <button type="button" id="btnForensicQuarterlyTabFetch" onclick="app.triggerStockFinancialsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Ingest quarterly financials">📊 Ingest Financials</button>
+                            </div>
                         </div>
                         <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
                             <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
@@ -1346,7 +1366,10 @@
                     <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
                         <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
                             <span>Exchange Block & Bulk Deals Ledger</span>
-                            <span id="instSmBlockCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Deals</span>
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span id="instSmBlockCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Deals</span>
+                                <button type="button" id="btnForensicBlockTabFetch" onclick="app.triggerStockBlockDealsFetch(app._smartMoneyForensicDossier?.ticker || 'AQYLON.NS')" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;cursor:pointer;" title="Ingest block deals">⚡ Ingest Block Deals</button>
+                            </div>
                         </div>
                         <div id="instSmBlockDealsContainer" style="padding:0.6rem 0.85rem;max-height:420px;overflow-y:auto;">
                             <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:2rem;">Select a stock to view exchange block deals ledger.</div>

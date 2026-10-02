@@ -927,6 +927,20 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 0.76rem;
+        }
+
+        /* Order Book Depth Spread Overlay & Volume Profile Styles */
+        #stockDetailOrderBookDepthOverlay {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148,163,184,0.35) transparent;
+        }
+        #stockDetailOrderBookDepthOverlay::-webkit-scrollbar {
+            width: 4px;
+        }
+        #stockDetailOrderBookDepthOverlay::-webkit-scrollbar-thumb {
+            background: rgba(148,163,184,0.35);
+            border-radius: 2px;
+        }
             text-align: left;
         }
         .clean-table thead th {
@@ -1089,6 +1103,116 @@
             animation: spin 0.6s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ━━━ SIDEBAR LAYOUT ━━━ */
+        .page-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 270px) minmax(0, 1fr);
+            gap: 1.5rem;
+            align-items: start;
+        }
+        .stock-sidebar {
+            position: sticky;
+            top: 64px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        @media (max-width: 1100px) {
+            .page-layout {
+                grid-template-columns: 1fr;
+            }
+            .stock-sidebar {
+                position: static;
+                order: -1;
+            }
+        }
+
+        .liquidity-depth-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
+            gap: 0.85rem;
+            align-items: stretch;
+        }
+        @media (max-width: 860px) {
+            .liquidity-depth-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sidebar Card */
+        .sidebar-card {
+            background: linear-gradient(180deg, #0e1019 0%, #08090f 100%);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 12px 28px -8px rgba(0,0,0,0.8), inset 0 1px 0 0 rgba(255,255,255,0.06);
+        }
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #ffffff;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .sidebar-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.78rem;
+        }
+        .sidebar-row:last-child { border-bottom: none; }
+        .sidebar-label {
+            font-size: 0.68rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .sidebar-value {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+        }
+        /* Earnings mini-table */
+        .earnings-mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.72rem;
+        }
+        .earnings-mini-table th {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            padding: 0.3rem 0;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+        }
+        .earnings-mini-table td {
+            padding: 0.32rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            font-size: 0.7rem;
+        }
+        .earnings-mini-table tr:last-child td { border-bottom: none; }
+        .earnings-mini-table .qtr-date {
+            font-weight: 700;
+            color: #e2e8f0;
+            font-family: var(--font-sans);
+        }
     </style>
 </head>
 <body>
@@ -1235,6 +1359,55 @@
             </div>
         </section>
 
+        <!-- ━━━ LEFT SIDEBAR + MAIN CONTENT LAYOUT ━━━ -->
+        <div class="page-layout">
+
+            <!-- LEFT SIDEBAR: EARNINGS CALENDAR & RECENT RESULTS -->
+            <aside class="stock-sidebar">
+
+                <!-- Next Earnings Date -->
+                <section class="sidebar-card" id="sidebarNextEarnings">
+                    <div class="sidebar-header"><span style="color: var(--amber);">🗓️</span> Next Earnings</div>
+                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">Date</span>
+                            <span class="sidebar-value" id="sbNextEarnDate" style="color: var(--sky);">—</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">Days Away</span>
+                            <span class="sidebar-value" id="sbNextEarnDays">—</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="sidebar-label">EPS Estimate</span>
+                            <span class="sidebar-value" id="sbNextEarnEst">—</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Last 4 Quarters -->
+                <section class="sidebar-card" id="sidebarEarningsHistory">
+                    <div class="sidebar-header"><span style="color: var(--emerald);">📊</span> Last 4 Quarters</div>
+                    <div style="overflow-x:auto;">
+                        <table class="earnings-mini-table">
+                            <thead>
+                                <tr>
+                                    <th>Quarter</th>
+                                    <th style="text-align:right;">EPS Est / Act</th>
+                                    <th style="text-align:right;">Reaction</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sbEarningsBody">
+                                <tr><td colspan="3" style="text-align:center;color:var(--text-tertiary);font-family:var(--font-sans);padding:0.6rem 0;">Loading earnings signals...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </aside>
+
+            <!-- MAIN CONTENT COLUMN -->
+            <section class="sidebar-main" style="display:flex;flex-direction:column;gap:1.75rem;min-width:0;">
+
         <!-- ━━━ INSTANT STATS BAR: Returns · Composite Scores ━━━ -->
         <div id="instantStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.65rem;padding:0.85rem 1.1rem;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
             <div style="text-align:center;">
@@ -1320,6 +1493,11 @@
                         <button type="button" id="btnRangeALL" class="btn-chart-range" onclick="setChartRange('ALL')" style="background: transparent; border: none; color: #94a3b8; font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; cursor: pointer;">ALL</button>
                     </div>
 
+                    <!-- Order Book Depth Overlay Toggle Button -->
+                    <button type="button" id="btnStockToggleDepth" onclick="toggleStockDepthSpread()" class="btn-section-action cyan-subtle" title="Toggle Floating Order Book Depth Spread Overlay" style="font-size: 0.72rem; padding: 0.22rem 0.65rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem; background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
+                        <span>🧱 Order Book Depth</span>
+                    </button>
+
                     <button type="button" onclick="loadStockDetailChartData()" class="btn-section-action cyan-subtle" title="Refresh Price Bars" style="font-size: 0.72rem; padding: 0.25rem 0.55rem; cursor: pointer;">
                         🔄
                     </button>
@@ -1344,95 +1522,155 @@
                     <div id="hudChangePill" style="display: none; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">—</div>
                 </div>
 
-                <!-- Canvas Container with Loading Overlay -->
-                <div style="position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
+                <!-- Canvas Container with Loading Overlay & Draggable Depth Overlay -->
+                <div id="stockDetailCanvasRelativeWrap" style="position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
                     <div id="stockDetailChartContainer" style="width: 100%; height: 100%;"></div>
-                    <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 10;">
+
+                    <!-- 🧱 Floating Draggable Order Book Depth Overlay -->
+                    <div id="stockDetailOrderBookDepthOverlay" style="position: absolute; top: 8px; right: 65px; width: 240px; max-height: calc(100% - 35px); pointer-events: none; z-index: 15; display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width 0.25s ease, max-height 0.25s ease, opacity 0.2s ease;">
+                    </div>
+
+                    <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 20;">
                         <span>Loading interactive candlestick series...</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 🌊 SECTION: BUY & SELL LIQUIDITY WALLS & DEPTH DISTRIBUTION -->
+            <!-- 🌊 SECTION: UNIVERSAL MULTI-TIER LIQUIDITY & VOLUME PROFILE TERMINAL -->
             <div id="liquidityWallsSection" style="margin-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 1.1rem; display: flex; flex-direction: column; gap: 0.9rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; font-weight: 700; color: #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; font-weight: 800; color: #e2e8f0;">
                         <span>🌊</span>
-                        <span>Institutional Liquidity Distribution &amp; Order Book Depth</span>
-                        <span id="liquiditySourceBadge" style="font-size: 0.68rem; font-family: var(--font-mono); padding: 0.1rem 0.45rem; border-radius: 4px; background: rgba(56,189,248,0.12); color: #38bdf8; border: 1px solid rgba(56,189,248,0.25);">NSE F&amp;O Open Interest + Swing Liquidity</span>
+                        <span>Universal Liquidity, Order Flow &amp; Volume Profile Terminal</span>
+                        <span id="liquiditySourceBadge" style="font-size: 0.68rem; font-family: var(--font-mono); padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(56,189,248,0.12); color: #38bdf8; border: 1px solid rgba(56,189,248,0.25); font-weight: 700;">Point-in-Time Order Flow &amp; Value Area</span>
                     </div>
-                    <div style="font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono);">
-                        <span>Current Spot / LTP: </span>
-                        <strong id="wallSpotPrice" style="color: #38bdf8;">₹—</strong>
+                    <div style="font-size: 0.74rem; color: #94a3b8; font-family: var(--font-mono); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>Current Spot / LTP:</span>
+                        <strong id="wallSpotPrice" style="color: #38bdf8; font-size: 0.9rem;">₹—</strong>
                     </div>
                 </div>
 
-                <!-- Metric Summary Chips -->
+                <!-- ⚠️ Dynamic Support Breakdown Alert Banner (Hidden when price is above primary floor) -->
+                <div id="supportBreakdownAlertBanner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #ef4444; border-radius: 6px; padding: 0.65rem 0.85rem; font-family: var(--font-mono); font-size: 0.76rem; color: #fecaca; line-height: 1.45;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.2rem;">
+                        <span style="font-weight: 800; color: #f87171; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>⚠️ SUPPORT FLOOR BREACH DETECTED</span>
+                            <span id="breakdownLevelText" style="color: #ffffff; background: rgba(239,68,68,0.25); padding: 0.05rem 0.4rem; border-radius: 3px;">Level: ₹—</span>
+                        </span>
+                        <span id="breakdownDeficitText" style="color: #fca5a5; font-weight: 700;">-0.0% below floor</span>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #cbd5e1;">
+                        <strong>Technical Principle:</strong> Broken support flips to overhead resistance/supply. Defensive progression transitions to next lower channel base below.
+                    </div>
+                </div>
+
+                <!-- Universal Metric Summary Chips (100% Equities Supported, No "N/A" States) -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem;">
-                    <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div id="valBuyWallTitle" style="font-size: 0.65rem; color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟢 Major Buy Wall (Put OI)</div>
+                    <div id="cardBuyWallBox" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.22); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div id="valBuyWallTitle" style="font-size: 0.65rem; color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟢 Primary Support / Buy Wall</div>
                         <div id="valBuyWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #34d399; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
-                        <div id="valBuyWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
+                        <div id="valBuyWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">—</div>
                     </div>
-                    <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div id="valSellWallTitle" style="font-size: 0.65rem; color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🔴 Major Sell Wall (Call OI)</div>
+                    <div id="cardSellWallBox" style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.22); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div id="valSellWallTitle" style="font-size: 0.65rem; color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🔴 Resistance / Sell Wall</div>
                         <div id="valSellWallStrike" style="font-size: 1.05rem; font-weight: 800; color: #f87171; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
-                        <div id="valSellWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— contracts</div>
+                        <div id="valSellWallDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">—</div>
                     </div>
-                    <div style="background: rgba(251, 191, 36, 0.06); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div id="valMaxPainTitle" style="font-size: 0.65rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟡 Max Pain Equilibrium</div>
+                    <div id="cardPocBox" style="background: rgba(251, 191, 36, 0.06); border: 1px solid rgba(251, 191, 36, 0.22); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div id="valMaxPainTitle" style="font-size: 0.65rem; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">🟡 Volume POC / Equilibrium</div>
                         <div id="valMaxPainStrike" style="font-size: 1.05rem; font-weight: 800; color: #fde047; font-family: var(--font-mono); margin-top: 0.15rem;">₹—</div>
-                        <div id="valMaxPainDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">Zero-payout strike</div>
+                        <div id="valMaxPainDetail" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">Point of Control Peak Volume</div>
                     </div>
-                    <div style="background: rgba(129, 140, 248, 0.06); border: 1px solid rgba(129, 140, 248, 0.2); border-radius: 8px; padding: 0.65rem 0.85rem;">
-                        <div id="valPcrTitle" style="font-size: 0.65rem; color: #818cf8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">⚖️ Put-Call Ratio (PCR)</div>
+                    <div id="cardDeltaBox" style="background: rgba(129, 140, 248, 0.06); border: 1px solid rgba(129, 140, 248, 0.22); border-radius: 8px; padding: 0.65rem 0.85rem;">
+                        <div id="valPcrTitle" style="font-size: 0.65rem; color: #818cf8; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;">⚖️ Order Flow &amp; Buy/Sell Pressure</div>
                         <div id="valPcrRatio" style="font-size: 1.05rem; font-weight: 800; color: #a5b4fc; font-family: var(--font-mono); margin-top: 0.15rem;">—</div>
                         <div id="valPcrSentiment" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">— sentiment</div>
                     </div>
                 </div>
 
-                <!-- Interactive SVG Cumulative Depth Mountain & Ladder Grid -->
-                <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr); gap: 0.85rem; align-items: stretch;">
-                    <!-- Left: Cumulative Liquidity Depth Mountain (SVG) -->
-                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono); margin-bottom: 0.5rem;">
-                            <span style="color: #34d399;">◀ Cumulative Buy Liquidity (Bids / Puts)</span>
-                            <span style="color: #f87171;">Cumulative Sell Liquidity (Asks / Calls) ▶</span>
+                <!-- 🛡️ Multi-Tier Defensive Support Hierarchy Progression -->
+                <div style="background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.75rem 0.95rem; display: flex; flex-direction: column; gap: 0.5rem; font-family: var(--font-mono);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.72rem; font-weight: 800; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.04em;">🛡️ Multi-Tier Support Defense Progression</span>
+                        <span style="font-size: 0.66rem; color: #64748b;">Step-down structural protection when higher bounds break</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.55rem;">
+                        <!-- Tier 1: 20-Day Swing Base -->
+                        <div id="supportTier1Card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.64rem; color: #94a3b8; font-weight: 700;">Tier 1 · 20D Swing Floor</div>
+                                <div id="supportTier1Price" style="font-size: 0.92rem; font-weight: 800; color: #34d399;">₹—</div>
+                            </div>
+                            <span id="supportTier1Status" style="font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">HOLDING</span>
                         </div>
-                        <div id="depthSvgContainer" style="width: 100%; height: 160px; position: relative;">
-                            <svg id="liquidityDepthSvg" width="100%" height="100%" viewBox="0 0 600 160" preserveAspectRatio="none" style="overflow: visible;">
+                        <!-- Tier 2: 50-DMA / 3M Macro Base -->
+                        <div id="supportTier2Card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.64rem; color: #94a3b8; font-weight: 700;">Tier 2 · 50-DMA / 3M Base</div>
+                                <div id="supportTier2Price" style="font-size: 0.92rem; font-weight: 800; color: #fbbf24;">₹—</div>
+                            </div>
+                            <span id="supportTier2Status" style="font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">MAJOR BUFFER</span>
+                        </div>
+                        <!-- Tier 3: 200-DMA / 52W Low -->
+                        <div id="supportTier3Card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 0.64rem; color: #94a3b8; font-weight: 700;">Tier 3 · 200-DMA / 52W Low</div>
+                                <div id="supportTier3Price" style="font-size: 0.92rem; font-weight: 800; color: #818cf8;">₹—</div>
+                            </div>
+                            <span id="supportTier3Status" style="font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(129,140,248,0.15); color: #818cf8; border: 1px solid rgba(129,140,248,0.3);">MACRO BEDROCK</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive SVG Volume Profile Histogram & Key Liquidity Levels Ladder -->
+                <div class="liquidity-depth-grid">
+                    <!-- Left: Volume Profile & Value Area Distribution (SVG) -->
+                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
+                            <span id="depthBuyLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-bullish, #34d399); background: var(--color-bullish-bg, rgba(52, 211, 153, 0.10)); border: 1px solid var(--color-bullish-border, rgba(52, 211, 153, 0.24)); padding: 0.15rem 0.5rem; border-radius: 4px;">◀ Buy Volume (Bids)</span>
+                            <div style="display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.68rem;">
+                                <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #fbbf24;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #fbbf24;"></span>POC</span>
+                                <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #38bdf8;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>VAH</span>
+                                <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #34d399;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399;"></span>VAL</span>
+                            </div>
+                            <span id="depthSellLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-bearish, #fb7185); background: var(--color-bearish-bg, rgba(251, 113, 133, 0.10)); border: 1px solid var(--color-bearish-border, rgba(251, 113, 133, 0.24)); padding: 0.15rem 0.5rem; border-radius: 4px;">Sell Volume (Asks) ▶</span>
+                        </div>
+                        <div id="depthSvgContainer" style="width: 100%; height: 210px; position: relative;">
+                            <svg id="liquidityDepthSvg" width="100%" height="100%" viewBox="0 0 600 210" preserveAspectRatio="none" role="img" aria-label="Institutional liquidity distribution and volume profile depth chart" style="overflow: visible;">
                                 <defs>
                                     <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.65"/>
-                                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.78"/>
+                                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.04"/>
                                     </linearGradient>
                                     <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.65"/>
-                                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+                                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.78"/>
+                                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.04"/>
                                     </linearGradient>
                                 </defs>
-                                <text x="300" y="80" text-anchor="middle" fill="#64748b" font-size="12" font-family="monospace">Calculating liquidity depth curves...</text>
+                                <text x="300" y="90" text-anchor="middle" fill="#94a3b8" font-size="12" font-family="monospace">Synthesizing volume profile &amp; order book depth...</text>
                             </svg>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; font-family: var(--font-mono); margin-top: 0.35rem;">
                             <span id="depthMinStrike">₹—</span>
+                            <span id="depthMidStrike">—</span>
                             <span id="depthCenterSpot" style="color: #38bdf8; font-weight: 700;">Spot: ₹—</span>
                             <span id="depthMaxStrike">₹—</span>
                         </div>
                     </div>
 
-                    <!-- Right: Top 4 Strike Walls Ladder -->
-                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
+                    <!-- Right: Top Key Liquidity Levels Ladder -->
+                    <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between; min-width: 0;">
                         <div style="font-size: 0.72rem; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 0.4rem; display: flex; justify-content: space-between;">
-                            <span>Top Key Liquidity Levels</span>
-                            <span style="font-size: 0.65rem; color: #64748b;">Contracts / Volume</span>
+                            <span>Key Structural Levels</span>
+                            <span style="font-size: 0.65rem; color: #64748b;">% from Spot</span>
                         </div>
-                        <div id="liquidityLevelsList" style="display: flex; flex-direction: column; gap: 0.45rem;">
-                            <div style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 1rem;">Loading liquidity ladder...</div>
+                        <div id="liquidityLevelsList" role="region" aria-live="polite" aria-atomic="true" style="display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow-y: auto; max-height: 220px;">
+                            <div style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 1rem;">Loading structural ladder...</div>
                         </div>
                     </div>
                 </div>
             </div>
+        </section>
         </section>
 
         <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
@@ -1766,7 +2004,7 @@
                         <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
                         <div class="section-actions">
                             <button type="button" id="btnFetchNewsDelta" onclick="fetchNewsDelta()" class="btn-section-action cyan-subtle" title="Fetch fresh news headlines, press releases, and corporate exchange announcements">
-                                🔄 Fetch from Sources
+                                🔁 Fetch Latest
                             </button>
                             <button type="button" id="btnRecalcNewsSentiment" onclick="fetchStockCatalystsOnly(true)" class="btn-section-action primary-subtle" title="Re-evaluate news sentiment, impact scoring (0-100%), and catalyst rankings">
                                 ⚡ Refresh Sentiment
@@ -2080,6 +2318,11 @@
 
         </section>
 
+            </section>
+        <!-- END MAIN CONTENT COLUMN -->
+        </div>
+        <!-- END PAGE LAYOUT -->
+
     </main>
 
     <script>
@@ -2315,6 +2558,7 @@
                     const data = await res.json();
                     stockState.earnings_history = data.earnings_history || [];
                     renderEarnings(stockState.earnings_history);
+                    renderEarningsSidebar(stockState.earnings_history);
                     if (isManual) showStockToast('Earnings track record updated', 'success');
                 }
             } catch (e) {
@@ -2482,7 +2726,7 @@
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/factor-evaluation`);
                 if (res.ok) {
                     const data = await res.json();
-                    stockState.factor_evaluation = data.factor_evaluation || data || {};
+                    stockState.factor_evaluation = data.factor_evaluation || data.data || data || {};
                     renderFactorEvaluation(stockState.factor_evaluation);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
                     if (isManual) showStockToast(`Multi-factor pillars evaluated (Composite: ${stockState.factor_evaluation.composite_score || '—'}/100)`, 'success');
@@ -2797,15 +3041,37 @@
 
             const el = (id) => document.getElementById(id);
             if (el('instScore')) el('instScore').textContent = score.toFixed(0);
-            if (el('instInflow')) el('instInflow').textContent = (inst.gross_inflow_cr || 0).toLocaleString();
-            if (el('instOutflow')) el('instOutflow').textContent = (inst.gross_outflow_cr || 0).toLocaleString();
+
+            // Honest zero-state: when no AMFI institutional filings exist for the ticker,
+            // display "—" instead of misleading "₹0 Cr".  STLTECH.NS has no MF holdings rows
+            // so gross_inflow_cr is 0.0 — surface it only when fund-level data is present.
+            const hasInstitutionalData = (inst.funds_accumulating_count || 0) > 0
+                                      || (inst.funds_selling_count || 0) > 0
+                                      || (inst.gross_inflow_cr || 0) > 0;
+            if (el('instInflow')) el('instInflow').textContent = hasInstitutionalData
+                ? `₹${(inst.gross_inflow_cr || 0).toLocaleString()} Cr`
+                : '—';
+            if (el('instOutflow')) el('instOutflow').textContent = hasInstitutionalData
+                ? `₹${(inst.gross_outflow_cr || 0).toLocaleString()} Cr`
+                : '—';
             if (el('instNetFlow')) {
-                const net = inst.net_flow_cr || 0;
-                el('instNetFlow').textContent = `${net >= 0 ? '+' : ''}${net.toLocaleString()}`;
-                el('instNetFlow').style.color = net >= 0 ? '#34d399' : '#f87171';
+                const net = inst.net_flow_cr ?? null;
+                if (hasInstitutionalData && net != null) {
+                    el('instNetFlow').textContent = `${net >= 0 ? '+' : ''}₹${net.toLocaleString()} Cr`;
+                    el('instNetFlow').style.color = net >= 0 ? '#34d399' : '#f87171';
+                } else {
+                    el('instNetFlow').textContent = '—';
+                    el('instNetFlow').style.color = '#71717a';
+                }
             }
             if (el('instTotalStake')) el('instTotalStake').textContent = inst.total_institutional_stake_pct != null ? `${inst.total_institutional_stake_pct.toFixed(1)}%` : '—%';
-            if (el('instFundsCount')) el('instFundsCount').textContent = `${inst.funds_accumulating_count || 0} / ${inst.funds_selling_count || 0}`;
+            if (el('instFundsCount')) {
+                const accCount = inst.funds_accumulating_count || 0;
+                const sellCount = inst.funds_selling_count || 0;
+                el('instFundsCount').textContent = (accCount > 0 || sellCount > 0)
+                    ? `+${accCount} / -${sellCount}`
+                    : 'No MF Filings On Record';
+            }
 
             // Shareholding pattern
             const tbody = document.getElementById('tblShareholdingBody');
@@ -3569,6 +3835,55 @@
             }).join('');
         }
 
+        function renderEarningsSidebar(history) {
+            const body = document.getElementById('sbEarningsBody');
+            const todayStr = new Date().toISOString().split('T')[0];
+            const upcoming = history.find(e => e.earnings_date > todayStr);
+            const past = history.filter(e => e.earnings_date <= todayStr).slice(0, 4);
+
+            // ── Next Earnings Date ──
+            const dateEl = document.getElementById('sbNextEarnDate');
+            const daysEl = document.getElementById('sbNextEarnDays');
+            const estEl  = document.getElementById('sbNextEarnEst');
+            if (upcoming) {
+                if (dateEl) dateEl.textContent = upcoming.earnings_date;
+                const daysAway = Math.ceil((new Date(upcoming.earnings_date) - new Date()) / 86400000);
+                if (daysEl) {
+                    daysEl.textContent = `${daysAway}d`;
+                    daysEl.style.color = daysAway <= 14 ? 'var(--rose)' : daysAway <= 30 ? 'var(--amber)' : 'var(--text-primary)';
+                }
+                if (estEl) estEl.textContent = upcoming.eps_estimate != null ? `₹${upcoming.eps_estimate}` : '—';
+            } else {
+                if (dateEl) dateEl.textContent = 'No upcoming date';
+                if (daysEl) daysEl.textContent = '—';
+                if (estEl)  estEl.textContent = '—';
+            }
+
+            // ── Last 4 Quarters ──
+            if (!body) return;
+            if (!past.length) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-tertiary);font-family:var(--font-sans);padding:0.5rem 0;">No historical earnings signals found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = past.map(e => {
+                const d = new Date(e.earnings_date);
+                const qLabel = `${['Q1','Q2','Q3','Q4'][Math.floor(d.getMonth()/3)]} ${d.getFullYear()}`;
+                const epsEst = e.eps_estimate != null ? `₹${e.eps_estimate}` : '—';
+                const epsRep = e.eps_reported != null ? `₹${e.eps_reported}` : '—';
+                const surp = e.surprise_pct;
+                const surpText = surp != null ? `${surp >= 0 ? '+' : ''}${surp.toFixed(1)}%` : '—';
+                const surpColor = surp != null ? (surp >= 0 ? 'var(--emerald)' : 'var(--rose)') : 'var(--text-tertiary)';
+                return `
+                    <tr>
+                        <td class="qtr-date" style="white-space:nowrap;">${qLabel}<div style="font-size:0.58rem;color:#64748b;font-weight:400;">${e.earnings_date}</div></td>
+                        <td style="text-align:right;white-space:nowrap;"><span style="color:#64748b;">${epsEst}</span> / <span style="color:#e2e8f0;">${epsRep}</span></td>
+                        <td style="text-align:right;color:${surpColor};font-weight:700;">${surpText}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         async function calculateSingleEps(earningsDate) {
             const row = document.getElementById(`row-earnings-${earningsDate}`);
             if (row) row.style.opacity = '0.5';
@@ -3724,7 +4039,7 @@
             const btn = document.getElementById('btnFetchNewsDelta');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching Sources...';
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching.';
             }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/fetch-news`, {
@@ -3744,7 +4059,7 @@
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '🔄 Fetch from Sources';
+                    btn.innerHTML = '🔁 Fetch Latest';
                 }
             }
         }
@@ -4785,6 +5100,238 @@
         let stockChartRawRecords = [];
         let activeChartRange = '1Y';
         let stockLiquidityData = null;
+        let stockOrderFlowData = null;
+        let isStockDepthSpreadVisible = true;
+        let isStockDepthSpreadExpanded = false;
+        let stockDepthDragState = null;
+
+        function toggleStockDepthSpread() {
+            isStockDepthSpreadVisible = !isStockDepthSpreadVisible;
+            const overlay = document.getElementById('stockDetailOrderBookDepthOverlay');
+            const btn = document.getElementById('btnStockToggleDepth');
+            if (overlay) {
+                overlay.style.display = isStockDepthSpreadVisible ? 'flex' : 'none';
+            }
+            if (btn) {
+                if (isStockDepthSpreadVisible) {
+                    btn.style.background = 'rgba(56, 189, 248, 0.15)';
+                    btn.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+                    btn.style.color = '#38bdf8';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                    btn.style.color = '#94a3b8';
+                }
+            }
+            if (isStockDepthSpreadVisible && stockOrderFlowData) {
+                const curP = (stockState.quote && stockState.quote.current_price) || (stockState.technical && stockState.technical.close) || 0;
+                renderStockOrderBookSpread(stockOrderFlowData, curP, stockLiquidityData);
+            }
+        }
+
+        function toggleStockDepthSpreadExpansion() {
+            isStockDepthSpreadExpanded = !isStockDepthSpreadExpanded;
+            if (stockOrderFlowData) {
+                const curP = (stockState.quote && stockState.quote.current_price) || (stockState.technical && stockState.technical.close) || 0;
+                renderStockOrderBookSpread(stockOrderFlowData, curP, stockLiquidityData);
+            }
+        }
+
+        function initStockDepthSpreadDrag() {
+            const overlay = document.getElementById('stockDetailOrderBookDepthOverlay');
+            const wrap = document.getElementById('stockDetailCanvasRelativeWrap');
+            if (!overlay || overlay._dragInitialized) return;
+            overlay._dragInitialized = true;
+
+            const restore = () => {
+                try {
+                    const saved = JSON.parse(localStorage.getItem('stock_detail_depth_pos') || 'null');
+                    if (saved && saved.left != null && wrap) {
+                        overlay.style.left = saved.left + 'px';
+                        overlay.style.top = saved.top + 'px';
+                        overlay.style.right = 'auto';
+                    }
+                } catch (e) { /* ignore */ }
+            };
+
+            overlay.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                const handle = e.target.closest('#stockDepthSpreadDragHandle');
+                if (!handle) return;
+                e.preventDefault();
+                const wrapRect = wrap ? wrap.getBoundingClientRect() : { left: 0, top: 0 };
+                const rect = overlay.getBoundingClientRect();
+                stockDepthDragState = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    origLeft: rect.left - wrapRect.left,
+                    origTop: rect.top - wrapRect.top,
+                };
+                document.body.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!stockDepthDragState || !wrap) return;
+                let left = stockDepthDragState.origLeft + (e.clientX - stockDepthDragState.startX);
+                let top = stockDepthDragState.origTop + (e.clientY - stockDepthDragState.startY);
+                left = Math.max(0, Math.min(left, wrap.clientWidth - overlay.offsetWidth));
+                top = Math.max(0, Math.min(top, wrap.clientHeight - 24));
+                overlay.style.left = left + 'px';
+                overlay.style.top = top + 'px';
+                overlay.style.right = 'auto';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!stockDepthDragState) return;
+                stockDepthDragState = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                try {
+                    if (wrap) {
+                        const r = overlay.getBoundingClientRect();
+                        const wrapRect = wrap.getBoundingClientRect();
+                        localStorage.setItem('stock_detail_depth_pos', JSON.stringify({
+                            left: Math.round(r.left - wrapRect.left),
+                            top: Math.round(r.top - wrapRect.top),
+                        }));
+                    }
+                } catch (e) { /* ignore */ }
+            });
+
+            window.addEventListener('resize', restore);
+            restore();
+        }
+
+        function renderStockOrderBookSpread(orderFlowData, currentPrice, wallsData) {
+            const overlay = document.getElementById('stockDetailOrderBookDepthOverlay');
+            if (!overlay) return;
+            initStockDepthSpreadDrag();
+
+            const spreadBins = orderFlowData?.order_book_spread || [];
+            const vp = orderFlowData?.volume_profile || {};
+            const of = orderFlowData?.order_flow || {};
+            const curP = currentPrice || orderFlowData?.current_price || 0;
+
+            const isExpanded = isStockDepthSpreadExpanded;
+            const overlayWidth = isExpanded ? '340px' : '230px';
+            const maxH = isExpanded ? '400px' : 'calc(100% - 35px)';
+            overlay.style.width = overlayWidth;
+            overlay.style.maxHeight = maxH;
+            overlay.style.overflowY = isExpanded ? 'auto' : 'hidden';
+            overlay.style.scrollBehavior = 'smooth';
+            overlay.style.display = isStockDepthSpreadVisible ? 'flex' : 'none';
+
+            if (!spreadBins || spreadBins.length === 0) {
+                const buyW = wallsData?.support_strike || curP * 0.96;
+                const sellW = wallsData?.resistance_strike || curP * 1.04;
+                const maxP = wallsData?.max_pain_strike || vp.poc || curP;
+                overlay.innerHTML = `
+                    <div style="background: rgba(5,5,8,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 0.45rem 0.6rem; font-family: var(--font-mono); font-size: 0.62rem; box-shadow: 0 4px 16px rgba(0,0,0,0.8); pointer-events: auto; backdrop-filter: blur(8px);">
+                        <div id="stockDepthSpreadDragHandle" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.25rem; margin-bottom: 0.35rem; cursor: grab; user-select: none;">
+                            <span style="color: #38bdf8; font-weight: 700;">🧱 Order Book Depth</span>
+                            <span style="color: #94a3b8;">Spot ₹${curP ? curP.toFixed(1) : '—'}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #f87171;">Resistance / Sell:</span>
+                                <span style="color: #fca5a5; font-weight: 700;">₹${Number(sellW).toFixed(1)}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #fde047;">Equilibrium (POC):</span>
+                                <span style="color: #fef08a; font-weight: 700;">₹${Number(maxP).toFixed(1)}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="color: #34d399;">Support / Floor:</span>
+                                <span style="color: #6ee7b7; font-weight: 700;">₹${Number(buyW).toFixed(1)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const sorted = [...spreadBins].sort((a, b) => b.price - a.price);
+            const maxVol = Math.max(1, ...sorted.map(b => b.volume || 1));
+            const buyPct = of.buy_volume_pct != null ? of.buy_volume_pct : 50;
+            const sellPct = of.sell_volume_pct != null ? of.sell_volume_pct : 50;
+            const minVol = isExpanded ? 0 : maxVol * 0.04;
+
+            const sellBins = sorted.filter(b => b.price > curP);
+            const buyBins = sorted.filter(b => b.price <= curP);
+
+            function fmtVol(v) {
+                return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(0) + 'k' : String(v);
+            }
+
+            function makeRow(b) {
+                const isAbove = b.price > curP;
+                const barColor = isAbove ? 'rgba(239,68,68,0.45)' : 'rgba(16,185,129,0.45)';
+                const borderColor = isAbove ? '#ef4444' : '#10b981';
+                const widthPct = Math.min(100, Math.max(8, (b.volume / maxVol) * 100));
+                const isSpot = Math.abs(b.price - curP) < (curP * 0.008);
+
+                let badge = '';
+                if (b.is_call_wall) badge = '<span style="background:#ef4444;color:#fff;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">CALL WALL</span>';
+                else if (b.is_put_wall) badge = '<span style="background:#10b981;color:#fff;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">PUT WALL</span>';
+                else if (b.is_sell_wall) badge = '<span style="background:#ef4444;color:#fff;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">SELL</span>';
+                else if (b.is_buy_wall) badge = '<span style="background:#10b981;color:#fff;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">BUY</span>';
+                else if (b.is_poc) badge = '<span style="background:#f59e0b;color:#000;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">POC</span>';
+                else if (b.is_vah) badge = '<span style="background:#38bdf8;color:#000;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">VAH</span>';
+                else if (b.is_val) badge = '<span style="background:#34d399;color:#000;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">VAL</span>';
+                else if (b.is_max_pain) badge = '<span style="background:#fde047;color:#000;font-size:0.46rem;padding:0 2px;border-radius:2px;font-weight:800;margin-left:2px;">MAX PAIN</span>';
+
+                return `
+                    <div class="bk-depth-row" data-price="${b.price.toFixed(2)}" style="display:flex;align-items:center;justify-content:space-between;height:${isExpanded ? '16px' : '13px'};font-size:${isExpanded ? '0.56rem' : '0.54rem'};position:relative;background:${isSpot ? 'rgba(56,189,248,0.12)' : 'transparent'};border-radius:2px;padding:0 2px;${isSpot ? 'border-left:2px solid #38bdf8;' : ''}" title="${isAbove ? 'ASK' : 'BID'} ₹${b.price.toFixed(1)} | Vol: ${b.volume.toLocaleString()} | Buy: ${(b.buy_volume || 0).toLocaleString()} | Sell: ${(b.sell_volume || 0).toLocaleString()}">
+                        <div style="position:absolute;top:1px;bottom:1px;right:0;width:${widthPct}%;background:${barColor};border-right:2px solid ${borderColor};border-radius:2px;z-index:1;"></div>
+                        <span style="position:relative;z-index:2;color:${isSpot ? '#38bdf8' : isAbove ? '#fca5a5' : '#6ee7b7'};font-weight:${isSpot || b.is_poc || b.is_call_wall ? '700' : '400'};white-space:nowrap;">
+                            ₹${b.price.toFixed(1)}${badge}
+                        </span>
+                        <span style="position:relative;z-index:2;color:#94a3b8;font-size:${isExpanded ? '0.52rem' : '0.50rem'};white-space:nowrap;">
+                            ${fmtVol(b.volume)}
+                        </span>
+                    </div>`;
+            }
+
+            const sellRows = sellBins.filter(b => b.volume >= minVol).map(makeRow).join('');
+            const spotRow = `<div id="stockDepthSpotDivider" style="display:flex;align-items:center;justify-content:center;height:${isExpanded ? '20px' : '16px'};font-size:0.58rem;font-weight:800;color:#38bdf8;background:rgba(56,189,248,0.08);border-top:1px solid rgba(56,189,248,0.35);border-bottom:1px solid rgba(56,189,248,0.35);margin:2px 0;letter-spacing:0.04em;">
+                <span style="display:inline-block;width:6px;height:6px;background:#38bdf8;border-radius:50%;margin-right:4px;"></span>
+                SPOT ₹${curP.toFixed(1)}
+            </div>`;
+            const buyRows = buyBins.filter(b => b.volume >= minVol).map(makeRow).join('');
+
+            const expandIcon = isExpanded ? '↙' : '⤢';
+            const expandLabel = isExpanded ? 'Compact' : 'Expand';
+
+            overlay.innerHTML = `
+                <div style="background:rgba(5,5,8,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:${isExpanded ? '0.45rem 0.55rem' : '0.35rem 0.45rem'};font-family:var(--font-mono);box-shadow:0 4px 16px rgba(0,0,0,0.8);pointer-events:auto;backdrop-filter:blur(8px);">
+                    <div id="stockDepthSpreadDragHandle" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.2rem;margin-bottom:0.25rem;cursor:grab;user-select:none;pointer-events:all;" title="Drag to reposition Depth Spread · × to hide">
+                        <span style="color:#38bdf8;font-weight:700;font-size:0.60rem;">🧱 Depth Spread</span>
+                        <div style="display:flex;align-items:center;gap:6px;pointer-events:all;">
+                            <span style="color:#fbbf24;font-size:0.52rem;">POC: ₹${vp.poc ? Number(vp.poc).toFixed(1) : '—'}</span>
+                            <button type="button" onclick="toggleStockDepthSpreadExpansion()" style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.52rem;padding:1px 5px;border-radius:3px;cursor:pointer;font-family:var(--font-mono);font-weight:700;white-space:nowrap;" title="${expandLabel} depth spread ladder">${expandIcon} ${expandLabel}</button>
+                            <button type="button" onclick="toggleStockDepthSpread()" style="background:transparent;border:none;color:#64748b;font-size:0.62rem;cursor:pointer;padding:0 2px;line-height:1;vertical-align:middle;" title="Close Depth Spread">×</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;height:5px;border-radius:2px;overflow:hidden;margin-bottom:0.3rem;" title="Order Flow: ${buyPct}% Bids vs ${sellPct}% Asks">
+                        <div style="width:${buyPct}%;background:#10b981;"></div>
+                        <div style="width:${sellPct}%;background:#ef4444;"></div>
+                    </div>
+                    ${isExpanded ? '<div style="display:flex;justify-content:space-between;font-size:0.48rem;color:#94a3b8;margin-bottom:4px;padding:0 2px;"><span>▲ ASKS (Sell)</span><span>BIDS (Buy) ▼</span></div>' : ''}
+                    <div style="display:flex;flex-direction:column;gap:1px;">
+                        ${sellRows}
+                        ${spotRow}
+                        ${buyRows}
+                    </div>
+                </div>`;
+
+            if (isExpanded) {
+                setTimeout(() => {
+                    const spotEl = document.getElementById('stockDepthSpotDivider');
+                    if (spotEl) spotEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }, 120);
+            }
+        }
 
         function formatTradingViewSymbol(sym) {
             if (!sym) return 'BSE:SENSEX';
@@ -4875,6 +5422,10 @@
                 if (nexusWrap) nexusWrap.style.display = 'flex';
                 if (nexusControls) nexusControls.style.display = 'flex';
                 initStockDetailChart();
+                if (stockOrderFlowData) {
+                    const curP = (stockState.quote && stockState.quote.current_price) || (stockState.technical && stockState.technical.close) || 0;
+                    renderStockOrderBookSpread(stockOrderFlowData, curP, stockLiquidityData);
+                }
             }
         }
 
@@ -5010,8 +5561,12 @@
             });
 
             await loadStockDetailChartData();
-            if (stockLiquidityData) {
-                applyLiquidityWallPriceLines(stockLiquidityData.support_strike, stockLiquidityData.resistance_strike, stockLiquidityData.max_pain_strike);
+            if (stockLiquidityData || stockOrderFlowData) {
+                const curP = (stockState.quote && stockState.quote.current_price) || (stockState.technical && stockState.technical.close) || 0;
+                applyLiquidityWallPriceLines(stockLiquidityData?.support_strike, stockLiquidityData?.resistance_strike, stockLiquidityData?.max_pain_strike, !!stockLiquidityData);
+                if (stockOrderFlowData) {
+                    renderStockOrderBookSpread(stockOrderFlowData, curP, stockLiquidityData);
+                }
             }
         }
 
@@ -5135,7 +5690,7 @@
         }
 
         // =========================================================================
-        // 🌊 Institutional Buy & Sell Liquidity Walls, Depth Mountain & Price Lines
+        // 🌊 Universal Multi-Tier Liquidity, Volume Profile & Order Flow Terminal
         // =========================================================================
         async function loadStockLiquidityWalls() {
             const cleanSym = ACTIVE_SYM.replace('.NS', '').replace('.BO', '');
@@ -5149,11 +5704,19 @@
             let sentiment = 'NEUTRAL';
             let spotPrice = null;
             let strikesList = [];
+            let orderFlowRes = null;
+            let technicalsRes = null;
 
+            // Parallel fetch: Options Chain, Order Flow / Volume Profile, and Point-in-Time Technicals
             try {
-                const optResp = await fetch(`/api/v1/options/chain?symbol=${encodeURIComponent(cleanSym)}`);
-                if (optResp.ok) {
-                    const optData = await optResp.json();
+                const [optPromise, ofPromise, techPromise] = await Promise.allSettled([
+                    fetch(`/api/v1/options/chain?symbol=${encodeURIComponent(cleanSym)}`),
+                    fetch(`/api/v1/orderflow/${encodeURIComponent(ACTIVE_SYM)}`),
+                    fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`)
+                ]);
+
+                if (optPromise.status === 'fulfilled' && optPromise.value.ok) {
+                    const optData = await optPromise.value.json();
                     if (optData.success && optData.data && (optData.data.status === 'LIVE' || optData.data.status === 'ARCHIVED') && Array.isArray(optData.data.strikes) && optData.data.strikes.length > 0) {
                         isFno = true;
                         const d = optData.data;
@@ -5165,35 +5728,33 @@
                         sentiment = d.sentiment || 'NEUTRAL';
                         spotPrice = d.spot_price;
                         strikesList = d.strikes || [];
-                        if (el('liquiditySourceBadge')) {
-                            el('liquiditySourceBadge').textContent = 'NSE F&O Open Interest Walls';
-                        }
                     }
+                }
+
+                if (ofPromise.status === 'fulfilled' && ofPromise.value.ok) {
+                    orderFlowRes = await ofPromise.value.json();
+                    if (orderFlowRes && orderFlowRes.success) {
+                        stockOrderFlowData = orderFlowRes;
+                    }
+                }
+
+                if (techPromise.status === 'fulfilled' && techPromise.value.ok) {
+                    const techData = await techPromise.value.json();
+                    technicalsRes = techData.technical || {};
                 }
             } catch (e) {
-                console.debug('Option chain lookup fallback:', e);
+                console.debug('Parallel liquidity fetch exception:', e);
             }
 
-            if (!isFno) {
-                try {
-                    const techResp = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`);
-                    if (techResp.ok) {
-                        const techData = await techResp.json();
-                        const t = techData.technical || {};
-                        if (!supportStrike && t.support_level) supportStrike = t.support_level;
-                        if (!resistanceStrike && t.resistance_level) resistanceStrike = t.resistance_level;
-                        if (!spotPrice && t.close) spotPrice = t.close;
-                    }
-                } catch (te) {
-                    console.debug('Technicals fallback failed:', te);
-                }
-                if (el('liquiditySourceBadge')) {
-                    el('liquiditySourceBadge').textContent = '🛡️ Cash Equity · Technical Swing Channels (Non-F&O)';
-                }
+            // Derive current spot price from available telemetry
+            if (!spotPrice && orderFlowRes && orderFlowRes.current_price) {
+                spotPrice = orderFlowRes.current_price;
             }
-
             if (!spotPrice && stockState.quote && stockState.quote.current_price) {
                 spotPrice = stockState.quote.current_price;
+            }
+            if (!spotPrice && technicalsRes && technicalsRes.close) {
+                spotPrice = technicalsRes.close;
             }
             if (!spotPrice && stockState.technical && stockState.technical.close) {
                 spotPrice = stockState.technical.close;
@@ -5202,20 +5763,56 @@
                 spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
             }
 
-            if (el('wallSpotPrice')) el('wallSpotPrice').textContent = spotPrice ? `₹${Number(spotPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
+            const vp = orderFlowRes?.volume_profile || {};
+            const of = orderFlowRes?.order_flow || {};
+            const tech = technicalsRes || stockState.technical || {};
 
+            // Fallback supports/resistances for cash market
+            const primarySupport = supportStrike || (vp.val ? vp.val : (tech.support_level || (spotPrice ? spotPrice * 0.95 : 0)));
+            const primaryResistance = resistanceStrike || (vp.vah ? vp.vah : (tech.resistance_level || (spotPrice ? spotPrice * 1.05 : 0)));
+            const primaryPoc = maxPainStrike || vp.poc || (spotPrice ? spotPrice : 0);
+
+            // Update Header Segment Badge & Spot display
+            if (el('liquiditySourceBadge')) {
+                if (isFno) {
+                    el('liquiditySourceBadge').textContent = '⚡ NSE F&O Options Walls + Order Flow Profile';
+                } else {
+                    el('liquiditySourceBadge').textContent = '🛡️ Cash Equity · Volume Profile (POC/VAH/VAL) + Multi-Tier Channels';
+                }
+            }
+            if (el('wallSpotPrice')) {
+                el('wallSpotPrice').textContent = spotPrice ? `₹${Number(spotPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+            }
+
+            // 1. Evaluate Technical Breakdown & Alert Banner
+            const isBroken = spotPrice && primarySupport && (spotPrice < (primarySupport * 0.998));
+            const banner = el('supportBreakdownAlertBanner');
+            if (banner) {
+                if (isBroken) {
+                    banner.style.display = 'block';
+                    const diffPct = ((spotPrice - primarySupport) / primarySupport * 100).toFixed(1);
+                    if (el('brokenFloorPrice')) el('brokenFloorPrice').textContent = `₹${Number(primarySupport).toFixed(2)}`;
+                    if (el('breakdownDesc')) {
+                        el('breakdownDesc').textContent = `Spot is currently trading ${Math.abs(Number(diffPct))}% below its primary swing floor (₹${Number(primarySupport).toFixed(2)}). Per classical technical polarity, broken support now acts as immediate overhead supply. Showing lower structural defense tiers below.`;
+                    }
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+
+            // 2. Populate 4 KPI Cards (Universal: F&O or Cash Volume Profile)
             if (isFno) {
                 if (el('valBuyWallTitle')) el('valBuyWallTitle').textContent = '🟢 Major Buy Wall (Put OI)';
-                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN')}` : '—';
+                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN')}` : `₹${Number(primarySupport).toFixed(1)}`;
                 if (el('valBuyWallDetail')) el('valBuyWallDetail').textContent = 'Peak Put OI Demand Floor';
 
                 if (el('valSellWallTitle')) el('valSellWallTitle').textContent = '🔴 Major Sell Wall (Call OI)';
-                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN')}` : '—';
-                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = 'Peak Call OI Resistance';
+                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN')}` : `₹${Number(primaryResistance).toFixed(1)}`;
+                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = 'Peak Call OI Overhead Supply';
 
                 if (el('valMaxPainTitle')) el('valMaxPainTitle').textContent = '🟡 Max Pain Equilibrium';
-                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = maxPainStrike ? `₹${Number(maxPainStrike).toLocaleString('en-IN')}` : '—';
-                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Zero-payout strike';
+                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = maxPainStrike ? `₹${Number(maxPainStrike).toLocaleString('en-IN')}` : `₹${Number(primaryPoc).toFixed(1)}`;
+                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Zero-loss strike pinning point';
 
                 if (el('valPcrTitle')) el('valPcrTitle').textContent = '⚖️ Put-Call Ratio (PCR)';
                 if (el('valPcrRatio')) el('valPcrRatio').textContent = pcrVal != null ? Number(pcrVal).toFixed(2) : '—';
@@ -5224,28 +5821,72 @@
                     el('valPcrSentiment').innerHTML = `<span style="color:${sColor};font-weight:700;">${sentiment}</span>`;
                 }
             } else {
-                if (el('valBuyWallTitle')) el('valBuyWallTitle').textContent = '🟢 Technical Support Floor';
-                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
-                if (el('valBuyWallDetail')) el('valBuyWallDetail').textContent = 'Point-in-Time Swing Floor';
+                // Cash Market Equity (Non-F&O)
+                if (el('valBuyWallTitle')) el('valBuyWallTitle').textContent = '🟢 Value Area Low (VAL)';
+                if (el('valBuyWallStrike')) el('valBuyWallStrike').textContent = vp.val ? `₹${Number(vp.val).toFixed(2)}` : (tech.support_level ? `₹${Number(tech.support_level).toFixed(2)}` : `₹${Number(primarySupport).toFixed(2)}`);
+                if (el('valBuyWallDetail')) el('valBuyWallDetail').textContent = '70% Value Area Support Floor';
 
-                if (el('valSellWallTitle')) el('valSellWallTitle').textContent = '🔴 Technical Resistance Ceiling';
-                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
-                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = 'Breakout Pivot Ceiling';
+                if (el('valSellWallTitle')) el('valSellWallTitle').textContent = '🔴 Value Area High (VAH)';
+                if (el('valSellWallStrike')) el('valSellWallStrike').textContent = vp.vah ? `₹${Number(vp.vah).toFixed(2)}` : (tech.resistance_level ? `₹${Number(tech.resistance_level).toFixed(2)}` : `₹${Number(primaryResistance).toFixed(2)}`);
+                if (el('valSellWallDetail')) el('valSellWallDetail').textContent = '70% Value Area Supply Ceiling';
 
-                if (el('valMaxPainTitle')) el('valMaxPainTitle').textContent = '🟡 Max Pain (F&O Only)';
-                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = 'N/A';
-                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Non-F&O Equity';
+                if (el('valMaxPainTitle')) el('valMaxPainTitle').textContent = '🟡 Volume POC Equilibrium';
+                if (el('valMaxPainStrike')) el('valMaxPainStrike').textContent = vp.poc ? `₹${Number(vp.poc).toFixed(2)}` : `₹${Number(primaryPoc).toFixed(2)}`;
+                if (el('valMaxPainDetail')) el('valMaxPainDetail').textContent = 'Point of Highest Traded Volume';
 
-                if (el('valPcrTitle')) el('valPcrTitle').textContent = '⚖️ Derivative PCR';
-                if (el('valPcrRatio')) el('valPcrRatio').textContent = 'N/A';
+                if (el('valPcrTitle')) el('valPcrTitle').textContent = '⚡ Cumulative Delta (CVD)';
+                const cvd = of.cvd != null ? of.cvd : (of.net_delta_volume || 0);
+                const cvdFormatted = Math.abs(cvd) >= 1e6 ? (cvd / 1e6).toFixed(2) + 'M' : Math.abs(cvd) >= 1e3 ? (cvd / 1e3).toFixed(1) + 'k' : String(cvd);
+                if (el('valPcrRatio')) {
+                    el('valPcrRatio').textContent = `${cvd >= 0 ? '+' : ''}${cvdFormatted}`;
+                    el('valPcrRatio').style.color = cvd >= 0 ? '#34d399' : '#f87171';
+                }
                 if (el('valPcrSentiment')) {
-                    el('valPcrSentiment').innerHTML = `<span style="color:#94a3b8;font-weight:600;">Cash Market Only</span>`;
+                    const buyPct = of.buy_volume_pct != null ? of.buy_volume_pct : 50;
+                    const sellPct = of.sell_volume_pct != null ? of.sell_volume_pct : 50;
+                    const flowVerdict = buyPct > 55 ? 'AGGRESSIVE BUYING' : (sellPct > 55 ? 'AGGRESSIVE SELLING' : 'BALANCED FLOW');
+                    const fColor = buyPct > 55 ? '#34d399' : (sellPct > 55 ? '#f87171' : '#94a3b8');
+                    el('valPcrSentiment').innerHTML = `<span style="color:${fColor};font-weight:700;">${flowVerdict} (${buyPct}% Bids)</span>`;
                 }
             }
 
-            renderLiquidityDepthMountain(strikesList, spotPrice, supportStrike, resistanceStrike, isFno);
-            renderLiquidityLadder(strikesList, supportStrike, resistanceStrike, maxPainStrike, isFno);
-            applyLiquidityWallPriceLines(supportStrike, resistanceStrike, isFno ? maxPainStrike : null, isFno);
+            // 3. Populate Multi-Tier Defensive Support Hierarchy Progression
+            const tier1Price = tech.support_level || vp.val || (spotPrice ? spotPrice * 0.96 : 0);
+            const tier2Price = tech.sma_50 || (tech.swing_low_3m ? tech.swing_low_3m : (spotPrice ? spotPrice * 0.91 : 0));
+            const tier3Price = tech.sma_200 || (stockState.quote?.week_52_low ? stockState.quote.week_52_low : (spotPrice ? spotPrice * 0.82 : 0));
+
+            const updateTierCard = (prefix, priceVal, baseDesc) => {
+                const valEl = el(`${prefix}Price`);
+                const statusEl = el(`${prefix}Status`);
+                if (!valEl) return;
+                valEl.textContent = priceVal ? `₹${Number(priceVal).toFixed(2)}` : '—';
+                if (spotPrice && priceVal) {
+                    const diffPct = ((spotPrice - priceVal) / priceVal * 100);
+                    if (diffPct < -0.2) {
+                        statusEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">❌ BROKEN (${Math.abs(diffPct).toFixed(1)}% below)</span> · Flips to Resistance`;
+                    } else if (Math.abs(diffPct) <= 1.5) {
+                        statusEl.innerHTML = `<span style="color:#fbbf24;font-weight:700;">⚡ TESTING NOW (${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%)</span> · Active Pivot`;
+                    } else {
+                        statusEl.innerHTML = `<span style="color:#34d399;font-weight:700;">🛡️ HOLDING (+${diffPct.toFixed(1)}% buffer)</span> · ${baseDesc}`;
+                    }
+                } else {
+                    statusEl.textContent = baseDesc;
+                }
+            };
+
+            updateTierCard('tier1Support', tier1Price, 'Recent 20D Reaction Low');
+            updateTierCard('tier2Support', tier2Price, 'Intermediate Channel Base');
+            updateTierCard('tier3Support', tier3Price, 'Long-term Macro Baseline');
+
+            // 4. Render Mountain & Ladder Visualizations
+            renderLiquidityDepthMountain(strikesList, spotPrice, primarySupport, primaryResistance, isFno, orderFlowRes);
+            renderLiquidityLadder(strikesList, primarySupport, primaryResistance, primaryPoc, isFno, orderFlowRes, tech);
+
+            // 5. Update Lightweight Charts Canvas Overlays & Price Lines
+            applyLiquidityWallPriceLines(primarySupport, primaryResistance, isFno ? primaryPoc : (vp.poc || null), isFno);
+            if (orderFlowRes) {
+                renderStockOrderBookSpread(orderFlowRes, spotPrice, stockLiquidityData);
+            }
         }
 
         function applyLiquidityWallPriceLines(support, resistance, maxPain, isFno) {
@@ -5271,7 +5912,7 @@
                     lineWidth: 2,
                     lineStyle: isFno ? window.LightweightCharts.LineStyle.Dashed : window.LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: isFno ? '🟢 BUY WALL' : `SUPPORT: ₹${Number(support).toFixed(1)}`,
+                    title: isFno ? '🟢 BUY WALL' : `VAL / SUP: ₹${Number(support).toFixed(1)}`,
                 });
             }
             if (resistance) {
@@ -5281,22 +5922,22 @@
                     lineWidth: 2,
                     lineStyle: isFno ? window.LightweightCharts.LineStyle.Dashed : window.LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
-                    title: isFno ? '🔴 SELL WALL' : `RESISTANCE: ₹${Number(resistance).toFixed(1)}`,
+                    title: isFno ? '🔴 SELL WALL' : `VAH / RES: ₹${Number(resistance).toFixed(1)}`,
                 });
             }
-            if (maxPain && isFno) {
+            if (maxPain) {
                 maxPainPriceLine = stockCandleSeries.createPriceLine({
                     price: parseFloat(maxPain),
                     color: '#fbbf24',
                     lineWidth: 1.5,
                     lineStyle: window.LightweightCharts.LineStyle.Dotted,
                     axisLabelVisible: true,
-                    title: '🟡 MAX PAIN',
+                    title: isFno ? '🟡 MAX PAIN' : `POC: ₹${Number(maxPain).toFixed(1)}`,
                 });
             }
         }
 
-        function renderLiquidityDepthMountain(strikes, spotPrice, supportStrike, resistanceStrike, isFno) {
+        function renderLiquidityDepthMountain(strikes, spotPrice, supportStrike, resistanceStrike, isFno, orderFlowRes) {
             const svg = document.getElementById('liquidityDepthSvg');
             if (!svg) return;
 
@@ -5314,154 +5955,326 @@
                 return;
             }
 
+            const el = (id) => document.getElementById(id);
+            const width = 600;
+            const height = 190;
+            const pad = 12;
+
+            // Scenario A: F&O Equity with active strike OI
             let filteredStrikes = isFno ? (strikes || []).filter(s => s.strike && s.strike > spotPrice * 0.75 && s.strike < spotPrice * 1.25) : [];
-            if (!isFno || filteredStrikes.length < 2) {
-                const el = (id) => document.getElementById(id);
-                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(2)}`;
-                if (el('depthMinStrike')) el('depthMinStrike').textContent = supportStrike ? `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
-                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = resistanceStrike ? `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—';
-                const supText = supportStrike ? `Support Floor: ₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Support: —';
-                const resText = resistanceStrike ? `Resistance Ceiling: ₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Resistance: —';
+            if (isFno && filteredStrikes.length >= 2) {
+                filteredStrikes.sort((a, b) => a.strike - b.strike);
+                const minK = filteredStrikes[0].strike;
+                const maxK = filteredStrikes[filteredStrikes.length - 1].strike;
+                const midK = (minK + maxK) / 2;
+
+                if (el('depthMinStrike')) el('depthMinStrike').textContent = `₹${Math.round(minK).toLocaleString('en-IN')}`;
+                if (el('depthMidStrike')) el('depthMidStrike').textContent = `₹${Math.round(midK).toLocaleString('en-IN')}`;
+                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
+                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = `₹${Math.round(maxK).toLocaleString('en-IN')}`;
+
+                const spotX = Math.max(pad, Math.min(width - pad, ((spotPrice - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad));
+
+                const bidStrikes = filteredStrikes.filter(s => s.strike <= spotPrice).reverse();
+                let cumBid = 0;
+                const bidPoints = [];
+                bidStrikes.forEach(s => {
+                    cumBid += (s.put_oi || s.put_vol || 1000);
+                    const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
+                    bidPoints.push({ x, cum: cumBid, strike: s.strike });
+                });
+
+                const askStrikes = filteredStrikes.filter(s => s.strike >= spotPrice);
+                let cumAsk = 0;
+                const askPoints = [];
+                askStrikes.forEach(s => {
+                    cumAsk += (s.call_oi || s.call_vol || 1000);
+                    const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
+                    askPoints.push({ x, cum: cumAsk, strike: s.strike });
+                });
+
+                const maxCum = Math.max(cumBid, cumAsk, 1000);
+                const scaleY = (cum) => height - pad - (cum / maxCum) * (height - 2 * pad - 24);
+
+                const maxBidCum = bidPoints.length ? Math.max(...bidPoints.map(p => p.cum)) : 0;
+                const maxAskCum = askPoints.length ? Math.max(...askPoints.map(p => p.cum)) : 0;
+                const peakBid = bidPoints.find(p => p.cum === maxBidCum) || null;
+                const peakAsk = askPoints.find(p => p.cum === maxAskCum) || null;
+
+                const gridLines = [0.25, 0.5, 0.75].map(frac => {
+                    const y = scaleY(maxCum * frac);
+                    const label = (maxCum * frac / 1000).toFixed(0) + 'K';
+                    return `<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
+                            <text x="${pad - 2}" y="${y + 3}" text-anchor="end" fill="#94a3b8" font-size="8" font-family="monospace">${label}</text>`;
+                }).join('');
+
+                const yAxisLabel = `<text x="${pad - 2}" y="${scaleY(maxCum) + 3}" text-anchor="end" fill="#94a3b8" font-size="8" font-family="monospace">${(maxCum / 1000).toFixed(0)}K</text>`;
+
+                let bidPath = `M ${spotX} ${height - pad}`;
+                bidPoints.forEach(p => { bidPath += ` L ${p.x} ${scaleY(p.cum)}`; });
+                bidPath += ` L ${pad} ${height - pad} Z`;
+
+                let askPath = `M ${spotX} ${height - pad}`;
+                askPoints.forEach(p => { askPath += ` L ${p.x} ${scaleY(p.cum)}`; });
+                askPath += ` L ${width - pad} ${height - pad} Z`;
+
+                const peakBidLabel = peakBid ? `<text x="${Math.max(pad + 4, peakBid.x - 2)}" y="${scaleY(peakBid.cum) - 5}" text-anchor="middle" fill="#10b981" font-size="8" font-family="monospace" font-weight="bold">${(peakBid.cum / 1000).toFixed(1)}K</text>` : '';
+                const peakAskLabel = peakAsk ? `<text x="${Math.min(width - pad - 4, peakAsk.x + 2)}" y="${scaleY(peakAsk.cum) - 5}" text-anchor="middle" fill="#ef4444" font-size="8" font-family="monospace" font-weight="bold">${(peakAsk.cum / 1000).toFixed(1)}K</text>` : '';
+
+                const spotGlowId = 'spotGlow';
+                const buyGradId = 'buyWallGrad';
+                const sellGradId = 'sellWallGrad';
+
                 svg.innerHTML = `
-                    <rect width="600" height="160" fill="rgba(15, 23, 42, 0.4)" rx="6" />
-                    <text x="300" y="60" text-anchor="middle" fill="#38bdf8" font-size="13" font-family="monospace" font-weight="bold">🛡️ Non-F&O Cash Equity Segment · Spot: ₹${Number(spotPrice).toFixed(2)}</text>
-                    <text x="300" y="88" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="monospace">${supText}  ·  ${resText}</text>
-                    <text x="300" y="112" text-anchor="middle" fill="#64748b" font-size="10" font-family="monospace">Options open interest profile not applicable to cash-only securities.</text>
+                    <defs>
+                        <linearGradient id="${buyGradId}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.78"/>
+                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.04"/>
+                        </linearGradient>
+                        <linearGradient id="${sellGradId}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#ef4444" stop-opacity="0.78"/>
+                            <stop offset="100%" stop-color="#ef4444" stop-opacity="0.04"/>
+                        </linearGradient>
+                        <radialGradient id="${spotGlowId}" cx="${spotX}" cy="50%" r="40" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.18"/>
+                            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+                        </radialGradient>
+                    </defs>
+                    <rect x="${pad}" y="${pad}" width="${width - 2 * pad}" height="${height - 2 * pad}" fill="url(#${spotGlowId})" />
+                    ${gridLines}
+                    ${yAxisLabel}
+                    <path d="${bidPath}" fill="url(#${buyGradId})" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 2" />
+                    <path d="${askPath}" fill="url(#${sellGradId})" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 2" />
+                    ${peakBidLabel}
+                    ${peakAskLabel}
+                    <line x1="${spotX}" y1="${pad}" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.75" />
+                    <text x="${spotX}" y="${pad + 10}" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="bold" font-family="monospace">LTP</text>
                 `;
+
+                const fmtK = v => v >= 1000000 ? `${(v / 1000000).toFixed(2)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
+                if (el('depthBuyLabel')) el('depthBuyLabel').textContent = `◀ Buy: ${fmtK(cumBid)} Puts`;
+                if (el('depthSellLabel')) el('depthSellLabel').textContent = `Calls: ${fmtK(cumAsk)} ▶`;
                 return;
             }
 
-            filteredStrikes.sort((a, b) => a.strike - b.strike);
-            const minK = filteredStrikes[0].strike;
-            const maxK = filteredStrikes[filteredStrikes.length - 1].strike;
+            // Scenario B: Cash Market Equity or Fallback -> Render Rich 30-Bin Volume Profile Histogram + Value Area Box + POC Line
+            const vp = orderFlowRes?.volume_profile || {};
+            const bins = orderFlowRes?.order_book_spread || [];
+            const sortedBins = [...bins].sort((a, b) => a.price - b.price);
 
-            const el = (id) => document.getElementById(id);
-            if (el('depthMinStrike')) el('depthMinStrike').textContent = `₹${Math.round(minK).toLocaleString('en-IN')}`;
-            if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${Number(spotPrice).toFixed(1)}`;
-            if (el('depthMaxStrike')) el('depthMaxStrike').textContent = `₹${Math.round(maxK).toLocaleString('en-IN')}`;
+            if (sortedBins.length > 0) {
+                const minP = sortedBins[0].price;
+                const maxP = sortedBins[sortedBins.length - 1].price;
+                const maxVol = Math.max(1, ...sortedBins.map(b => b.volume || 1));
+                const pocP = vp.poc || spotPrice;
+                const vahP = vp.vah || maxP;
+                const valP = vp.val || minP;
 
-            const width = 600;
-            const height = 160;
-            const pad = 10;
+                if (el('depthMinStrike')) el('depthMinStrike').textContent = `₹${minP.toFixed(1)}`;
+                if (el('depthMidStrike')) el('depthMidStrike').textContent = `POC ₹${pocP.toFixed(1)}`;
+                if (el('depthCenterSpot')) el('depthCenterSpot').textContent = `Spot: ₹${spotPrice.toFixed(1)}`;
+                if (el('depthMaxStrike')) el('depthMaxStrike').textContent = `₹${maxP.toFixed(1)}`;
 
-            const spotX = Math.max(pad, Math.min(width - pad, ((spotPrice - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad));
+                const priceToX = (p) => Math.max(pad, Math.min(width - pad, ((p - minP) / (maxP - minP || 1)) * (width - 2 * pad) + pad));
+                const spotX = priceToX(spotPrice);
+                const vahX = priceToX(vahP);
+                const valX = priceToX(valP);
+                const pocX = priceToX(pocP);
 
-            const bidStrikes = filteredStrikes.filter(s => s.strike <= spotPrice).reverse();
-            let cumBid = 0;
-            const bidPoints = [];
-            bidStrikes.forEach(s => {
-                cumBid += (s.put_oi || s.put_vol || 1000);
-                const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
-                bidPoints.push({ x, cum: cumBid, strike: s.strike });
-            });
+                const binWidth = Math.max(3, ((width - 2 * pad) / sortedBins.length) - 2);
 
-            const askStrikes = filteredStrikes.filter(s => s.strike >= spotPrice);
-            let cumAsk = 0;
-            const askPoints = [];
-            askStrikes.forEach(s => {
-                cumAsk += (s.call_oi || s.call_vol || 1000);
-                const x = ((s.strike - minK) / (maxK - minK || 1)) * (width - 2 * pad) + pad;
-                askPoints.push({ x, cum: cumAsk, strike: s.strike });
-            });
+                // 70% Value Area Shading Box
+                const vaBoxLeft = Math.min(valX, vahX);
+                const vaBoxWidth = Math.abs(vahX - valX);
+                const vaBox = `<rect x="${vaBoxLeft}" y="${pad}" width="${vaBoxWidth}" height="${height - 2 * pad}" fill="rgba(56,189,248,0.06)" stroke="rgba(56,189,248,0.2)" stroke-dasharray="2 2" rx="4" />`;
 
-            const maxCum = Math.max(cumBid, cumAsk, 1000);
-            const scaleY = (cum) => height - pad - (cum / maxCum) * (height - 2 * pad - 20);
+                // Volume bars
+                let barsSvg = '';
+                let totalBuyVol = 0;
+                let totalSellVol = 0;
 
-            let bidPath = `M ${spotX} ${height - pad}`;
-            bidPoints.forEach(p => {
-                bidPath += ` L ${p.x} ${scaleY(p.cum)}`;
-            });
-            bidPath += ` L ${pad} ${height - pad} Z`;
+                sortedBins.forEach(b => {
+                    const bx = priceToX(b.price) - (binWidth / 2);
+                    const bHeight = Math.max(4, ((b.volume || 1) / maxVol) * (height - 2 * pad - 20));
+                    const by = height - pad - bHeight;
+                    const isAbove = b.price > spotPrice;
+                    const barColor = isAbove ? 'rgba(239,68,68,0.55)' : 'rgba(16,185,129,0.55)';
+                    const barBorder = isAbove ? '#ef4444' : '#10b981';
+                    const isPoc = Math.abs(b.price - pocP) < ((maxP - minP) / sortedBins.length);
 
-            let askPath = `M ${spotX} ${height - pad}`;
-            askPoints.forEach(p => {
-                askPath += ` L ${p.x} ${scaleY(p.cum)}`;
-            });
-            askPath += ` L ${width - pad} ${height - pad} Z`;
+                    totalBuyVol += (b.buy_volume || b.volume * 0.5);
+                    totalSellVol += (b.sell_volume || b.volume * 0.5);
 
+                    barsSvg += `<rect x="${bx}" y="${by}" width="${binWidth}" height="${bHeight}" fill="${isPoc ? '#f59e0b' : barColor}" stroke="${isPoc ? '#fbbf24' : barBorder}" stroke-width="1" rx="1.5">
+                        <title>₹${b.price.toFixed(1)} | Vol: ${b.volume.toLocaleString()}</title>
+                    </rect>`;
+                });
+
+                // Vertical markers: POC, VAH, VAL, Spot
+                const pocLine = `<line x1="${pocX}" y1="${pad}" x2="${pocX}" y2="${height - pad}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 2" />
+                    <text x="${pocX}" y="${pad + 10}" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold" font-family="monospace">POC</text>`;
+                const vahLine = `<line x1="${vahX}" y1="${pad + 16}" x2="${vahX}" y2="${height - pad}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" />
+                    <text x="${vahX}" y="${pad + 24}" text-anchor="middle" fill="#38bdf8" font-size="8" font-weight="bold" font-family="monospace">VAH</text>`;
+                const valLine = `<line x1="${valX}" y1="${pad + 16}" x2="${valX}" y2="${height - pad}" stroke="#34d399" stroke-width="1.5" stroke-dasharray="2 2" />
+                    <text x="${valX}" y="${pad + 24}" text-anchor="middle" fill="#34d399" font-size="8" font-weight="bold" font-family="monospace">VAL</text>`;
+                const spotLine = `<line x1="${spotX}" y1="${pad}" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" />
+                    <circle cx="${spotX}" cy="${height - pad - 6}" r="3" fill="#38bdf8" />
+                    <text x="${spotX}" y="${height - pad + 10}" text-anchor="middle" fill="#ffffff" font-size="8" font-weight="bold" font-family="monospace">SPOT</text>`;
+
+                svg.innerHTML = `
+                    <defs>
+                        <linearGradient id="vpGridBg" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="rgba(15,23,42,0.6)"/>
+                            <stop offset="100%" stop-color="rgba(5,5,8,0.9)"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="0" y="0" width="${width}" height="${height}" fill="url(#vpGridBg)" rx="6" />
+                    ${vaBox}
+                    ${barsSvg}
+                    ${pocLine}
+                    ${vahLine}
+                    ${valLine}
+                    ${spotLine}
+                `;
+
+                const fmtV = v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : String(Math.round(v));
+                if (el('depthBuyLabel')) el('depthBuyLabel').textContent = `◀ Bid Vol: ${fmtV(totalBuyVol)}`;
+                if (el('depthSellLabel')) el('depthSellLabel').textContent = `Ask Vol: ${fmtV(totalSellVol)} ▶`;
+                return;
+            }
+
+            // Fallback: Clean stylized banner if orderflow API not available
             svg.innerHTML = `
-                <defs>
-                    <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.75"/>
-                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
-                    </linearGradient>
-                    <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.75"/>
-                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
-                    </linearGradient>
-                </defs>
-                <path d="${bidPath}" fill="url(#buyWallGrad)" stroke="#10b981" stroke-width="2" />
-                <path d="${askPath}" fill="url(#sellWallGrad)" stroke="#ef4444" stroke-width="2" />
-                <line x1="${spotX}" y1="10" x2="${spotX}" y2="${height - pad}" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8" />
-                <text x="${spotX}" y="24" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold" font-family="monospace">LTP</text>
+                <rect width="600" height="170" fill="rgba(15, 23, 42, 0.4)" rx="6" />
+                <text x="300" y="65" text-anchor="middle" fill="#38bdf8" font-size="13" font-family="monospace" font-weight="bold">🛡️ Cash Equity Structural Levels · Spot: ₹${Number(spotPrice).toFixed(2)}</text>
+                <text x="300" y="92" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="monospace">Support: ₹${Number(supportStrike || 0).toFixed(2)}  ·  Resistance: ₹${Number(resistanceStrike || 0).toFixed(2)}</text>
+                <text x="300" y="118" text-anchor="middle" fill="#64748b" font-size="10" font-family="monospace">Aggregating historical order flow and price volume profile...</text>
             `;
         }
 
-        function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike, isFno) {
+        function renderLiquidityLadder(strikes, supportStrike, resistanceStrike, maxPainStrike, isFno, orderFlowRes, techRes) {
             const list = document.getElementById('liquidityLevelsList');
             if (!list) return;
 
+            let spotPrice = (stockState.quote && stockState.quote.current_price) || null;
+            if (!spotPrice && stockState.technical && stockState.technical.close) spotPrice = stockState.technical.close;
+            if (!spotPrice && stockChartRawRecords.length > 0) spotPrice = stockChartRawRecords[stockChartRawRecords.length - 1].close;
+
+            const fmtK = v => v >= 1000000 ? `${(v / 1000000).toFixed(2)}M` : v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(Math.round(v));
+            const pctFromSpot = (price) => {
+                if (!spotPrice || !price) return null;
+                return ((price - spotPrice) / spotPrice) * 100;
+            };
+
             const items = [];
+            const vp = orderFlowRes?.volume_profile || {};
+            const tech = techRes || stockState.technical || {};
+
+            let maxOi = 1;
+            if (isFno && Array.isArray(strikes)) {
+                strikes.forEach(s => {
+                    const oi = Math.max(s.put_oi || 0, s.call_oi || 0);
+                    if (oi > maxOi) maxOi = oi;
+                });
+            }
+
             if (isFno) {
                 if (resistanceStrike) {
+                    const oi = (strikes.find(s => s && s.strike === resistanceStrike) || {}).call_oi || 0;
                     items.push({
-                        type: 'SELL_WALL',
-                        label: '🔴 Call OI Sell Wall',
+                        label: '🔴 Call OI Wall (Resistance)',
                         strike: `₹${Number(resistanceStrike).toLocaleString('en-IN')}`,
-                        val: 'Strong Resistance',
+                        oi,
+                        pct: pctFromSpot(resistanceStrike),
                         color: '#f87171',
-                        bg: 'rgba(239,68,68,0.1)',
+                        bg: 'rgba(239,68,68,0.08)',
+                        border: 'rgba(239,68,68,0.25)',
                     });
                 }
                 if (maxPainStrike) {
+                    const oi = (strikes.find(s => s && s.strike === maxPainStrike) || {}).call_oi || 0;
                     items.push({
-                        type: 'MAX_PAIN',
-                        label: '🟡 Max Pain Strike',
+                        label: '🟡 Max Pain (Equilibrium)',
                         strike: `₹${Number(maxPainStrike).toLocaleString('en-IN')}`,
-                        val: 'Neutral Pivot',
+                        oi,
+                        pct: pctFromSpot(maxPainStrike),
                         color: '#fbbf24',
-                        bg: 'rgba(251,191,36,0.1)',
+                        bg: 'rgba(251,191,36,0.07)',
+                        border: 'rgba(251,191,36,0.2)',
                     });
                 }
                 if (supportStrike) {
+                    const oi = (strikes.find(s => s && s.strike === supportStrike) || {}).put_oi || 0;
                     items.push({
-                        type: 'BUY_WALL',
-                        label: '🟢 Put OI Buy Wall',
+                        label: '🟢 Put OI Wall (Support)',
                         strike: `₹${Number(supportStrike).toLocaleString('en-IN')}`,
-                        val: 'Major Demand Floor',
+                        oi,
+                        pct: pctFromSpot(supportStrike),
                         color: '#34d399',
-                        bg: 'rgba(16,185,129,0.1)',
+                        bg: 'rgba(16,185,129,0.07)',
+                        border: 'rgba(16,185,129,0.2)',
                     });
                 }
             } else {
-                if (resistanceStrike) {
+                // Cash Market Equity Ladder
+                if (vp.vah || resistanceStrike) {
+                    const p = vp.vah || resistanceStrike;
                     items.push({
-                        type: 'TECH_RES',
-                        label: '🔴 Technical Resistance Ceiling',
-                        strike: `₹${Number(resistanceStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-                        val: 'Breakout Pivot',
+                        label: '🔴 Value Area High (VAH Supply)',
+                        strike: `₹${Number(p).toFixed(2)}`,
+                        oi: 0,
+                        pct: pctFromSpot(p),
                         color: '#f87171',
                         bg: 'rgba(239,68,68,0.08)',
+                        border: 'rgba(239,68,68,0.25)',
                     });
                 }
-                if (supportStrike) {
+                if (vp.poc || maxPainStrike) {
+                    const p = vp.poc || maxPainStrike;
                     items.push({
-                        type: 'TECH_SUP',
-                        label: '🟢 Technical Support Floor',
-                        strike: `₹${Number(supportStrike).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-                        val: 'Demand Baseline',
-                        color: '#34d399',
-                        bg: 'rgba(16,185,129,0.08)',
+                        label: '🟡 Volume POC (High-Liquidity Magnet)',
+                        strike: `₹${Number(p).toFixed(2)}`,
+                        oi: 0,
+                        pct: pctFromSpot(p),
+                        color: '#fbbf24',
+                        bg: 'rgba(251,191,36,0.07)',
+                        border: 'rgba(251,191,36,0.2)',
                     });
                 }
-                items.push({
-                    type: 'FNO_STATUS',
-                    label: '🛡️ Equity Derivatives Status',
-                    strike: 'Not in F&O',
-                    val: 'Cash Market Only',
-                    color: '#94a3b8',
-                    bg: 'rgba(148,163,184,0.06)',
-                });
+                if (vp.val || supportStrike) {
+                    const p = vp.val || supportStrike;
+                    items.push({
+                        label: '🟢 Value Area Low (VAL Support)',
+                        strike: `₹${Number(p).toFixed(2)}`,
+                        oi: 0,
+                        pct: pctFromSpot(p),
+                        color: '#34d399',
+                        bg: 'rgba(16,185,129,0.07)',
+                        border: 'rgba(16,185,129,0.2)',
+                    });
+                }
+                if (tech.sma_50) {
+                    items.push({
+                        label: '🛡️ 50-DMA Intermediate Base',
+                        strike: `₹${Number(tech.sma_50).toFixed(2)}`,
+                        oi: 0,
+                        pct: pctFromSpot(tech.sma_50),
+                        color: '#38bdf8',
+                        bg: 'rgba(56,189,248,0.06)',
+                        border: 'rgba(56,189,248,0.2)',
+                    });
+                }
+                if (tech.sma_200) {
+                    items.push({
+                        label: '🏛️ 200-DMA Macro Bedrock',
+                        strike: `₹${Number(tech.sma_200).toFixed(2)}`,
+                        oi: 0,
+                        pct: pctFromSpot(tech.sma_200),
+                        color: '#818cf8',
+                        bg: 'rgba(129,140,248,0.06)',
+                        border: 'rgba(129,140,248,0.2)',
+                    });
+                }
             }
 
             if (items.length === 0) {
@@ -5469,17 +6282,27 @@
                 return;
             }
 
-            list.innerHTML = items.map(item => `
-                <div style="display: flex; justify-content: space-between; align-items: center; background: ${item.bg}; border: 1px solid rgba(255,255,255,0.05); padding: 0.35rem 0.65rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem;">
-                    <div style="display: flex; align-items: center; gap: 0.4rem;">
-                        <span style="color: ${item.color}; font-weight: 700;">${item.label}</span>
+            list.innerHTML = items.map(item => {
+                const pctBadge = item.pct !== null
+                    ? `<span style="font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${item.color}22;color:${item.color};border:1px solid ${item.color}44;font-family:var(--font-mono);white-space:nowrap;">${item.pct > 0 ? '+' : ''}${item.pct.toFixed(1)}%</span>`
+                    : '';
+                const oiLabel = item.oi > 0 ? `<span style="font-size:0.62rem;color:#94a3b8;font-weight:600;">${fmtK(item.oi)} Contracts</span>` : '';
+                const barWidth = item.oi > 0 && maxOi > 1 ? `${Math.min(100, Math.max(12, (item.oi / maxOi) * 100))}%` : (item.pct !== null ? `${Math.max(15, Math.min(85, 100 - Math.abs(item.pct) * 5))}%` : '40%');
+                return `
+                <div style="position:relative;background:${item.bg};border:1px solid ${item.border};border-left:3px solid ${item.color};border-radius:6px;padding:0.42rem 0.65rem;overflow:hidden;font-family:var(--font-mono);transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;cursor:default;"
+                     onmouseenter="this.style.transform='translateX(3px)'; this.style.borderColor='${item.color}'; this.style.boxShadow='0 3px 10px rgba(0,0,0,0.35)';"
+                     onmouseleave="this.style.transform='translateX(0)'; this.style.borderColor='${item.border}'; this.style.boxShadow='none';">
+                    <div style="position:absolute;top:0;left:0;bottom:0;width:${barWidth};background:${item.color}1c;border-right:1px solid ${item.color}35;pointer-events:none;"></div>
+                    <div style="position:relative;display:flex;justify-content:space-between;align-items:center;gap:0.35rem;">
+                        <span style="font-size:0.7rem;color:${item.color};font-weight:700;">${item.label}</span>
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex-shrink:0;">
+                            <span style="font-size:0.8rem;font-weight:800;color:#e2e8f0;">${item.strike}</span>
+                            ${pctBadge}
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <span style="font-weight: 800; color: #ffffff;">${item.strike}</span>
-                        <span style="font-size: 0.65rem; color: #94a3b8;">${item.val}</span>
-                    </div>
-                </div>
-            `).join('');
+                    ${oiLabel ? `<div style="position:relative;margin-top:0.15rem;font-size:0.6rem;color:#94a3b8;">${oiLabel}</div>` : ''}
+                </div>`;
+            }).join('');
         }
 
         document.addEventListener('DOMContentLoaded', () => {

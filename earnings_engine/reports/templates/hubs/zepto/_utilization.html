@@ -1,0 +1,166 @@
+<!-- Manpower Utilization & Picking Productivity (IPP) Subtab Partial -->
+<div class="space-y-3">
+    <!-- Header Banner -->
+    <div class="glass-panel p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-lg">⚡</span>
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Manpower Utilization & IPP</h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                    Productivity Forensics
+                </span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+                Track Items Per Person-Hour (IPP), active pick hours vs. idle hours, and flex labor costs.
+            </p>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Active Month Badge Indicator -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Scope:</span>
+                <span id="utilActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
+            </div>
+
+            <button
+                type="button"
+                onclick="zeptoApp.loadUtilization()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+            >
+                <span>🔄</span> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Metric Cards Grid -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <!-- Total Items Picked -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Items Picked</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="utilTotalItems">--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Dark Store Outbound Volume</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Active Picker Pool:</span>
+                <span class="font-mono font-bold text-slate-300" id="utilActivePickers">--</span>
+            </div>
+        </div>
+
+        <!-- Average Store IPP -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average IPP</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">Benchmark: 120+</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="utilAvgIpp">--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Items / Active Person-Hour</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Punctuality Adherence:</span>
+                <span class="font-mono font-bold text-emerald-400">98.4%</span>
+            </div>
+        </div>
+
+        <!-- Active vs Idle Hours -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Floor Hours Breakdown</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="utilActiveHours">-- hrs</div>
+                <div class="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
+                    <span>Idle Hours: <strong class="text-rose-400 font-mono" id="utilIdleHours">0 hrs</strong></span>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Floor Utilization Rate:</span>
+                <span class="font-mono font-bold text-slate-200" id="utilFloorEfficiency">--%</span>
+            </div>
+        </div>
+
+        <!-- Flex Labor Cost -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Flex Labor Payouts</span>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-white tracking-tight" id="utilFlexLaborCost">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Direct Shift Compensation</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Cost Per Item:</span>
+                <span class="font-mono font-bold text-slate-300" id="utilCostPerItem">₹-- / item</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Staff Utilization Roster Matrix -->
+    <section class="glass-panel p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Utilization & IPP Roster</h4>
+                <p class="text-[10px] text-slate-400">Real-time productivity, picking speed, and active shifts for current working roster.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="utilActiveStaffBadge">
+                0 Active Staff
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2 px-3">Employee Name</th>
+                        <th class="py-2 px-3">Role Profile</th>
+                        <th class="py-2 px-3 text-center">Status</th>
+                        <th class="py-2 px-3 text-right">Items Picked</th>
+                        <th class="py-2 px-3 text-right">Active Pick Hrs</th>
+                        <th class="py-2 px-3 text-right">IPP Throughput</th>
+                        <th class="py-2 px-3 text-center">Productivity Tier</th>
+                        <th class="py-2 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="utilActiveStaffTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading active staff utilization roster...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Utilization Table -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider">Picker Productivity & Shift Ledger</h4>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="utilRecordCountBadge">
+                0 records
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Date</th>
+                        <th class="py-2.5 px-3">Employee</th>
+                        <th class="py-2.5 px-3">Role</th>
+                        <th class="py-2.5 px-3 text-right">Items Picked</th>
+                        <th class="py-2.5 px-3 text-right">Active Hours</th>
+                        <th class="py-2.5 px-3 text-right">Idle Hours</th>
+                        <th class="py-2.5 px-3 text-right">IPP Speed</th>
+                        <th class="py-2.5 px-3 text-right">Flex Labor Cost</th>
+                    </tr>
+                </thead>
+                <tbody id="utilTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-8 text-slate-500 text-xs">
+                            Loading manpower utilization metrics...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
