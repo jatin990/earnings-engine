@@ -18,7 +18,7 @@ import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.providers.provider_manager import get_data_manager
-from earnings_engine.data.universe import is_fno_eligible
+from earnings_engine.data.universe import is_fno_eligible, resolve_fno_symbol
 
 logger = logging.getLogger("earnings_engine.data.option_chain")
 
@@ -177,7 +177,7 @@ def analyze_option_chain(
       - strikes: Formatted list of strike dictionaries for table & chart
       - status: 'LIVE' | 'ARCHIVED' | 'NOT_FNO' | 'OFFLINE'
     """
-    clean_symbol = symbol.upper().replace(".NS", "")
+    clean_symbol = resolve_fno_symbol(symbol) or symbol.upper().replace(".NS", "").strip()
     cache_key = f"{clean_symbol}:{expiry_date or 'default'}:{strike_range or 'all'}"
 
     # Fast return from TTL cache unless force_refresh requested

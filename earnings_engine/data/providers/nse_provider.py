@@ -44,29 +44,69 @@ NSE_INDEX_MAP: dict[str, str] = {
     "FINNIFTY": "NIFTY FINANCIAL SERVICES",
     "NIFTY FIN SERVICE": "NIFTY FINANCIAL SERVICES",
     "NIFTY FINANCIAL SERVICES": "NIFTY FINANCIAL SERVICES",
+    "NIFTY_FIN_SERVICE": "NIFTY FINANCIAL SERVICES",
     "MIDCPNIFTY": "NIFTY MIDCAP SELECT",
     "NIFTY MIDCAP SELECT": "NIFTY MIDCAP SELECT",
+    "NIFTY_MID_SELECT": "NIFTY MIDCAP SELECT",
     "^NSEMDCP50": "NIFTY MIDCAP 50",
     "NIFTY MIDCAP 50": "NIFTY MIDCAP 50",
+    "NIFTY_MIDCAP_50": "NIFTY MIDCAP 50",
     "NIFTY MIDCAP 100": "NIFTY MIDCAP 100",
+    "NIFTY_MIDCAP_100": "NIFTY MIDCAP 100",
     "NIFTY MIDCAP 150": "NIFTY MIDCAP 150",
     "NIFTY SMALLCAP 50": "NIFTY SMALLCAP 50",
     "NIFTY SMALLCAP 100": "NIFTY SMALLCAP 100",
+    "^CNXSC": "NIFTY SMALLCAP 100",
     "NIFTY SMALLCAP 250": "NIFTY SMALLCAP 250",
     "NIFTY NEXT 50": "NIFTY NEXT 50",
     "NIFTYNXT50": "NIFTY NEXT 50",
+    "NIFTY_NEXT_50": "NIFTY NEXT 50",
+    "^CNXAUTO": "NIFTY AUTO",
     "NIFTY AUTO": "NIFTY AUTO",
+    "NIFTY_AUTO": "NIFTY AUTO",
+    "^CNXPHARMA": "NIFTY PHARMA",
     "NIFTY PHARMA": "NIFTY PHARMA",
+    "NIFTY_PHARMA": "NIFTY PHARMA",
+    "^CNXMETAL": "NIFTY METAL",
     "NIFTY METAL": "NIFTY METAL",
+    "NIFTY_METAL": "NIFTY METAL",
+    "^CNXFMCG": "NIFTY FMCG",
     "NIFTY FMCG": "NIFTY FMCG",
+    "NIFTY_FMCG": "NIFTY FMCG",
+    "^CNXENERGY": "NIFTY ENERGY",
     "NIFTY ENERGY": "NIFTY ENERGY",
+    "NIFTY_ENERGY": "NIFTY ENERGY",
+    "^CNXREALTY": "NIFTY REALTY",
+    "NIFTY REALTY": "NIFTY REALTY",
+    "NIFTY_REALTY": "NIFTY REALTY",
+    "^CNXINFRA": "NIFTY INFRA",
     "NIFTY INFRA": "NIFTY INFRA",
+    "NIFTY_INFRA": "NIFTY INFRA",
+    "^CNXPSE": "NIFTY PSE",
     "NIFTY PSE": "NIFTY PSE",
+    "NIFTY_PSE": "NIFTY PSE",
+    "^CNXPSUBANK": "NIFTY PSU BANK",
     "NIFTY PSU BANK": "NIFTY PSU BANK",
+    "NIFTY_PSU_BANK": "NIFTY PSU BANK",
     "NIFTY PRIVATE BANK": "NIFTY PRIVATE BANK",
+    "NIFTY_PRIVATE_BANK": "NIFTY PRIVATE BANK",
+    "^CNXMEDIA": "NIFTY MEDIA",
+    "NIFTY MEDIA": "NIFTY MEDIA",
+    "NIFTY_MEDIA": "NIFTY MEDIA",
+    "^CNXCOMMODITIES": "NIFTY COMMODITIES",
+    "NIFTY COMMODITIES": "NIFTY COMMODITIES",
+    "^CNXCONSUMPTION": "NIFTY CONSUMPTION",
+    "NIFTY CONSUMPTION": "NIFTY CONSUMPTION",
+    "^CNXMNC": "NIFTY MNC",
+    "NIFTY MNC": "NIFTY MNC",
+    "^CNXSERVICE": "NIFTY SERVICES SECTOR",
+    "NIFTY SERVICES SECTOR": "NIFTY SERVICES SECTOR",
     "NIFTY 100": "NIFTY 100",
+    "NIFTY_100": "NIFTY 100",
     "NIFTY 200": "NIFTY 200",
+    "NIFTY_200": "NIFTY 200",
     "NIFTY 500": "NIFTY 500",
+    "NIFTY_500": "NIFTY 500",
     "^CRSLDX": "NIFTY 500",
     "INDIA VIX": "INDIA VIX",
     "INDIAVIX": "INDIA VIX",
@@ -554,8 +594,8 @@ class NSEDirectProvider(DataProvider):
 
     def fetch_option_chain(self, symbol: str, expiry_date: str | None = None) -> dict[str, Any]:
         """Fetch real-time / archival Option Chain data for an equity or index."""
-        clean_symbol = symbol.upper().replace(".NS", "")
-        from earnings_engine.data.universe import is_fno_eligible
+        from earnings_engine.data.universe import is_fno_eligible, resolve_fno_symbol
+        clean_symbol = resolve_fno_symbol(symbol) or symbol.upper().replace(".NS", "").strip()
         if not is_fno_eligible(clean_symbol):
             logger.debug("[NSE:FNO_BYPASS] Symbol %s is not F&O eligible; skipping option chain network request", clean_symbol)
             return {
@@ -577,7 +617,7 @@ class NSEDirectProvider(DataProvider):
                     pass
 
                 # Handle indices vs equities
-                is_index = clean_symbol in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY") or clean_symbol.startswith("NIFTY")
+                is_index = clean_symbol in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50") or clean_symbol.startswith("NIFTY")
                 if is_index:
                     raw_chain = nse.index_option_chain(clean_symbol)
                 else:

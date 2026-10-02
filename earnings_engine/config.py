@@ -227,11 +227,21 @@ def market_of(ticker: str) -> str:
         return "IN"
     if sym.startswith("BSE:") or sym.startswith("NSE:"):
         return "IN"
+    if sym.startswith("^NSE") or sym.startswith("^CNX") or sym.startswith("^BSESN") or sym.startswith("^INDIAVIX"):
+        return "IN"
+    if sym.startswith("^GSPC") or sym.startswith("^IXIC") or sym.startswith("^DJI") or sym.startswith("^NDX") or sym.startswith("^RUT") or sym.startswith("^VIX"):
+        return "US"
     # Known NSE & BSE Indian indices
     index_names = {
         "NIFTY", "NIFTY50", "NIFTY 50", "BANKNIFTY", "NIFTY BANK",
         "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYIT", "NIFTY IT",
-        "^NSEI", "^NSEBANK", "^CNXIT", "^CNXFIN",
+        "NIFTY AUTO", "NIFTY PHARMA", "NIFTY METAL", "NIFTY FMCG", "NIFTY ENERGY",
+        "NIFTY REALTY", "NIFTY INFRA", "NIFTY PSE", "NIFTY PSU BANK", "NIFTY PRIVATE BANK",
+        "NIFTY MEDIA", "NIFTY SMALLCAP", "NIFTY SMALLCAP 100", "NIFTY MIDCAP 50", "NIFTY MIDCAP 100",
+        "NIFTY 100", "NIFTY 200", "NIFTY 500", "INDIA VIX", "INDIAVIX",
+        "^NSEI", "^NSEBANK", "^CNXIT", "^CNXFIN", "^CNXAUTO", "^CNXPHARMA", "^CNXMETAL",
+        "^CNXFMCG", "^CNXENERGY", "^CNXREALTY", "^CNXINFRA", "^CNXPSE", "^CNXPSUBANK",
+        "^CNXMEDIA", "^CNXSC", "^CRSLDX", "^INDIAVIX",
         "SENSEX", "BSESENSEX", "^BSESN", "BSE:SENSEX", "BSE100", "BSE200", "BSE500",
         "BSEBANK", "BSEAUTO", "BSEIT", "BSEFMCG", "BSEPOWER", "BSEMETAL", "BSEHEALTHCARE",
         "BSECAP", "BSEMIDCAP", "BSESMALLCAP",

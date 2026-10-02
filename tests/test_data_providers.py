@@ -63,8 +63,61 @@ class TestDataProviders:
         assert resolve_nse_index_name("NIFTY IT") == "NIFTY IT"
         assert resolve_nse_index_name("^CNXFIN") == "NIFTY FINANCIAL SERVICES"
         assert resolve_nse_index_name("FINNIFTY") == "NIFTY FINANCIAL SERVICES"
+        assert resolve_nse_index_name("^CNXAUTO") == "NIFTY AUTO"
+        assert resolve_nse_index_name("^CNXPHARMA") == "NIFTY PHARMA"
+        assert resolve_nse_index_name("^CNXENERGY") == "NIFTY ENERGY"
+        assert resolve_nse_index_name("^CNXMETAL") == "NIFTY METAL"
+        assert resolve_nse_index_name("^CNXREALTY") == "NIFTY REALTY"
+        assert resolve_nse_index_name("^CNXPSUBANK") == "NIFTY PSU BANK"
+        assert resolve_nse_index_name("^INDIAVIX") == "INDIA VIX"
         assert resolve_nse_index_name("INFY.NS") is None
         assert resolve_nse_index_name("RELIANCE") is None
+
+    def test_resolve_fno_symbol_and_is_fno_eligible(self) -> None:
+        from earnings_engine.data.universe import is_fno_eligible, resolve_fno_symbol
+
+        # Indices
+        assert resolve_fno_symbol("^NSEBANK") == "BANKNIFTY"
+        assert resolve_fno_symbol("BANKNIFTY") == "BANKNIFTY"
+        assert resolve_fno_symbol("NIFTY BANK") == "BANKNIFTY"
+        assert resolve_fno_symbol("^NSEI") == "NIFTY"
+        assert resolve_fno_symbol("NIFTY 50") == "NIFTY"
+        assert resolve_fno_symbol("^CNXFIN") == "FINNIFTY"
+        assert resolve_fno_symbol("FINNIFTY") == "FINNIFTY"
+        assert resolve_fno_symbol("MIDCPNIFTY") == "MIDCPNIFTY"
+
+        # F&O Eligibility checks
+        assert is_fno_eligible("^NSEBANK") is True
+        assert is_fno_eligible("BANKNIFTY") is True
+        assert is_fno_eligible("NIFTY BANK") is True
+        assert is_fno_eligible("^NSEI") is True
+        assert is_fno_eligible("NIFTY 50") is True
+        assert is_fno_eligible("NIFTY") is True
+        assert is_fno_eligible("RELIANCE") is True
+        assert is_fno_eligible("RELIANCE.NS") is True
+        assert is_fno_eligible("TCS.NS") is True
+        assert is_fno_eligible("UNKNOWN_NON_FNO_STOCK") is False
+        assert is_fno_eligible("") is False
+
+    def test_non_nse_index_bypass(self) -> None:
+        """Verify non-NSE tickers like ^GSPC or ^IXIC do not invoke stock_df/index_df and return empty."""
+        provider = NSEDirectProvider()
+        df = provider.fetch_ohlcv("^GSPC", start_date="2026-09-25", end_date="2026-10-02")
+        assert df.empty
+        q = provider.fetch_quote("^GSPC")
+        assert q["price"] is None
+
+    def test_yfinance_provider_normalization(self) -> None:
+        p = YFinanceProvider()
+        assert p._normalize_symbol("NIFTY") == "^NSEI"
+        assert p._normalize_symbol("BANKNIFTY") == "^NSEBANK"
+        assert p._normalize_symbol("NIFTY AUTO") == "^CNXAUTO"
+        assert p._normalize_symbol("NIFTY PHARMA") == "^CNXPHARMA"
+        assert p._normalize_symbol("SENSEX") == "^BSESN"
+        assert p._normalize_symbol("^GSPC") == "^GSPC"
+        assert p._normalize_symbol("AAPL") == "AAPL"
+        assert p._normalize_symbol("RELIANCE") == "RELIANCE.NS"
+        assert p._normalize_symbol("RELIANCE.NS") == "RELIANCE.NS"
 
     def test_fetch_ohlcv_routes_index_without_stock_df(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ^NSEBANK is routed to index data and does not call equity stock_df."""
@@ -181,6 +234,15 @@ class TestOptionChainAnalytics:
         assert market_of("LICHSGFIN") == "IN"  # Bare NSE F&O underlying
         assert market_of("NIFTY") == "IN"
         assert market_of("BANKNIFTY") == "IN"
+        assert market_of("^NSEBANK") == "IN"
+        assert market_of("^CNXAUTO") == "IN"
+        assert market_of("^CNXPHARMA") == "IN"
+        assert market_of("^INDIAVIX") == "IN"
+        assert market_of("SENSEX") == "IN"
+        assert market_of("^BSESN") == "IN"
+        assert market_of("^GSPC") == "US"
+        assert market_of("^IXIC") == "US"
+        assert market_of("^DJI") == "US"
         assert market_of("AAPL") == "US"
         assert market_of("MSFT") == "US"
 

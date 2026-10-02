@@ -133,6 +133,43 @@ _SEED_NSE_FNO = [
     "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZEEL", "ZYDUSLIFE"
 ]
 
+FNO_INDEX_ALIASES: dict[str, str] = {
+    "^NSEI": "NIFTY",
+    "NIFTY": "NIFTY",
+    "NIFTY50": "NIFTY",
+    "NIFTY 50": "NIFTY",
+    "NIFTY_50": "NIFTY",
+    "^NSEBANK": "BANKNIFTY",
+    "BANKNIFTY": "BANKNIFTY",
+    "NIFTYBANK": "BANKNIFTY",
+    "NIFTY BANK": "BANKNIFTY",
+    "NIFTY_BANK": "BANKNIFTY",
+    "^CNXFIN": "FINNIFTY",
+    "FINNIFTY": "FINNIFTY",
+    "NIFTY FIN SERVICE": "FINNIFTY",
+    "NIFTY FINANCIAL SERVICES": "FINNIFTY",
+    "MIDCPNIFTY": "MIDCPNIFTY",
+    "NIFTY MIDCAP SELECT": "MIDCPNIFTY",
+    "NIFTY_MID_SELECT": "MIDCPNIFTY",
+    "NIFTYNXT50": "NIFTYNXT50",
+    "NIFTY NEXT 50": "NIFTYNXT50",
+    "NIFTY_NEXT_50": "NIFTYNXT50",
+}
+
+
+def resolve_fno_symbol(ticker: str) -> str:
+    """Normalize index names, aliases, and ticker suffixes to canonical NSE F&O underlying symbol."""
+    if not ticker:
+        return ""
+    clean = str(ticker).upper().strip()
+    if clean in FNO_INDEX_ALIASES:
+        return FNO_INDEX_ALIASES[clean]
+    clean_no_ns = clean.replace(".NS", "").strip()
+    if clean_no_ns in FNO_INDEX_ALIASES:
+        return FNO_INDEX_ALIASES[clean_no_ns]
+    return clean_no_ns
+
+
 _FNO_NORMALIZED_SET: set[str] = set()
 
 
@@ -140,13 +177,11 @@ def is_fno_eligible(ticker: str) -> bool:
     """Check if a ticker or symbol is eligible for NSE Derivatives (F&O).
 
     Fast in-memory lookup (<0.01ms). Normalizes ticker symbol (removes .NS suffix,
-    converts to uppercase, trims whitespace).
+    resolves index aliases, converts to uppercase, trims whitespace).
     """
     if not ticker:
         return False
-    clean = str(ticker).upper().strip()
-    if clean.endswith(".NS"):
-        clean = clean[:-3]
+    clean = resolve_fno_symbol(ticker)
     global _FNO_NORMALIZED_SET
     if not _FNO_NORMALIZED_SET:
         _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
