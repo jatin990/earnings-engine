@@ -1128,6 +1128,18 @@
             }
         }
 
+        .liquidity-depth-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
+            gap: 0.85rem;
+            align-items: stretch;
+        }
+        @media (max-width: 860px) {
+            .liquidity-depth-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Sidebar Card */
         .sidebar-card {
             background: linear-gradient(180deg, #0e1019 0%, #08090f 100%);
@@ -1611,31 +1623,31 @@
                 </div>
 
                 <!-- Interactive SVG Volume Profile Histogram & Key Liquidity Levels Ladder -->
-                <div style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr); gap: 0.85rem; align-items: stretch;">
+                <div class="liquidity-depth-grid">
                     <!-- Left: Volume Profile & Value Area Distribution (SVG) -->
                     <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.85rem; display: flex; flex-direction: column; justify-content: space-between;">
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap;">
-                            <span id="depthBuyLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: #34d399; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); padding: 0.15rem 0.5rem; border-radius: 4px;">◀ Buy Volume (Bids)</span>
+                            <span id="depthBuyLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-bullish, #34d399); background: var(--color-bullish-bg, rgba(52, 211, 153, 0.10)); border: 1px solid var(--color-bullish-border, rgba(52, 211, 153, 0.24)); padding: 0.15rem 0.5rem; border-radius: 4px;">◀ Buy Volume (Bids)</span>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.68rem;">
                                 <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #fbbf24;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #fbbf24;"></span>POC</span>
                                 <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #38bdf8;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>VAH</span>
                                 <span style="display: inline-flex; align-items: center; gap: 0.2rem; color: #34d399;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399;"></span>VAL</span>
                             </div>
-                            <span id="depthSellLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: #f87171; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); padding: 0.15rem 0.5rem; border-radius: 4px;">Sell Volume (Asks) ▶</span>
+                            <span id="depthSellLabel" style="font-size: 0.68rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-bearish, #fb7185); background: var(--color-bearish-bg, rgba(251, 113, 133, 0.10)); border: 1px solid var(--color-bearish-border, rgba(251, 113, 133, 0.24)); padding: 0.15rem 0.5rem; border-radius: 4px;">Sell Volume (Asks) ▶</span>
                         </div>
                         <div id="depthSvgContainer" style="width: 100%; height: 210px; position: relative;">
-                            <svg id="liquidityDepthSvg" width="100%" height="100%" viewBox="0 0 600 210" preserveAspectRatio="none" style="overflow: visible;">
+                            <svg id="liquidityDepthSvg" width="100%" height="100%" viewBox="0 0 600 210" preserveAspectRatio="none" role="img" aria-label="Institutional liquidity distribution and volume profile depth chart" style="overflow: visible;">
                                 <defs>
                                     <linearGradient id="buyWallGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.65"/>
-                                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.05"/>
+                                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.78"/>
+                                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.04"/>
                                     </linearGradient>
                                     <linearGradient id="sellWallGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.65"/>
-                                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05"/>
+                                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.78"/>
+                                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.04"/>
                                     </linearGradient>
                                 </defs>
-                                <text x="300" y="90" text-anchor="middle" fill="#64748b" font-size="12" font-family="monospace">Synthesizing volume profile &amp; order book depth...</text>
+                                <text x="300" y="90" text-anchor="middle" fill="#94a3b8" font-size="12" font-family="monospace">Synthesizing volume profile &amp; order book depth...</text>
                             </svg>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #64748b; font-family: var(--font-mono); margin-top: 0.35rem;">
@@ -1652,7 +1664,7 @@
                             <span>Key Structural Levels</span>
                             <span style="font-size: 0.65rem; color: #64748b;">% from Spot</span>
                         </div>
-                        <div id="liquidityLevelsList" style="display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow-y: auto; max-height: 220px;">
+                        <div id="liquidityLevelsList" role="region" aria-live="polite" aria-atomic="true" style="display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow-y: auto; max-height: 220px;">
                             <div style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 1rem;">Loading structural ladder...</div>
                         </div>
                     </div>
@@ -6110,10 +6122,10 @@
                     const y = scaleY(maxCum * frac);
                     const label = (maxCum * frac / 1000).toFixed(0) + 'K';
                     return `<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-                            <text x="${pad - 2}" y="${y + 3}" text-anchor="end" fill="#475569" font-size="8" font-family="monospace">${label}</text>`;
+                            <text x="${pad - 2}" y="${y + 3}" text-anchor="end" fill="#94a3b8" font-size="8" font-family="monospace">${label}</text>`;
                 }).join('');
 
-                const yAxisLabel = `<text x="${pad - 2}" y="${scaleY(maxCum) + 3}" text-anchor="end" fill="#475569" font-size="8" font-family="monospace">${(maxCum / 1000).toFixed(0)}K</text>`;
+                const yAxisLabel = `<text x="${pad - 2}" y="${scaleY(maxCum) + 3}" text-anchor="end" fill="#94a3b8" font-size="8" font-family="monospace">${(maxCum / 1000).toFixed(0)}K</text>`;
 
                 let bidPath = `M ${spotX} ${height - pad}`;
                 bidPoints.forEach(p => { bidPath += ` L ${p.x} ${scaleY(p.cum)}`; });
@@ -6275,6 +6287,14 @@
             const vp = orderFlowRes?.volume_profile || {};
             const tech = techRes || stockState.technical || {};
 
+            let maxOi = 1;
+            if (isFno && Array.isArray(strikes)) {
+                strikes.forEach(s => {
+                    const oi = Math.max(s.put_oi || 0, s.call_oi || 0);
+                    if (oi > maxOi) maxOi = oi;
+                });
+            }
+
             if (isFno) {
                 if (resistanceStrike) {
                     const oi = (strikes.find(s => s && s.strike === resistanceStrike) || {}).call_oi || 0;
@@ -6383,17 +6403,21 @@
                 const pctBadge = item.pct !== null
                     ? `<span style="font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${item.color}22;color:${item.color};border:1px solid ${item.color}44;font-family:var(--font-mono);white-space:nowrap;">${item.pct > 0 ? '+' : ''}${item.pct.toFixed(1)}%</span>`
                     : '';
-                const oiLabel = item.oi > 0 ? `<span style="font-size:0.62rem;color:#64748b;">${fmtK(item.oi)} OI</span>` : '';
+                const oiLabel = item.oi > 0 ? `<span style="font-size:0.62rem;color:#94a3b8;font-weight:600;">${fmtK(item.oi)} Contracts</span>` : '';
+                const barWidth = item.oi > 0 && maxOi > 1 ? `${Math.min(100, Math.max(12, (item.oi / maxOi) * 100))}%` : (item.pct !== null ? `${Math.max(15, Math.min(85, 100 - Math.abs(item.pct) * 5))}%` : '40%');
                 return `
-                <div style="position:relative;background:${item.bg};border:1px solid ${item.border};border-left:3px solid ${item.color};border-radius:6px;padding:0.4rem 0.6rem;overflow:hidden;font-family:var(--font-mono);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.35rem;">
+                <div style="position:relative;background:${item.bg};border:1px solid ${item.border};border-left:3px solid ${item.color};border-radius:6px;padding:0.42rem 0.65rem;overflow:hidden;font-family:var(--font-mono);transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;cursor:default;"
+                     onmouseenter="this.style.transform='translateX(3px)'; this.style.borderColor='${item.color}'; this.style.boxShadow='0 3px 10px rgba(0,0,0,0.35)';"
+                     onmouseleave="this.style.transform='translateX(0)'; this.style.borderColor='${item.border}'; this.style.boxShadow='none';">
+                    <div style="position:absolute;top:0;left:0;bottom:0;width:${barWidth};background:${item.color}1c;border-right:1px solid ${item.color}35;pointer-events:none;"></div>
+                    <div style="position:relative;display:flex;justify-content:space-between;align-items:center;gap:0.35rem;">
                         <span style="font-size:0.7rem;color:${item.color};font-weight:700;">${item.label}</span>
                         <div style="display:flex;align-items:center;gap:0.4rem;flex-shrink:0;">
                             <span style="font-size:0.8rem;font-weight:800;color:#e2e8f0;">${item.strike}</span>
                             ${pctBadge}
                         </div>
                     </div>
-                    ${oiLabel ? `<div style="position:relative;margin-top:0.15rem;font-size:0.6rem;color:#64748b;">${oiLabel}</div>` : ''}
+                    ${oiLabel ? `<div style="position:relative;margin-top:0.15rem;font-size:0.6rem;color:#94a3b8;">${oiLabel}</div>` : ''}
                 </div>`;
             }).join('');
         }
