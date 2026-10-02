@@ -221,17 +221,23 @@ def test_fii_dii_release_schedule_states():
     assert "Thursday ~18:30 IST" in sched3["label"]
     assert sched3["is_today_settled"] is True
 
-    # Case 4: Friday after 18:30 IST settled -> Next is Monday
-    dt_fri_evening = datetime(2026, 10, 2, 14, 0, 0, tzinfo=timezone.utc)
-    sched4 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-02", now_dt=dt_fri_evening)
+    # Case 4: Non-holiday Friday after 18:30 IST settled -> Next is Monday
+    dt_fri_evening = datetime(2026, 9, 25, 14, 0, 0, tzinfo=timezone.utc)
+    sched4 = compute_fii_dii_release_schedule(latest_date_in_db="2026-09-25", now_dt=dt_fri_evening)
     assert sched4["status"] == "settled"
     assert "Monday ~18:30 IST" in sched4["label"]
 
     # Case 5: Saturday / Sunday weekend pause -> Next is Monday
     dt_sat = datetime(2026, 10, 3, 10, 0, 0, tzinfo=timezone.utc)
-    sched5 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-02", now_dt=dt_sat)
+    sched5 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-01", now_dt=dt_sat)
     assert sched5["status"] == "weekend_pause"
     assert "Monday ~18:30 IST" in sched5["label"]
+
+    # Case 6: Market holiday pause (e.g. Gandhi Jayanti Friday 2026-10-02) -> Next is Monday
+    dt_holiday = datetime(2026, 10, 2, 10, 0, 0, tzinfo=timezone.utc)
+    sched6 = compute_fii_dii_release_schedule(latest_date_in_db="2026-10-01", now_dt=dt_holiday)
+    assert sched6["status"] == "holiday_pause"
+    assert "Monday ~18:30 IST" in sched6["label"]
 
 
 def test_market_pulse_card_timestamps(client):

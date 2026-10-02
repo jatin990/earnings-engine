@@ -89,41 +89,42 @@ def compute_fii_dii_release_schedule(latest_date_in_db: str | None = None, now_d
         now_dt = datetime.now(timezone.utc)
 
     # Convert UTC to IST (+5:30)
-    ist_dt = now_dt + IST_OFFSET
+    ist_dt = now_dt.astimezone(IST_TZ) if now_dt.tzinfo else (now_dt + IST_OFFSET)
     weekday = ist_dt.weekday()  # 0=Mon, ..., 4=Fri, 5=Sat, 6=Sun
     time_val = ist_dt.hour + ist_dt.minute / 60.0 + ist_dt.second / 3600.0
 
-    today_str = ist_dt.strftime("%Y-%m-%d")
+    today_date = ist_dt.date()
+    today_str = today_date.strftime("%Y-%m-%d")
     is_today_settled = (latest_date_in_db == today_str)
+    is_today_holiday = is_market_holiday(today_date)
+    is_today_trading = is_trading_day(today_date)
 
-    # Target release time on trading day is 18:30 IST (18.5)
-    if weekday < 5:  # Monday - Friday
+    if not is_today_trading:
+        # Weekend or Market Holiday -> Next active trading day
+        next_day = today_date + timedelta(days=1)
+        while not is_trading_day(next_day):
+            next_day += timedelta(days=1)
+        target_date = next_day
+        status = "holiday_pause" if is_today_holiday else "weekend_pause"
+        label = f"{target_date.strftime('%A')} ~18:30 IST"
+    else:
+        # Active trading day
         if time_val < 18.5:
-            target_date = ist_dt.date()
+            target_date = today_date
             status = "pending_today"
             label = "Today ~18:30 IST"
         else:
             if is_today_settled:
-                if weekday == 4:  # Friday -> Monday
-                    target_date = (ist_dt + timedelta(days=3)).date()
-                    status = "settled"
-                    label = "Monday ~18:30 IST"
-                else:  # Mon-Thu -> Tomorrow
-                    target_date = (ist_dt + timedelta(days=1)).date()
-                    status = "settled"
-                    label = f"{(ist_dt + timedelta(days=1)).strftime('%A')} ~18:30 IST"
+                next_day = today_date + timedelta(days=1)
+                while not is_trading_day(next_day):
+                    next_day += timedelta(days=1)
+                target_date = next_day
+                status = "settled"
+                label = f"{target_date.strftime('%A')} ~18:30 IST"
             else:
-                target_date = ist_dt.date()
+                target_date = today_date
                 status = "awaiting_settlement"
                 label = "Today (Awaiting NSE Release)"
-    elif weekday == 5:  # Saturday -> Monday
-        target_date = (ist_dt + timedelta(days=2)).date()
-        status = "weekend_pause"
-        label = "Monday ~18:30 IST"
-    else:  # Sunday -> Monday
-        target_date = (ist_dt + timedelta(days=1)).date()
-        status = "weekend_pause"
-        label = "Monday ~18:30 IST"
 
     target_dt_ist = datetime.combine(target_date, datetime.min.time()).replace(hour=18, minute=30, second=0)
     target_dt_utc = (target_dt_ist - IST_OFFSET).replace(tzinfo=timezone.utc)
@@ -170,24 +171,19 @@ def get_expected_latest_trading_date(now_dt: datetime | None = None) -> str:
         now_dt = datetime.now(timezone.utc)
 
     # Convert UTC to IST (+5:30)
-    ist_offset = timedelta(hours=5, minutes=30)
-    ist_dt = now_dt + ist_offset
+    ist_dt = now_dt.astimezone(IST_TZ) if now_dt.tzinfo else (now_dt + IST_OFFSET)
+    target_date = ist_dt.date()
 
-    weekday = ist_dt.weekday()
-    if weekday == 5:  # Saturday -> Friday
-        target = (ist_dt - timedelta(days=1)).date()
-    elif weekday == 6:  # Sunday -> Friday
-        target = (ist_dt - timedelta(days=2)).date()
-    else:  # Monday - Friday
+    if not is_trading_day(target_date):
+        # Weekend or Holiday -> latest completed trading day
+        target = get_latest_completed_trading_day(target_date)
+    else:
         time_val = ist_dt.hour + ist_dt.minute / 60.0
         # If before 18:00 IST (18.0), today's settlement is not released yet; expect previous trading day
         if time_val < 18.0:
-            if weekday == 0:  # Monday morning -> previous Friday (3 days ago)
-                target = (ist_dt - timedelta(days=3)).date()
-            else:
-                target = (ist_dt - timedelta(days=1)).date()
+            target = get_latest_completed_trading_day(target_date - timedelta(days=1))
         else:
-            target = ist_dt.date()
+            target = target_date
 
     return target.strftime("%Y-%m-%d")
 
@@ -396,17 +392,22 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
-    # 1. Determine active weekday market sessions (Monday to Friday)
+    # 1. Determine active weekday market sessions (Monday to Friday) via fast index lookup
     try:
         active_dates_rows = conn.execute("""
-            SELECT date, COUNT(*) as cnt, SUM(volume) as tot_vol
-            FROM price_history
-            WHERE date <= date('now')
-            GROUP BY date
-            HAVING cnt >= 30 AND tot_vol > 1000000
+            SELECT date FROM price_history
+            WHERE ticker = '^NSEI' AND date <= date('now')
             ORDER BY date DESC
             LIMIT 40
         """).fetchall()
+        if not active_dates_rows:
+            active_dates_rows = conn.execute("""
+                SELECT DISTINCT date
+                FROM price_history
+                WHERE date <= date('now')
+                ORDER BY date DESC
+                LIMIT 40
+            """).fetchall()
     except Exception:
         active_dates_rows = []
 
