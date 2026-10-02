@@ -4524,6 +4524,76 @@ def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = 
     return {"id": rec_id, "ipp": ipp}
 
 
+def purge_zepto_operational_data(
+    store_name: str | None = None,
+    month: str | None = None,
+    include_emails: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, int]:
+    """
+    Purge historical Zepto operational data to allow clean re-ingestion with updated parsers.
+    Cleans zepto_manpower_utilization, zepto_loss_records, zepto_store_metrics,
+    zepto_attendance_records, and zepto_attendance_imports.
+    Optionally purges zepto_gmail_messages if include_emails is True.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    purged_counts: dict[str, int] = {
+        "manpower_utilization": 0,
+        "loss_records": 0,
+        "store_metrics": 0,
+        "attendance_records": 0,
+        "attendance_imports": 0,
+        "gmail_messages": 0,
+    }
+
+    with _connect(settings) as conn:
+        # Build filter clauses
+        def build_filter(date_col: str, store_col: str = "store_name") -> tuple[str, list[Any]]:
+            clauses = ["1=1"]
+            params: list[Any] = []
+            if store_name and store_name != "ALL":
+                clauses.append(f"{store_col} = ?")
+                params.append(store_name)
+            if month and month != "ALL":
+                clauses.append(f"substr({date_col}, 1, 7) = ?")
+                params.append(month)
+            return " AND ".join(clauses), params
+
+        # 1. Manpower Utilization
+        w, p = build_filter("util_date")
+        cur = conn.execute(f"DELETE FROM zepto_manpower_utilization WHERE {w}", p)
+        purged_counts["manpower_utilization"] = cur.rowcount
+
+        # 2. Loss Records
+        w, p = build_filter("record_date")
+        cur = conn.execute(f"DELETE FROM zepto_loss_records WHERE {w}", p)
+        purged_counts["loss_records"] = cur.rowcount
+
+        # 3. Store Metrics
+        w, p = build_filter("metric_date")
+        cur = conn.execute(f"DELETE FROM zepto_store_metrics WHERE {w}", p)
+        purged_counts["store_metrics"] = cur.rowcount
+
+        # 4. Attendance Records & Imports
+        w, p = build_filter("shift_date")
+        cur = conn.execute(f"DELETE FROM zepto_attendance_records WHERE {w}", p)
+        purged_counts["attendance_records"] = cur.rowcount
+
+        w_imp, p_imp = build_filter("created_at")
+        cur = conn.execute(f"DELETE FROM zepto_attendance_imports WHERE {w_imp}", p_imp)
+        purged_counts["attendance_imports"] = cur.rowcount
+
+        # 5. Gmail Messages (optional)
+        if include_emails:
+            w_msg, p_msg = build_filter("iso_date")
+            cur = conn.execute(f"DELETE FROM zepto_gmail_messages WHERE {w_msg}", p_msg)
+            purged_counts["gmail_messages"] = cur.rowcount
+
+    return purged_counts
+
+
 def get_manpower_utilization_summary(
     store_name: str | None = None,
     start_date: str | None = None,

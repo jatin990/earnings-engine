@@ -1074,16 +1074,39 @@ async def get_recent_emails_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/api/v1/zepto/data/purge", summary="Purge Historical Operational Data for Clean Re-ingestion")
+async def purge_zepto_data_endpoint(
+    store_name: str | None = Query(None, description="Store name, or defaults to all stores"),
+    month: str | None = Query(None, description="Month YYYY-MM, or defaults to all months"),
+    include_emails: bool = Query(False, description="Whether to also purge ingested raw Gmail messages"),
+) -> dict[str, Any]:
+    """Purge historical operational records to enable clean re-ingestion with latest multi-sheet parsers."""
+    purged = zepto_db.purge_zepto_operational_data(
+        store_name=store_name,
+        month=month,
+        include_emails=include_emails,
+        settings=_settings,
+    )
+    return {
+        "status": "success",
+        "message": f"Successfully purged operational records for store={store_name or 'ALL'}, month={month or 'ALL'}",
+        "purged_counts": purged,
+    }
+
+
 @router.post("/api/v1/zepto/gmail/ingest-all-emails", summary="Ingest All Operational Emails & Parse Metrics into Database")
 async def ingest_all_emails_endpoint(
     month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(False, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge operational database tables prior to re-ingestion"),
 ) -> dict[str, Any]:
     """
     Ingest all operational emails from linked Gmail inbox for the specified month (or all):
-    1. Fetches all messages for the month across operational categories and saves them into zepto_gmail_messages.
-    2. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, and DQ Loss.
-    3. Extracts structured body metrics (GMV, Orders, AOV, SLA, IPP, Loss) and updates persistent tables.
-    4. Returns updated category counters and ingested payload details.
+    1. Optionally purges old operational data if purge_existing is True.
+    2. Fetches all messages for the month across operational categories and saves them into zepto_gmail_messages.
+    3. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, Manpower, and DQ Loss.
+    4. Extracts structured body metrics (GMV, Orders, AOV, SLA, IPP, Loss) and updates persistent tables.
+    5. Returns updated category counters and ingested payload details.
     """
     import base64
     import urllib.parse
@@ -1103,6 +1126,14 @@ async def ingest_all_emails_endpoint(
         )
 
     clean_month, gmail_q = _build_gmail_month_query(month)
+
+    if purge_existing:
+        zepto_db.purge_zepto_operational_data(
+            month=clean_month if clean_month != "ALL" else None,
+            include_emails=False,
+            settings=_settings,
+        )
+
     headers = {"Authorization": f"Bearer {token}"}
     ingested_counts = {
         "STORE_METRICS": 0,
@@ -1118,14 +1149,15 @@ async def ingest_all_emails_endpoint(
     processed_details = {
         "attendance_records": 0,
         "store_metrics_records": 0,
+        "manpower_records": 0,
         "loss_records": 0,
         "emails_scanned": 0,
         "month": clean_month,
     }
 
     try:
-        # Step 1: Detect existing IDs to only process net-new delta emails during batch ingestion
-        existing_msg_ids = zepto_db.get_saved_gmail_message_ids(settings=_settings)
+        # Step 1: Detect existing IDs to only process net-new delta emails unless force=True
+        existing_msg_ids = set() if force else zepto_db.get_saved_gmail_message_ids(settings=_settings)
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             all_msg_summaries = []
@@ -1157,10 +1189,11 @@ async def ingest_all_emails_endpoint(
             processed_details["emails_scanned"] = len(all_msg_summaries)
             delta_summaries = [m for m in all_msg_summaries if m.get("id") not in existing_msg_ids]
             logger.info(
-                "[GMAIL-INGEST-DELTA] Month=%s: %d total messages on Gmail, %d delta new to ingest",
+                "[GMAIL-INGEST-DELTA] Month=%s: %d total messages on Gmail, %d to ingest (force=%s)",
                 clean_month,
                 len(all_msg_summaries),
                 len(delta_summaries),
+                force,
             )
             emails_to_save = []
 
@@ -1332,6 +1365,14 @@ async def ingest_all_emails_endpoint(
                                         zepto_db.save_store_metrics(r, settings=_settings)
                                         processed_details["store_metrics_records"] += 1
                                         email_parsed_count += 1
+
+                                    # Persist granular worker records into zepto_manpower_utilization
+                                    w_records = parsed_met.get("worker_records", [])
+                                    if w_records:
+                                        zepto_db.save_manpower_utilization_batch(w_records, settings=_settings)
+                                        processed_details["manpower_records"] += len(w_records)
+                                        email_parsed_count += len(w_records)
+
                                     email_parsed_status = "PARSED"
                                 except Exception as e:
                                     logger.warning("[GMAIL-INGEST] Error parsing store metrics attachment %s: %s", fname, e)
