@@ -33,6 +33,19 @@ def test_get_commodities_chart_intelligence_endpoint(client):
     assert data["symbol"] == "GOLD"
     assert "candles" in data
     assert "indicators" in data
+    assert "volume_profile" in data
+    assert "liquidity_sweeps" in data
+    assert "microstructure" in data
     assert "tactical_hud" in data
     assert "where_to_buy" in data["tactical_hud"]
     assert "where_to_sell" in data["tactical_hud"]
+
+
+def test_get_commodities_latest_tick_endpoint(client):
+    resp = client.get("/api/v1/commodities/latest-tick?symbol=GOLD&interval=5m")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] in (True, False)
+    assert data["symbol"] == "GOLD"
+    assert "spot_price" in data
+    assert "timestamp" in data

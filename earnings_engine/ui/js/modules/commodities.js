@@ -7,6 +7,9 @@
  * - 15-minute Opening Range Breakout (ORB-15) and expansion targets
  * - Smart Money Concepts (SMC): Bullish (D-OB) and Bearish (S-OB) Order Blocks and Fair Value Gaps
  * - Algorithmic Support & Resistance Trendlines
+ * - Interactive SMC Playbook educational drawer
+ * - Interactive Crosshair Hover Inspector Bar (#commHoverInspectorCard)
+ * - Real-Time Incremental Tick Engine (3000ms poller)
  * - Actionable 3-Column Tactical Trade HUD Deck (Where to Buy / Where to Sell)
  */
 (function (window) {
@@ -36,22 +39,51 @@
     mod._priceLines = [];
     mod._chartData = null;
     mod._pollTimer = null;
+    mod._tickTimer = null;
+    mod._avgVolume = 1;
     mod._hasFitted = false;
     mod._isFullscreen = false;
     mod._escListenerBound = false;
+    mod._crosshairBound = false;
 
     /**
      * Initialize the module
      */
     mod.init = function () {
         mod.loadChart(false);
+
+        // Full dataset reload timer (60s)
         if (!mod._pollTimer) {
             mod._pollTimer = setInterval(() => {
                 const tab = document.getElementById('tab-commodities');
                 if (tab && (tab.style.display !== 'none' || tab.classList.contains('active'))) {
                     mod.loadChart(false);
                 }
-            }, 30000); // 30s live poll
+            }, 60000);
+        }
+
+        // Fast Incremental Tick Poller (3000ms)
+        if (!mod._tickTimer) {
+            mod._tickTimer = setInterval(() => {
+                const tab = document.getElementById('tab-commodities');
+                if (tab && (tab.style.display !== 'none' || tab.classList.contains('active'))) {
+                    mod.pollLatestTick();
+                }
+            }, 3000);
+        }
+    };
+
+    /**
+     * Toggle educational SMC Playbook drawer
+     */
+    mod.togglePlaybook = function () {
+        const content = document.getElementById('commPlaybookContent');
+        const chevron = document.getElementById('commPlaybookChevron');
+        if (!content) return;
+        const isHidden = content.style.display === 'none' || !content.style.display;
+        content.style.display = isHidden ? 'block' : 'none';
+        if (chevron) {
+            chevron.textContent = isHidden ? '▲' : '▼';
         }
     };
 
@@ -113,7 +145,7 @@
     };
 
     /**
-     * Fetch chart intelligence from REST API
+     * Fetch full chart intelligence from REST API
      */
     mod.loadChart = async function (forceRefresh = false) {
         const loadingEl = document.getElementById('commChartLoading');
@@ -136,6 +168,14 @@
             const data = await res.json();
             mod._chartData = data;
 
+            // Compute average volume for hover surge metrics
+            if (data.candles && data.candles.length > 0) {
+                const vols = data.candles.map(c => c.volume || 0);
+                const recent = vols.slice(-20);
+                const sum = recent.reduce((a, b) => a + b, 0);
+                mod._avgVolume = Math.max(Math.round(sum / Math.max(recent.length, 1)), 1);
+            }
+
             // Render KPI cards & Tactical Trade HUD
             mod.renderTacticalHUD(data);
 
@@ -151,6 +191,53 @@
                 refreshBtn.disabled = false;
                 refreshBtn.innerHTML = '<span>🔄</span> Refresh';
             }
+        }
+    };
+
+    /**
+     * Fast Real-Time Incremental Tick Poller (3000ms)
+     */
+    mod.pollLatestTick = async function () {
+        if (!mod._candleSeries || !mod._chart) return;
+        try {
+            const url = `/api/v1/commodities/latest-tick?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (!data.success || !data.latest_candle) return;
+
+            const candle = data.latest_candle;
+            const curr = data.currency_symbol || '$';
+
+            // Incremental Candle & Volume Update
+            mod._candleSeries.update(candle);
+            if (mod._volumeSeries) {
+                mod._volumeSeries.update({
+                    time: candle.time,
+                    value: candle.volume,
+                    color: candle.close >= candle.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
+                });
+            }
+
+            // Update Spot price and change HUD
+            const spotEl = document.getElementById('commKpiSpotPrice');
+            const spotChangeEl = document.getElementById('commKpiSpotChange');
+            const timeEl = document.getElementById('commChartTimestamp');
+
+            if (spotEl) spotEl.textContent = `${curr}${candle.close.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            if (spotChangeEl) {
+                const chg = data.change_24h || 0;
+                const sign = chg >= 0 ? '+' : '';
+                spotChangeEl.textContent = `24h: ${sign}${chg}%`;
+                spotChangeEl.style.color = chg >= 0 ? '#10b981' : '#f43f5e';
+            }
+            if (timeEl && data.timestamp) {
+                timeEl.textContent = `As of ${data.timestamp}`;
+            }
+
+        } catch (e) {
+            // Quiet tick error
         }
     };
 
@@ -205,6 +292,140 @@
                     }
                 });
                 mod._escListenerBound = true;
+            }
+
+            // Crosshair Hover Inspector Hook
+            if (!mod._crosshairBound) {
+                mod._chart.subscribeCrosshairMove(mod.handleCrosshairMove);
+                mod._crosshairBound = true;
+            }
+        }
+    };
+
+    /**
+     * Crosshair move handler for Sticky Hover Inspector Bar
+     */
+    mod.handleCrosshairMove = function (param) {
+        const timeEl = document.getElementById('commInspTime');
+        const oEl = document.getElementById('commInspO');
+        const hEl = document.getElementById('commInspH');
+        const lEl = document.getElementById('commInspL');
+        const cEl = document.getElementById('commInspC');
+        const trEl = document.getElementById('commInspTr');
+        const volSurgeEl = document.getElementById('commInspVolSurge');
+        const wickDeltaEl = document.getElementById('commInspWickDelta');
+        const smcDetailsEl = document.getElementById('commInspSmcDetails');
+        const smcZoneEl = document.getElementById('commInspSmcZone');
+
+        if (!param || !param.time || !param.seriesData || !mod._candleSeries) {
+            return;
+        }
+
+        const candle = param.seriesData.get(mod._candleSeries);
+        if (!candle) return;
+
+        const curr = mod._chartData?.currency_symbol || '$';
+        const o = Number(candle.open || 0);
+        const h = Number(candle.high || 0);
+        const l = Number(candle.low || 0);
+        const c = Number(candle.close || 0);
+        const tr = Math.max(h - l, 0.01);
+
+        if (timeEl) {
+            const d = new Date(param.time * 1000);
+            timeEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        if (oEl) oEl.textContent = `${curr}${o.toFixed(2)}`;
+        if (hEl) hEl.textContent = `${curr}${h.toFixed(2)}`;
+        if (lEl) lEl.textContent = `${curr}${l.toFixed(2)}`;
+        if (cEl) cEl.textContent = `${curr}${c.toFixed(2)}`;
+        if (trEl) trEl.textContent = `${curr}${tr.toFixed(2)}`;
+
+        // Volume surge multiple
+        const volData = param.seriesData.get(mod._volumeSeries);
+        const v = volData ? Number(volData.value || 0) : Number(candle.volume || 0);
+        const avgVol = mod._avgVolume || 1;
+        const volRatio = (v / avgVol).toFixed(1);
+
+        if (volSurgeEl) {
+            volSurgeEl.textContent = `Vol: ${v ? v.toLocaleString() : '--'} (${volRatio}x avg)`;
+            if (Number(volRatio) >= 2.0) {
+                volSurgeEl.style.background = 'rgba(16, 185, 129, 0.25)';
+                volSurgeEl.style.color = '#10b981';
+            } else if (Number(volRatio) >= 1.2) {
+                volSurgeEl.style.background = 'rgba(56, 189, 248, 0.2)';
+                volSurgeEl.style.color = '#38bdf8';
+            } else {
+                volSurgeEl.style.background = 'rgba(255, 255, 255, 0.08)';
+                volSurgeEl.style.color = '#ededed';
+            }
+        }
+
+        // Wick Delta (Buyer Absorb vs Seller Reject)
+        const upperWick = Math.max(0, h - Math.max(o, c));
+        const lowerWick = Math.max(0, Math.min(o, c) - l);
+        const wickDelta = (lowerWick - upperWick).toFixed(2);
+        if (wickDeltaEl) {
+            if (lowerWick > upperWick) {
+                wickDeltaEl.innerHTML = `Delta: <span style="color:#10b981;font-weight:700;">+${curr}${wickDelta} (Buyer)</span>`;
+            } else if (upperWick > lowerWick) {
+                wickDeltaEl.innerHTML = `Delta: <span style="color:#f43f5e;font-weight:700;">-${curr}${Math.abs(Number(wickDelta)).toFixed(2)} (Seller)</span>`;
+            } else {
+                wickDeltaEl.innerHTML = `Delta: <span style="color:var(--text-secondary);">Balanced</span>`;
+            }
+        }
+
+        // Check if cursor price is inside any Order Block or FVG
+        const pPrice = c;
+        let activeZone = null;
+        const obs = mod._chartData?.indicators?.order_blocks || [];
+        const fvgs = mod._chartData?.indicators?.fvgs || [];
+
+        for (const ob of obs) {
+            const minB = Math.min(ob.bottom, ob.top);
+            const maxB = Math.max(ob.bottom, ob.top);
+            if (pPrice >= minB && pPrice <= maxB) {
+                activeZone = {
+                    type: ob.type === 'BULLISH_OB' ? 'Demand OB (D-OB)' : 'Supply OB (S-OB)',
+                    color: ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e',
+                    status: ob.status || (ob.mitigated ? 'MITIGATED' : 'UNMITIGATED'),
+                    distPts: ob.distance_pts !== undefined ? ob.distance_pts : Math.abs(pPrice - ob.midpoint).toFixed(2),
+                    top: ob.top,
+                    bottom: ob.bottom,
+                };
+                break;
+            }
+        }
+
+        if (!activeZone) {
+            for (const fvg of fvgs) {
+                const minF = Math.min(fvg.bottom, fvg.top);
+                const maxF = Math.max(fvg.bottom, fvg.top);
+                if (pPrice >= minF && pPrice <= maxF) {
+                    activeZone = {
+                        type: fvg.type === 'BULLISH_FVG' ? 'Bullish FVG' : 'Bearish FVG',
+                        color: fvg.type === 'BULLISH_FVG' ? '#38bdf8' : '#f43f5e',
+                        status: fvg.status || (fvg.mitigated ? 'MITIGATED' : 'UNFILLED'),
+                        distPts: fvg.distance_pts !== undefined ? fvg.distance_pts : Math.abs(pPrice - fvg.midpoint).toFixed(2),
+                        top: fvg.top,
+                        bottom: fvg.bottom,
+                    };
+                    break;
+                }
+            }
+        }
+
+        if (smcDetailsEl && smcZoneEl) {
+            if (activeZone) {
+                smcZoneEl.style.borderColor = activeZone.color;
+                smcZoneEl.style.background = activeZone.color === '#10b981' ? 'rgba(16, 185, 129, 0.15)' : (activeZone.color === '#38bdf8' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(244, 63, 94, 0.15)');
+                smcZoneEl.style.color = activeZone.color;
+                smcDetailsEl.innerHTML = `<strong>${activeZone.type}</strong> · [${curr}${activeZone.bottom} – ${curr}${activeZone.top}] · <span style="font-weight:700;">${activeZone.status}</span>`;
+            } else {
+                smcZoneEl.style.borderColor = 'rgba(234,179,8,0.25)';
+                smcZoneEl.style.background = 'rgba(234,179,8,0.12)';
+                smcZoneEl.style.color = '#eab308';
+                smcDetailsEl.textContent = 'Cursor Active · Outside SMC Zones';
             }
         }
     };
@@ -402,7 +623,7 @@
                 position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
                 color: ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e',
                 shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
-                text: ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB'),
+                text: `${ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB')} (${ob.status || 'UNMIT'})`,
             }));
             mod._candleSeries.setMarkers(markers);
         } else {
@@ -488,6 +709,24 @@
         }
         if (pivotFloorEl && ind.pivots) {
             pivotFloorEl.textContent = `Pivot: ${curr}${ind.pivots.p !== undefined && ind.pivots.p !== null ? ind.pivots.p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        }
+
+        // Microstructure depth
+        const micro = data.microstructure || {};
+        const buyDepthEl = document.getElementById('commKpiBuyDepth');
+        const sellDepthEl = document.getElementById('commKpiSellDepth');
+        const cvdBiasEl = document.getElementById('commKpiCvdBias');
+
+        if (buyDepthEl && micro.buy_depth_pct !== undefined) {
+            buyDepthEl.textContent = `${micro.buy_depth_pct}%`;
+        }
+        if (sellDepthEl && micro.sell_depth_pct !== undefined) {
+            sellDepthEl.textContent = `${micro.sell_depth_pct}%`;
+        }
+        if (cvdBiasEl) {
+            const biasLabel = micro.cvd_bias ? micro.cvd_bias.replace(/_/g, ' ') : 'Balanced';
+            const spread = micro.spread_bps !== undefined ? `${micro.spread_bps} bps` : '--';
+            cvdBiasEl.textContent = `CVD: ${biasLabel} · Spread: ${spread}`;
         }
 
         // 3. 3-Column Tactical Trade HUD Deck

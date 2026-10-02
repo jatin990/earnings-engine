@@ -6,14 +6,19 @@ import pandas as pd
 import numpy as np
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from earnings_engine.data.commodities_chart_engine import (
     get_supported_commodity_symbols,
     resolve_commodity_symbol,
     get_commodity_chart_intelligence,
+    get_commodity_latest_tick,
     _calculate_session_vwap,
     _calculate_orb,
     _detect_order_blocks_and_fvg,
+    _detect_liquidity_sweeps,
+    _calculate_volume_profile_poc,
+    _calculate_microstructure_depth,
     _detect_trendlines,
     _calculate_classical_pivots,
     _generate_tactical_signals,
@@ -91,7 +96,48 @@ def test_detect_order_blocks_and_fvg():
         assert "type" in ob
         assert "top" in ob
         assert "bottom" in ob
+        assert "midpoint" in ob
+        assert "volume_surge" in ob
+        assert "status" in ob
+        assert "distance_pts" in ob
+        assert "distance_pct" in ob
         assert ob["short_label"] in ("D-OB", "S-OB")
+    if fvgs:
+        fvg = fvgs[0]
+        assert "gap_size" in fvg
+        assert "status" in fvg
+        assert "midpoint" in fvg
+
+
+def test_detect_liquidity_sweeps():
+    df = _make_dummy_intraday_df(60, 78000.0)
+    sweeps = _detect_liquidity_sweeps(df)
+    assert isinstance(sweeps, list)
+    for s in sweeps:
+        assert s["type"] in ("BSL_SWEEP", "SSL_SWEEP")
+        assert "sweep_level" in s
+        assert "wick_pts" in s
+
+
+def test_calculate_volume_profile_poc():
+    df = _make_dummy_intraday_df(50, 78000.0)
+    vp = _calculate_volume_profile_poc(df)
+    assert "poc" in vp
+    assert "vah" in vp
+    assert "val" in vp
+    assert vp["poc"] > 0
+    assert vp["vah"] >= vp["val"]
+    assert len(vp["bins"]) == 24
+
+
+def test_calculate_microstructure_depth():
+    df = _make_dummy_intraday_df(50, 78000.0)
+    micro = _calculate_microstructure_depth(df, 78000.0)
+    assert "buy_depth_pct" in micro
+    assert "sell_depth_pct" in micro
+    assert "spread_bps" in micro
+    assert "cvd_bias" in micro
+    assert abs((micro["buy_depth_pct"] + micro["sell_depth_pct"]) - 100.0) < 0.2
 
 
 def test_detect_trendlines():
@@ -137,5 +183,20 @@ def test_get_commodity_chart_intelligence_structure():
     assert data["success"] is True
     assert data["symbol"] == "GOLD"
     assert "candles" in data
+    assert "volume_profile" in data
+    assert "liquidity_sweeps" in data
+    assert "microstructure" in data
     assert "indicators" in data
     assert "tactical_hud" in data
+
+
+def test_get_commodity_latest_tick():
+    mock_df = _make_dummy_intraday_df(20, 2750.0)
+    with patch("earnings_engine.data.commodities_chart_engine.fetch_commodity_candles", return_value=mock_df):
+        tick = get_commodity_latest_tick("GOLD", interval="5m")
+        assert tick["success"] is True
+        assert tick["symbol"] == "GOLD"
+        assert tick["spot_price"] > 0
+        assert "latest_candle" in tick
+        assert tick["latest_candle"]["close"] == tick["spot_price"]
+        assert "time" in tick["latest_candle"]
