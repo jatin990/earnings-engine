@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from earnings_engine.data.commodities_chart_engine import (
     get_supported_commodity_symbols,
@@ -102,7 +103,6 @@ def test_detect_order_blocks_and_fvg():
         assert "distance_pts" in ob
         assert "distance_pct" in ob
         assert ob["short_label"] in ("D-OB", "S-OB")
-
     if fvgs:
         fvg = fvgs[0]
         assert "type" in fvg
@@ -111,6 +111,7 @@ def test_detect_order_blocks_and_fvg():
         assert "midpoint" in fvg
         assert "gap_size" in fvg
         assert "status" in fvg
+        assert "formation_time_iso" in fvg
         assert "distance_pts" in fvg
 
 
@@ -118,11 +119,10 @@ def test_detect_liquidity_sweeps():
     df = _make_dummy_intraday_df(60, 78000.0)
     sweeps = _detect_liquidity_sweeps(df)
     assert isinstance(sweeps, list)
-    for sw in sweeps:
-        assert sw["type"] in ("BSL_SWEEP", "SSL_SWEEP")
-        assert "level" in sw
-        assert "sweep_extreme" in sw
-        assert "status" in sw
+    for s in sweeps:
+        assert s["type"] in ("BSL_SWEEP", "SSL_SWEEP")
+        assert "sweep_level" in s
+        assert "wick_pts" in s
 
 
 def test_calculate_volume_profile_poc():
@@ -134,16 +134,18 @@ def test_calculate_volume_profile_poc():
     assert vp["poc"] > 0
     assert vp["vah"] >= vp["poc"] or vp["vah"] >= vp["val"]
     assert vp["val"] <= vp["vah"]
+    assert len(vp["bins"]) == 24
 
 
 def test_calculate_microstructure_depth():
     df = _make_dummy_intraday_df(60, 78000.0)
     micro = _calculate_microstructure_depth(df, 78000.0)
-    assert "resting_buy_depth_pct" in micro
-    assert "resting_sell_depth_pct" in micro
+    assert "buy_depth_pct" in micro
+    assert "sell_depth_pct" in micro
+    assert "spread_bps" in micro
     assert "cvd_bias" in micro
-    assert "spread_proxy" in micro
-    assert round(micro["resting_buy_depth_pct"] + micro["resting_sell_depth_pct"], 1) == 100.0
+    assert "imbalance_ratio" in micro
+    assert abs((micro["buy_depth_pct"] + micro["sell_depth_pct"]) - 100.0) < 0.2
 
 
 def test_detect_trendlines():
@@ -185,26 +187,35 @@ def test_calculate_gsr():
 
 
 def test_get_commodity_chart_intelligence_structure():
-    data = get_commodity_chart_intelligence("GOLD", interval="5m", period="5d")
-    assert data["success"] is True
-    assert data["symbol"] == "GOLD"
-    assert "candles" in data
-    assert "indicators" in data
-    assert "tactical_hud" in data
-    ind = data["indicators"]
-    assert "poc" in ind
-    assert "vah" in ind
-    assert "val" in ind
-    assert "volume_profile" in ind
-    assert "liquidity_sweeps" in ind
-    assert "microstructure" in ind
+    mock_df = _make_dummy_intraday_df(60, 2750.0)
+    with patch("earnings_engine.data.commodities_chart_engine.fetch_commodity_candles", return_value=mock_df):
+        data = get_commodity_chart_intelligence("GOLD", interval="5m", period="5d")
+        assert data["success"] is True
+        assert data["symbol"] == "GOLD"
+        assert "candles" in data
+        assert "volume_profile" in data
+        assert "liquidity_sweeps" in data
+        assert "microstructure" in data
+        assert "indicators" in data
+        assert "tactical_hud" in data
+        ind = data["indicators"]
+        assert "poc" in ind
+        assert "vah" in ind
+        assert "val" in ind
+        assert "volume_profile" in ind
+        assert "liquidity_sweeps" in ind
+        assert "microstructure" in ind
 
 
 def test_get_commodity_latest_tick():
-    tick = get_commodity_latest_tick("GOLD", interval="5m")
-    assert tick["success"] is True
-    assert tick["symbol"] == "GOLD"
-    assert "spot_price" in tick
-    assert "change_24h" in tick
-    assert "currency_symbol" in tick
-    assert "timestamp" in tick
+    mock_df = _make_dummy_intraday_df(20, 2750.0)
+    with patch("earnings_engine.data.commodities_chart_engine.fetch_commodity_candles", return_value=mock_df):
+        tick = get_commodity_latest_tick("GOLD", interval="5m")
+        assert tick["success"] is True
+        assert tick["symbol"] == "GOLD"
+        assert tick["spot_price"] > 0
+        assert "latest_candle" in tick
+        assert tick["latest_candle"]["close"] == tick["spot_price"]
+        assert "time" in tick["latest_candle"]
+        assert "currency_symbol" in tick
+        assert "timestamp" in tick

@@ -6,8 +6,11 @@
  * - Dynamic Session VWAP (±1.5σ dispersion bands)
  * - 15-minute Opening Range Breakout (ORB-15) and expansion targets
  * - Smart Money Concepts (SMC): Bullish (D-OB) and Bearish (S-OB) Order Blocks, Fair Value Gaps, and Liquidity Sweeps
- * - Sticky Hover Inspector Bar & Microstructure Depth Widget
- * - Fast Real-Time Incremental Tick Poller (3s)
+ * - Algorithmic Support & Resistance Trendlines
+ * - Interactive SMC Playbook educational drawer
+ * - Sticky Crosshair Hover Inspector Bar (#commHoverInspectorCard)
+ * - Microstructure Depth & Imbalance Widget
+ * - Fast Real-Time Incremental Tick Engine (3000ms poller)
  * - Actionable 3-Column Tactical Trade HUD Deck (Where to Buy / Where to Sell)
  */
 (function (window) {
@@ -39,9 +42,11 @@
     mod._chartData = null;
     mod._pollTimer = null;
     mod._tickTimer = null;
+    mod._avgVolume = 1;
     mod._hasFitted = false;
     mod._isFullscreen = false;
     mod._escListenerBound = false;
+    mod._crosshairBound = false;
 
     /**
      * Check if commodities tab is active / visible in viewport
@@ -78,6 +83,20 @@
     };
 
     /**
+     * Toggle educational SMC Playbook drawer
+     */
+    mod.togglePlaybook = function () {
+        const content = document.getElementById('commPlaybookContent');
+        const chevron = document.getElementById('commPlaybookChevron');
+        if (!content) return;
+        const isHidden = content.style.display === 'none' || !content.style.display;
+        content.style.display = isHidden ? 'block' : 'none';
+        if (chevron) {
+            chevron.textContent = isHidden ? '▲' : '▼';
+        }
+    };
+
+    /**
      * Switch active commodity symbol
      */
     mod.switchCommodity = function (symbol) {
@@ -86,77 +105,112 @@
         mod._symbol = clean;
         mod._hasFitted = false;
 
-        // Update pills
+        // Update pill UI
         document.querySelectorAll('.comm-asset-pill').forEach(pill => {
-            const isActive = pill.getAttribute('data-asset') === clean;
-            pill.classList.toggle('active', isActive);
-            pill.style.background = isActive ? 'rgba(234, 179, 8, 0.25)' : 'transparent';
-            pill.style.color = isActive ? '#eab308' : 'var(--text-secondary)';
-            pill.style.borderColor = isActive ? 'rgba(234, 179, 8, 0.5)' : 'rgba(255, 255, 255, 0.1)';
+            if (pill.getAttribute('data-asset') === clean) {
+                pill.classList.add('active');
+                pill.style.background = 'var(--primary, #3b82f6)';
+                pill.style.color = '#fff';
+            } else {
+                pill.classList.remove('active');
+                pill.style.background = 'transparent';
+                pill.style.color = 'var(--text-secondary, #94a3b8)';
+            }
         });
 
-        const select = document.getElementById('commAssetSelect');
+        // Also sync dropdown if available
+        const select = document.getElementById('commSymbolSelect');
         if (select) select.value = clean;
 
-        mod.loadChart(false);
+        mod.loadChart(true);
     };
 
     /**
-     * Set timeframe interval
+     * Set chart timeframe interval (1m, 5m, 15m, 1h, 1d)
      */
     mod.setTimeframe = function (tf) {
-        if (!tf) return;
+        if (!tf || tf === mod._timeframe) return;
         mod._timeframe = tf;
-        mod._period = (tf === '1d' || tf === '1D') ? '6mo' : '5d';
         mod._hasFitted = false;
 
         document.querySelectorAll('.comm-tf-btn').forEach(btn => {
-            const isActive = btn.getAttribute('data-tf') === tf;
-            btn.classList.toggle('active', isActive);
-            btn.style.background = isActive ? 'rgba(255, 255, 255, 0.18)' : 'transparent';
-            btn.style.color = isActive ? '#ffffff' : 'var(--text-secondary)';
-            btn.style.fontWeight = isActive ? '700' : '400';
-            btn.style.borderRadius = '4px';
+            if (btn.getAttribute('data-tf') === tf) {
+                btn.classList.add('active');
+                btn.style.background = 'var(--primary, #3b82f6)';
+                btn.style.color = '#fff';
+            } else {
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--text-secondary, #94a3b8)';
+            }
         });
 
-        mod.loadChart(false);
+        mod.loadChart(true);
     };
 
     /**
-     * Toggle layer overlay
+     * Set chart lookback period (1d, 5d, 1mo, 3mo, 1y)
      */
-    mod.toggleLayer = function (layer, isChecked) {
-        if (layer in mod._layers) {
-            mod._layers[layer] = isChecked;
-            if (mod._chartData) {
-                mod.renderChartLayers(mod._chartData);
+    mod.setPeriod = function (period) {
+        if (!period || period === mod._period) return;
+        mod._period = period;
+        mod._hasFitted = false;
+
+        document.querySelectorAll('.comm-period-btn').forEach(btn => {
+            if (btn.getAttribute('data-period') === period) {
+                btn.classList.add('active');
+                btn.style.background = 'var(--primary, #3b82f6)';
+                btn.style.color = '#fff';
+            } else {
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+                btn.style.color = 'var(--text-secondary, #94a3b8)';
             }
+        });
+
+        mod.loadChart(true);
+    };
+
+    /**
+     * Toggle layer visibility (vwap, orb, ob, fvg, pivots, trendlines)
+     */
+    mod.toggleLayer = function (layerName, isChecked) {
+        mod._layers[layerName] = isChecked;
+        if (mod._chartData) {
+            mod.renderChartLayers(mod._chartData);
         }
     };
 
     /**
-     * Fetch full chart intelligence from REST API
+     * Load chart intelligence payload from backend
      */
     mod.loadChart = async function (forceRefresh = false, preserveZoom = false) {
         const loadingEl = document.getElementById('commChartLoading');
         const refreshBtn = document.getElementById('commRefreshBtn');
 
-        if (loadingEl && !mod._chartData) loadingEl.style.display = 'flex';
+        if (!preserveZoom && loadingEl) loadingEl.style.display = 'flex';
         if (refreshBtn) {
             refreshBtn.disabled = true;
-            refreshBtn.innerHTML = '<span>⏳</span> Loading...';
+            refreshBtn.innerHTML = '<span style="animation:spin 1s linear infinite;">⏳</span> Loading...';
         }
 
         try {
             const url = `/api/v1/commodities/chart-intelligence?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}&period=${encodeURIComponent(mod._period)}${forceRefresh ? '&force_refresh=true' : ''}`;
             const res = await fetch(url);
             if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || `HTTP ${res.status}`);
+                throw new Error(`Failed to load commodities intelligence: ${res.statusText}`);
             }
 
             const data = await res.json();
             mod._chartData = data;
+
+            // Compute average volume for hover surge metrics
+            if (data.candles && data.candles.length > 0) {
+                const vols = data.candles.map(c => c.volume || 0);
+                const recent = vols.slice(-20);
+                const sum = recent.reduce((a, b) => a + b, 0);
+                mod._avgVolume = Math.max(Math.round(sum / Math.max(recent.length, 1)), 1);
+            }
 
             // Render KPI cards, Microstructure widget & Tactical Trade HUD
             mod.renderTacticalHUD(data);
@@ -180,6 +234,7 @@
      * Fast incremental tick poller (3s)
      */
     mod.pollLatestTick = async function () {
+        if (!mod._candleSeries || !mod._chart) return;
         try {
             const url = `/api/v1/commodities/latest-tick?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}`;
             const res = await fetch(url);
@@ -260,9 +315,12 @@
             });
 
             // Crosshair Movement Subscription for Sticky Hover Inspector
-            mod._chart.subscribeCrosshairMove((param) => {
-                mod.handleCrosshairMove(param);
-            });
+            if (!mod._crosshairBound) {
+                mod._chart.subscribeCrosshairMove((param) => {
+                    mod.handleCrosshairMove(param);
+                });
+                mod._crosshairBound = true;
+            }
 
             window.addEventListener('resize', () => {
                 if (mod._chart && container) {
@@ -283,7 +341,7 @@
     };
 
     /**
-     * Handle crosshair movement for sticky hover inspector bar
+     * Crosshair move handler for Sticky Hover Inspector Bar
      */
     mod.handleCrosshairMove = function (param) {
         const inspectTime = document.getElementById('commInspectTime');
@@ -294,6 +352,7 @@
         const inspectTr = document.getElementById('commInspectTr');
         const inspectVol = document.getElementById('commInspectVol');
         const inspectDelta = document.getElementById('commInspectDelta');
+        const inspectZoneDetails = document.getElementById('commInspectZoneDetails');
         const inspectZone = document.getElementById('commInspectZone');
 
         if (!param || !mod._candleSeries) return;
@@ -310,7 +369,6 @@
             if (param.point && param.point.y !== undefined && mod._candleSeries.coordinateToPrice) {
                 const hoverPrice = mod._candleSeries.coordinateToPrice(param.point.y);
                 if (hoverPrice) {
-                    // Find candle closest to hover price or last candle
                     candle = mod._chartData.candles.reduce((prev, curr) => {
                         return Math.abs(curr.close - hoverPrice) < Math.abs(prev.close - hoverPrice) ? curr : prev;
                     }, mod._chartData.candles[mod._chartData.candles.length - 1]);
@@ -337,12 +395,27 @@
         const tr = Math.max((candle.high || 0) - (candle.low || 0), 0);
         if (inspectTr) inspectTr.textContent = `${curr}${tr.toFixed(2)}`;
 
-        const volItem = mod._volumeSeries ? param.seriesData.get(mod._volumeSeries) : null;
-        if (inspectVol && volItem) {
-            const v = volItem.value || 0;
-            inspectVol.textContent = `Vol: ${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`;
+        // Volume surge multiple
+        const volItem = mod._volumeSeries && param.seriesData ? param.seriesData.get(mod._volumeSeries) : null;
+        const v = volItem ? Number(volItem.value || 0) : Number(candle.volume || 0);
+        const avgVol = mod._avgVolume || 1;
+        const volRatio = (v / avgVol).toFixed(1);
+
+        if (inspectVol) {
+            inspectVol.textContent = `Vol: ${v ? (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v) : '--'} (${volRatio}x avg)`;
+            if (Number(volRatio) >= 2.0) {
+                inspectVol.style.background = 'rgba(16, 185, 129, 0.25)';
+                inspectVol.style.color = '#10b981';
+            } else if (Number(volRatio) >= 1.2) {
+                inspectVol.style.background = 'rgba(56, 189, 248, 0.2)';
+                inspectVol.style.color = '#38bdf8';
+            } else {
+                inspectVol.style.background = 'rgba(255, 255, 255, 0.08)';
+                inspectVol.style.color = '#ededed';
+            }
         }
 
+        // Wick Delta (Buyer Absorption vs Seller Rejection Pressure)
         if (inspectDelta && candle.high !== undefined && candle.low !== undefined) {
             const rng = Math.max(candle.high - candle.low, 0.001);
             const buyRatio = Math.round(((candle.close - candle.low) / rng) * 100);
@@ -353,7 +426,7 @@
         }
 
         // Zone intersection check
-        if (inspectZone && mod._chartData && mod._chartData.indicators) {
+        if (inspectZoneDetails && mod._chartData && mod._chartData.indicators) {
             const ind = mod._chartData.indicators;
             let matchedZone = null;
             let zoneColor = '#a855f7';
@@ -396,7 +469,7 @@
                 const vah = ind.vah;
                 const val = ind.val;
                 if (Math.abs(hoverPrice - poc) <= (poc * 0.002)) {
-                    matchedZone = `Volume Profile POC (Point of Control) @ ${curr}${poc.toFixed(2)}`;
+                    matchedZone = `Volume Profile POC @ ${curr}${poc.toFixed(2)}`;
                     zoneColor = '#eab308';
                 } else if (vah && Math.abs(hoverPrice - vah) <= (vah * 0.002)) {
                     matchedZone = `Value Area High (VAH 70%) @ ${curr}${vah.toFixed(2)}`;
@@ -419,11 +492,17 @@
             }
 
             if (matchedZone) {
-                inspectZone.textContent = matchedZone;
-                inspectZone.style.color = zoneColor;
+                inspectZoneDetails.textContent = matchedZone;
+                if (inspectZone) {
+                    inspectZone.style.color = zoneColor;
+                    inspectZone.style.borderColor = zoneColor;
+                }
             } else {
-                inspectZone.textContent = 'Free Flow / Fair Value Zone';
-                inspectZone.style.color = 'var(--text-secondary)';
+                inspectZoneDetails.textContent = 'Free Flow / Fair Value Zone';
+                if (inspectZone) {
+                    inspectZone.style.color = '#eab308';
+                    inspectZone.style.borderColor = 'rgba(234,179,8,0.25)';
+                }
             }
         }
     };
@@ -631,7 +710,7 @@
                     position: ob.type === 'BULLISH_OB' ? 'belowBar' : 'aboveBar',
                     color: ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e',
                     shape: ob.type === 'BULLISH_OB' ? 'arrowUp' : 'arrowDown',
-                    text: (ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB')) + ' (' + (ob.status || 'UNMIT') + ')',
+                    text: `${ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB')} (${ob.status || 'UNMIT'})`,
                 });
             });
         }
@@ -737,15 +816,15 @@
         }
 
         // 3. Microstructure Imbalance Widget
-        const micro = ind.microstructure || {};
+        const micro = ind.microstructure || data.microstructure || {};
         const buyDepthEl = document.getElementById('commKpiBuyDepth');
         const sellDepthEl = document.getElementById('commKpiSellDepth');
         const buyDepthBar = document.getElementById('commKpiBuyDepthBar');
         const cvdBadge = document.getElementById('commKpiCvdBadge');
         const spreadProxyEl = document.getElementById('commKpiSpreadProxy');
 
-        const buyPct = micro.resting_buy_depth_pct !== undefined ? micro.resting_buy_depth_pct : 50.0;
-        const sellPct = micro.resting_sell_depth_pct !== undefined ? micro.resting_sell_depth_pct : 50.0;
+        const buyPct = micro.buy_depth_pct !== undefined ? micro.buy_depth_pct : (micro.resting_buy_depth_pct !== undefined ? micro.resting_buy_depth_pct : 50.0);
+        const sellPct = micro.sell_depth_pct !== undefined ? micro.sell_depth_pct : (micro.resting_sell_depth_pct !== undefined ? micro.resting_sell_depth_pct : 50.0);
 
         if (buyDepthEl) buyDepthEl.textContent = `${buyPct}%`;
         if (sellDepthEl) sellDepthEl.textContent = `${sellPct}%`;
@@ -766,8 +845,9 @@
             }
         }
 
-        if (spreadProxyEl && micro.spread_proxy !== undefined) {
-            spreadProxyEl.textContent = `Spread: ~${curr}${micro.spread_proxy}`;
+        if (spreadProxyEl) {
+            const spreadText = micro.spread_bps !== undefined ? `${micro.spread_bps} bps` : (micro.spread_proxy !== undefined ? `~$${micro.spread_proxy}` : '~$0.05');
+            spreadProxyEl.textContent = `Spread: ${spreadText}`;
         }
 
         // 4. 3-Column Tactical Trade HUD Deck

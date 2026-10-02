@@ -55,7 +55,7 @@
     </div>
 
     <!-- 2. Quick Asset Selector Pills -->
-    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
         <span style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem;">Commodities:</span>
         <button class="btn btn-sm btn-secondary comm-asset-pill active" data-asset="GOLD" onclick="commoditiesModule.switchCommodity('GOLD')">🥇 Gold</button>
         <button class="btn btn-sm btn-secondary comm-asset-pill" data-asset="SILVER" onclick="commoditiesModule.switchCommodity('SILVER')">🥈 Silver</button>
@@ -66,8 +66,68 @@
         <button class="btn btn-sm btn-secondary comm-asset-pill" data-asset="PLATINUM" onclick="commoditiesModule.switchCommodity('PLATINUM')">🪙 Platinum</button>
     </div>
 
+    <!-- Interactive SMC & Leading Indicators Playbook (Collapsible Drawer) -->
+    <div style="margin-bottom: 1.25rem; background: rgba(24,24,27,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+        <button type="button" onclick="commoditiesModule.togglePlaybook()" id="commPlaybookToggleBtn" style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: transparent; border: none; color: var(--text-primary); cursor: pointer; text-align: left; font-size: 0.85rem; font-weight: 700;">
+            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                <span>📖</span>
+                <span>SMC &amp; Leading Indicators Playbook <span style="font-weight: 400; color: var(--text-secondary); font-size: 0.78rem;">(Why You See Setups Before The Move)</span></span>
+            </span>
+            <span id="commPlaybookChevron" style="font-size: 0.8rem; color: var(--text-secondary); transition: transform 0.2s;">▼</span>
+        </button>
+        <div id="commPlaybookContent" style="display: none; padding: 0 1rem 1rem 1rem; border-top: 1px solid rgba(255,255,255,0.06);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;">
+                <!-- 1. Demand & Supply OB -->
+                <div style="background: rgba(10,10,10,0.6); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; padding: 0.75rem;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #10b981; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>🧱</span> Demand &amp; Supply Order Blocks (OB)
+                    </div>
+                    <p style="font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                        Resting institutional footprints established on the impulse origin candle. <strong>D-OB</strong> marks the last down candle before a violent surge; <strong>S-OB</strong> marks the last up candle before a breakdown. Unmitigated zones serve as high-probability entry magnets.
+                    </p>
+                </div>
+                <!-- 2. Fair Value Gaps -->
+                <div style="background: rgba(10,10,10,0.6); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 0.75rem;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>⚡</span> Fair Value Gaps (FVG)
+                    </div>
+                    <p style="font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                        3-bar imbalance vacuum where price expands so rapidly that liquidity is left one-sided. Price dynamically gravitates back to rebalance the gap midpoint before continuing the trend.
+                    </p>
+                </div>
+                <!-- 3. Liquidity Sweeps -->
+                <div style="background: rgba(10,10,10,0.6); border: 1px solid rgba(244,63,94,0.2); border-radius: 8px; padding: 0.75rem;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #f43f5e; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>🎯</span> Liquidity Sweeps (BSL / SSL)
+                    </div>
+                    <p style="font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                        Institutional stop hunts. <strong>BSL Sweeps</strong> probe above swing highs to trigger buyer stops before reversing; <strong>SSL Sweeps</strong> flush below swing lows to absorb seller liquidity into demand.
+                    </p>
+                </div>
+                <!-- 4. Session Anchored VWAP -->
+                <div style="background: rgba(10,10,10,0.6); border: 1px solid rgba(168,85,247,0.2); border-radius: 8px; padding: 0.75rem;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #a855f7; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>📐</span> Session VWAP (&plusmn;1.5&sigma;)
+                    </div>
+                    <p style="font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                        Volume-weighted average price serves as the institutional equilibrium baseline. The &plusmn;1.5 standard deviation dispersion envelope identifies overextended mean-reversion extremes.
+                    </p>
+                </div>
+                <!-- 5. Volume Profile POC -->
+                <div style="background: rgba(10,10,10,0.6); border: 1px solid rgba(234,179,8,0.2); border-radius: 8px; padding: 0.75rem;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: #eab308; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>📊</span> Volume Profile POC &amp; Value Area
+                    </div>
+                    <p style="font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+                        <strong>POC (Point of Control)</strong> defines the highest-volume price node where heavy accumulation took place. <strong>VAH / VAL</strong> enclose 70% of total volume distribution, acting as key acceptance brackets.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 3. Key Commodities KPI Cards -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
         <!-- Spot Price -->
         <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
             <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">Spot Price</div>
@@ -159,21 +219,27 @@
         </div>
 
         <!-- Sticky Hover Inspector Bar -->
-        <div id="commHoverInspectorCard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;background:#09090b;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.5rem 0.85rem;margin-bottom:0.75rem;font-family:var(--font-mono);font-size:0.75rem;">
-            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                <span style="color:var(--text-secondary);font-weight:600;">BAR:</span>
-                <span id="commInspectTime" style="color:#ededed;">--</span>
-                <span>O: <strong id="commInspectOpen" style="color:#fff;">--</strong></span>
-                <span>H: <strong id="commInspectHigh" style="color:#10b981;">--</strong></span>
-                <span>L: <strong id="commInspectLow" style="color:#f43f5e;">--</strong></span>
-                <span>C: <strong id="commInspectClose" style="color:#fff;">--</strong></span>
-                <span style="color:var(--text-secondary);">TR: <strong id="commInspectTr" style="color:#fbbf24;">--</strong></span>
-                <span id="commInspectVol" class="badge" style="background:rgba(255,255,255,0.08);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:4px;font-size:0.7rem;">Vol: --</span>
-                <span id="commInspectDelta" class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:0.1rem 0.35rem;border-radius:4px;font-size:0.7rem;">Delta: --</span>
+        <div id="commHoverInspectorCard" style="background: rgba(15,15,18,0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem;">
+            <!-- Left: Cursor Time & OHLC & TR -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <span id="commInspectTime" style="color: #38bdf8; font-weight: 700;">Cursor: --</span>
+                <span style="color: var(--text-secondary);">O: <strong id="commInspectOpen" style="color: #fff;">--</strong></span>
+                <span style="color: var(--text-secondary);">H: <strong id="commInspectHigh" style="color: #10b981;">--</strong></span>
+                <span style="color: var(--text-secondary);">L: <strong id="commInspectLow" style="color: #f43f5e;">--</strong></span>
+                <span style="color: var(--text-secondary);">C: <strong id="commInspectClose" style="color: #fff;">--</strong></span>
+                <span style="color: var(--text-secondary);">TR: <strong id="commInspectTr" style="color: #fbbf24;">--</strong></span>
             </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="color:var(--text-secondary);font-weight:600;">ACTIVE ZONE:</span>
-                <span id="commInspectZone" style="color:#a855f7;font-weight:700;">Hover over chart / SMC zones</span>
+
+            <!-- Middle: Volume Surge & Wick Pressure -->
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <span id="commInspectVol" class="badge" style="background: rgba(255,255,255,0.08); color: #ededed; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Vol: --</span>
+                <span id="commInspectDelta" class="badge" style="background: rgba(56,189,248,0.12); color: #38bdf8; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Delta: --</span>
+            </div>
+
+            <!-- Right: Active SMC Zone Forensics -->
+            <div id="commInspectZone" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.73rem; background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.25); color: #eab308; padding: 0.2rem 0.55rem; border-radius: 5px;">
+                <span>🎯</span>
+                <span id="commInspectZoneDetails">Hover over chart / SMC zones</span>
             </div>
         </div>
 
