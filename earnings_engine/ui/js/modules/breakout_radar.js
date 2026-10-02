@@ -1667,6 +1667,17 @@
         };
 
         app.openBreakoutInspectorDrawer = function(tickerOrCandidate) {
+            const ticker = typeof tickerOrCandidate === 'object' && tickerOrCandidate !== null
+                ? (tickerOrCandidate.ticker || tickerOrCandidate.symbol)
+                : tickerOrCandidate;
+            const currentRadarList = Array.isArray(app._breakoutData)
+                ? app._breakoutData.map(c => c.ticker || c.symbol).filter(Boolean)
+                : [];
+
+            if (typeof app.openStockDrawer === 'function') {
+                return app.openStockDrawer(ticker, { initialSection: 'structure', list: currentRadarList });
+            }
+
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
 
@@ -1807,7 +1818,7 @@
             }
 
             if (openDrawer) {
-                app.openBreakoutInspectorDrawer();
+                app.openBreakoutInspectorDrawer(ticker);
             }
         };
 

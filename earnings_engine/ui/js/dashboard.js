@@ -623,11 +623,36 @@ const API_BASE = window.location.origin;
                 const initialTab = this.getInitialTab();
                 this.switchTab(initialTab, true, true);
 
+                // Check if deep link hash points to stock drawer (e.g. #stock/RELIANCE.NS)
+                const curHash = window.location.hash ? window.location.hash.replace(/^#/, '').trim() : '';
+                if (curHash.startsWith('stock/')) {
+                    const stockSym = decodeURIComponent(curHash.substring(6)).trim();
+                    if (stockSym && typeof app.openStockDrawer === 'function') {
+                        setTimeout(() => app.openStockDrawer(stockSym), 100);
+                    }
+                }
+
                 window.addEventListener('hashchange', () => {
+                    const hash = window.location.hash ? window.location.hash.replace(/^#/, '').trim() : '';
+                    if (hash.startsWith('stock/')) {
+                        const stockSym = decodeURIComponent(hash.substring(6)).trim();
+                        if (stockSym && typeof app.openStockDrawer === 'function') {
+                            app.openStockDrawer(stockSym);
+                            return;
+                        }
+                    }
                     const tab = this.getInitialTab();
                     this.switchTab(tab, false, false);
                 });
                 window.addEventListener('popstate', () => {
+                    const hash = window.location.hash ? window.location.hash.replace(/^#/, '').trim() : '';
+                    if (hash.startsWith('stock/')) {
+                        const stockSym = decodeURIComponent(hash.substring(6)).trim();
+                        if (stockSym && typeof app.openStockDrawer === 'function') {
+                            app.openStockDrawer(stockSym);
+                            return;
+                        }
+                    }
                     const tab = this.getInitialTab();
                     this.switchTab(tab, false, false);
                 });

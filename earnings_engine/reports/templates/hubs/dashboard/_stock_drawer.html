@@ -1,0 +1,497 @@
+<!-- ========================================================================= -->
+<!-- 🚀 NEXUS INTELLIGENCE PLATFORM — UNIVERSAL ASYNC STOCK SLIDE-OVER DRAWER -->
+<!-- ========================================================================= -->
+
+<!-- Backdrop -->
+<div id="stockDrawerBackdrop" class="stock-drawer-backdrop" onclick="app.closeStockDrawer()"></div>
+
+<!-- Slide-Over Drawer Aside -->
+<aside id="stockSliderDrawer" class="stock-slider-drawer" aria-label="Stock Intelligence Drawer">
+    <!-- ↔️ Left Resizer Drag Handle -->
+    <div id="stockDrawerResizer" class="stock-drawer-resizer" title="Drag to adjust drawer width"></div>
+
+    <!-- Sticky Topbar HUD -->
+    <div class="stock-drawer-topbar">
+        <!-- Left: Stock Identity & Live Badges -->
+        <div class="stock-drawer-identity">
+            <span style="font-size:1.15rem;">📈</span>
+            <span id="drawerTicker" class="drawer-ticker-badge">TICKER</span>
+            <span id="drawerCompanyName" class="drawer-company-name">Company Intelligence</span>
+            <span id="drawerLivePrice" class="drawer-quote-pill">--</span>
+            <span id="drawerChangeBadge" class="drawer-delta-badge neutral">--</span>
+        </div>
+
+        <!-- Right: Stepper, Presets, Popout, Refresh, Close -->
+        <div class="stock-drawer-controls">
+            <!-- Stepper [◄ i/N ►] -->
+            <div class="drawer-stepper-group" title="Cycle through list candidates">
+                <button type="button" onclick="app.stepStockDrawer(-1)" class="drawer-stepper-btn" title="Previous stock ([)">◄</button>
+                <span id="drawerStepperCount" class="drawer-stepper-count">[0 / 0]</span>
+                <button type="button" onclick="app.stepStockDrawer(1)" class="drawer-stepper-btn" title="Next stock (])">►</button>
+            </div>
+
+            <!-- Width Presets -->
+            <div class="drawer-preset-group">
+                <button type="button" onclick="app.setStockDrawerWidth(640)" class="drawer-preset-btn" title="Compact width (640px)">640</button>
+                <button type="button" onclick="app.setStockDrawerWidth(880)" class="drawer-preset-btn" title="Standard width (880px)">880</button>
+                <button type="button" onclick="app.setStockDrawerWidth(1100)" class="drawer-preset-btn" title="Wide Pro width (1100px)">1100</button>
+                <button type="button" onclick="app.setStockDrawerWidth('98vw')" class="drawer-preset-btn preset-max" title="Full screen width (98vw)">Max ⇱</button>
+            </div>
+
+            <!-- Popout Link -->
+            <a id="drawerPopoutLink" href="#" target="_blank" class="drawer-btn-action" title="Open in full dedicated tab">
+                <span>Popout</span> ↗
+            </a>
+
+            <!-- Refresh Button -->
+            <button type="button" onclick="app.refreshStockDrawer()" class="drawer-btn-action" title="Refresh drawer data">
+                🔄
+            </button>
+
+            <!-- Close Button -->
+            <button type="button" onclick="app.closeStockDrawer()" class="drawer-btn-close" title="Close Drawer (Esc)">
+                ✕ <span style="font-size:0.65rem;opacity:0.75;font-family:var(--font-mono, monospace);">(Esc)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick-Jump Navigation Ribbon -->
+    <nav class="stock-drawer-nav" aria-label="Stock Drawer Sections">
+        <button type="button" class="drawer-nav-pill active" onclick="app.scrollDrawerTo('#drawerSecQuote')">📊 Quote &amp; 52W</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecChart')">📉 Chart Studio</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecStructure')">📐 Structure</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecEPS')">💵 Formula EPS</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecConsensus')">🧠 AI Consensus</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecInstitutional')">🏛️ Institutional</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecFactors')">⭐ Factors</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecNews')">📰 News</button>
+        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecNotes')">📝 Notes</button>
+    </nav>
+
+    <!-- Scrollable Drawer Body -->
+    <div id="stockDrawerBody" class="stock-drawer-body">
+
+        <!-- ======================================================== -->
+        <!-- 1. QUOTE & 52W GAUGE CARD                                -->
+        <!-- ======================================================== -->
+        <section id="drawerSecQuote" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">📊</span>
+                    <span>Live Market Quote &amp; 52W Range</span>
+                </div>
+                <span id="drawerQuoteTimeframe" class="drawer-timeframe-badge">🟢 Real-Time / EOD</span>
+            </div>
+
+            <!-- Shimmer -->
+            <div id="drawerQuoteShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row" style="width: 70%;"></div>
+                <div class="drawer-shimmer drawer-shimmer-box" style="margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- Content -->
+            <div id="drawerQuoteContent" style="display:none;">
+                <div class="drawer-grid-metrics">
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Open</span>
+                        <span id="drawerValOpen" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">High</span>
+                        <span id="drawerValHigh" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Low</span>
+                        <span id="drawerValLow" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Prev Close</span>
+                        <span id="drawerValPrevClose" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Volume</span>
+                        <span id="drawerValVolume" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Surge (5D vs 63D)</span>
+                        <span id="drawerValVolSurge" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Market Cap</span>
+                        <span id="drawerValMcap" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">P/E (TTM)</span>
+                        <span id="drawerValPE" class="drawer-metric-val">--</span>
+                    </div>
+                </div>
+
+                <!-- 52-Week Range Gauge Bar -->
+                <div class="drawer-gauge-container">
+                    <div class="drawer-gauge-header">
+                        <span>52W Low: <strong id="drawerVal52Low" style="color:#fb7185;">--</strong></span>
+                        <span style="font-weight:700;color:#ffffff;">52-Week Position Gauge</span>
+                        <span>52W High: <strong id="drawerVal52High" style="color:#34d399;">--</strong></span>
+                    </div>
+                    <div class="drawer-gauge-track">
+                        <div class="drawer-gauge-gradient"></div>
+                        <div id="drawerGaugeMarker" class="drawer-gauge-marker" style="left: 50%;"></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.64rem;color:#71717a;font-family:var(--font-mono, monospace);">
+                        <span>Deep Value Floor</span>
+                        <span id="drawerGaugePct">--% of 52W Range</span>
+                        <span>All-Time Resistance</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 2. QUANTUM CHART STUDIO CARD                             -->
+        <!-- ======================================================== -->
+        <section id="drawerSecChart" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">📉</span>
+                    <span>Quantum Chart Studio</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.35rem;">
+                    <button type="button" onclick="app.setDrawerChartTF('1D')" class="btn-preset-chip">1D</button>
+                    <button type="button" onclick="app.setDrawerChartTF('1W')" class="btn-preset-chip">1W</button>
+                    <button type="button" onclick="app.setDrawerChartTF('1M')" class="btn-preset-chip">1M</button>
+                    <button type="button" onclick="app.setDrawerChartTF('1Y')" class="btn-preset-chip active">1Y</button>
+                </div>
+            </div>
+
+            <!-- Chart Container / Embed -->
+            <div id="drawerChartFrameContainer" style="height:340px;background:#05070d;border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;position:relative;">
+                <div id="drawerChartShimmer" class="drawer-shimmer drawer-shimmer-chart" style="position:absolute;inset:0;"></div>
+                <iframe id="drawerChartIframe" src="" style="width:100%;height:100%;border:none;background:transparent;display:block;" onload="document.getElementById('drawerChartShimmer').style.display='none';"></iframe>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 3. MARKET STRUCTURE & BOUNDARIES HUD                     -->
+        <!-- ======================================================== -->
+        <section id="drawerSecStructure" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">📐</span>
+                    <span>Market Structure &amp; Execution Bounds</span>
+                </div>
+                <span id="drawerStructureTimeframe" class="drawer-timeframe-badge">Swing / EOD</span>
+            </div>
+
+            <div id="drawerStructureShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-row" style="width:85%;"></div>
+                <div class="drawer-shimmer drawer-shimmer-box"></div>
+            </div>
+
+            <div id="drawerStructureContent" style="display:none;">
+                <div class="drawer-grid-metrics">
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Support (S1)</span>
+                        <span id="drawerValSupport" class="drawer-metric-val" style="color:#34d399;">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Resistance (R1)</span>
+                        <span id="drawerValResistance" class="drawer-metric-val" style="color:#fb7185;">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">ATR (14D)</span>
+                        <span id="drawerValATR" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">RSI (14D)</span>
+                        <span id="drawerValRSI" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">20 DMA</span>
+                        <span id="drawerValSMA20" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">50 DMA</span>
+                        <span id="drawerValSMA50" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">200 DMA</span>
+                        <span id="drawerValSMA200" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Trend Bias</span>
+                        <span id="drawerValTrendBias" class="drawer-metric-val">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 4. FORMULA EPS DERIVATION & MATRIX                       -->
+        <!-- ======================================================== -->
+        <section id="drawerSecEPS" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">💵</span>
+                    <span>Formula EPS Derivation &amp; History</span>
+                </div>
+                <span class="drawer-timeframe-badge">Last 12 Quarters</span>
+            </div>
+
+            <div id="drawerEPSShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+            </div>
+
+            <div id="drawerEPSContent" style="display:none;">
+                <div class="drawer-table-wrap">
+                    <table class="drawer-table">
+                        <thead>
+                            <tr>
+                                <th>QUARTER</th>
+                                <th style="text-align:right;">REPORTED</th>
+                                <th style="text-align:right;">ESTIMATE</th>
+                                <th style="text-align:right;">SURPRISE</th>
+                                <th style="text-align:right;">SOURCE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drawerEPSTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 5. OMNIROUTE 4-MODEL AI CONSENSUS ENGINE                 -->
+        <!-- ======================================================== -->
+        <section id="drawerSecConsensus" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">🧠</span>
+                    <span>OmniRoute 4-Model AI Consensus Engine</span>
+                </div>
+                <span id="drawerConsensusBadge" class="drawer-timeframe-badge">On-Demand Zero-Token</span>
+            </div>
+
+            <!-- Zero-Token State (Default if no cached consensus) -->
+            <div id="drawerConsensusZeroToken" class="drawer-consensus-zero-token">
+                <div style="font-size:1.5rem;">🧠</div>
+                <div style="font-weight:700;font-size:0.90rem;color:#e2e8f0;">Zero-Token Default Guarantee</div>
+                <div style="font-size:0.75rem;color:#94a3b8;max-width:380px;">
+                    Execute multi-model quantitative consensus across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large on demand.
+                </div>
+                <button type="button" onclick="app.triggerDrawerConsensus()" class="drawer-consensus-btn">
+                    <span>⚡ Run 4-Model AI Consensus</span>
+                </button>
+            </div>
+
+            <!-- Consensus Loading Spinner -->
+            <div id="drawerConsensusLoading" style="display:none;text-align:center;padding:1.8rem 1rem;">
+                <div style="width:32px;height:32px;border:3px solid rgba(59,130,246,0.2);border-radius:50%;border-top-color:#38bdf8;animation:spin 0.8s linear infinite;margin:0 auto 0.75rem auto;"></div>
+                <div style="font-size:0.82rem;color:#cbd5e1;font-weight:700;font-family:var(--font-mono, monospace);">
+                    Synthesizing Multi-Model Reasoning across OmniRoute Gateway...
+                </div>
+            </div>
+
+            <!-- Consensus Content -->
+            <div id="drawerConsensusContent" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.65rem 0.85rem;margin-bottom:0.65rem;">
+                    <div>
+                        <div style="font-size:0.65rem;color:#8e97a8;font-family:var(--font-mono, monospace);">CONSENSUS VERDICT</div>
+                        <div id="drawerConsensusVerdict" style="font-weight:800;font-size:1.05rem;font-family:var(--font-mono, monospace);">--</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.65rem;color:#8e97a8;font-family:var(--font-mono, monospace);">CONFIDENCE SCORE</div>
+                        <div id="drawerConsensusConfidence" style="font-weight:800;font-size:1.05rem;color:#38bdf8;font-family:var(--font-mono, monospace);">--</div>
+                    </div>
+                </div>
+
+                <!-- 4-Model Breakdown Grid -->
+                <div id="drawerConsensusModelsGrid" class="drawer-models-grid">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- AI Key Rationale / Catalyst Summary -->
+                <div style="margin-top:0.65rem;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.65rem 0.85rem;">
+                    <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;font-family:var(--font-mono, monospace);margin-bottom:0.25rem;">KEY RATIONALE &amp; CATALYSTS</div>
+                    <div id="drawerConsensusRationale" style="font-size:0.75rem;color:#cbd5e1;line-height:1.5;">--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 6. INSTITUTIONAL FORENSICS HUD                           -->
+        <!-- ======================================================== -->
+        <section id="drawerSecInstitutional" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">🏛️</span>
+                    <span>Institutional Forensics &amp; AMFI Flows</span>
+                </div>
+                <span id="drawerInstTimeframe" class="drawer-timeframe-badge">QoQ Filing</span>
+            </div>
+
+            <div id="drawerInstShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-box"></div>
+            </div>
+
+            <div id="drawerInstContent" style="display:none;">
+                <!-- Shareholding Pattern -->
+                <div class="drawer-grid-metrics" style="margin-bottom:0.65rem;">
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Promoters</span>
+                        <span id="drawerInstPromoter" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">FII / FPI</span>
+                        <span id="drawerInstFII" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">DII / Mutual Funds</span>
+                        <span id="drawerInstDII" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Public / Retail</span>
+                        <span id="drawerInstPublic" class="drawer-metric-val">--</span>
+                    </div>
+                </div>
+
+                <!-- Top Fund Holdings Table -->
+                <div style="font-size:0.68rem;font-weight:700;color:#94a3b8;font-family:var(--font-mono, monospace);margin-bottom:0.35rem;text-transform:uppercase;">
+                    Top Mutual Funds &amp; Institutional Stakes
+                </div>
+                <div class="drawer-table-wrap">
+                    <table class="drawer-table">
+                        <thead>
+                            <tr>
+                                <th>INSTITUTION / FUND</th>
+                                <th style="text-align:right;">HOLDING %</th>
+                                <th style="text-align:right;">QoQ CHG</th>
+                                <th style="text-align:right;">VALUE (₹CR)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drawerInstHoldingsBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 7. FACTOR EVALUATION & QUALITY RATING                     -->
+        <!-- ======================================================== -->
+        <section id="drawerSecFactors" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">⭐</span>
+                    <span>Factor Evaluation &amp; Composite Rating</span>
+                </div>
+                <span id="drawerRatingBadge" class="drawer-timeframe-badge">Multi-Factor</span>
+            </div>
+
+            <div id="drawerFactorsShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-box"></div>
+            </div>
+
+            <div id="drawerFactorsContent" style="display:none;">
+                <div style="display:flex;align-items:center;gap:0.75rem;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.65rem 0.85rem;margin-bottom:0.65rem;">
+                    <div id="drawerRatingGradeBadge" style="font-size:1.6rem;font-weight:900;font-family:var(--font-mono, monospace);color:#38bdf8;line-height:1;">
+                        --
+                    </div>
+                    <div>
+                        <div id="drawerRatingHeadline" style="font-size:0.82rem;font-weight:700;color:#ffffff;">Rating Summary</div>
+                        <div id="drawerRatingSubtext" style="font-size:0.70rem;color:#94a3b8;">Industry benchmarked quality analysis</div>
+                    </div>
+                </div>
+
+                <div class="drawer-grid-metrics">
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Valuation</span>
+                        <span id="drawerFactorValuation" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Growth</span>
+                        <span id="drawerFactorGrowth" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Profitability</span>
+                        <span id="drawerFactorProfitability" class="drawer-metric-val">--</span>
+                    </div>
+                    <div class="drawer-metric-tile">
+                        <span class="drawer-metric-label">Financial Health</span>
+                        <span id="drawerFactorHealth" class="drawer-metric-val">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 8. LIVE NEWS CATALYSTS & DISCLOSURES                     -->
+        <!-- ======================================================== -->
+        <section id="drawerSecNews" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">📰</span>
+                    <span>Live News Catalysts &amp; Filings</span>
+                </div>
+                <button type="button" onclick="app.refreshDrawerNews()" class="btn-preset-chip" title="Fetch fresh delta">Delta Sync 🔄</button>
+            </div>
+
+            <div id="drawerNewsShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+            </div>
+
+            <div id="drawerNewsContent" style="display:none;">
+                <div id="drawerNewsList" style="display:flex;flex-direction:column;gap:0.5rem;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================== -->
+        <!-- 9. INSTITUTIONAL NOTES & QUALITATIVE LOG                 -->
+        <!-- ======================================================== -->
+        <section id="drawerSecNotes" class="drawer-card">
+            <div class="drawer-card-header">
+                <div class="drawer-card-title">
+                    <span class="drawer-card-title-icon">📝</span>
+                    <span>Institutional Notes &amp; Quantitative Log</span>
+                </div>
+                <span class="drawer-timeframe-badge">Saved Local / Cloud</span>
+            </div>
+
+            <div id="drawerNotesShimmer">
+                <div class="drawer-shimmer drawer-shimmer-row"></div>
+                <div class="drawer-shimmer drawer-shimmer-box"></div>
+            </div>
+
+            <div id="drawerNotesContent" style="display:none;">
+                <!-- Automated Quantitative Commentary -->
+                <div id="drawerAutoNote" style="font-size:0.75rem;color:#cbd5e1;line-height:1.5;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.65rem 0.85rem;margin-bottom:0.65rem;">
+                    --
+                </div>
+
+                <!-- Custom User Observation Note -->
+                <div style="display:flex;flex-direction:column;gap:0.35rem;">
+                    <label style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono, monospace);text-transform:uppercase;">
+                        Custom Trading Thesis / Observation:
+                    </label>
+                    <textarea id="drawerUserNoteInput" rows="3" style="width:100%;background:#000000;border:1px solid rgba(255,255,255,0.12);border-radius:5px;color:#ffffff;font-size:0.75rem;padding:0.5rem;font-family:var(--font-mono, monospace);resize:vertical;" placeholder="Add private notes on setup confirmation, volume profile, or target levels..."></textarea>
+                    <div style="display:flex;justify-content:flex-end;">
+                        <button type="button" onclick="app.saveDrawerUserNote()" class="btn-preset-chip active" style="padding:0.25rem 0.75rem;">
+                            💾 Save Thesis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+</aside>

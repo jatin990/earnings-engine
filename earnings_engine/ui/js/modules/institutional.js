@@ -2332,6 +2332,16 @@
             const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : clean + '.NS';
             this._selectedTicker = cleanTicker;
 
+            const instList = [
+                ...(this.institutionalData?.accumulating || []).map(i => i.ticker),
+                ...(this.institutionalData?.distributing || []).map(i => i.ticker),
+                ...(this.institutionalData?.smartMoney || []).map(i => i.ticker),
+            ].filter(Boolean);
+
+            if (typeof app.openStockDrawer === 'function') {
+                return app.openStockDrawer(cleanTicker, { initialSection: 'institutional', list: instList });
+            }
+
             // Open the drawer shell (reparent to body + slide in)
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
