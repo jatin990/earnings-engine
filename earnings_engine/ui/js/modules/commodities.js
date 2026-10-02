@@ -887,6 +887,11 @@
         const regimeTag = document.getElementById('commRegimeTag');
         const momentumBias = document.getElementById('commMomentumBias');
         const regimeBadge = document.getElementById('commRegimeBadge');
+        const timelineBadge = document.getElementById('commTimelineBadge');
+
+        if (timelineBadge) {
+            timelineBadge.textContent = `📅 5D SMC Window (${(data.candles || []).length} bars)`;
+        }
 
         if (regimeTag) regimeTag.textContent = hud.regime || 'NEUTRAL';
         if (momentumBias) momentumBias.textContent = hud.momentum_bias?.replace(/_/g, ' ') || 'NEUTRAL';
