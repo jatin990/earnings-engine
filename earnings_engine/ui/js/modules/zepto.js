@@ -4547,7 +4547,12 @@ const zeptoApp = {
             const res = await fetch(`/api/v1/zepto/utilization/summary?${params.toString()}`);
             if (!res.ok) return;
             const data = await res.json();
+            this.utilizationData = data;
             this.renderUtilization(data);
+
+            // Re-render active staff utilization with real metrics
+            const activeStaff = (this.employees || []).filter(e => (e.status === 'ACTIVE' || e.status === 'ON_PROBATION') && e.is_hidden !== 1);
+            this.renderActiveStaffUtilization(activeStaff);
         } catch (err) {
             console.error('[ZEPTO-UTIL] Error loading utilization:', err);
         }
@@ -5226,19 +5231,47 @@ const zeptoApp = {
             return;
         }
 
+        // Map real utilization telemetry if available from utilization summary
+        const utilMap = {};
+        if (this.utilizationData && Array.isArray(this.utilizationData.records)) {
+            this.utilizationData.records.forEach(r => {
+                const key = (r.employee_name || r.name || '').trim().toLowerCase();
+                const idKey = (r.employee_id || r.id || '').trim().toLowerCase();
+                if (key) utilMap[key] = r;
+                if (idKey) utilMap[idKey] = r;
+            });
+        }
+
         tbody.innerHTML = activeStaff.map(emp => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
 
-            // Pick speed tier based on rating and role
-            const estIpp = emp.role === 'PICKER' ? Math.round(115 + (emp.rating || 5.0) * 8) : (emp.role === 'SHIFT_INCHARGE' ? 145 : 100);
-            const estItems = emp.role === 'PICKER' ? Math.round(estIpp * 7.5) : Math.round(estIpp * 4);
-            const estHours = emp.role === 'PICKER' ? '7.5h' : '8.0h';
-            const tierBadge = estIpp >= 140
-                ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ELITE</span>'
-                : (estIpp >= 120
-                    ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">STANDARD</span>'
-                    : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">TRAINING</span>');
+            const nameKey = (emp.name || '').trim().toLowerCase();
+            const idKey = (emp.id || '').trim().toLowerCase();
+            const realUtil = utilMap[nameKey] || utilMap[idKey] || null;
+
+            let itemsDisplay = '—';
+            let hoursDisplay = '—';
+            let ippDisplay = 'UNLOGGED';
+            let tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">UNLOGGED</span>';
+
+            if (realUtil) {
+                const items = realUtil.items_picked || realUtil.items_count || 0;
+                const hours = realUtil.hours_worked || realUtil.active_hours || 0;
+                const ipp = realUtil.packer_ipp || realUtil.ipp || (hours > 0 ? Math.round(items / hours) : 0);
+
+                itemsDisplay = items > 0 ? items.toLocaleString('en-IN') : '0';
+                hoursDisplay = hours > 0 ? `${hours.toFixed(1)}h` : '0.0h';
+                ippDisplay = ipp > 0 ? `${ipp} IPP` : '—';
+
+                if (ipp >= 140) {
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ELITE</span>';
+                } else if (ipp >= 120) {
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">STANDARD</span>';
+                } else if (ipp > 0) {
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">TRAINING</span>';
+                }
+            }
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
@@ -5248,9 +5281,9 @@ const zeptoApp = {
                     </td>
                     <td class="py-2.5 px-3">${roleBadge}</td>
                     <td class="py-2.5 px-3 text-center">${statusBadge}</td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${estItems.toLocaleString('en-IN')}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${estHours}</td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${estIpp} IPP</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${itemsDisplay}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${hoursDisplay}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${ippDisplay}</td>
                     <td class="py-2.5 px-3 text-center">${tierBadge}</td>
                     <td class="py-2.5 px-3 text-center">
                         <button type="button" onclick="zeptoApp.openEmployeeDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition">
@@ -5277,11 +5310,6 @@ const zeptoApp = {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
 
-            // Defect accuracy estimate based on performance rating
-            const accuracyPct = Math.min(100, (97.0 + ((emp.rating || 5.0) * 0.58))).toFixed(1);
-            const incidents = (emp.rating || 5.0) < 4.5 ? 1 : 0;
-            const defectLoss = incidents > 0 ? (emp.role === 'PICKER' ? 420.0 : 0.0) : 0.0;
-
             return `
                 <tr class="hover:bg-white/[0.02] transition">
                     <td class="py-2.5 px-3">
@@ -5290,12 +5318,12 @@ const zeptoApp = {
                     </td>
                     <td class="py-2.5 px-3">${roleBadge}</td>
                     <td class="py-2.5 px-3 text-center">${statusBadge}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-slate-300">184 hrs</td>
-                    <td class="py-2.5 px-3 text-right font-mono ${incidents > 0 ? 'text-amber-300 font-bold' : 'text-slate-400'}">${incidents}</td>
-                    <td class="py-2.5 px-3 text-right font-mono ${defectLoss > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${this.formatCurrency(defectLoss)}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">—</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">0</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">₹0</td>
                     <td class="py-2.5 px-3 text-center">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${accuracyPct >= 99.0 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'}">
-                            ${accuracyPct}%
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">
+                            UNLOGGED
                         </span>
                     </td>
                     <td class="py-2.5 px-3 text-center">
@@ -5323,7 +5351,6 @@ const zeptoApp = {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
             const stars = this.getRatingStars(emp.rating);
-            const slaPct = (98.0 + Math.min(1.8, (emp.rating || 5.0) * 0.35)).toFixed(1);
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
@@ -5333,10 +5360,10 @@ const zeptoApp = {
                     </td>
                     <td class="py-2.5 px-3">${roleBadge}</td>
                     <td class="py-2.5 px-3 text-center">${statusBadge}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-slate-200">192.0h</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300 font-bold">96.5%</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">—</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">—</td>
                     <td class="py-2.5 px-3 text-center font-mono font-bold text-amber-300">${stars}</td>
-                    <td class="py-2.5 px-3 text-center font-mono font-bold text-indigo-300">${slaPct}%</td>
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-400">—</td>
                     <td class="py-2.5 px-3 text-center">
                         <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-0.5 rounded bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 font-bold text-[10px] border border-indigo-500/30 transition">
                             🏆 Review
@@ -5362,10 +5389,6 @@ const zeptoApp = {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
 
-            // Attributed expense estimate
-            const spendAttributed = emp.role === 'SHIFT_INCHARGE' ? 2450.0 : (emp.role === 'HOUSEKEEPING' ? 850.0 : 450.0);
-            const outOfPocket = emp.role === 'SHIFT_INCHARGE' ? '₹850 (Reimbursed)' : 'None';
-
             return `
                 <tr class="hover:bg-white/[0.02] transition">
                     <td class="py-2.5 px-3">
@@ -5375,8 +5398,8 @@ const zeptoApp = {
                     <td class="py-2.5 px-3">${roleBadge}</td>
                     <td class="py-2.5 px-3 text-center">${statusBadge}</td>
                     <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${this.formatCurrency(emp.base_salary_monthly)}</td>
-                    <td class="py-2.5 px-3 text-right font-mono font-bold text-pink-300">${this.formatCurrency(spendAttributed)}</td>
-                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">${outOfPocket}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">₹0</td>
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">None</td>
                     <td class="py-2.5 px-3 text-center">
                         <button type="button" onclick="zeptoApp.openSalaryDrilldown('${emp.id}')" class="px-2 py-0.5 rounded bg-pink-500/15 hover:bg-pink-500/25 text-pink-300 font-bold text-[10px] border border-pink-500/30 transition">
                             💵 P&L Log

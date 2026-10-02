@@ -3342,7 +3342,31 @@ def get_employee_attendance_detail(
         ).fetchall()
 
         if not records:
-            return None
+            emp = conn.execute(
+                "SELECT * FROM zepto_employees WHERE id = ? OR name = ?",
+                (employee_id, employee_id),
+            ).fetchone()
+            if not emp:
+                return None
+            emp_dict = dict(emp)
+            return {
+                "employee_id": emp_dict["id"],
+                "employee_name": emp_dict["name"],
+                "designation": emp_dict.get("role") or "Unassigned",
+                "store_name": "JMU-Sainik Colony",
+                "total_shifts": 0,
+                "present_count": 0,
+                "absent_count": 0,
+                "week_off_count": 0,
+                "half_day_count": 0,
+                "holiday_count": 0,
+                "attendance_rate_pct": 0.0,
+                "total_hours_worked": 0.0,
+                "avg_shift_hours": 0.0,
+                "avg_break_mins": 0,
+                "risk_tier": "LOW",
+                "punch_history": [],
+            }
 
         records_list = [dict(r) for r in records]
         first = records_list[0]
