@@ -36,7 +36,8 @@ const API_BASE = window.location.origin;
                 'coverage': ['/static/js/modules/coverage.js'],
                 'industries': ['/static/js/modules/industries.js'],
                 'patterns': ['/static/js/modules/consensus.js', '/static/js/modules/patterns.js'],
-                'options': ['/static/js/modules/options_hub.js']
+                'options': ['/static/js/modules/options_hub.js'],
+                'commodities': ['/static/js/modules/commodities.js']
             },
 
             loadScript(src) {
@@ -957,7 +958,7 @@ const API_BASE = window.location.origin;
 
             async switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'options', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -1017,6 +1018,7 @@ const API_BASE = window.location.origin;
                         'catalysts': 'Catalysts & News',
                         'premarket': '🌅 Pre-Market Setups',
                         'options': '⚡ Option Chain & Derivatives',
+                        'commodities': '🥇 Commodities & Energy',
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
@@ -1143,6 +1145,11 @@ const API_BASE = window.location.origin;
                 if (name === 'options') {
                     if (typeof app.initOptionsHub === 'function') {
                         app.initOptionsHub();
+                    }
+                }
+                if (name === 'commodities') {
+                    if (window.commoditiesModule && typeof window.commoditiesModule.init === 'function') {
+                        window.commoditiesModule.init();
                     }
                 }
                 if (name === 'gainers') {

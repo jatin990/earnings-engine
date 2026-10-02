@@ -25,6 +25,7 @@ from earnings_engine.api.routers import (
     auth,
     breakout,
     cards,
+    commodities,
     consensus,
     dashboard,
     deals,
@@ -521,6 +522,7 @@ app.include_router(deals.router)
 app.include_router(routes_reg30.router)
 app.include_router(tri_confluence.router)
 app.include_router(options.router)
+app.include_router(commodities.router)
 app.include_router(swing.router)
 app.include_router(trading_agents.router)
 app.include_router(alerts.router)
