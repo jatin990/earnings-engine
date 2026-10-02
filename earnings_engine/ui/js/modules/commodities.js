@@ -480,10 +480,17 @@
         // 3. Render Indicator Layers
         mod.renderChartLayers(data);
 
-        // Fit Content on initial render or symbol switch
+        // Autoscale price axis and fit time content on every asset/timeframe switch
+        try {
+            mod._chart.priceScale('right').applyOptions({ autoScale: true });
+        } catch (e) {}
+
         if (!mod._hasFitted) {
             mod._chart.timeScale().fitContent();
             mod._hasFitted = true;
+        } else {
+            // Also reset time scale to fit new asset data extent cleanly
+            mod._chart.timeScale().fitContent();
         }
     };
 
@@ -495,7 +502,7 @@
 
         const ind = data.indicators || {};
 
-        // 1. Clear existing price lines & trendlines
+        // 1. Clear existing price lines & trendlines and reset secondary indicator data
         mod._priceLines.forEach(line => {
             try { mod._candleSeries.removePriceLine(line); } catch (e) {}
         });
@@ -505,6 +512,11 @@
             try { mod._chart.removeSeries(ts); } catch (e) {}
         });
         mod._trendlineSeries = [];
+
+        if (mod._vwapSeries) mod._vwapSeries.setData([]);
+        if (mod._vwapUpperSeries) mod._vwapUpperSeries.setData([]);
+        if (mod._vwapLowerSeries) mod._vwapLowerSeries.setData([]);
+        if (mod._candleSeries) mod._candleSeries.setMarkers([]);
 
         // 2. VWAP Series
         if (mod._layers.vwap && ind.vwap && ind.vwap.length > 0) {
