@@ -25,6 +25,69 @@ logger = logging.getLogger("earnings_engine.data.providers.nse")
 _nselive_lock = threading.Lock()
 _nselive_client: Any | None = None
 
+NSE_INDEX_MAP: dict[str, str] = {
+    "^NSEI": "NIFTY 50",
+    "NIFTY": "NIFTY 50",
+    "NIFTY50": "NIFTY 50",
+    "NIFTY 50": "NIFTY 50",
+    "NIFTY_50": "NIFTY 50",
+    "^NSEBANK": "NIFTY BANK",
+    "BANKNIFTY": "NIFTY BANK",
+    "NIFTYBANK": "NIFTY BANK",
+    "NIFTY BANK": "NIFTY BANK",
+    "NIFTY_BANK": "NIFTY BANK",
+    "^CNXIT": "NIFTY IT",
+    "NIFTYIT": "NIFTY IT",
+    "NIFTY IT": "NIFTY IT",
+    "NIFTY_IT": "NIFTY IT",
+    "^CNXFIN": "NIFTY FINANCIAL SERVICES",
+    "FINNIFTY": "NIFTY FINANCIAL SERVICES",
+    "NIFTY FIN SERVICE": "NIFTY FINANCIAL SERVICES",
+    "NIFTY FINANCIAL SERVICES": "NIFTY FINANCIAL SERVICES",
+    "MIDCPNIFTY": "NIFTY MIDCAP SELECT",
+    "NIFTY MIDCAP SELECT": "NIFTY MIDCAP SELECT",
+    "^NSEMDCP50": "NIFTY MIDCAP 50",
+    "NIFTY MIDCAP 50": "NIFTY MIDCAP 50",
+    "NIFTY MIDCAP 100": "NIFTY MIDCAP 100",
+    "NIFTY MIDCAP 150": "NIFTY MIDCAP 150",
+    "NIFTY SMALLCAP 50": "NIFTY SMALLCAP 50",
+    "NIFTY SMALLCAP 100": "NIFTY SMALLCAP 100",
+    "NIFTY SMALLCAP 250": "NIFTY SMALLCAP 250",
+    "NIFTY NEXT 50": "NIFTY NEXT 50",
+    "NIFTYNXT50": "NIFTY NEXT 50",
+    "NIFTY AUTO": "NIFTY AUTO",
+    "NIFTY PHARMA": "NIFTY PHARMA",
+    "NIFTY METAL": "NIFTY METAL",
+    "NIFTY FMCG": "NIFTY FMCG",
+    "NIFTY ENERGY": "NIFTY ENERGY",
+    "NIFTY INFRA": "NIFTY INFRA",
+    "NIFTY PSE": "NIFTY PSE",
+    "NIFTY PSU BANK": "NIFTY PSU BANK",
+    "NIFTY PRIVATE BANK": "NIFTY PRIVATE BANK",
+    "NIFTY 100": "NIFTY 100",
+    "NIFTY 200": "NIFTY 200",
+    "NIFTY 500": "NIFTY 500",
+    "^CRSLDX": "NIFTY 500",
+    "INDIA VIX": "INDIA VIX",
+    "INDIAVIX": "INDIA VIX",
+    "^INDIAVIX": "INDIA VIX",
+}
+
+
+def resolve_nse_index_name(symbol: str) -> str | None:
+    """Resolve standard ticker, Yahoo symbol, or alias to canonical NSE official index name."""
+    if not symbol:
+        return None
+    raw = symbol.strip().upper()
+    clean = raw.replace(".NS", "")
+    if raw in NSE_INDEX_MAP:
+        return NSE_INDEX_MAP[raw]
+    if clean in NSE_INDEX_MAP:
+        return NSE_INDEX_MAP[clean]
+    if clean.startswith("NIFTY ") or clean.startswith("INDIA "):
+        return clean
+    return None
+
 
 def _get_nselive_client() -> Any:
     """Return a shared NSELive instance to reuse session cookies across option chain calls."""
@@ -70,8 +133,18 @@ class NSEDirectProvider(DataProvider):
         end_date: str | None = None,
         interval: str = "1d",
     ) -> pd.DataFrame:
-        """Fetch historical equity data directly from NSE archives."""
+        """Fetch historical equity or index data directly from NSE archives."""
+        # Check if ticker represents an NSE index (e.g. ^NSEBANK, ^NSEI, BANKNIFTY, NIFTY 50)
+        resolved_index = resolve_nse_index_name(ticker)
+        if resolved_index is not None:
+            return self._fetch_index_ohlcv(resolved_index, start_date, end_date)
+
         clean_symbol = ticker.upper().replace(".NS", "")
+        # Guard: symbols with leading caret (^) that are not recognized indices shouldn't be queried as stocks
+        if clean_symbol.startswith("^"):
+            logger.info("[NSE:EQUITY_BYPASS] Non-equity ticker %s skipped for stock archive query", clean_symbol)
+            return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+
         end_str = end_date or datetime.now().strftime("%Y-%m-%d")
 
         # 1. Try nselib capital_market
@@ -172,9 +245,183 @@ class NSEDirectProvider(DataProvider):
 
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
+    def _fetch_index_ohlcv(
+        self,
+        index_name: str,
+        start_date: str,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        """Fetch historical index values directly from NSE archives."""
+        idx_clean = index_name.upper()
+        end_str = end_date or datetime.now().strftime("%Y-%m-%d")
+
+        # 1. Try nselib capital_market.index_data
+        from_dt = datetime.strptime(start_date[:10], "%Y-%m-%d").strftime("%d-%m-%Y")
+        to_dt = datetime.strptime(end_str[:10], "%Y-%m-%d").strftime("%d-%m-%Y")
+        logger.info("[NSELIB:REQ] capital_market.index_data(index=%s, from_date=%s, to_date=%s)", idx_clean, from_dt, to_dt)
+        t0 = time.perf_counter()
+        try:
+            import nselib
+            from nselib import capital_market
+            from earnings_engine.rate_limits import record_request
+
+            try:
+                record_request("nse")
+            except Exception:
+                pass
+
+            raw_df = capital_market.index_data(
+                index=idx_clean,
+                from_date=from_dt,
+                to_date=to_dt,
+            )
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df.copy()
+                df.columns = df.columns.str.strip().str.lower()
+                rename_map = {
+                    "open_index_val": "open",
+                    "high_index_val": "high",
+                    "low_index_val": "low",
+                    "close_index_val": "close",
+                    "traded_qty": "volume",
+                    "timestamp": "date",
+                }
+                df = df.rename(columns=rename_map)
+                if "date" in df.columns:
+                    df["date"] = pd.to_datetime(df["date"], format="%d-%b-%Y", errors="coerce").dt.strftime("%Y-%m-%d")
+                    df = df.set_index("date").sort_index()
+
+                if "volume" not in df.columns:
+                    df["volume"] = 0.0
+
+                cols = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
+                res_df = df[cols].apply(pd.to_numeric, errors="coerce").dropna(subset=["close"])
+                logger.info("[NSELIB:RESP] index_data(%s) -> %d rows (%.1fms)", idx_clean, len(res_df), elapsed_ms)
+                return res_df
+            else:
+                logger.info("[NSELIB:RESP] index_data(%s) -> 0 rows (%.1fms)", idx_clean, elapsed_ms)
+        except Exception as e:
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            logger.warning("[NSELIB:FAIL] index_data(%s) failed after %.1fms: %s", idx_clean, elapsed_ms, e)
+
+        # 2. Try jugaad-data index_df
+        from_d = datetime.strptime(start_date[:10], "%Y-%m-%d").date()
+        to_d = datetime.strptime(end_str[:10], "%Y-%m-%d").date()
+        logger.info("[JUGAAD:REQ] index_df(symbol=%s, from_date=%s, to_date=%s)", idx_clean, from_d, to_d)
+        t0_j = time.perf_counter()
+        try:
+            from jugaad_data.nse import index_df
+            from earnings_engine.rate_limits import record_request
+
+            try:
+                record_request("jugaad_data")
+            except Exception:
+                pass
+
+            raw_df = index_df(symbol=idx_clean, from_date=from_d, to_date=to_d)
+            elapsed_ms = (time.perf_counter() - t0_j) * 1000
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df.copy()
+                df.columns = df.columns.str.strip().str.lower()
+                rename_map = {
+                    "open": "open",
+                    "high": "high",
+                    "low": "low",
+                    "close": "close",
+                    "volume": "volume",
+                    "historicaldate": "date",
+                }
+                df = df.rename(columns=rename_map)
+                if "volume" not in df.columns:
+                    df["volume"] = 0.0
+                if "date" in df.columns:
+                    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+                    df = df.set_index("date").sort_index()
+
+                cols = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
+                res_df = df[cols].apply(pd.to_numeric, errors="coerce").dropna(subset=["close"])
+                logger.info("[JUGAAD:RESP] index_df(%s) -> %d rows (%.1fms)", idx_clean, len(res_df), elapsed_ms)
+                return res_df
+            else:
+                logger.info("[JUGAAD:RESP] index_df(%s) -> 0 rows (%.1fms)", idx_clean, elapsed_ms)
+        except Exception as e:
+            elapsed_ms = (time.perf_counter() - t0_j) * 1000
+            logger.warning("[JUGAAD:FAIL] index_df(%s) failed after %.1fms: %s", idx_clean, elapsed_ms, e)
+
+        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+
     def fetch_quote(self, ticker: str) -> dict[str, Any]:
-        """Fetch latest live quote for an NSE stock."""
+        """Fetch latest live quote for an NSE stock or index."""
+        resolved_index = resolve_nse_index_name(ticker)
+        if resolved_index is not None:
+            # 1. Try jugaad-data live_index
+            t0 = time.perf_counter()
+            nse = _get_nselive_client()
+            if nse is not None:
+                try:
+                    from earnings_engine.rate_limits import record_request
+                    try:
+                        record_request("nse")
+                    except Exception:
+                        pass
+                    data = nse.live_index(resolved_index)
+                    elapsed_ms = (time.perf_counter() - t0) * 1000
+                    if data and isinstance(data, dict) and data.get("data"):
+                        first_item = data["data"][0]
+                        price = float(first_item.get("lastPrice") or 0.0)
+                        if price > 0:
+                            logger.info("[JUGAAD:RESP] live_index(%s) quote found price=%.2f (%.1fms)", resolved_index, price, elapsed_ms)
+                            return {
+                                "symbol": ticker,
+                                "price": price,
+                                "open": first_item.get("open"),
+                                "high": first_item.get("dayHigh"),
+                                "low": first_item.get("dayLow"),
+                                "previous_close": first_item.get("previousClose"),
+                                "change": first_item.get("change"),
+                                "pChange": first_item.get("pChange"),
+                                "provider": "nse_direct",
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                except Exception as e:
+                    elapsed_ms = (time.perf_counter() - t0) * 1000
+                    logger.debug("[JUGAAD:FAIL] live_index(%s) quote failed after %.1fms: %s", resolved_index, elapsed_ms, e)
+
+            # 2. Fallback to nselib market_watch_all_indices
+            t0 = time.perf_counter()
+            try:
+                import nselib
+                from nselib import capital_market
+                from earnings_engine.rate_limits import record_request
+                try:
+                    record_request("nse")
+                except Exception:
+                    pass
+                df = capital_market.market_watch_all_indices()
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                if df is not None and not df.empty and "index" in df.columns:
+                    match = df[df["index"].str.upper() == resolved_index.upper()]
+                    if match.empty and "indexSymbol" in df.columns:
+                        match = df[df["indexSymbol"].str.upper() == resolved_index.upper()]
+                    if not match.empty:
+                        p = float(match["last"].iloc[0])
+                        logger.info("[NSELIB:RESP] market_watch_all_indices(%s) found price=%.2f (%.1fms)", resolved_index, p, elapsed_ms)
+                        return {
+                            "symbol": ticker,
+                            "price": p,
+                            "provider": "nse_direct",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+            except Exception as e:
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                logger.debug("[NSELIB:FAIL] market_watch_all_indices quote failed for %s after %.1fms: %s", resolved_index, elapsed_ms, e)
+
+            return {"symbol": ticker, "price": None, "provider": "nse_direct"}
+
         clean_symbol = ticker.upper().replace(".NS", "")
+        if clean_symbol.startswith("^"):
+            return {"symbol": ticker, "price": None, "provider": "nse_direct"}
 
         # Try nselib
         today_str = datetime.now().strftime("%d-%m-%Y")
@@ -406,37 +653,6 @@ class NSEDirectProvider(DataProvider):
         }
 
     def fetch_index_data(self, index_name: str, start_date: str, end_date: str | None = None) -> pd.DataFrame:
-        """Fetch historical index values (e.g. NIFTY 50, NIFTY BANK)."""
-        idx_clean = index_name.upper()
-        end_str = end_date or datetime.now().strftime("%Y-%m-%d")
-        from_d = datetime.strptime(start_date[:10], "%Y-%m-%d").date()
-        to_d = datetime.strptime(end_str[:10], "%Y-%m-%d").date()
-        logger.info("[JUGAAD:REQ] index_df(symbol=%s, from_date=%s, to_date=%s)", idx_clean, from_d, to_d)
-        t0 = time.perf_counter()
-        try:
-            from earnings_engine.rate_limits import record_request
-            try:
-                record_request("jugaad_data")
-            except Exception:
-                pass
-            from jugaad_data.nse import index_df
-
-            raw_df = index_df(symbol=idx_clean, from_date=from_d, to_date=to_d)
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            if raw_df is not None and not raw_df.empty:
-                df = raw_df.copy()
-                df.columns = df.columns.str.strip().str.lower()
-                if "historicaldate" in df.columns:
-                    df["date"] = pd.to_datetime(df["historicaldate"]).dt.strftime("%Y-%m-%d")
-                    df = df.set_index("date").sort_index()
-                cols = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
-                res_df = df[cols].apply(pd.to_numeric, errors="coerce")
-                logger.info("[JUGAAD:RESP] index_df(%s) -> %d rows (%.1fms)", idx_clean, len(res_df), elapsed_ms)
-                return res_df
-            else:
-                logger.info("[JUGAAD:RESP] index_df(%s) -> 0 rows (%.1fms)", idx_clean, elapsed_ms)
-        except Exception as e:
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            logger.warning("[JUGAAD:FAIL] index_df(%s) failed after %.1fms: %s", idx_clean, elapsed_ms, e)
-
-        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+        """Fetch historical index values (e.g. NIFTY 50, NIFTY BANK, ^NSEBANK)."""
+        resolved = resolve_nse_index_name(index_name) or index_name
+        return self._fetch_index_ohlcv(resolved, start_date, end_date)

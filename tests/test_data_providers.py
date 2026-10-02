@@ -50,6 +50,90 @@ class TestDataProviders:
         new_nse_count = get_ratelimits_summary()["downstreams"]["nse"]["timeframes"]["24h"]["current"]
         assert new_nse_count >= initial_nse_count + 1
 
+    def test_resolve_nse_index_name(self) -> None:
+        from earnings_engine.data.providers.nse_provider import resolve_nse_index_name
+
+        assert resolve_nse_index_name("^NSEBANK") == "NIFTY BANK"
+        assert resolve_nse_index_name("BANKNIFTY") == "NIFTY BANK"
+        assert resolve_nse_index_name("NIFTY BANK") == "NIFTY BANK"
+        assert resolve_nse_index_name("^NSEI") == "NIFTY 50"
+        assert resolve_nse_index_name("NIFTY") == "NIFTY 50"
+        assert resolve_nse_index_name("NIFTY 50") == "NIFTY 50"
+        assert resolve_nse_index_name("^CNXIT") == "NIFTY IT"
+        assert resolve_nse_index_name("NIFTY IT") == "NIFTY IT"
+        assert resolve_nse_index_name("^CNXFIN") == "NIFTY FINANCIAL SERVICES"
+        assert resolve_nse_index_name("FINNIFTY") == "NIFTY FINANCIAL SERVICES"
+        assert resolve_nse_index_name("INFY.NS") is None
+        assert resolve_nse_index_name("RELIANCE") is None
+
+    def test_fetch_ohlcv_routes_index_without_stock_df(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify ^NSEBANK is routed to index data and does not call equity stock_df."""
+        provider = NSEDirectProvider()
+
+        called_methods = []
+
+        def mock_stock_df(*args, **kwargs):
+            called_methods.append("stock_df")
+            raise RuntimeError("stock_df should not be called for indices")
+
+        def mock_index_data(index, from_date, to_date):
+            called_methods.append(f"index_data:{index}")
+            return pd.DataFrame({
+                "INDEX_NAME": ["NIFTY BANK"],
+                "OPEN_INDEX_VAL": [54000.0],
+                "HIGH_INDEX_VAL": [54500.0],
+                "LOW_INDEX_VAL": [53800.0],
+                "CLOSE_INDEX_VAL": [54200.0],
+                "TRADED_QTY": [1000000],
+                "TIMESTAMP": ["01-OCT-2026"],
+            })
+
+        try:
+            import nselib.capital_market as ncm
+            monkeypatch.setattr(ncm, "index_data", mock_index_data)
+        except Exception:
+            pass
+
+        try:
+            import jugaad_data.nse as jnse
+            monkeypatch.setattr(jnse, "stock_df", mock_stock_df)
+        except Exception:
+            pass
+
+        df = provider.fetch_ohlcv("^NSEBANK", start_date="2026-09-25", end_date="2026-10-02")
+        assert "stock_df" not in called_methods
+        assert "index_data:NIFTY BANK" in called_methods
+        assert not df.empty
+        assert "close" in df.columns
+        assert float(df["close"].iloc[0]) == 54200.0
+
+    def test_fetch_quote_routes_index(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify fetch_quote routes ^NSEBANK to live_index."""
+        provider = NSEDirectProvider()
+
+        class MockNSELive:
+            def live_index(self, symbol: str):
+                return {
+                    "data": [{
+                        "symbol": symbol,
+                        "lastPrice": 54450.75,
+                        "open": 54583.05,
+                        "dayHigh": 55091.45,
+                        "dayLow": 54066.6,
+                        "previousClose": 54633.05,
+                        "change": -182.3,
+                        "pChange": -0.33,
+                    }]
+                }
+
+        from earnings_engine.data.providers import nse_provider
+        monkeypatch.setattr(nse_provider, "_get_nselive_client", lambda: MockNSELive())
+
+        q = provider.fetch_quote("^NSEBANK")
+        assert q["symbol"] == "^NSEBANK"
+        assert q["price"] == 54450.75
+        assert q["previous_close"] == 54633.05
+
 
 
 class TestOptionChainAnalytics:
