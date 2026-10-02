@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from earnings_engine.data.zepto_attendance_parser import (
     _extract_xlsx_native,
+    _extract_xlsx_sheets_native,
     excel_date_to_iso,
     parse_duration_to_mins,
 )
@@ -255,14 +256,17 @@ def parse_zepto_store_metrics_excel(
 ) -> Dict[str, Any]:
     """
     Parse Zepto Dark Store daily metric summary spreadsheet.
-    Extracts sales GMV, order volume, AOV, inbound/outbound hours, IPP, and 10-min SLA adherence.
+    Supports multi-sheet workbooks (Packer_Thor_Raw, Flex_Worker_Thor_Raw, Packman_PunchOut_Missed_Raw)
+    as well as flat single-sheet store summary reports.
+    Extracts sales GMV, order volume, AOV, inbound/outbound hours, IPP, 10-min SLA adherence,
+    and granular individual worker manpower records.
     """
     if isinstance(file_source, str) and not file_name:
         file_name = os.path.basename(file_source)
 
-    matrix = _extract_xlsx_native(file_source)
-    if not matrix:
-        raise ValueError("Store metrics spreadsheet contains no readable rows.")
+    sheets = _extract_xlsx_sheets_native(file_source)
+    if not sheets:
+        raise ValueError("Store metrics spreadsheet contains no readable sheets.")
 
     # Infer Store Name
     inferred_store = "Zepto Dark Store"
@@ -272,16 +276,194 @@ def parse_zepto_store_metrics_excel(
         if m:
             inferred_store = m.group(1).replace("_", " ")
 
-    # Expected column aliases
+    def _to_float(val: Any, default: float = 0.0) -> float:
+        if val is None or val == "":
+            return default
+        try:
+            clean_v = re.sub(r"[₹$,% ]", "", str(val).strip())
+            return float(clean_v)
+        except (ValueError, TypeError):
+            return default
+
+    # Check if this is a Multi-Sheet Zepto Report (with Packer_Thor_Raw or similar)
+    packer_sheet_key = None
+    for s_name in sheets.keys():
+        if "packer" in s_name.lower() or "thor" in s_name.lower():
+            packer_sheet_key = s_name
+            break
+
+    records = []
+    worker_records = []
+
+    if packer_sheet_key:
+        matrix = sheets[packer_sheet_key]
+        header_idx = -1
+        col_map = {}
+
+        # Aliases tailored for Packer_Thor_Raw 44-column layout
+        alias_map = {
+            "scheduled_date": ["scheduled_date", "scheduled date", "date", "shift date"],
+            "store_name": ["store_name", "store name", "store", "darkstore"],
+            "store_id": ["store_id", "store id"],
+            "packer_id": ["packer_id", "packer id"],
+            "employee_id": ["employee_id", "employee id", "emp_id"],
+            "employee_code": ["employee_code", "employee code", "emp code", "code"],
+            "emp_name": ["emp_name", "full_name", "employee_name", "name"],
+            "role": ["emplyoee_role", "employee_role", "role", "designation"],
+            "attendance_status": ["attendence_status", "attendance_status", "muster_status", "status"],
+            "thor_work_hour": ["thor_work_hour", "thor work hour", "work hour", "total hours"],
+            "ib_work_hour": ["ib_work_hour", "ib work hour", "inbound hours", "ib hour"],
+            "ob_hour": ["ob_hour", "ob hour", "outbound hours", "ob work hour"],
+            "break_hour": ["break_hour", "break hour", "break"],
+            "idle_hour": ["idle_hour", "idle hour", "idle"],
+            "day_ob_orders": ["day_ob_order_handled", "day ob order handled", "orders handled", "day orders"],
+            "day_ob_packed_qty": ["day_ob_order_packed_qty", "day ob packed qty", "packed qty", "items packed"],
+            "day_ob_ipp": ["day_ob_ipp", "day ob ipp", "day ipp", "ipp"],
+            "day_task_adherence": ["day_task_adherence", "day task adherence", "adherence"],
+            "mtd_orders": ["mtd_orders_handled", "mtd orders handled"],
+            "mtd_ob_ipp": ["mtd_ob_ipp", "mtd ob ipp"],
+        }
+
+        for idx, row in enumerate(matrix[:25]):
+            row_lower = [str(c).strip().lower() for c in row]
+            matched = {}
+            for canonical, aliases in alias_map.items():
+                for c_idx, cell_str in enumerate(row_lower):
+                    if cell_str in aliases:
+                        matched[canonical] = c_idx
+                        break
+                if canonical not in matched:
+                    for c_idx, cell_str in enumerate(row_lower):
+                        if any(alias in cell_str for alias in aliases):
+                            # Avoid 'store_name' matching 'store_id'
+                            if canonical == "store_name" and "store_id" in cell_str:
+                                continue
+                            if canonical == "emp_name" and "store_name" in cell_str:
+                                continue
+                            matched[canonical] = c_idx
+                            break
+            if ("employee_code" in matched or "packer_id" in matched or "employee_id" in matched or "emp_name" in matched) and ("scheduled_date" in matched or "thor_work_hour" in matched):
+                header_idx = idx
+                col_map = matched
+                break
+
+        if header_idx != -1:
+            data_rows = matrix[header_idx + 1:]
+            detected_store = ""
+            date_totals: Dict[str, Dict[str, Any]] = {}
+
+            for row in data_rows:
+                if not any(row):
+                    continue
+
+                raw_store = str(row[col_map["store_name"]]).strip() if "store_name" in col_map and col_map["store_name"] < len(row) else ""
+                if raw_store and not detected_store:
+                    detected_store = raw_store
+
+                raw_date = row[col_map["scheduled_date"]] if "scheduled_date" in col_map and col_map["scheduled_date"] < len(row) else ""
+                metric_date = excel_date_to_iso(raw_date) or datetime.now().strftime("%Y-%m-%d")
+
+                emp_code = str(row[col_map["employee_code"]]).strip() if "employee_code" in col_map and col_map["employee_code"] < len(row) else ""
+                emp_id = str(row[col_map["employee_id"]]).strip() if "employee_id" in col_map and col_map["employee_id"] < len(row) else ""
+                packer_id = str(row[col_map["packer_id"]]).strip() if "packer_id" in col_map and col_map["packer_id"] < len(row) else ""
+                final_emp_id = emp_code or emp_id or packer_id
+
+                emp_name = str(row[col_map["emp_name"]]).strip() if "emp_name" in col_map and col_map["emp_name"] < len(row) else ""
+                role = str(row[col_map["role"]]).strip() if "role" in col_map and col_map["role"] < len(row) else "Packer"
+
+                if not final_emp_id and not emp_name:
+                    continue
+
+                thor_hr = _to_float(row[col_map["thor_work_hour"]]) if "thor_work_hour" in col_map and col_map["thor_work_hour"] < len(row) else 0.0
+                ib_hr = _to_float(row[col_map["ib_work_hour"]]) if "ib_work_hour" in col_map and col_map["ib_work_hour"] < len(row) else 0.0
+                ob_hr = _to_float(row[col_map["ob_hour"]]) if "ob_hour" in col_map and col_map["ob_hour"] < len(row) else 0.0
+                break_hr = _to_float(row[col_map["break_hour"]]) if "break_hour" in col_map and col_map["break_hour"] < len(row) else 0.0
+                idle_hr = _to_float(row[col_map["idle_hour"]]) if "idle_hour" in col_map and col_map["idle_hour"] < len(row) else 0.0
+
+                day_orders = int(_to_float(row[col_map["day_ob_orders"]])) if "day_ob_orders" in col_map and col_map["day_ob_orders"] < len(row) else 0
+                day_packed_qty = int(_to_float(row[col_map["day_ob_packed_qty"]])) if "day_ob_packed_qty" in col_map and col_map["day_ob_packed_qty"] < len(row) else 0
+                day_ipp = _to_float(row[col_map["day_ob_ipp"]]) if "day_ob_ipp" in col_map and col_map["day_ob_ipp"] < len(row) else 0.0
+                day_adh = _to_float(row[col_map["day_task_adherence"]]) if "day_task_adherence" in col_map and col_map["day_task_adherence"] < len(row) else 100.0
+                if 0 < day_adh <= 1.0:
+                    day_adh = round(day_adh * 100.0, 2)
+
+                worker_rec = {
+                    "store_name": raw_store or detected_store or inferred_store,
+                    "util_date": metric_date,
+                    "employee_id": final_emp_id,
+                    "employee_name": emp_name or final_emp_id,
+                    "role": role,
+                    "items_picked": day_packed_qty,
+                    "active_pick_hours": ob_hr if ob_hr > 0 else (thor_hr - break_hr - idle_hr),
+                    "idle_hours": idle_hr,
+                    "ipp": day_ipp,
+                    "flex_labor_cost": 0.0,
+                    "adherence_pct": day_adh,
+                    "day_orders_handled": day_orders,
+                    "thor_work_hours": thor_hr,
+                    "ib_work_hours": ib_hr,
+                    "ob_work_hours": ob_hr,
+                }
+                worker_records.append(worker_rec)
+
+                # Accumulate daily rollup
+                if metric_date not in date_totals:
+                    date_totals[metric_date] = {
+                        "store_name": raw_store or detected_store or inferred_store,
+                        "metric_date": metric_date,
+                        "sales_gmv": 0.0,
+                        "order_count": 0,
+                        "inbound_hours": 0.0,
+                        "outbound_hours": 0.0,
+                        "total_packed_qty": 0,
+                        "ipp_sum": 0.0,
+                        "ipp_count": 0,
+                        "sla_adherence_pct": 100.0,
+                        "raw_source": "EXCEL_METRICS_SUMMARY",
+                    }
+                dt_entry = date_totals[metric_date]
+                dt_entry["order_count"] += day_orders
+                dt_entry["inbound_hours"] += ib_hr
+                dt_entry["outbound_hours"] += ob_hr
+                dt_entry["total_packed_qty"] += day_packed_qty
+                if day_ipp > 0:
+                    dt_entry["ipp_sum"] += day_ipp
+                    dt_entry["ipp_count"] += 1
+
+            for dt_key, d_sum in sorted(date_totals.items()):
+                avg_ipp = round(d_sum["ipp_sum"] / d_sum["ipp_count"], 1) if d_sum["ipp_count"] > 0 else 0.0
+                records.append({
+                    "store_name": d_sum["store_name"],
+                    "metric_date": d_sum["metric_date"],
+                    "sales_gmv": d_sum["sales_gmv"],
+                    "order_count": d_sum["order_count"],
+                    "aov": 0.0,
+                    "inbound_hours": round(d_sum["inbound_hours"], 2),
+                    "outbound_hours": round(d_sum["outbound_hours"], 2),
+                    "packer_ipp": avg_ipp,
+                    "sla_adherence_pct": d_sum["sla_adherence_pct"],
+                    "raw_source": "EXCEL_METRICS_SUMMARY",
+                })
+
+            return {
+                "store_name": detected_store or inferred_store,
+                "total_records": len(records),
+                "records": records,
+                "total_worker_records": len(worker_records),
+                "worker_records": worker_records,
+            }
+
+    # Fallback / Flat single sheet parser
+    matrix = next(iter(sheets.values()))
     alias_map = {
-        "metric_date": ["date", "metric date", "report date", "day", "order date"],
-        "store_name": ["store", "store name", "darkstore", "dark store", "hub"],
+        "metric_date": ["date", "metric date", "report date", "day", "order date", "scheduled_date"],
+        "store_name": ["store_name", "store", "store name", "darkstore", "dark store", "hub"],
         "sales_gmv": ["sales gmv", "gmv", "total sales", "revenue", "gross sales", "sales"],
         "order_count": ["orders", "order count", "total orders", "dispatched orders", "delivered orders", "orders count"],
         "aov": ["aov", "average order value", "avg order value", "basket size"],
-        "inbound_hours": ["inbound hours", "inbound hrs", "inbound", "grn hours"],
-        "outbound_hours": ["outbound hours", "outbound hrs", "outbound", "dispatch hours"],
-        "packer_ipp": ["packer ipp", "ipp", "picker ipp", "items per hour", "packer throughput"],
+        "inbound_hours": ["inbound hours", "inbound hrs", "inbound", "grn hours", "ib_work_hour"],
+        "outbound_hours": ["outbound hours", "outbound hrs", "outbound", "dispatch hours", "ob_hour"],
+        "packer_ipp": ["packer ipp", "ipp", "picker ipp", "items per hour", "packer throughput", "day_ob_ipp"],
         "sla_adherence_pct": ["sla adherence", "sla %", "10 min sla", "10-min sla", "sla adherence %", "sla"],
     }
 
@@ -308,11 +490,9 @@ def parse_zepto_store_metrics_excel(
             col_map = matched
             break
 
-    records = []
     if header_idx != -1:
         data_rows = matrix[header_idx + 1:]
     else:
-        # If no explicit header row, try parsing row by row heuristically
         data_rows = matrix
 
     for r_idx, row in enumerate(data_rows):
@@ -328,16 +508,6 @@ def parse_zepto_store_metrics_excel(
             else inferred_store
         )
 
-        def _to_float(val: Any, default: float = 0.0) -> float:
-            if val is None or val == "":
-                return default
-            try:
-                # Remove commas, currency symbols, and percentage signs
-                clean_v = re.sub(r"[₹$,% ]", "", str(val).strip())
-                return float(clean_v)
-            except (ValueError, TypeError):
-                return default
-
         sales_gmv = _to_float(row[col_map["sales_gmv"]]) if "sales_gmv" in col_map and col_map["sales_gmv"] < len(row) else 0.0
         order_count = int(_to_float(row[col_map["order_count"]])) if "order_count" in col_map and col_map["order_count"] < len(row) else 0
         aov = _to_float(row[col_map["aov"]]) if "aov" in col_map and col_map["aov"] < len(row) else 0.0
@@ -348,7 +518,7 @@ def parse_zepto_store_metrics_excel(
         outbound_hours = _to_float(row[col_map["outbound_hours"]]) if "outbound_hours" in col_map and col_map["outbound_hours"] < len(row) else 0.0
         packer_ipp = _to_float(row[col_map["packer_ipp"]]) if "packer_ipp" in col_map and col_map["packer_ipp"] < len(row) else 0.0
         sla_pct = _to_float(row[col_map["sla_adherence_pct"]], default=100.0) if "sla_adherence_pct" in col_map and col_map["sla_adherence_pct"] < len(row) else 100.0
-        if 0 < sla_pct <= 1.0: # Fraction represented as 0.985
+        if 0 < sla_pct <= 1.0:
             sla_pct = round(sla_pct * 100.0, 2)
 
         if sales_gmv > 0 or order_count > 0 or packer_ipp > 0:
@@ -369,6 +539,8 @@ def parse_zepto_store_metrics_excel(
         "store_name": inferred_store,
         "total_records": len(records),
         "records": records,
+        "total_worker_records": 0,
+        "worker_records": [],
     }
 
 
@@ -458,14 +630,15 @@ def parse_zepto_loss_shrinkage_excel(
 ) -> Dict[str, Any]:
     """
     Parse Zepto Dark Store DQ Loss, Spoilage, and Inventory Shrinkage Excel report.
-    Extracts SKU defect counts, loss type (DQ_LOSS, SHRINKAGE, SPOILAGE), category, and monetary damage.
+    Supports multi-sheet workbooks (DQ_Details, Inhouse_DOD, MTD_Summary) as well as flat files.
+    Extracts SKU defect counts, loss type (DQ_LOSS, SHRINKAGE, SPOILAGE), category, sub-category, and monetary damage.
     """
     if isinstance(file_source, str) and not file_name:
         file_name = os.path.basename(file_source)
 
-    matrix = _extract_xlsx_native(file_source)
-    if not matrix:
-        raise ValueError("Loss/Shrinkage spreadsheet contains no readable rows.")
+    sheets = _extract_xlsx_sheets_native(file_source)
+    if not sheets:
+        raise ValueError("Loss/Shrinkage spreadsheet contains no readable sheets.")
 
     inferred_store = "Zepto Dark Store"
     if file_name:
@@ -474,15 +647,45 @@ def parse_zepto_loss_shrinkage_excel(
         if m:
             inferred_store = m.group(1).replace("_", " ")
 
+    def _clean_num(val: Any, default: float = 0.0) -> float:
+        if val is None or val == "":
+            return default
+        try:
+            clean_v = re.sub(r"[₹$,% ]", "", str(val).strip())
+            return float(clean_v)
+        except (ValueError, TypeError):
+            return default
+
+    records = []
+
+    # Priority 1: Check for DQ_Details sheet (Defect/Damage Quality loss report)
+    dq_sheet_key = None
+    inhouse_sheet_key = None
+    mtd_sheet_key = None
+
+    for s_name in sheets.keys():
+        s_lower = s_name.lower()
+        if "dq" in s_lower or "defect" in s_lower:
+            dq_sheet_key = s_name
+        elif "inhouse" in s_lower or "dod" in s_lower:
+            inhouse_sheet_key = s_name
+        elif "mtd" in s_lower or "summary" in s_lower:
+            mtd_sheet_key = s_name
+
+    target_sheet_name = dq_sheet_key or inhouse_sheet_key or next(iter(sheets.keys()))
+    matrix = sheets[target_sheet_name]
+
+    # Flexible alias map supporting DQ_Details, Inhouse_DOD, MTD_Summary and generic loss formats
     alias_map = {
-        "record_date": ["date", "record date", "damage date", "audit date", "loss date"],
-        "store_name": ["store", "store name", "darkstore", "hub"],
+        "record_date": ["crtdate", "date", "record date", "damage date", "audit date", "loss date"],
+        "store_name": ["store_name", "store", "store name", "darkstore", "hub"],
         "loss_type": ["loss type", "type", "defect type", "classification", "loss category"],
-        "category": ["category", "dept", "department", "sku category", "item group"],
-        "sku_id": ["sku id", "sku_id", "sku code", "sku_code", "sku", "item code", "item_code", "article id", "article_id", "barcode", "product code"],
-        "item_name": ["item name", "item_name", "product name", "product_name", "sku name", "sku_name", "item description", "product description", "item"],
-        "amount": ["amount", "loss amount", "value", "total loss", "cost", "damage value", "cost value"],
-        "sku_count": ["sku count", "skus", "quantity", "qty", "units", "items", "defect count", "count"],
+        "category": ["category", "dept", "department", "sku category", "item group", "level_3_category"],
+        "sub_category": ["subcategory", "sub_category", "sub category"],
+        "sku_id": ["sku_id", "sku id", "sku code", "sku_code", "sku", "item code", "item_code", "article id", "article_id", "barcode", "product code"],
+        "item_name": ["sku_name", "sku name", "item name", "item_name", "product name", "product_name", "item description", "product description", "item"],
+        "amount": ["dq_value", "inhouse_net_amount", "amount", "loss amount", "value", "total loss", "cost", "damage value", "cost value", "rto_amount", "short_pick_amount", "fcc_amount"],
+        "sku_count": ["dq", "inhouse_net", "sku count", "skus", "quantity", "qty", "units", "items", "defect count", "count", "rto", "short_pick", "fcc"],
         "notes": ["notes", "remarks", "reason", "defect reason", "root cause", "comments", "description"],
     }
 
@@ -492,23 +695,38 @@ def parse_zepto_loss_shrinkage_excel(
     for idx, row in enumerate(matrix[:25]):
         row_lower = [str(c).strip().lower() for c in row]
         matched = {}
+        # Pass 1: exact matching
         for canonical, aliases in alias_map.items():
-            for c_idx, cell_str in enumerate(row_lower):
-                if cell_str in aliases:
-                    matched[canonical] = c_idx
-                    break
-            if canonical not in matched:
+            for alias in aliases:
                 for c_idx, cell_str in enumerate(row_lower):
-                    if any(alias in cell_str for alias in aliases):
+                    if cell_str == alias:
                         matched[canonical] = c_idx
                         break
+                if canonical in matched:
+                    break
 
-        if "amount" in matched or "loss_type" in matched or "sku_count" in matched:
+        # Pass 2: substring matching for unmatched keys
+        for canonical, aliases in alias_map.items():
+            if canonical in matched:
+                continue
+            for alias in aliases:
+                for c_idx, cell_str in enumerate(row_lower):
+                    if alias in cell_str:
+                        # Avoid 'dq' matching 'dq_value'
+                        if canonical == "sku_count" and "value" in cell_str:
+                            continue
+                        if canonical == "amount" and "qty" in cell_str:
+                            continue
+                        matched[canonical] = c_idx
+                        break
+                if canonical in matched:
+                    break
+
+        if "amount" in matched or "loss_type" in matched or "sku_count" in matched or "sku_id" in matched:
             header_idx = idx
             col_map = matched
             break
 
-    records = []
     data_rows = matrix[header_idx + 1:] if header_idx != -1 else matrix
 
     for row in data_rows:
@@ -524,38 +742,40 @@ def parse_zepto_loss_shrinkage_excel(
             else inferred_store
         )
 
-        def _clean_num(val: Any, default: float = 0.0) -> float:
-            if val is None or val == "":
-                return default
-            try:
-                clean_v = re.sub(r"[₹$,% ]", "", str(val).strip())
-                return float(clean_v)
-            except (ValueError, TypeError):
-                return default
-
         amount = _clean_num(row[col_map["amount"]]) if "amount" in col_map and col_map["amount"] < len(row) else 0.0
         sku_count = int(_clean_num(row[col_map["sku_count"]])) if "sku_count" in col_map and col_map["sku_count"] < len(row) else 1
 
-        raw_type = str(row[col_map["loss_type"]]).strip().upper() if "loss_type" in col_map and col_map["loss_type"] < len(row) else "DQ_LOSS"
-        loss_type = "DQ_LOSS"
-        if "SHRINK" in raw_type or "VARIANCE" in raw_type or "CYCLE" in raw_type:
-            loss_type = "SHRINKAGE"
-        elif "DAMAGE" in raw_type or "TRANSIT" in raw_type:
-            loss_type = "TRANSIT_DAMAGE"
-        elif "EXPIRY" in raw_type or "SPOIL" in raw_type or "FRESH" in raw_type:
-            loss_type = "SPOILAGE"
+        raw_type = str(row[col_map["loss_type"]]).strip().upper() if "loss_type" in col_map and col_map["loss_type"] < len(row) else ""
+        if not raw_type:
+            if "dq" in target_sheet_name.lower() or "dq" in (file_name or "").lower():
+                loss_type = "DQ_LOSS"
+            elif "shrink" in target_sheet_name.lower() or "inhouse" in target_sheet_name.lower() or "shrink" in (file_name or "").lower():
+                loss_type = "SHRINKAGE"
+            else:
+                loss_type = "DQ_LOSS"
+        else:
+            loss_type = "DQ_LOSS"
+            if "SHRINK" in raw_type or "VARIANCE" in raw_type or "CYCLE" in raw_type or "INHOUSE" in raw_type:
+                loss_type = "SHRINKAGE"
+            elif "DAMAGE" in raw_type or "TRANSIT" in raw_type:
+                loss_type = "TRANSIT_DAMAGE"
+            elif "EXPIRY" in raw_type or "SPOIL" in raw_type or "FRESH" in raw_type:
+                loss_type = "SPOILAGE"
 
-        raw_cat = str(row[col_map["category"]]).strip().upper() if "category" in col_map and col_map["category"] < len(row) else "GENERAL"
+        raw_cat = str(row[col_map["category"]]).strip() if "category" in col_map and col_map["category"] < len(row) else "General"
+        sub_cat = str(row[col_map["sub_category"]]).strip() if "sub_category" in col_map and col_map["sub_category"] < len(row) else ""
+
         category = "GENERAL"
-        if "FRUIT" in raw_cat or "VEG" in raw_cat or "F&V" in raw_cat:
+        cat_upper = raw_cat.upper()
+        if "FRUIT" in cat_upper or "VEG" in cat_upper or "F&V" in cat_upper:
             category = "FRUITS_VEG"
-        elif "DAIRY" in raw_cat or "MILK" in raw_cat:
+        elif "DAIRY" in cat_upper or "MILK" in cat_upper:
             category = "DAIRY"
-        elif "MEAT" in raw_cat or "FROZEN" in raw_cat:
+        elif "MEAT" in cat_upper or "FROZEN" in cat_upper:
             category = "FROZEN_MEAT"
-        elif "FMCG" in raw_cat or "SNACK" in raw_cat or "GROCERY" in raw_cat:
+        elif "FMCG" in cat_upper or "SNACK" in cat_upper or "GROCERY" in cat_upper:
             category = "FMCG_PACKAGED"
-        elif "BEVERAGE" in raw_cat or "DRINK" in raw_cat:
+        elif "BEVERAGE" in cat_upper or "DRINK" in cat_upper:
             category = "BEVERAGES"
         elif raw_cat:
             category = raw_cat
@@ -587,6 +807,7 @@ def parse_zepto_loss_shrinkage_excel(
                 "record_date": record_date,
                 "loss_type": loss_type,
                 "category": category,
+                "sub_category": sub_cat,
                 "sku_id": sku_id,
                 "item_name": item_name,
                 "amount": amount,
@@ -594,8 +815,14 @@ def parse_zepto_loss_shrinkage_excel(
                 "notes": notes,
             })
 
+    total_amount = round(sum(r["amount"] for r in records), 2)
+    total_units = sum(r["sku_count"] for r in records)
+
     return {
         "store_name": inferred_store,
         "total_records": len(records),
+        "total_amount": total_amount,
+        "total_units": total_units,
+        "loss_type": records[0]["loss_type"] if records else "DQ_LOSS",
         "records": records,
     }

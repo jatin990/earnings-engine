@@ -157,10 +157,10 @@ def parse_duration_to_mins(val: Any) -> int:
     return 0
 
 
-def _extract_xlsx_native(file_source: Union[str, bytes, io.BytesIO]) -> List[List[str]]:
+def _extract_xlsx_sheets_native(file_source: Union[str, bytes, io.BytesIO]) -> Dict[str, List[List[str]]]:
     """
-    Zero-dependency extraction of cell matrix from .xlsx using zipfile & ElementTree.
-    Returns list of rows, where each row is a list of cell strings.
+    Zero-dependency extraction of all sheets and cell matrices from .xlsx using zipfile & ElementTree.
+    Returns dict mapping sheet_name -> list of rows (where each row is a list of cell strings).
     """
     if isinstance(file_source, str):
         z = zipfile.ZipFile(file_source, "r")
@@ -179,13 +179,43 @@ def _extract_xlsx_native(file_source: Union[str, bytes, io.BytesIO]) -> List[Lis
             text = "".join(t.text or "" for t in text_nodes)
             shared_strings.append(text)
 
-    # Read first sheet
-    sheet_files = [f for f in z.namelist() if f.startswith("xl/worksheets/sheet") and f.endswith(".xml")]
-    if not sheet_files:
-        raise ValueError("No worksheets found in Excel archive.")
+    # Read workbook sheet list and relationships
+    sheet_map: List[tuple[str, str]] = []  # (sheet_name, target_file)
+    rels: Dict[str, str] = {}
+    if "xl/_rels/workbook.xml.rels" in z.namelist():
+        try:
+            rel_tree = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+            for rel in rel_tree.findall(".//{*}Relationship"):
+                r_id = rel.attrib.get("Id", "")
+                target = rel.attrib.get("Target", "")
+                if target:
+                    if not target.startswith("xl/"):
+                        target = f"xl/{target}" if not target.startswith("/") else target.lstrip("/")
+                    rels[r_id] = target
+        except Exception:
+            pass
 
-    sheet_xml = z.read(sheet_files[0])
-    sheet_tree = ET.fromstring(sheet_xml)
+    if "xl/workbook.xml" in z.namelist():
+        try:
+            wb_tree = ET.fromstring(z.read("xl/workbook.xml"))
+            for sheet_node in wb_tree.findall(".//{*}sheet"):
+                s_name = sheet_node.attrib.get("name", "")
+                r_id = ""
+                for k, v in sheet_node.attrib.items():
+                    if k.endswith("id") and k != "sheetId":
+                        r_id = v
+                        break
+                target_file = rels.get(r_id, "")
+                if s_name:
+                    sheet_map.append((s_name, target_file))
+        except Exception:
+            pass
+
+    # If sheet_map is empty or missing targets, fallback to worksheet file listing
+    sheet_files = [f for f in z.namelist() if f.startswith("xl/worksheets/sheet") and f.endswith(".xml")]
+    if not sheet_map:
+        for idx, f in enumerate(sheet_files):
+            sheet_map.append((f"Sheet{idx + 1}", f))
 
     def col_to_index(col_str: str) -> int:
         idx = 0
@@ -193,41 +223,77 @@ def _extract_xlsx_native(file_source: Union[str, bytes, io.BytesIO]) -> List[Lis
             idx = idx * 26 + (ord(ch.upper()) - ord('A') + 1)
         return idx - 1
 
-    matrix: List[List[str]] = []
+    result_sheets: Dict[str, List[List[str]]] = {}
 
-    for row_node in sheet_tree.findall(".//{*}row"):
-        row_cells: Dict[int, str] = {}
-        for c in row_node.findall(".//{*}c"):
-            r_attr = c.attrib.get("r", "")
-            t_attr = c.attrib.get("t", "")
+    for idx, (s_name, target_file) in enumerate(sheet_map):
+        actual_target = target_file
+        if not actual_target or actual_target not in z.namelist():
+            if idx < len(sheet_files):
+                actual_target = sheet_files[idx]
+            elif sheet_files:
+                actual_target = sheet_files[0]
+            else:
+                continue
 
-            # Extract column letters from cell reference (e.g. "AB12" -> "AB")
-            col_letters = "".join([ch for ch in r_attr if ch.isalpha()])
-            col_idx = col_to_index(col_letters) if col_letters else len(row_cells)
+        try:
+            sheet_xml = z.read(actual_target)
+            sheet_tree = ET.fromstring(sheet_xml)
+        except Exception:
+            continue
 
-            # Extract cell value
-            v_node = c.find(".//{*}v")
-            val = ""
-            if v_node is not None and v_node.text is not None:
-                raw_v = v_node.text
-                if t_attr == "s":
-                    idx = int(raw_v)
-                    val = shared_strings[idx] if idx < len(shared_strings) else raw_v
-                else:
-                    val = raw_v
-            elif t_attr == "inlineStr":
-                t_node = c.find(".//{*}t")
-                if t_node is not None and t_node.text:
-                    val = t_node.text
+        matrix: List[List[str]] = []
+        for row_node in sheet_tree.findall(".//{*}row"):
+            row_cells: Dict[int, str] = {}
+            for c in row_node.findall(".//{*}c"):
+                r_attr = c.attrib.get("r", "")
+                t_attr = c.attrib.get("t", "")
 
-            row_cells[col_idx] = val
+                col_letters = "".join([ch for ch in r_attr if ch.isalpha()])
+                col_idx = col_to_index(col_letters) if col_letters else len(row_cells)
 
-        if row_cells:
-            max_col = max(row_cells.keys())
-            row_list = [row_cells.get(i, "") for i in range(max_col + 1)]
-            matrix.append(row_list)
+                v_node = c.find(".//{*}v")
+                val = ""
+                if v_node is not None and v_node.text is not None:
+                    raw_v = v_node.text
+                    if t_attr == "s":
+                        try:
+                            idx_s = int(raw_v)
+                            val = shared_strings[idx_s] if idx_s < len(shared_strings) else raw_v
+                        except (ValueError, IndexError):
+                            val = raw_v
+                    else:
+                        val = raw_v
+                elif t_attr == "inlineStr":
+                    t_node = c.find(".//{*}t")
+                    if t_node is not None and t_node.text:
+                        val = t_node.text
 
-    return matrix
+                row_cells[col_idx] = val
+
+            if row_cells:
+                max_col = max(row_cells.keys())
+                row_list = [row_cells.get(i, "") for i in range(max_col + 1)]
+                matrix.append(row_list)
+
+        result_sheets[s_name] = matrix
+
+    return result_sheets
+
+
+def _extract_xlsx_native(
+    file_source: Union[str, bytes, io.BytesIO],
+    sheet_name: Optional[str] = None,
+) -> List[List[str]]:
+    """
+    Zero-dependency extraction of cell matrix from .xlsx using zipfile & ElementTree.
+    Returns list of rows for the specified sheet or first sheet.
+    """
+    sheets = _extract_xlsx_sheets_native(file_source)
+    if not sheets:
+        return []
+    if sheet_name and sheet_name in sheets:
+        return sheets[sheet_name]
+    return next(iter(sheets.values()))
 
 
 def parse_zepto_attendance_excel(
@@ -261,7 +327,7 @@ def parse_zepto_attendance_excel(
     # Expected column aliases in priority order (exact matches first)
     alias_map = {
         "store_name": ["store_name", "store name", "store", "darkstore", "dark store"],
-        "emp_id": ["employee_code", "emp id", "employee id", "employee code", "emp code", "staff id", "code"],
+        "emp_id": ["employee_code", "employee_id", "emp id", "employee id", "employee code", "emp code", "staff id", "code"],
         "emp_name": ["full_name", "fullname", "emp name", "employee name", "staff name", "name"],
         "designation": ["current_role_name", "role_name", "designation", "role", "dept", "department", "position"],
         "shift_date": ["scheduled_date", "attendance date", "shift date", "muster date", "date", "day"],
@@ -271,6 +337,8 @@ def parse_zepto_attendance_excel(
         "punch_out": ["actual_out_time", "out time", "punch out", "last out", "outtime", "out_time"],
         "work_duration": ["work duration", "actual hours", "worked hours", "work hours", "duration", "total hours"],
         "break_duration": ["break duration", "break time", "total break", "break"],
+        "doj": ["doj", "date of joining", "joining date", "joining_date"],
+        "user_status": ["user_status", "user status", "employment status", "emp status"],
         "status": ["muster_status", "attendance status", "final status", "muster status", "status", "att status", "state"],
     }
 
@@ -378,6 +446,10 @@ def parse_zepto_attendance_excel(
 
         status_counts[norm_status] = status_counts.get(norm_status, 0) + 1
 
+        raw_doj = row[col_map["doj"]] if "doj" in col_map and col_map["doj"] < len(row) else ""
+        doj = excel_date_to_iso(raw_doj)
+        user_status = str(row[col_map["user_status"]]).strip().upper() if "user_status" in col_map and col_map["user_status"] < len(row) else "ACTIVE"
+
         rec = {
             "employee_id": emp_id or emp_name,
             "employee_name": emp_name or emp_id,
@@ -391,6 +463,8 @@ def parse_zepto_attendance_excel(
             "break_duration_mins": break_dur,
             "raw_status": raw_status,
             "status": norm_status,
+            "doj": doj,
+            "user_status": user_status,
         }
         records.append(rec)
 

@@ -4340,6 +4340,149 @@ def get_loss_records(
 # Manpower Utilization & IPP DAL
 # ---------------------------------------------------------------------------
 
+def save_loss_records_batch(
+    records: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> int:
+    """
+    Bulk persist dark store loss / shrinkage records with deterministic composite ID.
+    Returns count of records saved.
+    """
+    import hashlib
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    if not records:
+        return 0
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for r in records:
+        store = str(r.get("store_name") or "JMU-Sainik Colony").strip()
+        date_str = str(r.get("record_date") or r.get("loss_date") or datetime.now().strftime("%Y-%m-%d")).strip()
+        loss_type = str(r.get("loss_type") or "DQ_LOSS").strip().upper()
+        category = str(r.get("category") or "GENERAL").strip().upper()
+        sku_id = str(r.get("sku_id") or "").strip()
+        item_name = str(r.get("item_name") or r.get("sku_name") or "").strip()
+        notes = str(r.get("notes") or "").strip()
+        amount = float(r.get("amount") or r.get("loss_amount") or 0.0)
+        sku_count = int(r.get("sku_count") or 0)
+        source_email_id = r.get("source_email_id")
+
+        if r.get("id"):
+            rec_id = str(r["id"])
+        else:
+            sku_identifier = sku_id or item_name or notes or "general"
+            email_part = str(source_email_id or "")
+            raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{amount}|{email_part}".encode("utf-8")
+            rec_id = f"loss_{hashlib.md5(raw_key).hexdigest()[:16]}"
+
+        rows.append((
+            rec_id,
+            store,
+            date_str,
+            loss_type,
+            category,
+            sku_id,
+            item_name,
+            amount,
+            sku_count,
+            notes,
+            source_email_id,
+            now_iso,
+            now_iso,
+        ))
+
+    with _connect(settings) as conn:
+        conn.executemany(
+            """
+            INSERT INTO zepto_loss_records (
+                id, store_name, record_date, loss_type, category,
+                sku_id, item_name, amount, sku_count, notes, source_email_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                store_name = excluded.store_name,
+                record_date = excluded.record_date,
+                loss_type = excluded.loss_type,
+                category = excluded.category,
+                sku_id = excluded.sku_id,
+                item_name = excluded.item_name,
+                amount = excluded.amount,
+                sku_count = excluded.sku_count,
+                notes = excluded.notes,
+                source_email_id = COALESCE(excluded.source_email_id, zepto_loss_records.source_email_id),
+                updated_at = excluded.updated_at
+            """,
+            rows,
+        )
+    return len(rows)
+
+
+def save_manpower_utilization_batch(
+    records: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> int:
+    """
+    Bulk persist worker utilization and items-picked-per-hour metrics with deterministic ID.
+    Returns count of records saved.
+    """
+    import hashlib
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    if not records:
+        return 0
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for r in records:
+        store = str(r.get("store_name") or "JMU-Sainik Colony").strip()
+        date_str = str(r.get("util_date") or r.get("scheduled_date") or r.get("shift_date") or datetime.now().strftime("%Y-%m-%d")).strip()
+        emp_id = str(r.get("employee_id") or r.get("employee_code") or r.get("packer_id") or "").strip()
+        emp_name = str(r.get("employee_name") or emp_id).strip()
+        role = str(r.get("role") or r.get("designation") or "Picker").strip()
+        items_picked = int(r.get("items_picked") or r.get("day_ob_packed_qty") or 0)
+        active_hours = float(r.get("active_pick_hours") or r.get("thor_work_hour") or r.get("ob_hour") or 0.0)
+        idle_hours = float(r.get("idle_hours") or r.get("idle_hour") or 0.0)
+        raw_ipp = r.get("ipp") or r.get("day_ob_ipp")
+        ipp = float(raw_ipp if raw_ipp is not None else (round(items_picked / active_hours, 1) if active_hours > 0 else 0.0))
+        flex_labor_cost = float(r.get("flex_labor_cost") or 0.0)
+
+        if r.get("id"):
+            rec_id = str(r["id"])
+        else:
+            raw_key = f"{store}|{date_str}|{emp_id}|{role}".encode("utf-8")
+            rec_id = f"util_{hashlib.md5(raw_key).hexdigest()[:16]}"
+
+        rows.append((
+            rec_id,
+            store,
+            date_str,
+            emp_id,
+            emp_name,
+            role,
+            items_picked,
+            active_hours,
+            idle_hours,
+            ipp,
+            flex_labor_cost,
+            now_iso,
+            now_iso,
+        ))
+
+    with _connect(settings) as conn:
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO zepto_manpower_utilization (
+                id, store_name, util_date, employee_id, employee_name, role,
+                items_picked, active_pick_hours, idle_hours, ipp,
+                flex_labor_cost, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+    return len(rows)
+
+
 def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
     """Persist worker utilization and items-picked-per-hour metrics."""
     settings = settings or Settings()
