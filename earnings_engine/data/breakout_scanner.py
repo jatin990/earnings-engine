@@ -2608,7 +2608,7 @@ def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     """
     if len(closes) < 15:
         return 0.0, float("nan")
-    atr_pct = _calc_atr_pct(closes, default=float("nan"))
+    atr_pct = _calc_atr_pct(closes, default=0.0)
     if np.isnan(atr_pct) or atr_pct <= 0:
         return 0.0, float("nan")
     if atr_pct < 0.5:
@@ -3174,7 +3174,7 @@ def _score_classic_technical(
     """Strategy 1: Classic Technical Coiling."""
     signal_price = float(closes.iloc[-1])
     res_score, pct_from_high = _score_resistance_proximity(closes)
-    vol_score, vol_ratio = _score_volume_surge(volumes) if len(volumes) >= 5 else (0.0, float("nan"))
+    vol_score, vol_ratio = _score_volume_surge(volumes) if len(volumes) >= 5 else (0.0, 1.0)
     comp_score, atr_pct = _score_price_compression(closes)
     mom_score, momentum_signal = _score_momentum(closes)
     fund_score, avg_quality = _score_fundamental(quality_scores or [])
