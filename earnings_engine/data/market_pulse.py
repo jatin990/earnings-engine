@@ -32,6 +32,12 @@ from earnings_engine.data.institutional_verifier import (
     record_provenance,
 )
 from earnings_engine.data.prices import fetch_batch_live_quotes, fetch_live_quote, load_prices
+from earnings_engine.data.trading_calendar import (
+    is_trading_day,
+    is_market_holiday,
+    get_latest_completed_trading_day,
+    is_indian_market_open,
+)
 from earnings_engine.features.market_sentiment import get_market_sentiment, get_volatility_regime
 
 logger = logging.getLogger(__name__)
@@ -40,18 +46,16 @@ _PULSE_CACHE: dict[str, Any] = {}
 _INDICES_CACHE: dict[str, Any] = {}
 _SECTORS_CACHE: dict[str, Any] = {}
 _LIQUIDITY_CACHE: dict[str, Any] = {}
+_PARTICIPANT_OI_CACHE: dict[str, Any] = {}
 _PULSE_CACHE_TTL: float = 60.0  # 60s cache TTL
 _LAST_FII_DII_SYNC_ATTEMPT: float = 0.0
+_FAILED_NSE_OI_DATES: dict[str, float] = {}  # iso_date -> failure timestamp
+_FAILED_NSE_OI_TTL: float = 1800.0  # 30 min negative cache cooldown
 
 
 def is_market_open(ts: float) -> bool:
     """Check if Indian market is open at the given UTC timestamp."""
-    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-    if dt.weekday() >= 5:  # Weekend
-        return False
-    # IST is UTC+5:30. Open: 09:15 IST = 03:45 UTC. Close: 15:30 IST = 10:00 UTC.
-    time_val = dt.hour + dt.minute / 60.0
-    return 3.75 <= time_val < 10.0
+    return is_indian_market_open(ts)
 
 
 IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -1049,27 +1053,43 @@ def sync_nse_participant_oi_data(
     except Exception as e:
         logger.debug("[PARTICIPANT-OI] Table setup notice: %s", e)
 
-    # Determine candidate weekday dates for the last `days` days
-    today_dt = datetime.now(timezone.utc).date()
+    # Determine candidate valid trading dates up to the latest completed trading session
+    now_utc = datetime.now(timezone.utc)
+    now_ist = now_utc + IST_OFFSET
+    now_ts = time.time()
+
+    latest_completed = get_latest_completed_trading_day(now_ist.date())
+    # If today is an active trading day but before standard settlement release time (~18:30 IST),
+    # today's clearing archive has not been published yet -> anchor target to yesterday's completed session
+    if latest_completed == now_ist.date():
+        time_val = now_ist.hour + now_ist.minute / 60.0
+        if time_val < 18.5:
+            latest_completed = get_latest_completed_trading_day(now_ist.date() - timedelta(days=1))
+
     target_dates: list[tuple[str, str]] = []  # (YYYY-MM-DD, DDMMYYYY)
-    cur = today_dt
+    cur = latest_completed
     while len(target_dates) < days:
-        if cur.weekday() < 5:  # Mon-Fri
+        if is_trading_day(cur):
             target_dates.append((cur.strftime("%Y-%m-%d"), cur.strftime("%d%m%Y")))
         cur -= timedelta(days=1)
 
-    # Check which dates already exist in SQLite
+    # Check which dates already exist in SQLite or are currently in negative-cache cooldown
     missing_dates: list[tuple[str, str]] = []
     if not force:
+        try:
+            existing_counts = dict(conn.execute(
+                "SELECT date, COUNT(*) FROM participant_oi_positioning WHERE future_index_long > 0 GROUP BY date"
+            ).fetchall())
+        except Exception:
+            existing_counts = {}
+
         for iso_d, ddmmyyyy in target_dates:
-            try:
-                row = conn.execute(
-                    "SELECT COUNT(*) FROM participant_oi_positioning WHERE date = ? AND future_index_long > 0",
-                    (iso_d,)
-                ).fetchone()
-                if not row or row[0] < 4:
-                    missing_dates.append((iso_d, ddmmyyyy))
-            except Exception:
+            # Check negative cache cooldown (don't re-attempt failed/unreleased dates within 30 min)
+            last_failed_ts = _FAILED_NSE_OI_DATES.get(iso_d, 0.0)
+            if (now_ts - last_failed_ts) < _FAILED_NSE_OI_TTL:
+                continue
+
+            if existing_counts.get(iso_d, 0) < 4:
                 missing_dates.append((iso_d, ddmmyyyy))
     else:
         missing_dates = target_dates
@@ -1096,6 +1116,7 @@ def sync_nse_participant_oi_data(
         try:
             resp = requests.get(url, headers=headers, timeout=8)
             if resp.status_code != 200 or len(resp.content) < 50:
+                _FAILED_NSE_OI_DATES[iso_date] = time.time()
                 return None
 
             raw_bytes = resp.content
@@ -1367,30 +1388,48 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     except Exception:
         session_label = latest_date_str
 
-    # Build 30-day, 10-day, and 7-day Participant OI History Matrix
+    # Build 30-day, 10-day, and 7-day Participant OI History Matrix via a single batched SQL query
     history_30d: list[dict[str, Any]] = []
-    for d_str in trading_dates_raw[:30]:
+    target_dates_subset = trading_dates_raw[:30]
+
+    date_grouped: dict[str, dict[str, Any]] = {}
+    if target_dates_subset:
+        placeholders = ", ".join(["?"] * len(target_dates_subset))
+        try:
+            batch_sql = f"""
+                SELECT * FROM participant_oi_positioning
+                WHERE date IN ({placeholders})
+                ORDER BY date DESC,
+                         CASE participant
+                             WHEN 'FII' THEN 1
+                             WHEN 'DII' THEN 2
+                             WHEN 'PRO' THEN 3
+                             WHEN 'CLIENT' THEN 4
+                             ELSE 5
+                         END
+            """
+            cur = conn.execute(batch_sql, target_dates_subset)
+            cols = [d[0] for d in cur.description] if cur.description else []
+            all_rows = cur.fetchall()
+            for r in all_rows:
+                row_map = dict(zip(cols, r)) if cols else {}
+                d_val = str(row_map.get("date", ""))
+                p_code = str(row_map.get("participant", ""))
+                if d_val not in date_grouped:
+                    date_grouped[d_val] = {}
+                if p_code:
+                    date_grouped[d_val][p_code] = row_map
+        except Exception as e:
+            logger.warning("[PARTICIPANT-OI] Batch history query error: %s", e)
+
+    for d_str in target_dates_subset:
         try:
             dt_obj = datetime.strptime(d_str, "%Y-%m-%d").date()
             d_fmt = dt_obj.strftime("%d %b (%a)")
         except Exception:
             d_fmt = d_str
 
-        p_rows = conn.execute(
-            "SELECT * FROM participant_oi_positioning WHERE date = ? ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'PRO' THEN 3 WHEN 'CLIENT' THEN 4 ELSE 5 END",
-            (d_str,)
-        ).fetchall()
-
-        cur = conn.execute("SELECT * FROM participant_oi_positioning WHERE date = ? LIMIT 1", (d_str,))
-        cols = [d[0] for d in cur.description] if cur.description else []
-
-        p_dict: dict[str, Any] = {}
-        for r in p_rows:
-            row_map = dict(zip(cols, r)) if cols else {}
-            p_code = row_map.get("participant", "")
-            if p_code:
-                p_dict[p_code] = row_map
-
+        p_dict = date_grouped.get(d_str, {})
         fii_stat = p_dict.get("FII", {})
         dii_stat = p_dict.get("DII", {})
         pro_stat = p_dict.get("PRO", {})
