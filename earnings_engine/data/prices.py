@@ -24,6 +24,12 @@ import shutil
 
 from earnings_engine.config import Settings, market_of
 from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
+from earnings_engine.data.trading_calendar import (
+    is_trading_day,
+    is_market_holiday,
+    get_latest_completed_trading_day,
+    is_indian_market_open,
+)
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.prices")
@@ -813,8 +819,8 @@ def ingest_prices(
     return results
 
 
-def _get_market_session_status(ticker: str) -> dict[str, Any]:
-    """Determine market session status (open, closed, weekend, pre/post market) for a ticker.
+def _get_market_session_status(ticker: str, now_dt: datetime | None = None) -> dict[str, Any]:
+    """Determine market session status (open, closed, weekend, holiday, pre/post market) for a ticker.
 
     NSE equities/indices (.NS, ^NSE*, ^CNX*, ^INDIAVIX) use Asia/Kolkata (IST: 09:15-15:30).
     US equities and other assets use America/New_York (EST/EDT: 09:30-16:00).
@@ -834,9 +840,17 @@ def _get_market_session_status(ticker: str) -> dict[str, Any]:
         else:
             tz = timezone(timedelta(hours=-4))  # Approximate US Eastern (EDT)
 
-    now_local = datetime.now(tz)
+    if now_dt is not None:
+        if now_dt.tzinfo is None:
+            now_local = now_dt.replace(tzinfo=timezone.utc).astimezone(tz)
+        else:
+            now_local = now_dt.astimezone(tz)
+    else:
+        now_local = datetime.now(tz)
+
     weekday = now_local.weekday()  # Monday = 0, Sunday = 6
     is_weekend = weekday >= 5
+    target_date = now_local.date()
 
     open_time = dt_time(9, 15) if is_india else dt_time(9, 30)
     close_time = dt_time(15, 30) if is_india else dt_time(16, 0)
@@ -846,39 +860,85 @@ def _get_market_session_status(ticker: str) -> dict[str, Any]:
     is_open = False
     is_pre_market = False
     is_post_market = False
+    is_holiday = False
+    session_label = "closed"
 
-    if not is_weekend:
-        if current_time < open_time:
-            is_pre_market = True
-        elif current_time > close_time:
-            is_post_market = True
+    if is_india:
+        is_holiday = is_market_holiday(target_date)
+        if is_holiday:
+            is_open = False
+            session_label = "closed"
+            last_trading_day_obj = get_latest_completed_trading_day(target_date - timedelta(days=1))
+            last_trading_date = last_trading_day_obj.strftime("%Y-%m-%d")
+            friday_date = last_trading_date
+            friday_close_dt = datetime.combine(last_trading_day_obj, close_time).replace(tzinfo=tz)
+        elif is_weekend:
+            is_open = False
+            session_label = "closed"
+            last_trading_day_obj = get_latest_completed_trading_day(target_date)
+            last_trading_date = last_trading_day_obj.strftime("%Y-%m-%d")
+            friday_date = last_trading_date
+            friday_close_dt = datetime.combine(last_trading_day_obj, close_time).replace(tzinfo=tz)
         else:
-            is_open = True
-
-    if is_weekend:
-        friday_dt = now_local - timedelta(days=weekday - 4)
-        friday_date = friday_dt.strftime("%Y-%m-%d")
-        last_trading_date = friday_date
-        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
-    elif is_pre_market:
-        if weekday == 0:
-            prev_dt = now_local - timedelta(days=3)
-            friday_dt = prev_dt
-        else:
-            prev_dt = now_local - timedelta(days=1)
-            friday_dt = now_local - timedelta(days=weekday + 3)
-        friday_date = friday_dt.strftime("%Y-%m-%d")
-        last_trading_date = prev_dt.strftime("%Y-%m-%d")
-        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+            # Active trading day
+            if current_time < open_time:
+                is_pre_market = True
+                session_label = "pre_market"
+                prev_trading_day = get_latest_completed_trading_day(target_date - timedelta(days=1))
+                last_trading_date = prev_trading_day.strftime("%Y-%m-%d")
+                friday_date = last_trading_date
+                friday_close_dt = datetime.combine(prev_trading_day, close_time).replace(tzinfo=tz)
+            elif current_time >= close_time:
+                is_post_market = True
+                session_label = "post_market"
+                last_trading_date = market_date
+                friday_date = market_date
+                friday_close_dt = datetime.combine(target_date, close_time).replace(tzinfo=tz)
+            else:
+                is_open = True
+                session_label = "regular"
+                last_trading_date = market_date
+                friday_date = market_date
+                friday_close_dt = datetime.combine(target_date, close_time).replace(tzinfo=tz)
     else:
-        friday_dt = now_local - timedelta(days=weekday - 4) if weekday >= 4 else now_local - timedelta(days=weekday + 3)
-        friday_date = friday_dt.strftime("%Y-%m-%d")
-        last_trading_date = market_date
-        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+        # Non-Indian / US Market
+        if not is_weekend:
+            if current_time < open_time:
+                is_pre_market = True
+                session_label = "pre_market"
+            elif current_time >= close_time:
+                is_post_market = True
+                session_label = "post_market"
+            else:
+                is_open = True
+                session_label = "regular"
+
+        if is_weekend:
+            friday_dt = now_local - timedelta(days=weekday - 4)
+            friday_date = friday_dt.strftime("%Y-%m-%d")
+            last_trading_date = friday_date
+            friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+        elif is_pre_market:
+            if weekday == 0:
+                prev_dt = now_local - timedelta(days=3)
+                friday_dt = prev_dt
+            else:
+                prev_dt = now_local - timedelta(days=1)
+                friday_dt = now_local - timedelta(days=weekday + 3)
+            friday_date = friday_dt.strftime("%Y-%m-%d")
+            last_trading_date = prev_dt.strftime("%Y-%m-%d")
+            friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+        else:
+            friday_dt = now_local - timedelta(days=weekday - 4) if weekday >= 4 else now_local - timedelta(days=weekday + 3)
+            friday_date = friday_dt.strftime("%Y-%m-%d")
+            last_trading_date = market_date
+            friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
 
     return {
         "is_open": is_open,
         "is_weekend": is_weekend,
+        "is_holiday": is_holiday,
+        "session": session_label,
         "is_pre_market": is_pre_market,
         "is_post_market": is_post_market,
         "market_date": market_date,
@@ -889,6 +949,9 @@ def _get_market_session_status(ticker: str) -> dict[str, Any]:
         "open_time": open_time,
         "close_time": close_time,
     }
+
+
+get_market_session = _get_market_session_status
 
 
 def _get_cached_quotes_batch(
@@ -974,10 +1037,15 @@ def _is_cached_quote_fresh(
 
     is_open = session.get("is_open", False)
     is_weekend = session.get("is_weekend", False)
+    is_holiday = session.get("is_holiday", False)
     is_post = session.get("is_post_market", False)
     is_pre = session.get("is_pre_market", False)
     market_date = session.get("market_date", "")
     cur_date = cached_record.get("cur_date") or ""
+
+    if is_holiday:
+        # On market holidays, settled historical prices from the latest completed trading session are 100% fresh
+        return True
 
     fetched_at_str = cached_record.get("prices_fetched_at")
     fetched_at_dt: datetime | None = None
@@ -1124,6 +1192,7 @@ def _build_quote_from_cached_record(
 
     quote: dict[str, Any] = {
         "ticker": sym,
+        "symbol": sym,
         "current_price": round(float(last_p), 2) if last_p is not None else None,
         "previous_close": round(float(prev_c), 2) if prev_c is not None and prev_c > 0 else None,
         "day_change": None,
@@ -1165,6 +1234,7 @@ def fetch_live_quote(
     force: bool = False,
     ttl_minutes: int = 5,
     silent: bool = False,
+    now_dt: datetime | None = None,
 ) -> dict[str, Any]:
     """Fetch authoritative live real-time market quote for a single ticker.
 
@@ -1179,7 +1249,7 @@ def fetch_live_quote(
     sym = ticker.strip().upper()
     fetch_sym = KNOWN_TICKER_ALIASES.get(sym, sym)
     canonical = canonical_symbol(sym)
-    session = _get_market_session_status(sym)
+    session = _get_market_session_status(sym, now_dt=now_dt)
 
     # 1. DB-First Freshness Check (serve immediately if fresh in SQLite)
     if not force:
@@ -1189,8 +1259,67 @@ def fetch_live_quote(
             logger.debug("[QUOTE:CACHE-HIT] %s served from SQLite (market_open=%s)", sym, session["is_open"])
             return _build_quote_from_cached_record(sym, record, session)
 
+        # Off-market / Holiday / Weekend fallback to settled SQLite prices without outbound network call
+        if session.get("is_holiday") or session.get("is_weekend") or not session.get("is_open"):
+            if record and record.get("cur_close") and float(record.get("cur_close") or 0) > 0:
+                return _build_quote_from_cached_record(sym, record, session)
+            try:
+                hist_df = load_prices(sym, settings)
+                if not hist_df.empty and "close" in hist_df.columns:
+                    closes = hist_df["close"].dropna()
+                    if len(closes) > 0:
+                        last_c = float(closes.iloc[-1])
+                        prev_c_val = float(closes.iloc[-2]) if len(closes) >= 2 else last_c
+                        chg_pts = round(last_c - prev_c_val, 2)
+                        chg_pct = round(((last_c - prev_c_val) / prev_c_val) * 100.0, 2) if prev_c_val > 0 else 0.0
+                        return {
+                            "ticker": sym,
+                            "symbol": sym,
+                            "current_price": round(last_c, 2),
+                            "previous_close": round(prev_c_val, 2),
+                            "day_change": chg_pts,
+                            "day_change_pct": chg_pct,
+                            "day_open": float(hist_df["open"].iloc[-1]) if "open" in hist_df.columns else last_c,
+                            "day_high": float(hist_df["high"].iloc[-1]) if "high" in hist_df.columns else last_c,
+                            "day_low": float(hist_df["low"].iloc[-1]) if "low" in hist_df.columns else last_c,
+                            "week_52_high": float(hist_df["high"].tail(252).max()) if "high" in hist_df.columns else last_c,
+                            "week_52_low": float(hist_df["low"].tail(252).min()) if "low" in hist_df.columns else last_c,
+                            "volume": int(hist_df["volume"].iloc[-1]) if "volume" in hist_df.columns else 0,
+                            "avg_volume": int(hist_df["volume"].tail(50).mean()) if "volume" in hist_df.columns else 0,
+                            "market_cap": None,
+                            "currency": "INR" if sym.endswith(".NS") else "USD",
+                            "is_live": False,
+                            "last_updated": datetime.now().isoformat(),
+                            "pct_from_52w_high": 0.0,
+                            "pct_from_52w_low": 0.0,
+                        }
+            except Exception as e:
+                logger.debug("[OFF-MARKET:FALLBACK-ERROR] %s: %s", sym, e)
+            return {
+                "ticker": sym,
+                "symbol": sym,
+                "current_price": None,
+                "previous_close": None,
+                "day_change": None,
+                "day_change_pct": None,
+                "day_open": None,
+                "day_high": None,
+                "day_low": None,
+                "week_52_high": None,
+                "week_52_low": None,
+                "volume": None,
+                "avg_volume": None,
+                "market_cap": None,
+                "currency": "INR" if sym.endswith(".NS") else "USD",
+                "is_live": False,
+                "last_updated": datetime.now().isoformat(),
+                "pct_from_52w_high": None,
+                "pct_from_52w_low": None,
+            }
+
     quote: dict[str, Any] = {
         "ticker": sym,
+        "symbol": sym,
         "current_price": None,
         "previous_close": None,
         "day_change": None,
@@ -1759,7 +1888,31 @@ def fetch_batch_live_quotes(
             session = _get_market_session_status(sym)
             if record and _is_cached_quote_fresh(record, session, ttl_minutes=ttl_minutes):
                 results[t] = _build_quote_from_cached_record(t, record, session)
+            elif (session.get("is_holiday") or session.get("is_weekend") or not session.get("is_open")) and record and record.get("cur_close") and float(record.get("cur_close") or 0) > 0:
+                results[t] = _build_quote_from_cached_record(t, record, session)
             else:
+                # If off-market and not in batch CTE, attempt quick local price history lookup before falling back to network
+                if session.get("is_holiday") or session.get("is_weekend") or not session.get("is_open"):
+                    try:
+                        hist_df = load_prices(sym, settings)
+                        if not hist_df.empty and "close" in hist_df.columns:
+                            closes = hist_df["close"].dropna()
+                            if len(closes) > 0:
+                                last_c = float(closes.iloc[-1])
+                                prev_c_val = float(closes.iloc[-2]) if len(closes) >= 2 else last_c
+                                results[t] = {
+                                    "ticker": t,
+                                    "current_price": round(last_c, 2),
+                                    "previous_close": round(prev_c_val, 2),
+                                    "day_change": round(last_c - prev_c_val, 2),
+                                    "day_change_pct": round(((last_c - prev_c_val) / prev_c_val) * 100.0, 2) if prev_c_val > 0 else 0.0,
+                                    "volume": int(hist_df["volume"].iloc[-1]) if "volume" in hist_df.columns else 0,
+                                    "is_live": False,
+                                    "last_updated": datetime.now().isoformat(),
+                                }
+                                continue
+                    except Exception:
+                        pass
                 stale_tickers.append(t)
     else:
         stale_tickers = list(unique_tickers)
