@@ -5627,14 +5627,36 @@
 
             chart.subscribeCrosshairMove(param => {
                 const el = (id) => document.getElementById(id);
-                if (!param || !param.time || !param.seriesData) {
+                if (!param) {
                     updateHudWithLastBar();
                     return;
                 }
-                const candleData = param.seriesData.get(candleSeries);
+                let candleData = param.seriesData ? param.seriesData.get(candleSeries) : null;
+                let volData = param.seriesData ? param.seriesData.get(volumeSeries) : null;
+                let timeVal = param.time;
+
+                // Y-axis scale hover fallback when cursor is on price scale
+                if (!candleData && stockChartRawRecords && stockChartRawRecords.length > 0) {
+                    if (param.point && param.point.y !== undefined && candleSeries.coordinateToPrice) {
+                        const hoverPrice = candleSeries.coordinateToPrice(param.point.y);
+                        if (hoverPrice) {
+                            const match = stockChartRawRecords.reduce((prev, curr) => {
+                                return Math.abs(curr.close - hoverPrice) < Math.abs(prev.close - hoverPrice) ? curr : prev;
+                            }, stockChartRawRecords[stockChartRawRecords.length - 1]);
+                            candleData = { open: match.open, high: match.high, low: match.low, close: match.close };
+                            volData = { value: match.volume };
+                            timeVal = match.date || match.time;
+                        }
+                    }
+                }
+
+                if (!candleData) {
+                    updateHudWithLastBar();
+                    return;
+                }
                 const volData = param.seriesData.get(volumeSeries);
                 if (candleData) {
-                    if (el('hudDate')) el('hudDate').textContent = param.time;
+                    if (el('hudDate')) el('hudDate').textContent = timeVal || param.time;
                     if (el('hudOpen')) el('hudOpen').textContent = candleData.open != null ? '₹' + candleData.open.toFixed(2) : '—';
                     if (el('hudHigh')) el('hudHigh').textContent = candleData.high != null ? '₹' + candleData.high.toFixed(2) : '—';
                     if (el('hudLow')) el('hudLow').textContent = candleData.low != null ? '₹' + candleData.low.toFixed(2) : '—';

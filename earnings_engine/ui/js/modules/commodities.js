@@ -296,15 +296,36 @@
         const inspectDelta = document.getElementById('commInspectDelta');
         const inspectZone = document.getElementById('commInspectZone');
 
-        if (!param || !param.time || !param.seriesData || !mod._candleSeries) {
-            return;
+        if (!param || !mod._candleSeries) return;
+
+        let candle = null;
+        let timeSec = param.time;
+
+        if (param.seriesData) {
+            candle = param.seriesData.get(mod._candleSeries);
         }
 
-        const candle = param.seriesData.get(mod._candleSeries);
+        // Fallback: If cursor is on Y-axis scale or hover point without time param
+        if (!candle && mod._chartData && mod._chartData.candles && mod._chartData.candles.length > 0) {
+            if (param.point && param.point.y !== undefined && mod._candleSeries.coordinateToPrice) {
+                const hoverPrice = mod._candleSeries.coordinateToPrice(param.point.y);
+                if (hoverPrice) {
+                    // Find candle closest to hover price or last candle
+                    candle = mod._chartData.candles.reduce((prev, curr) => {
+                        return Math.abs(curr.close - hoverPrice) < Math.abs(prev.close - hoverPrice) ? curr : prev;
+                    }, mod._chartData.candles[mod._chartData.candles.length - 1]);
+                    timeSec = candle.time;
+                }
+            } else {
+                candle = mod._chartData.candles[mod._chartData.candles.length - 1];
+                timeSec = candle.time;
+            }
+        }
+
         if (!candle) return;
 
         const curr = mod._chartData?.currency_symbol || '$';
-        const d = new Date(param.time * 1000);
+        const d = new Date((timeSec || param.time || Date.now() / 1000) * 1000);
         const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
         if (inspectTime) inspectTime.textContent = timeStr;

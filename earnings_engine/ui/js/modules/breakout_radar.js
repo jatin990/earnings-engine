@@ -2506,6 +2506,42 @@
                         app.renderBreakoutOrderBookSpread(null, curPrice, wallsData);
                     });
 
+                                // Crosshair HUD subscription with Y-axis price scale fallback
+                chart.subscribeCrosshairMove((param) => {
+                    const el = (id) => document.getElementById(id);
+                    if (!param) return;
+                    let candle = param.seriesData ? param.seriesData.get(candleSeries) : null;
+                    let volItem = param.seriesData ? param.seriesData.get(volumeSeries) : null;
+                    let timeVal = param.time;
+
+                    if (!candle && app._bkRawBars && app._bkRawBars.length > 0) {
+                        if (param.point && param.point.y !== undefined && candleSeries.coordinateToPrice) {
+                            const hoverPrice = candleSeries.coordinateToPrice(param.point.y);
+                            if (hoverPrice) {
+                                const match = app._bkRawBars.reduce((prev, curr) => {
+                                    return Math.abs(curr.close - hoverPrice) < Math.abs(prev.close - hoverPrice) ? curr : prev;
+                                }, app._bkRawBars[app._bkRawBars.length - 1]);
+                                candle = { open: match.open, high: match.high, low: match.low, close: match.close };
+                                volItem = { value: match.volume };
+                                timeVal = match.date || match.time;
+                            }
+                        }
+                    }
+
+                    if (candle) {
+                        const hudO = document.getElementById('bkInspBarO');
+                        const hudH = document.getElementById('bkInspBarH');
+                        const hudL = document.getElementById('bkInspBarL');
+                        const hudC = document.getElementById('bkInspBarC');
+                        const hudTime = document.getElementById('bkInspBarTime');
+                        if (hudO) hudO.textContent = '₹' + Number(candle.open).toFixed(2);
+                        if (hudH) hudH.textContent = '₹' + Number(candle.high).toFixed(2);
+                        if (hudL) hudL.textContent = '₹' + Number(candle.low).toFixed(2);
+                        if (hudC) hudC.textContent = '₹' + Number(candle.close).toFixed(2);
+                        if (hudTime && timeVal) hudTime.textContent = timeVal;
+                    }
+                });
+
                 chart.timeScale().fitContent();
             } catch (err) {
                 console.warn('[BREAKOUT] Error initializing quantum chart:', err);
