@@ -209,22 +209,23 @@
                 <div class="flex items-center gap-2">
                     <button
                         type="button"
-                        onclick="zeptoApp.ingestAllEmails()"
-                        id="btnIngestAllEmails"
-                        class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
-                        title="Scan inbox, classify emails, download attachments, and persist metrics"
+                        onclick="zeptoApp.syncGmailDelta()"
+                        id="btnSyncGmailDelta"
+                        class="px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/25 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition"
+                        title="Check Gmail for new incoming emails and fetch only the delta into local database"
                     >
-                        <span id="btnIngestAllEmailsIcon">⚡</span>
-                        <span id="btnIngestAllEmailsText">Ingest All Emails</span>
+                        <span id="btnSyncGmailDeltaIcon">⚡</span>
+                        <span id="btnSyncGmailDeltaText">Sync Delta</span>
                     </button>
                     <button
                         type="button"
                         onclick="zeptoApp.loadRecentEmails()"
                         id="btnRefreshGmailFeed"
                         class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5 shadow-sm"
+                        title="Reload instantly from local database"
                     >
                         <span id="btnRefreshGmailFeedIcon">🔄</span>
-                        <span id="btnRefreshGmailFeedText">Refresh Mailbox</span>
+                        <span id="btnRefreshGmailFeedText">Reload DB</span>
                     </button>
                     <span id="gmailFeedCountBadge" class="text-[10px] font-bold px-2 py-1 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
                         0 Emails

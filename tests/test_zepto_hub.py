@@ -212,9 +212,8 @@ def test_zepto_hub_renders_attendance_tab(client):
     assert resp.status_code == 200
     assert "tabBtn-attendance" in resp.text
     assert "tabContent-attendance" in resp.text
-    assert "Attendance & Shifts" in resp.text
-    assert "Active Staff Attendance & Work Log" in resp.text
-    assert "attMonthFilter" in resp.text
+    assert "Daily punch muster, shift adherence, and absenteeism intelligence" in resp.text
+    assert "attActiveScopeBadge" in resp.text
     assert "attTableBody" in resp.text
 
 

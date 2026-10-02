@@ -177,7 +177,12 @@
             </select>
 
             <!-- Month Filter -->
-            <select id="incMonthFilter" onchange="zeptoApp.filterIncome()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] uppercase font-bold text-slate-400 font-mono">Scope:</span>
+                <span id="incActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
+            </div>
+            <!-- Legacy hidden select for compatibility with filterIncome() -->
+            <select id="incMonthFilter" onchange="zeptoApp.filterIncome()" class="hidden">
                 <option value="ALL" selected>All Months</option>
             </select>
 

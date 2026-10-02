@@ -258,8 +258,21 @@
                 </div>
             </div>
 
-            <!-- Global Action Bar -->
-            <div class="flex items-center gap-1.5 flex-wrap">
+            <!-- Global Action Bar & Central Month Filter -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Unified Global Month Scope Selector -->
+                <div class="flex items-center gap-1.5 bg-black/60 border border-white/20 rounded-md px-2.5 py-1.5 shadow-inner">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Scope:</span>
+                    <select
+                        id="globalMonthSelector"
+                        onchange="zeptoApp.onGlobalMonthChange(this.value)"
+                        class="bg-transparent text-xs text-white font-bold font-mono focus:outline-none cursor-pointer pr-1"
+                        title="Global month filter across all store metrics, attendance, losses, and analytics"
+                    >
+                        <option value="ALL" class="bg-slate-900 text-white">All Months</option>
+                    </select>
+                </div>
+
                 <button type="button" onclick="zeptoApp.openAddEmployeeModal()" class="btn-zepto">
                     <span>➕</span> Add Employee
                 </button>
@@ -374,7 +387,14 @@
 
                     <!-- Group 1: Store Operations -->
                     <div class="space-y-1">
-                        <button type="button" class="nav-tab active" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
+                        <button type="button" class="nav-tab active" id="tabBtn-dashboard" onclick="zeptoApp.switchTab('dashboard')">
+                            <span class="nav-icon text-sm">📊</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Master Dashboard</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">MoM & DoD Intelligence</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
                             <span class="nav-icon text-sm">👥</span>
                             <div class="flex-1 truncate">
                                 <div class="text-xs font-bold leading-tight">Staff & Payroll</div>
@@ -438,6 +458,13 @@
                                 <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Hiring & Interviews</div>
                             </div>
                         </button>
+                        <button type="button" class="nav-tab" id="tabBtn-offers" onclick="zeptoApp.switchTab('offers')">
+                            <span class="nav-icon text-sm">📄</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Offer Letters</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Generator & Slabs</div>
+                            </div>
+                        </button>
                         <button type="button" class="nav-tab" id="tabBtn-security" onclick="zeptoApp.switchTab('security')">
                             <span class="nav-icon text-sm">💰</span>
                             <div class="flex-1 truncate">
@@ -471,8 +498,13 @@
 
             <!-- Main Tab Content Area -->
             <div class="lg:col-span-9 xl:col-span-10 min-w-0 space-y-4">
+                <!-- ================= TAB: MASTER OPERATIONS DASHBOARD ================= -->
+                <main id="tabContent-dashboard" class="space-y-4">
+                    {% include "hubs/zepto/_dashboard.html" %}
+                </main>
+
                 <!-- ================= TAB 1: EMPLOYEES & SALARIES ================= -->
-                <main id="tabContent-employees" class="space-y-4">
+                <main id="tabContent-employees" class="space-y-4" style="display: none;">
                     {% include "hubs/zepto/_employees.html" %}
                 </main>
 
@@ -509,6 +541,11 @@
                 <!-- ================= TAB 4: FUTURE CANDIDATES ================= -->
                 <main id="tabContent-candidates" class="space-y-4" style="display: none;">
                     {% include "hubs/zepto/_candidates.html" %}
+                </main>
+
+                <!-- ================= TAB: OFFER LETTERS GENERATOR ================= -->
+                <main id="tabContent-offers" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_offers.html" %}
                 </main>
 
                 <!-- ================= TAB 5: ZEPTO SECURITY & CAPITAL LEDGER ================= -->

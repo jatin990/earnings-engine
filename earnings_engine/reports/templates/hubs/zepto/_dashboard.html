@@ -1,0 +1,216 @@
+<!-- Master Operations Dashboard Partial: MoM & DoD Cross-Subsystem Intelligence -->
+<div class="space-y-4">
+    <!-- Header Banner & Active Scope Info -->
+    <div class="glass-panel p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-xl">📊</span>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Executive Operations Dashboard</h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/20 font-mono" id="dashActiveScopeBadge">
+                    All Historical Months
+                </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+                Cross-subsystem intelligence matrix combining Store Attendance & Absenteeism, Financial Loss & DQ Defects, Order Dispatches, GMV, and Picker IPP Throughput.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[11px] text-slate-400 font-mono">Scoped by Header Month:</span>
+            <span class="text-xs font-bold text-white font-mono px-2 py-1 rounded bg-white/5 border border-white/10" id="dashSelectedMonthLabel">ALL</span>
+            <button
+                type="button"
+                onclick="zeptoApp.loadOperationsDashboard()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+            >
+                <span>🔄</span> Refresh Matrix
+            </button>
+        </div>
+    </div>
+
+    <!-- Executive Summary KPI Cards (5 High-Density Cards) -->
+    <section class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <!-- 1. Total Store Financial Loss -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Total Store Loss</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="dashLossBadge">Net Defect</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-rose-400 tracking-tight" id="dashTotalLoss">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">DQ + Shrinkage + Spoilage</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Loss Incidents:</span>
+                <span class="font-mono font-bold text-slate-300" id="dashLossIncidents">--</span>
+            </div>
+        </div>
+
+        <!-- 2. Attendance & Staffing Rate -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance Adherence</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dashAttendanceBadge">--% Rate</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="dashPresentShifts">-- / --</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Present vs Scheduled Shifts</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Absent Shifts:</span>
+                <span class="font-mono font-bold text-rose-400" id="dashAbsentShifts">--</span>
+            </div>
+        </div>
+
+        <!-- 3. Orders Dispatched -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Order Throughput</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">Dispatched</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="dashTotalOrders">--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Customer Deliveries</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Sales GMV:</span>
+                <span class="font-mono font-bold text-slate-300" id="dashTotalGmv">₹--</span>
+            </div>
+        </div>
+
+        <!-- 4. Picker Productivity (IPP) -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Packer & Picker IPP</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">Velocity</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="dashAvgIpp">-- IPP</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Items Picked Per Hour</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Benchmark:</span>
+                <span class="font-mono font-bold text-slate-400">120+ Target</span>
+            </div>
+        </div>
+
+        <!-- 5. Active Days Recorded -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Temporal Coverage</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dashDaysCountBadge">-- Days</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="dashDaysCount">--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Operating Store Days</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Dark Store:</span>
+                <span class="font-mono font-bold text-slate-300">JMU-Sainik</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 1: Month-on-Month (MoM) Historical Multi-Stream Comparison Matrix -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="text-sm">📅</span>
+                <div>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Month-on-Month (MoM) Operational Trends</h4>
+                    <p class="text-[10px] text-slate-400">Multi-horizon historical progression across store attendance, financial losses, orders, and speed.</p>
+                </div>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dashMomMonthsBadge">
+                -- Months
+            </span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Operational Month</th>
+                        <th class="py-2.5 px-3 text-right">Headcount</th>
+                        <th class="py-2.5 px-3 text-right">Shifts Present</th>
+                        <th class="py-2.5 px-3 text-right">Absent</th>
+                        <th class="py-2.5 px-3 text-right">Attendance %</th>
+                        <th class="py-2.5 px-3 text-right">Orders</th>
+                        <th class="py-2.5 px-3 text-right">Picker IPP</th>
+                        <th class="py-2.5 px-3 text-right text-rose-400 font-bold">Total Loss (₹)</th>
+                        <th class="py-2.5 px-3 text-right">Loss Incidents</th>
+                        <th class="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dashMomTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="10" class="text-center py-6 text-slate-500 text-xs">
+                            Loading Month-on-Month operational records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- SECTION 2: Day-on-Day (DoD) Comprehensive Daily Operational Ledger -->
+    <section class="glass-panel p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="text-sm">📈</span>
+                <div>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Day-on-Day (DoD) Daily Performance Ledger</h4>
+                    <p class="text-[10px] text-slate-400">Day-by-day synchronization of shift attendance, dispatch orders, throughput velocity, and defect losses.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                    type="text"
+                    id="dashDodSearchInput"
+                    placeholder="Search date YYYY-MM-DD..."
+                    oninput="zeptoApp.filterDashboardDod()"
+                    class="bg-black/60 border border-white/10 rounded-md px-2.5 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-white/30"
+                />
+                <button
+                    type="button"
+                    onclick="zeptoApp.exportDashboardDodCsv()"
+                    class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1 transition whitespace-nowrap shadow-sm"
+                    title="Export Day-on-Day matrix to CSV"
+                >
+                    <span>📥</span> CSV
+                </button>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono whitespace-nowrap" id="dashDodRecordBadge">
+                    -- Days
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-96">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-wider bg-white/[0.02] sticky top-0 bg-slate-900/90 backdrop-blur z-10">
+                        <th class="py-2 px-3 whitespace-nowrap">Date</th>
+                        <th class="py-2 px-3 text-right">Shifts Sched</th>
+                        <th class="py-2 px-3 text-right">Present</th>
+                        <th class="py-2 px-3 text-right">Absent</th>
+                        <th class="py-2 px-3 text-right">Attendance %</th>
+                        <th class="py-2 px-3 text-right">Orders</th>
+                        <th class="py-2 px-3 text-right">Sales GMV (₹)</th>
+                        <th class="py-2 px-3 text-right">Packer IPP</th>
+                        <th class="py-2 px-3 text-right text-rose-400 font-bold">Total Loss (₹)</th>
+                        <th class="py-2 px-3 text-right">Loss Incidents</th>
+                        <th class="py-2 px-3 text-right">SKUs Impacted</th>
+                    </tr>
+                </thead>
+                <tbody id="dashDodTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="11" class="text-center py-6 text-slate-500 text-xs">
+                            Loading Day-on-Day operational records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

@@ -1,0 +1,481 @@
+<!-- Tab: Offer Letter Generator & Slabs (Akash Kumar Template) -->
+<div class="space-y-3">
+    <!-- Top Action Toolbar -->
+    <div class="glass-panel px-3.5 py-2.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap flex-1">
+            <!-- Saved Letters Selector -->
+            <div class="flex items-center gap-1.5">
+                <span class="text-xs text-slate-400 font-medium">📂 Saved:</span>
+                <select id="savedOfferLetterSelect" onchange="zeptoApp.onSelectSavedOfferLetter(this.value)"
+                    class="bg-black/90 border border-white/15 rounded-md px-2.5 py-1 text-xs text-white focus:outline-none focus:border-white/40 max-w-[220px]">
+                    <option value="">⚡ Select Saved Letter...</option>
+                </select>
+            </div>
+
+            <!-- Candidate Quick-Fill Selector -->
+            <div class="flex items-center gap-1.5 border-l border-white/10 pl-2.5">
+                <span class="text-xs text-slate-400 font-medium">🎯 From Candidate:</span>
+                <select id="offerCandidateSelect" onchange="zeptoApp.onSelectCandidateForOffer(this.value)"
+                    class="bg-black/90 border border-white/15 rounded-md px-2.5 py-1 text-xs text-white focus:outline-none focus:border-white/40 max-w-[200px]">
+                    <option value="">Choose Candidate...</option>
+                </select>
+            </div>
+
+            <button type="button" onclick="zeptoApp.resetOfferLetterToDefault()"
+                class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1">
+                <span>📄</span> New Letter
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="zeptoApp.saveCurrentOfferLetter()" id="saveOfferLetterBtn"
+                class="btn-zepto text-xs whitespace-nowrap bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40">
+                <span>💾</span> Save Letter
+            </button>
+            <button type="button" onclick="zeptoApp.printOrDownloadOfferLetter()"
+                class="btn-zepto text-xs whitespace-nowrap bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border-cyan-500/40 font-bold">
+                <span>📥</span> Download PDF / Print
+            </button>
+            <button type="button" onclick="zeptoApp.deleteCurrentOfferLetter()" id="deleteOfferLetterBtn" style="display: none;"
+                class="px-2 py-1 rounded bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-300 text-xs">
+                <span>🗑️</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Split Workspace: Left Controls / Right A4 Sheet Preview -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+
+        <!-- Left Pane: Form Controls (xl:col-span-4) -->
+        <div class="xl:col-span-4 space-y-3">
+            <div class="glass-panel p-3.5 space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-white/10">
+                    <h3 class="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+                        <span>⚙️</span> Letter Parameters
+                    </h3>
+                    <span class="text-[10px] text-slate-400 font-mono" id="offerDocRefBadge">RPS-ZEP-2026/10-01</span>
+                </div>
+
+                <div class="text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded p-2 flex items-start gap-1.5">
+                    <span class="text-xs">💡</span>
+                    <span><strong>Live In-Place Editing:</strong> You can edit any parameter here, or <strong>click directly anywhere on the A4 document</strong> on the right to edit words, tables, or clauses!</span>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-2.5 text-xs">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Title</label>
+                            <select id="of_title" onchange="zeptoApp.syncFormToPreview()"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+                                <option value="Mr.">Mr.</option>
+                                <option value="Ms.">Ms.</option>
+                                <option value="Mrs.">Mrs.</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Candidate Name *</label>
+                            <input type="text" id="of_candidate_name" oninput="zeptoApp.syncFormToPreview()"
+                                placeholder="e.g. Akash Kumar" value="Akash Kumar"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-semibold">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Letter Date</label>
+                            <input type="text" id="of_date" oninput="zeptoApp.syncFormToPreview()"
+                                value="01/10/2026"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Date of Joining</label>
+                            <input type="text" id="of_date_of_joining" oninput="zeptoApp.syncFormToPreview()"
+                                value="01/10/2026"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Position / Role</label>
+                            <input type="text" id="of_role" oninput="zeptoApp.syncFormToPreview()"
+                                value="Pickpackers"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Department</label>
+                            <input type="text" id="of_department" oninput="zeptoApp.syncFormToPreview()"
+                                value="Operations"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Employment Type</label>
+                            <input type="text" id="of_employment_type" oninput="zeptoApp.syncFormToPreview()"
+                                value="Full - Time"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Doc Ref</label>
+                            <input type="text" id="of_doc_ref" oninput="zeptoApp.syncFormToPreview()"
+                                value="RPS-ZEP-2026/10-03"
+                                class="w-full bg-black/80 border border-white/10 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30 font-mono">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Work Location</label>
+                        <input type="text" id="of_work_location" oninput="zeptoApp.syncFormToPreview()"
+                            value="Sector F Sainik Colony Jammu"
+                            class="w-full bg-black/80 border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
+                    </div>
+
+                    <!-- Compensation Inputs -->
+                    <div class="pt-2 border-t border-white/10 space-y-2">
+                        <span class="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Compensation Highlights</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-0.5">Basic Pay (Monthly)</label>
+                                <input type="number" id="of_basic_pay" oninput="zeptoApp.syncFormToPreview()"
+                                    value="12000" step="500"
+                                    class="w-full bg-black/80 border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-0.5">Total Potential (Slab 1)</label>
+                                <input type="number" id="of_total_potential" oninput="zeptoApp.syncFormToPreview()"
+                                    value="17000" step="500"
+                                    class="w-full bg-black/80 border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30 font-mono font-bold text-emerald-400">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signatory -->
+                    <div class="pt-2 border-t border-white/10 space-y-2">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Authorized Signatory</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-0.5">Signatory Name</label>
+                                <input type="text" id="of_signatory_name" oninput="zeptoApp.syncFormToPreview()"
+                                    value="Jatin"
+                                    class="w-full bg-black/80 border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30 font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-0.5">Signatory Title</label>
+                                <input type="text" id="of_signatory_title" oninput="zeptoApp.syncFormToPreview()"
+                                    value="Authorized Signatory"
+                                    class="w-full bg-black/80 border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-white/30">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Pane: Live A4 Document Preview Canvas (xl:col-span-8) -->
+        <div class="xl:col-span-8 flex justify-center overflow-x-auto pb-8">
+            <!-- A4 Sheet Container -->
+            <div id="offerLetterDocContainer" class="bg-slate-900/60 p-2 sm:p-4 rounded-xl border border-white/10 shadow-2xl max-w-full">
+
+                <!-- The Actual Document (Exact A4 Styling: 210mm x 297mm) -->
+                <div id="offerLetterDoc"
+                    class="bg-white text-slate-900 font-sans shadow-2xl mx-auto transition-all"
+                    style="width: 210mm; min-height: 297mm; padding: 10mm 14mm; font-size: 10.5pt; line-height: 1.35; color: #111827; box-sizing: border-box; position: relative;">
+
+                    <!-- Header -->
+                    <div class="flex items-start justify-between border-b-2 border-slate-900 pb-2 mb-2.5">
+                        <div>
+                            <div id="pv_comp_name" contenteditable="true" spellcheck="false" class="text-[17pt] font-extrabold tracking-tight text-slate-950 uppercase leading-none font-sans">
+                                RAKESHPARMESHWAR & SONS CO.
+                            </div>
+                            <div id="pv_comp_sub" contenteditable="true" spellcheck="false" class="text-[8.5pt] font-bold text-slate-700 tracking-wider uppercase mt-1">
+                                PARTNERED WITH ZEPTO (FRANCHISE STORE)
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div id="pv_doc_heading" contenteditable="true" spellcheck="false" class="text-[15pt] font-black text-slate-950 tracking-wide uppercase leading-none">
+                                OFFER LETTER
+                            </div>
+                            <div id="pv_confidential_badge" contenteditable="true" spellcheck="false" class="text-[8.5pt] font-bold text-red-600 italic tracking-tight mt-1">
+                                Strictly Confidential
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Bar (Date, To, Location) -->
+                    <div class="bg-slate-50 border border-slate-300 rounded px-3 py-1.5 mb-2.5 flex items-center justify-between text-[9.5pt]">
+                        <div>
+                            <span class="font-bold text-slate-700">Date:</span>
+                            <span id="pv_meta_date" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">01/10/2026</span>
+                        </div>
+                        <div>
+                            <span class="font-bold text-slate-700">To:</span>
+                            <span id="pv_meta_title" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">Mr.</span>
+                            <span id="pv_meta_name" contenteditable="true" spellcheck="false" class="font-bold text-slate-950">Akash Kumar</span>
+                        </div>
+                        <div>
+                            <span class="font-bold text-slate-700">Location:</span>
+                            <span id="pv_meta_location" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">Jammu, J&K</span>
+                        </div>
+                    </div>
+
+                    <!-- Subject & Salutation -->
+                    <div class="mb-2">
+                        <div class="text-[10pt] font-bold text-slate-950 mb-1">
+                            <span>Subject: Offer of Employment – </span>
+                            <span id="pv_subj_role" contenteditable="true" spellcheck="false" class="text-slate-950 underline decoration-slate-400 decoration-1 underline-offset-2">Pickpackers / Store Associates</span>
+                        </div>
+                        <div class="text-[9.5pt] font-semibold text-slate-900 mb-1">
+                            <span>Dear </span><span id="pv_salut_name" contenteditable="true" spellcheck="false" class="font-bold">Akash Kumar</span><span>,</span>
+                        </div>
+                        <p id="pv_intro_p" contenteditable="true" spellcheck="false" class="text-[9pt] text-slate-800 leading-snug text-justify">
+                            We are pleased to offer you employment with <strong>Rakeshparmeshwar & Sons Co.</strong>, partnered with Zepto as a franchise, for the position of <strong>Pickpackers/Store Associates</strong>. We believe your skills and enthusiasm will be a valuable addition to our operational team.
+                        </p>
+                    </div>
+
+                    <!-- 3x2 Position Matrix Cards -->
+                    <div class="grid grid-cols-3 gap-1.5 mb-2.5">
+                        <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70">
+                            <div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">POSITION</div>
+                            <div id="pv_grid_position" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Pickpackers</div>
+                        </div>
+                        <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70">
+                            <div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">DEPARTMENT</div>
+                            <div id="pv_grid_department" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Operations</div>
+                        </div>
+                        <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70">
+                            <div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">EMPLOYMENT TYPE</div>
+                            <div id="pv_grid_emp_type" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Full - Time</div>
+                        </div>
+                        <div class="col-span-2 border border-slate-300 rounded p-1.5 bg-slate-50/70">
+                            <div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">WORK LOCATION</div>
+                            <div id="pv_grid_location" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Sector F Sainik Colony Jammu</div>
+                        </div>
+                        <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70">
+                            <div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">DATE OF JOINING</div>
+                            <div id="pv_grid_joining_date" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5 font-mono">01/10/2026</div>
+                        </div>
+                    </div>
+
+                    <!-- Compensation Details & KPI Slab Table -->
+                    <div class="mb-2">
+                        <div class="text-[8.5pt] font-extrabold text-slate-950 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span id="pv_comp_title" contenteditable="true" spellcheck="false">COMPENSATION DETAILS (JAMMU – SAINIK COLONY ZEPTO STORE)</span>
+                        </div>
+
+                        <div class="border border-slate-900 rounded overflow-hidden">
+                            <table class="w-full text-left border-collapse text-[8pt]" style="line-height: 1.25;">
+                                <thead>
+                                    <tr class="bg-slate-900 text-white font-bold text-[7.5pt] uppercase tracking-wider">
+                                        <th class="p-1 pl-2 border-r border-slate-700 w-[24%]">KPI</th>
+                                        <th class="p-1 border-r border-slate-700 w-[25%] text-center">SLAB 1 (KPI / AMOUNT)</th>
+                                        <th class="p-1 border-r border-slate-700 w-[25%] text-center">SLAB 2 (KPI / AMOUNT)</th>
+                                        <th class="p-1 pr-2 w-[26%] text-center">SLAB 3 (KPI / AMOUNT)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-300">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">BASIC PAY</td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td>
+                                        <td class="p-1 pr-2 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">ATTENDANCE BONUS</td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">26 or 27 Attendance <strong class="ml-1 text-slate-950">₹1,000</strong></td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">1 Leave with Info <strong class="ml-1 text-slate-950">₹700</strong></td>
+                                        <td class="p-1 pr-2 text-center" contenteditable="true">2 Leave with Info <strong class="ml-1 text-slate-950">₹500</strong></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">BEHAVIOUR</td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹1,000</strong></td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹700</strong></td>
+                                        <td class="p-1 pr-2 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹500</strong></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">IPP</td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">160+ <strong class="ml-1 text-slate-950">₹1,000</strong></td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">140+ <strong class="ml-1 text-slate-950">₹700</strong></td>
+                                        <td class="p-1 pr-2 text-center" contenteditable="true">120+ <strong class="ml-1 text-slate-950">₹500</strong></td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">SLA</td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">SLA 3 <strong class="ml-1 text-slate-950">₹2,000</strong></td>
+                                        <td class="p-1 border-r border-slate-300 text-center" contenteditable="true">SLA 2 <strong class="ml-1 text-slate-950">₹1,500</strong></td>
+                                        <td class="p-1 pr-2 text-center" contenteditable="true">SLA 1 <strong class="ml-1 text-slate-950">₹700</strong></td>
+                                    </tr>
+                                    <tr class="bg-slate-100 font-extrabold text-[8.5pt]">
+                                        <td class="p-1 pl-2 text-slate-950 border-r border-slate-400 uppercase" contenteditable="true">TOTAL POTENTIAL</td>
+                                        <td class="p-1 border-r border-slate-400 text-center text-slate-950" contenteditable="true" id="pv_slab1_total">₹17,000</td>
+                                        <td class="p-1 border-r border-slate-400 text-center text-slate-950" contenteditable="true" id="pv_slab2_total">₹15,600</td>
+                                        <td class="p-1 pr-2 text-center text-slate-950" contenteditable="true" id="pv_slab3_total">₹14,200</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Achievers Bonus Box -->
+                        <div class="mt-1 border border-slate-300 rounded bg-slate-50/80 px-2 py-1 flex items-center justify-between text-[7.5pt]">
+                            <div class="font-bold text-slate-900 flex items-center gap-1">
+                                <span class="text-amber-600">★</span>
+                                <span contenteditable="true">Achievers Bonus (Additional Monthly Top Performer Incentive):</span>
+                            </div>
+                            <div class="flex items-center gap-3 font-semibold text-slate-800">
+                                <span contenteditable="true">1st Best Performer: <strong class="text-slate-950">₹1,500</strong></span>
+                                <span class="text-slate-300">|</span>
+                                <span contenteditable="true">2nd Best Performer: <strong class="text-slate-950">₹1,000</strong></span>
+                                <span class="text-slate-300">|</span>
+                                <span contenteditable="true">3rd Best Performer: <strong class="text-slate-950">₹700</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Responsibilities (7 Bullets) -->
+                    <div class="mb-2">
+                        <div class="text-[8pt] font-extrabold text-slate-950 uppercase tracking-wider mb-0.5">
+                            KEY RESPONSIBILITIES
+                        </div>
+                        <ul id="pv_responsibilities_list" contenteditable="true" spellcheck="false" class="list-disc pl-4 text-[7.5pt] text-slate-800 space-y-0.5 leading-tight">
+                            <li>Picking items accurately as per order from the store inventory.</li>
+                            <li>Packing orders securely and ensuring high packing accuracy.</li>
+                            <li>Ensuring timely order processing and quick store dispatch.</li>
+                            <li>Maintaining strict cleanliness and organization in work area.</li>
+                            <li>Following all safety, hygiene, and daily operational guidelines.</li>
+                            <li>Assisting in regular inventory management and cycle stock checks.</li>
+                            <li>Performing any other operational duties assigned by the supervisor or management.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Probation & General Terms -->
+                    <div class="mb-2">
+                        <div class="text-[8pt] font-extrabold text-slate-950 uppercase tracking-wider mb-0.5">
+                            PROBATION & GENERAL TERMS
+                        </div>
+                        <div id="pv_terms_content" contenteditable="true" spellcheck="false" class="text-[7pt] text-slate-700 space-y-1 text-justify leading-tight">
+                            <p>
+                                <strong class="text-slate-900">Probation Period:</strong> You will be on probation for a period of <strong>3 months</strong> from the date of joining. Your performance, conduct, attendance, and suitability for the role will be evaluated during this period. Confirmation of employment will be communicated upon successful completion of probation.
+                            </p>
+                            <p>
+                                <strong class="text-slate-900">General Terms & Notice:</strong> You are required to abide by company policies and guidelines as amended from time to time. The company reserves the right to terminate employment in cases of misconduct or policy violations. If you decide to resign, you must provide <strong>one month prior notice</strong>, failing which one month's salary may be deducted as per management decision.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Signatures Block -->
+                    <div class="pt-2 border-t border-slate-300 mt-2 flex items-end justify-between text-[8.5pt]">
+                        <!-- Left Signatory -->
+                        <div>
+                            <div class="text-[8pt] font-bold text-slate-700">For Rakeshparmeshwar & Sons Co.</div>
+                            <!-- Stylized Signature -->
+                            <div id="pv_sign_script" contenteditable="true" spellcheck="false"
+                                class="text-[20pt] font-serif italic text-slate-900 my-0.5 tracking-wider select-none"
+                                style="font-family: 'Brush Script MT', 'Segoe Script', cursive, serif;">
+                                Jatin
+                            </div>
+                            <div class="text-[8pt] font-extrabold text-slate-950">
+                                <span>Authorized Signatory (</span><span id="pv_sign_name">Jatin</span><span>)</span>
+                            </div>
+                        </div>
+
+                        <!-- Candidate Acceptance Placeholder -->
+                        <div class="text-right">
+                            <div class="text-[7.5pt] text-slate-500 mb-6">Accepted and Agreed by Employee:</div>
+                            <div class="border-t border-slate-400 w-44 pt-0.5 text-center text-[7pt] text-slate-600">
+                                Signature & Date
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Bar -->
+                    <div class="pt-2 border-t border-slate-200 mt-2 flex items-center justify-between text-[7pt] text-slate-500">
+                        <div id="pv_footer_tagline" contenteditable="true" spellcheck="false" class="font-medium">
+                            Delivering Excellence, Every Time. | Partnered with Zepto
+                        </div>
+                        <div class="font-mono">
+                            <span id="pv_footer_doc_ref" contenteditable="true" spellcheck="false">Document Ref: RPS-ZEP-2026/10-03</span>
+                            <span class="ml-2 font-semibold">Page 1 of 1</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Specialized Print Media CSS for 100% Exact Single-Page A4 PDF Output -->
+<style>
+/* Subtle styling for live contenteditable fields */
+#offerLetterDoc [contenteditable="true"] {
+    outline: none;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    border-radius: 2px;
+}
+#offerLetterDoc [contenteditable="true"]:hover {
+    background-color: rgba(234, 179, 8, 0.08);
+}
+#offerLetterDoc [contenteditable="true"]:focus {
+    background-color: rgba(59, 130, 246, 0.09);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+@media print {
+    /* Hide everything in the page */
+    html, body {
+        background: #fff !important;
+        color: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    body * {
+        visibility: hidden !important;
+    }
+
+    /* Isolate only the offer letter canvas */
+    #offerLetterDoc, #offerLetterDoc * {
+        visibility: visible !important;
+    }
+
+    #offerLetterDocContainer {
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    #offerLetterDoc {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 210mm !important;
+        min-height: 297mm !important;
+        height: 297mm !important;
+        margin: 0 !important;
+        padding: 10mm 14mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: #fff !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    #offerLetterDoc [contenteditable="true"]:hover,
+    #offerLetterDoc [contenteditable="true"]:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+}
+</style>

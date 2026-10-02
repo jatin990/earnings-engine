@@ -34,7 +34,7 @@ const zeptoApp = {
 
         // Tab routing via hash
         const rawHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-        if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(rawHash)) {
+        if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].includes(rawHash)) {
             this.activeTab = rawHash;
         }
         this.switchTab(this.activeTab, false);
@@ -42,7 +42,7 @@ const zeptoApp = {
         // Listen for browser back/forward and anchor hash changes
         window.addEventListener('hashchange', () => {
             const newHash = (window.location.hash || '#employees').replace('#', '').split('?')[0];
-            if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].includes(newHash)) {
+            if (['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].includes(newHash)) {
                 if (this.activeTab !== newHash) {
                     this.switchTab(newHash, false);
                 }
@@ -103,7 +103,7 @@ const zeptoApp = {
             window.location.hash = tabId;
         }
 
-        ['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'security', 'gmail'].forEach(t => {
+        ['employees', 'attendance', 'utilization', 'loss', 'scorecard', 'income', 'expenses', 'candidates', 'offers', 'security', 'gmail'].forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -121,6 +121,7 @@ const zeptoApp = {
         if (tabId === 'utilization') this.loadUtilization();
         if (tabId === 'loss') this.loadLoss();
         if (tabId === 'scorecard') this.loadScorecard();
+        if (tabId === 'offers') this.initOfferLetterModule();
     },
 
     // -----------------------------------------------------------------------
@@ -1765,6 +1766,9 @@ const zeptoApp = {
                     </td>
                     <td class="p-3.5 pr-4 text-center">
                         <div class="flex items-center justify-center gap-1.5">
+                            <button type="button" onclick="zeptoApp.prepareOfferFromCandidate('${cand.id}')" class="px-2 py-1 rounded bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 font-semibold text-[11px] shadow transition flex items-center gap-1" title="Generate customized Offer Letter">
+                                <span>📄</span> Offer
+                            </button>
                             ${cand.stage !== 'HIRED' ? `
                                 <button type="button" onclick="zeptoApp.openConvertCandidateModal('${cand.id}')" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow transition" title="Hire and transfer to Staff Roster">
                                     ⚡ Hire Staff
@@ -3528,7 +3532,8 @@ const zeptoApp = {
         try {
             const monthFilter = selectedMonth || document.getElementById('gmailMonthFilter')?.value || 'CURRENT';
             const queryMonth = monthFilter === 'CURRENT' ? new Date().toISOString().slice(0, 7) : monthFilter;
-            const res = await fetch(`/api/v1/zepto/gmail/recent-emails?month=${encodeURIComponent(queryMonth)}`);
+            // Load instantly from local database (zero-latency, no Gmail API call)
+            const res = await fetch(`/api/v1/zepto/gmail/emails?month=${encodeURIComponent(queryMonth)}`);
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.detail || 'Failed to fetch emails');
@@ -3550,6 +3555,49 @@ const zeptoApp = {
             }
         } finally {
             if (refreshIcon) refreshIcon.className = '';
+        }
+    },
+
+    async syncGmailDelta() {
+        const btn = document.getElementById('btnSyncGmailDelta');
+        const icon = document.getElementById('btnSyncGmailDeltaIcon');
+        const text = document.getElementById('btnSyncGmailDeltaText');
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.className = 'inline-block animate-spin';
+        if (text) text.textContent = 'Syncing...';
+
+        try {
+            const monthFilter = document.getElementById('gmailMonthFilter')?.value || 'CURRENT';
+            const queryMonth = monthFilter === 'CURRENT' ? new Date().toISOString().slice(0, 7) : monthFilter;
+            const res = await fetch(`/api/v1/zepto/gmail/recent-emails?month=${encodeURIComponent(queryMonth)}`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to sync emails');
+            }
+
+            const data = await res.json();
+            const deltaCount = data.delta_fetched || 0;
+            const emails = data.emails || [];
+
+            this.gmail.emails = emails;
+            this.updateGmailCategoryCounts(emails);
+            this.filterGmailEmails();
+
+            const badgeEl = document.getElementById('gmailFeedCountBadge');
+            if (badgeEl) badgeEl.textContent = `${emails.length} Emails (${data.month || queryMonth})`;
+
+            if (deltaCount > 0) {
+                this.showToast(`⚡ Synced ${deltaCount} new email${deltaCount > 1 ? 's' : ''} from Gmail`);
+            } else {
+                this.showToast('✅ Mailbox is up to date — no new emails');
+            }
+        } catch (err) {
+            this.showToast(`⚠️ Gmail delta sync error: ${err.message}`, true);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) icon.className = '';
+            if (text) text.textContent = 'Sync Delta';
         }
     },
 
@@ -3582,7 +3630,7 @@ const zeptoApp = {
                 });
             }
 
-            // Reload email feed and store tabs
+            // Reload email feed and store tabs from local database after ingest completes
             await this.loadRecentEmails();
             await this.loadOverview();
             if (this.currentTab === 'attendance') await this.loadAttendanceData();
@@ -4958,6 +5006,464 @@ const zeptoApp = {
                 </tr>
             `;
         }).join('');
+    },
+
+    // -----------------------------------------------------------------------
+    // Offer Letter Generator & Document Studio
+    // -----------------------------------------------------------------------
+
+    currentOfferLetterId: null,
+    offerLettersCache: [],
+
+    async initOfferLetterModule() {
+        // Only initialize once per tab switch
+        if (this._offerModuleInitialized) {
+            return;
+        }
+        this._offerModuleInitialized = true;
+        await this.loadOfferLetters();
+        await this.populateOfferCandidateDropdown();
+    },
+
+    async loadOfferLetters() {
+        try {
+            const res = await fetch('/api/v1/zepto/offer-letters');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to load offer letters');
+
+            this.offerLettersCache = data.items || [];
+            const select = document.getElementById('savedOfferLetterSelect');
+            if (select) {
+                select.innerHTML = '<option value="">⚡ Select Saved Letter...</option>';
+                this.offerLettersCache.forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.id;
+                    opt.textContent = `${l.candidate_name} — ${l.role} (${l.date_of_joining})`;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('[ZEPTO-OFFERS] Error loading offer letters:', err);
+        }
+    },
+
+    async populateOfferCandidateDropdown() {
+        try {
+            const res = await fetch('/api/v1/zepto/candidates');
+            const data = await res.json();
+            if (!res.ok) return;
+
+            const select = document.getElementById('offerCandidateSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Choose Candidate...</option>';
+                (data.items || []).forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.name} — ${c.target_role}`;
+                    opt.dataset.name = c.name;
+                    opt.dataset.role = c.target_role;
+                    opt.dataset.salary = c.expected_salary || 12000;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('[ZEPTO-OFFERS] Error populating candidates:', err);
+        }
+    },
+
+    onSelectSavedOfferLetter(letterId) {
+        if (!letterId) return;
+        this.loadOfferLetterById(letterId);
+    },
+
+    async loadOfferLetterById(letterId) {
+        try {
+            const res = await fetch(`/api/v1/zepto/offer-letters/${letterId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Not found');
+
+            const letter = data.letter;
+            this.currentOfferLetterId = letter.id;
+
+            // Populate form fields
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+            setVal('of_title', letter.title);
+            setVal('of_candidate_name', letter.candidate_name);
+            setVal('of_date', this._formatDateForOffer(letter.created_at));
+            setVal('of_date_of_joining', letter.date_of_joining);
+            setVal('of_role', letter.role);
+            setVal('of_department', letter.department);
+            setVal('of_employment_type', letter.employment_type);
+            setVal('of_doc_ref', letter.doc_ref);
+            setVal('of_work_location', letter.work_location);
+            setVal('of_basic_pay', letter.basic_pay);
+            setVal('of_total_potential', letter.total_potential);
+            setVal('of_signatory_name', letter.signatory_name);
+            setVal('of_signatory_title', letter.signatory_title);
+
+            // Restore HTML snapshot if available
+            if (letter.html_snapshot) {
+                const docEl = document.getElementById('offerLetterDoc');
+                if (docEl) docEl.innerHTML = letter.html_snapshot;
+            } else {
+                this.syncFormToPreview();
+            }
+
+            // Show delete button and doc ref badge
+            const delBtn = document.getElementById('deleteOfferLetterBtn');
+            if (delBtn) delBtn.style.display = 'inline-flex';
+            const refBadge = document.getElementById('offerDocRefBadge');
+            if (refBadge) refBadge.textContent = letter.doc_ref || letter.id;
+
+            this.showToast(`📄 Loaded offer letter for ${letter.candidate_name}`);
+        } catch (err) {
+            this.showToast('⚠️ Failed to load offer letter: ' + err.message, true);
+        }
+    },
+
+    onSelectCandidateForOffer(candId) {
+        if (!candId) return;
+        const select = document.getElementById('offerCandidateSelect');
+        const selOpt = select?.querySelector(`option[value="${candId}"]`);
+        if (!selOpt) return;
+
+        const name = selOpt.dataset.name || '';
+        const role = selOpt.dataset.role || 'PICKER';
+        const salary = parseFloat(selOpt.dataset.salary || 12000);
+
+        // Map role codes to readable roles
+        const roleMap = {
+            'PICKER': 'Pickpackers',
+            'SHIFT_INCHARGE': 'Shift Incharges',
+            'SECURITY_GUARD': 'Security Guards',
+            'HOUSEKEEPING': 'House Keeping',
+        };
+        const roleLabel = roleMap[role] || role;
+
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+        setVal('of_candidate_name', name);
+        setVal('of_role', roleLabel);
+        setVal('of_basic_pay', salary);
+
+        // Generate document reference
+        const now = new Date();
+        const yr = now.getFullYear();
+        const mo = String(now.getMonth() + 1).padStart(2, '0');
+        const seq = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
+        setVal('of_doc_ref', `RPS-ZEP-${yr}/${mo}-${seq}`);
+        setVal('of_date', `${String(now.getDate()).padStart(2, '0')}/${mo}/${yr}`);
+        setVal('of_date_of_joining', `${String(now.getDate()).padStart(2, '0')}/${mo}/${yr}`);
+
+        this.currentOfferLetterId = null;
+        this.syncFormToPreview();
+        this.showToast(`🎯 Pre-filled offer letter for ${name}`);
+    },
+
+    prepareOfferFromCandidate(candId) {
+        // Switch to offers tab and pre-fill from candidate
+        this.switchTab('offers');
+        // Wait for DOM rendering before populating
+        setTimeout(() => {
+            this.onSelectCandidateForOffer(candId);
+        }, 200);
+    },
+
+    syncFormToPreview() {
+        const v = (id) => document.getElementById(id)?.value || '';
+        const s = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+        const candName = v('of_candidate_name');
+        const title = v('of_title');
+        const letterDate = v('of_date');
+        const joiningDate = v('of_date_of_joining');
+        const role = v('of_role');
+        const department = v('of_department');
+        const empType = v('of_employment_type');
+        const location = v('of_work_location');
+        const docRef = v('of_doc_ref');
+        const sigName = v('of_signatory_name');
+        const basicPay = v('of_basic_pay');
+        const totalPotential = v('of_total_potential');
+
+        s('pv_meta_date', letterDate);
+        s('pv_meta_title', title);
+        s('pv_meta_name', candName);
+        s('pv_salut_name', candName);
+        s('pv_subj_role', role + ' / Store Associates');
+        s('pv_grid_position', role);
+        s('pv_grid_department', department);
+        s('pv_grid_emp_type', empType);
+        s('pv_grid_location', location);
+        s('pv_grid_joining_date', joiningDate);
+
+        // Update basic pay and total potential in compensation table
+        const bp = parseFloat(basicPay || 12000);
+        const bpStr = '₹' + bp.toLocaleString('en-IN');
+        const tp = parseFloat(totalPotential || 17000);
+        const tpStr = '₹' + tp.toLocaleString('en-IN');
+        s('pv_slab1_total', tpStr);
+
+        // Signatory
+        s('pv_sign_script', sigName);
+        s('pv_sign_name', sigName);
+
+        // Footer doc ref
+        s('pv_footer_doc_ref', 'Document Ref: ' + docRef);
+
+        // Doc ref badge
+        const refBadge = document.getElementById('offerDocRefBadge');
+        if (refBadge) refBadge.textContent = docRef;
+    },
+
+    async saveCurrentOfferLetter() {
+        const btn = document.getElementById('saveOfferLetterBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+        try {
+            const v = (id) => document.getElementById(id)?.value || '';
+            const candName = v('of_candidate_name');
+            if (!candName.trim()) {
+                throw new Error('Candidate name is required.');
+            }
+
+            // Capture live HTML snapshot of the document
+            const docEl = document.getElementById('offerLetterDoc');
+            const htmlSnapshot = docEl ? docEl.innerHTML : '';
+
+            const payload = {
+                candidate_name: candName,
+                title: v('of_title'),
+                role: v('of_role'),
+                department: v('of_department'),
+                work_location: v('of_work_location'),
+                date_of_joining: v('of_date_of_joining'),
+                employment_type: v('of_employment_type'),
+                doc_ref: v('of_doc_ref'),
+                basic_pay: parseFloat(v('of_basic_pay') || 12000),
+                total_potential: parseFloat(v('of_total_potential') || 17000),
+                signatory_name: v('of_signatory_name'),
+                signatory_title: v('of_signatory_title'),
+                data_json: JSON.stringify({
+                    letter_date: v('of_date'),
+                }),
+                html_snapshot: htmlSnapshot,
+            };
+
+            // If editing an existing letter, include its ID
+            if (this.currentOfferLetterId) {
+                payload.id = this.currentOfferLetterId;
+            }
+
+            // Include candidate linkage if selected
+            const candSelect = document.getElementById('offerCandidateSelect');
+            if (candSelect && candSelect.value) {
+                payload.cand_id = candSelect.value;
+            }
+
+            const res = await fetch('/api/v1/zepto/offer-letters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to save letter');
+
+            this.currentOfferLetterId = data.letter.id;
+
+            // Show delete button
+            const delBtn = document.getElementById('deleteOfferLetterBtn');
+            if (delBtn) delBtn.style.display = 'inline-flex';
+
+            await this.loadOfferLetters();
+            this.showToast(`💾 Offer letter for ${candName} saved successfully!`);
+        } catch (err) {
+            this.showToast('⚠️ ' + err.message, true);
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span>💾</span> Save Letter'; }
+        }
+    },
+
+    async deleteCurrentOfferLetter() {
+        if (!this.currentOfferLetterId) return;
+        if (!confirm('Delete this saved offer letter?')) return;
+
+        try {
+            const res = await fetch(`/api/v1/zepto/offer-letters/${this.currentOfferLetterId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete offer letter');
+
+            this.currentOfferLetterId = null;
+            const delBtn = document.getElementById('deleteOfferLetterBtn');
+            if (delBtn) delBtn.style.display = 'none';
+
+            await this.loadOfferLetters();
+            this.resetOfferLetterToDefault();
+            this.showToast('🗑️ Offer letter deleted.');
+        } catch (err) {
+            this.showToast('⚠️ ' + err.message, true);
+        }
+    },
+
+    resetOfferLetterToDefault() {
+        this.currentOfferLetterId = null;
+        this._offerModuleInitialized = false;
+
+        // Reset form fields to defaults
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+        setVal('of_title', 'Mr.');
+        setVal('of_candidate_name', 'Akash Kumar');
+        setVal('of_role', 'Pickpackers');
+        setVal('of_department', 'Operations');
+        setVal('of_employment_type', 'Full - Time');
+        setVal('of_work_location', 'Sector F Sainik Colony Jammu');
+        setVal('of_basic_pay', '12000');
+        setVal('of_total_potential', '17000');
+        setVal('of_signatory_name', 'Jatin');
+        setVal('of_signatory_title', 'Authorized Signatory');
+
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yr = now.getFullYear();
+        setVal('of_date', `${dd}/${mm}/${yr}`);
+        setVal('of_date_of_joining', `${dd}/${mm}/${yr}`);
+        setVal('of_doc_ref', `RPS-ZEP-${yr}/${mm}-01`);
+
+        // Reset selectors
+        const savedSel = document.getElementById('savedOfferLetterSelect');
+        if (savedSel) savedSel.value = '';
+        const candSel = document.getElementById('offerCandidateSelect');
+        if (candSel) candSel.value = '';
+
+        // Hide delete button
+        const delBtn = document.getElementById('deleteOfferLetterBtn');
+        if (delBtn) delBtn.style.display = 'none';
+
+        // Reload default template into the document preview — replace innerHTML
+        // with the original template structure
+        this._resetOfferDocToTemplate();
+        this.syncFormToPreview();
+        this.initOfferLetterModule();
+    },
+
+    _resetOfferDocToTemplate() {
+        const docEl = document.getElementById('offerLetterDoc');
+        if (!docEl) return;
+
+        // Restore the static HTML template for the A4 preview
+        docEl.innerHTML = `
+            <!-- Header -->
+            <div class="flex items-start justify-between border-b-2 border-slate-900 pb-2 mb-2.5">
+                <div>
+                    <div id="pv_comp_name" contenteditable="true" spellcheck="false" class="text-[17pt] font-extrabold tracking-tight text-slate-950 uppercase leading-none font-sans">RAKESHPARMESHWAR & SONS CO.</div>
+                    <div id="pv_comp_sub" contenteditable="true" spellcheck="false" class="text-[8.5pt] font-bold text-slate-700 tracking-wider uppercase mt-1">PARTNERED WITH ZEPTO (FRANCHISE STORE)</div>
+                </div>
+                <div class="text-right">
+                    <div id="pv_doc_heading" contenteditable="true" spellcheck="false" class="text-[15pt] font-black text-slate-950 tracking-wide uppercase leading-none">OFFER LETTER</div>
+                    <div id="pv_confidential_badge" contenteditable="true" spellcheck="false" class="text-[8.5pt] font-bold text-red-600 italic tracking-tight mt-1">Strictly Confidential</div>
+                </div>
+            </div>
+            <!-- Metadata Bar -->
+            <div class="bg-slate-50 border border-slate-300 rounded px-3 py-1.5 mb-2.5 flex items-center justify-between text-[9.5pt]">
+                <div><span class="font-bold text-slate-700">Date:</span><span id="pv_meta_date" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">01/10/2026</span></div>
+                <div><span class="font-bold text-slate-700">To:</span><span id="pv_meta_title" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">Mr.</span> <span id="pv_meta_name" contenteditable="true" spellcheck="false" class="font-bold text-slate-950">Akash Kumar</span></div>
+                <div><span class="font-bold text-slate-700">Location:</span><span id="pv_meta_location" contenteditable="true" spellcheck="false" class="font-semibold text-slate-950 ml-1">Jammu, J&K</span></div>
+            </div>
+            <!-- Subject & Salutation -->
+            <div class="mb-2">
+                <div class="text-[10pt] font-bold text-slate-950 mb-1"><span>Subject: Offer of Employment – </span><span id="pv_subj_role" contenteditable="true" spellcheck="false" class="text-slate-950 underline decoration-slate-400 decoration-1 underline-offset-2">Pickpackers / Store Associates</span></div>
+                <div class="text-[9.5pt] font-semibold text-slate-900 mb-1"><span>Dear </span><span id="pv_salut_name" contenteditable="true" spellcheck="false" class="font-bold">Akash Kumar</span><span>,</span></div>
+                <p id="pv_intro_p" contenteditable="true" spellcheck="false" class="text-[9pt] text-slate-800 leading-snug text-justify">We are pleased to offer you employment with <strong>Rakeshparmeshwar & Sons Co.</strong>, partnered with Zepto as a franchise, for the position of <strong>Pickpackers/Store Associates</strong>. We believe your skills and enthusiasm will be a valuable addition to our operational team.</p>
+            </div>
+            <!-- Position Matrix -->
+            <div class="grid grid-cols-3 gap-1.5 mb-2.5">
+                <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70"><div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">POSITION</div><div id="pv_grid_position" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Pickpackers</div></div>
+                <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70"><div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">DEPARTMENT</div><div id="pv_grid_department" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Operations</div></div>
+                <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70"><div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">EMPLOYMENT TYPE</div><div id="pv_grid_emp_type" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Full - Time</div></div>
+                <div class="col-span-2 border border-slate-300 rounded p-1.5 bg-slate-50/70"><div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">WORK LOCATION</div><div id="pv_grid_location" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5">Sector F Sainik Colony Jammu</div></div>
+                <div class="border border-slate-300 rounded p-1.5 bg-slate-50/70"><div class="text-[7.5pt] font-bold text-slate-500 uppercase tracking-wider">DATE OF JOINING</div><div id="pv_grid_joining_date" contenteditable="true" spellcheck="false" class="text-[9pt] font-bold text-slate-950 mt-0.5 font-mono">01/10/2026</div></div>
+            </div>
+            <!-- Compensation Table -->
+            <div class="mb-2">
+                <div class="text-[8.5pt] font-extrabold text-slate-950 uppercase tracking-wider mb-1"><span id="pv_comp_title" contenteditable="true" spellcheck="false">COMPENSATION DETAILS (JAMMU – SAINIK COLONY ZEPTO STORE)</span></div>
+                <div class="border border-slate-900 rounded overflow-hidden">
+                    <table class="w-full text-left border-collapse text-[8pt]" style="line-height: 1.25;">
+                        <thead><tr class="bg-slate-900 text-white font-bold text-[7.5pt] uppercase tracking-wider"><th class="p-1 pl-2 border-r border-slate-700 w-[24%]">KPI</th><th class="p-1 border-r border-slate-700 w-[25%] text-center">SLAB 1 (KPI / AMOUNT)</th><th class="p-1 border-r border-slate-700 w-[25%] text-center">SLAB 2 (KPI / AMOUNT)</th><th class="p-1 pr-2 w-[26%] text-center">SLAB 3 (KPI / AMOUNT)</th></tr></thead>
+                        <tbody class="divide-y divide-slate-300">
+                            <tr class="hover:bg-slate-50"><td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">BASIC PAY</td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td><td class="p-1 pr-2 text-center" contenteditable="true">Attendance Basis <strong class="ml-1 text-slate-950">₹12,000</strong></td></tr>
+                            <tr class="hover:bg-slate-50"><td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">ATTENDANCE BONUS</td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">26 or 27 Attendance <strong class="ml-1 text-slate-950">₹1,000</strong></td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">1 Leave with Info <strong class="ml-1 text-slate-950">₹700</strong></td><td class="p-1 pr-2 text-center" contenteditable="true">2 Leave with Info <strong class="ml-1 text-slate-950">₹500</strong></td></tr>
+                            <tr class="hover:bg-slate-50"><td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">BEHAVIOUR</td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹1,000</strong></td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹700</strong></td><td class="p-1 pr-2 text-center" contenteditable="true">DHM Feedback <strong class="ml-1 text-slate-950">₹500</strong></td></tr>
+                            <tr class="hover:bg-slate-50"><td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">IPP</td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">160+ <strong class="ml-1 text-slate-950">₹1,000</strong></td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">140+ <strong class="ml-1 text-slate-950">₹700</strong></td><td class="p-1 pr-2 text-center" contenteditable="true">120+ <strong class="ml-1 text-slate-950">₹500</strong></td></tr>
+                            <tr class="hover:bg-slate-50"><td class="p-1 pl-2 font-bold text-slate-900 border-r border-slate-300" contenteditable="true">SLA</td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">SLA 3 <strong class="ml-1 text-slate-950">₹2,000</strong></td><td class="p-1 border-r border-slate-300 text-center" contenteditable="true">SLA 2 <strong class="ml-1 text-slate-950">₹1,500</strong></td><td class="p-1 pr-2 text-center" contenteditable="true">SLA 1 <strong class="ml-1 text-slate-950">₹700</strong></td></tr>
+                            <tr class="bg-slate-100 font-extrabold text-[8.5pt]"><td class="p-1 pl-2 text-slate-950 border-r border-slate-400 uppercase" contenteditable="true">TOTAL POTENTIAL</td><td class="p-1 border-r border-slate-400 text-center text-slate-950" contenteditable="true" id="pv_slab1_total">₹17,000</td><td class="p-1 border-r border-slate-400 text-center text-slate-950" contenteditable="true" id="pv_slab2_total">₹15,600</td><td class="p-1 pr-2 text-center text-slate-950" contenteditable="true" id="pv_slab3_total">₹14,200</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Achievers Bonus -->
+                <div class="mt-1 border border-slate-300 rounded bg-slate-50/80 px-2 py-1 flex items-center justify-between text-[7.5pt]">
+                    <div class="font-bold text-slate-900 flex items-center gap-1"><span class="text-amber-600">★</span><span contenteditable="true">Achievers Bonus (Additional Monthly Top Performer Incentive):</span></div>
+                    <div class="flex items-center gap-3 font-semibold text-slate-800">
+                        <span contenteditable="true">1st Best Performer: <strong class="text-slate-950">₹1,500</strong></span><span class="text-slate-300">|</span>
+                        <span contenteditable="true">2nd Best Performer: <strong class="text-slate-950">₹1,000</strong></span><span class="text-slate-300">|</span>
+                        <span contenteditable="true">3rd Best Performer: <strong class="text-slate-950">₹700</strong></span>
+                    </div>
+                </div>
+            </div>
+            <!-- Key Responsibilities -->
+            <div class="mb-2">
+                <div class="text-[8pt] font-extrabold text-slate-950 uppercase tracking-wider mb-0.5">KEY RESPONSIBILITIES</div>
+                <ul id="pv_responsibilities_list" contenteditable="true" spellcheck="false" class="list-disc pl-4 text-[7.5pt] text-slate-800 space-y-0.5 leading-tight">
+                    <li>Picking items accurately as per order from the store inventory.</li>
+                    <li>Packing orders securely and ensuring high packing accuracy.</li>
+                    <li>Ensuring timely order processing and quick store dispatch.</li>
+                    <li>Maintaining strict cleanliness and organization in work area.</li>
+                    <li>Following all safety, hygiene, and daily operational guidelines.</li>
+                    <li>Assisting in regular inventory management and cycle stock checks.</li>
+                    <li>Performing any other operational duties assigned by the supervisor or management.</li>
+                </ul>
+            </div>
+            <!-- Probation & Terms -->
+            <div class="mb-2">
+                <div class="text-[8pt] font-extrabold text-slate-950 uppercase tracking-wider mb-0.5">PROBATION & GENERAL TERMS</div>
+                <div id="pv_terms_content" contenteditable="true" spellcheck="false" class="text-[7pt] text-slate-700 space-y-1 text-justify leading-tight">
+                    <p><strong class="text-slate-900">Probation Period:</strong> You will be on probation for a period of <strong>3 months</strong> from the date of joining. Your performance, conduct, attendance, and suitability for the role will be evaluated during this period. Confirmation of employment will be communicated upon successful completion of probation.</p>
+                    <p><strong class="text-slate-900">General Terms & Notice:</strong> You are required to abide by company policies and guidelines as amended from time to time. The company reserves the right to terminate employment in cases of misconduct or policy violations. If you decide to resign, you must provide <strong>one month prior notice</strong>, failing which one month's salary may be deducted as per management decision.</p>
+                </div>
+            </div>
+            <!-- Signatures -->
+            <div class="pt-2 border-t border-slate-300 mt-2 flex items-end justify-between text-[8.5pt]">
+                <div>
+                    <div class="text-[8pt] font-bold text-slate-700">For Rakeshparmeshwar & Sons Co.</div>
+                    <div id="pv_sign_script" contenteditable="true" spellcheck="false" class="text-[20pt] font-serif italic text-slate-900 my-0.5 tracking-wider select-none" style="font-family: 'Brush Script MT', 'Segoe Script', cursive, serif;">Jatin</div>
+                    <div class="text-[8pt] font-extrabold text-slate-950"><span>Authorized Signatory (</span><span id="pv_sign_name">Jatin</span><span>)</span></div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[7.5pt] text-slate-500 mb-6">Accepted and Agreed by Employee:</div>
+                    <div class="border-t border-slate-400 w-44 pt-0.5 text-center text-[7pt] text-slate-600">Signature & Date</div>
+                </div>
+            </div>
+            <!-- Footer -->
+            <div class="pt-2 border-t border-slate-200 mt-2 flex items-center justify-between text-[7pt] text-slate-500">
+                <div id="pv_footer_tagline" contenteditable="true" spellcheck="false" class="font-medium">Delivering Excellence, Every Time. | Partnered with Zepto</div>
+                <div class="font-mono"><span id="pv_footer_doc_ref" contenteditable="true" spellcheck="false">Document Ref: RPS-ZEP-2026/10-01</span><span class="ml-2 font-semibold">Page 1 of 1</span></div>
+            </div>
+        `;
+    },
+
+    printOrDownloadOfferLetter() {
+        window.print();
+    },
+
+    _formatDateForOffer(isoStr) {
+        if (!isoStr) {
+            const now = new Date();
+            return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+        }
+        try {
+            const d = new Date(isoStr);
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        } catch {
+            return isoStr;
+        }
     }
 };
 

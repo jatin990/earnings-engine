@@ -54,7 +54,9 @@ async def get_zepto_hub_ui() -> HTMLResponse:
 # ---------------------------------------------------------------------------
 
 @router.get("/api/v1/zepto/overview", summary="Store Overview & Analytics")
-async def get_zepto_overview_endpoint() -> dict[str, Any]:
+async def get_zepto_overview_endpoint(
+    month: str | None = Query(None),
+) -> dict[str, Any]:
     """Return aggregated headcount, attrition, spend insights and 50-50 equity progress."""
     try:
         data = zepto_db.get_zepto_overview(_settings)
@@ -62,6 +64,24 @@ async def get_zepto_overview_endpoint() -> dict[str, Any]:
     except Exception as e:
         logger.error("[ZEPTO-API] Error computing overview: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/zepto/operations/analytics", summary="Get Master MoM and DoD Operational Dashboard")
+async def get_zepto_dashboard_analytics_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, or 'ALL'"),
+    store_name: str | None = Query(None, description="Filter by dark store name"),
+) -> dict[str, Any]:
+    """Retrieve cross-operational Month-on-Month and Day-on-Day matrix covering attendance, loss, orders, GMV, and IPP."""
+    try:
+        data = zepto_db.get_zepto_dashboard_analytics(
+            month=month,
+            store_name=store_name,
+            settings=_settings,
+        )
+        return {"success": True, **data}
+    except Exception as exc:
+        logger.error("[ZEPTO-ANALYTICS] Error fetching operations analytics: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/api/v1/zepto/staffing-targets", summary="Get Staffing Targets & Capacity")
@@ -879,10 +899,13 @@ async def get_recent_emails_endpoint(
     headers = {"Authorization": f"Bearer {token}"}
 
     try:
+        # Step 1: Identify what is already saved locally so we only fetch delta from Gmail
+        existing_msg_ids = zepto_db.get_saved_gmail_message_ids(settings=_settings)
+
         async with httpx.AsyncClient(timeout=45.0) as client:
             all_msg_summaries = []
             page_token = None
-            max_pages = 10  # Paginate to fetch all emails for the month (up to 500)
+            max_pages = 10  # Paginate to check all message IDs for the month (lightweight query)
 
             for _ in range(max_pages):
                 list_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50"
@@ -906,9 +929,18 @@ async def get_recent_emails_endpoint(
                 if not page_token:
                     break
 
-            emails = []
+            # Step 2: Delta detection - only fetch full bodies for emails not already in local database
+            delta_summaries = [m for m in all_msg_summaries if m.get("id") not in existing_msg_ids]
+            logger.info(
+                "[GMAIL-DELTA] Month=%s: %d total messages found on Gmail, %d new delta messages to download",
+                clean_month,
+                len(all_msg_summaries),
+                len(delta_summaries),
+            )
 
-            for msg_summary in all_msg_summaries:
+            new_emails = []
+
+            for msg_summary in delta_summaries:
                 msg_id = msg_summary["id"]
                 msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
                 m_resp = await client.get(msg_url, headers=headers)
@@ -988,7 +1020,7 @@ async def get_recent_emails_endpoint(
                 month_ym = iso_date[:7]
                 store_name = cat_info.get("store_name") or "JMU-Sainik Colony"
 
-                emails.append({
+                new_emails.append({
                     "id": msg_id,
                     "thread_id": msg_data.get("threadId"),
                     "store_name": store_name,
@@ -1010,19 +1042,20 @@ async def get_recent_emails_endpoint(
                     "internal_date": msg_data.get("internalDate"),
                 })
 
-            # Save all parsed emails to SQLite DB for persistent caching
-            if emails:
-                zepto_db.save_gmail_messages(emails, settings=_settings)
+            # Step 3: Save any net-new delta emails to SQLite DB
+            if new_emails:
+                zepto_db.save_gmail_messages(new_emails, settings=_settings)
 
-            # Query database to return full consolidated list for that month
+            # Step 4: Return consolidated list from local database for instant zero-latency rendering
             all_month_emails = zepto_db.get_saved_gmail_messages(month=clean_month, settings=_settings)
 
             return {
                 "success": True,
                 "month": clean_month,
-                "count": len(all_month_emails) if all_month_emails else len(emails),
-                "emails": all_month_emails if all_month_emails else emails,
-                "source": "GMAIL_SYNCED_AND_DB_SAVED",
+                "count": len(all_month_emails),
+                "emails": all_month_emails,
+                "delta_fetched": len(new_emails),
+                "source": "DATABASE_WITH_DELTA_SYNC" if new_emails else "DATABASE_UP_TO_DATE",
             }
     except HTTPException:
         raise
@@ -1091,10 +1124,13 @@ async def ingest_all_emails_endpoint(
     }
 
     try:
+        # Step 1: Detect existing IDs to only process net-new delta emails during batch ingestion
+        existing_msg_ids = zepto_db.get_saved_gmail_message_ids(settings=_settings)
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             all_msg_summaries = []
             page_token = None
-            max_pages = 10  # Fetch all messages in the month
+            max_pages = 10  # Fetch message ID index for the month
 
             for _ in range(max_pages):
                 list_url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50"
@@ -1119,9 +1155,16 @@ async def ingest_all_emails_endpoint(
                     break
 
             processed_details["emails_scanned"] = len(all_msg_summaries)
+            delta_summaries = [m for m in all_msg_summaries if m.get("id") not in existing_msg_ids]
+            logger.info(
+                "[GMAIL-INGEST-DELTA] Month=%s: %d total messages on Gmail, %d delta new to ingest",
+                clean_month,
+                len(all_msg_summaries),
+                len(delta_summaries),
+            )
             emails_to_save = []
 
-            for msg_summary in all_msg_summaries:
+            for msg_summary in delta_summaries:
                 msg_id = msg_summary["id"]
                 msg_url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}?format=full"
                 m_resp = await client.get(msg_url, headers=headers)
@@ -1775,13 +1818,15 @@ async def get_store_metrics_summary_endpoint(
     store_name: str | None = Query(None),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    month: str | None = Query(None),
 ) -> dict[str, Any]:
-    """Retrieve daily sales GMV, orders, AOV, IPP, and SLA adherence trends."""
+    """Retrieve daily sales GMV, orders, AOV, IPP, and SLA adherence trends with month filtering."""
     try:
         summary = zepto_db.get_store_metrics_summary(
             store_name=store_name,
             start_date=start_date,
             end_date=end_date,
+            month=month,
             settings=_settings,
         )
         return {"success": True, **summary}
@@ -1871,13 +1916,15 @@ async def get_manpower_utilization_summary_endpoint(
     store_name: str | None = Query(None),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    month: str | None = Query(None),
 ) -> dict[str, Any]:
-    """Retrieve items picked, active picker hours, idle hours, and average IPP."""
+    """Retrieve items picked, active picker hours, idle hours, and average IPP with month filtering."""
     try:
         summary = zepto_db.get_manpower_utilization_summary(
             store_name=store_name,
             start_date=start_date,
             end_date=end_date,
+            month=month,
             settings=_settings,
         )
         return {"success": True, **summary}

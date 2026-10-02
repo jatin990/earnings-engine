@@ -17,16 +17,10 @@
 
         <!-- Filter Controls Toolbar -->
         <div class="flex items-center gap-2 flex-wrap">
-            <!-- Dynamic Month Selector -->
-            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5">
-                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Month:</span>
-                <select
-                    id="lossMonthFilter"
-                    onchange="zeptoApp.loadLoss()"
-                    class="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer"
-                >
-                    <option value="ALL" class="bg-slate-900 text-slate-200">All Months</option>
-                </select>
+            <!-- Active Month Badge Indicator -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Scope:</span>
+                <span id="lossActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
             </div>
 
             <!-- Loss Classification Filter -->

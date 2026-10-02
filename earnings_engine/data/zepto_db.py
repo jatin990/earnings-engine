@@ -4261,17 +4261,21 @@ def get_manpower_utilization_summary(
     store_name: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    month: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Retrieve aggregated picker IPP, labor utilization, and efficiency metrics."""
+    """Retrieve aggregated picker IPP, labor utilization, and efficiency metrics with monthly scoping."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
 
     where = ["1=1"]
     params: list[Any] = []
-    if store_name:
+    if store_name and store_name != "ALL":
         where.append("store_name = ?")
         params.append(store_name)
+    if month and month != "ALL":
+        where.append("substr(util_date, 1, 7) = ?")
+        params.append(month)
     if start_date:
         where.append("util_date >= ?")
         params.append(start_date)
@@ -4306,6 +4310,279 @@ def get_manpower_utilization_summary(
             "avg_ipp": avg_ipp,
             "total_flex_cost": round(total_flex_cost, 2),
             "records": items,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Cross-Operational Analytics & Month-on-Month / Day-on-Day Master Ledger
+# ---------------------------------------------------------------------------
+
+def get_zepto_dashboard_analytics(
+    month: str | None = None,
+    store_name: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """
+    Retrieve unified Month-on-Month (MoM) and Day-on-Day (DoD) cross-subsystem metrics.
+    Merges Store Operations: Attendance (Headcount/Presents/Absents),
+    Financial Loss & DQ defects, Dispatched Orders, GMV, and Picker IPP into an executive ledger.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # 1. Available Months (distinct YYYY-MM across all operational domains)
+        q_months = """
+        SELECT DISTINCT ym FROM (
+            SELECT DISTINCT substr(shift_date, 1, 7) AS ym FROM zepto_attendance_records WHERE shift_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(metric_date, 1, 7) AS ym FROM zepto_store_metrics WHERE metric_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(record_date, 1, 7) AS ym FROM zepto_loss_records WHERE record_date IS NOT NULL
+            UNION
+            SELECT DISTINCT month_ym AS ym FROM zepto_gmail_messages WHERE month_ym IS NOT NULL
+            UNION
+            SELECT DISTINCT year_month AS ym FROM zepto_store_income WHERE year_month IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(expense_date, 1, 7) AS ym FROM zepto_expenses WHERE expense_date IS NOT NULL
+            UNION
+            SELECT DISTINCT substr(util_date, 1, 7) AS ym FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
+        ) WHERE ym IS NOT NULL AND length(ym) = 7
+        ORDER BY ym DESC
+        """
+        month_rows = conn.execute(q_months).fetchall()
+        available_months = [r["ym"] for r in month_rows if r["ym"]]
+        if not available_months:
+            available_months = [datetime.now().strftime("%Y-%m")]
+
+        active_month = month if (month and month in available_months) else (month or "ALL")
+
+        # 2. Month-on-Month (MoM) Historical Multi-Stream Trends
+        mom_trends = []
+        for ym in sorted(available_months, reverse=False):
+            # Financial Loss
+            l_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(amount), 0.0) AS loss_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COUNT(*) AS loss_incidents,
+                    COALESCE(SUM(sku_count), 0) AS skus_affected
+                FROM zepto_loss_records
+                WHERE substr(record_date, 1, 7) = ? AND category != 'EMAIL_INGESTED'
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Attendance & Headcount
+            att_row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS scheduled_shifts,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) AS present_count,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) AS absent_count,
+                    COUNT(DISTINCT employee_id) AS active_headcount,
+                    COALESCE(SUM(work_duration_mins), 0) AS total_work_mins
+                FROM zepto_attendance_records
+                WHERE substr(shift_date, 1, 7) = ?
+                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Orders & Scorecard
+            met_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(sales_gmv), 0.0) AS total_gmv,
+                    COALESCE(SUM(order_count), 0) AS total_orders,
+                    AVG(NULLIF(packer_ipp, 0.0)) AS avg_ipp,
+                    AVG(NULLIF(sla_adherence_pct, 0.0)) AS avg_sla
+                FROM zepto_store_metrics
+                WHERE substr(metric_date, 1, 7) = ?
+                """,
+                (ym,),
+            ).fetchone()
+
+            # Manpower Utilization
+            util_row = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(items_picked), 0) AS total_picked,
+                    COALESCE(SUM(active_pick_hours), 0.0) AS active_hours,
+                    COALESCE(SUM(idle_hours), 0.0) AS idle_hours,
+                    AVG(NULLIF(ipp, 0.0)) AS avg_picker_ipp
+                FROM zepto_manpower_utilization
+                WHERE substr(util_date, 1, 7) = ?
+                """,
+                (ym,),
+            ).fetchone()
+
+            pres = att_row["present_count"] or 0
+            absn = att_row["absent_count"] or 0
+            denom = pres + absn
+            att_rate = round((pres / denom) * 100.0, 1) if denom > 0 else 0.0
+            tot_orders = met_row["total_orders"] or 0
+            tot_gmv = round(met_row["total_gmv"] or 0.0, 2)
+            aov = round(tot_gmv / tot_orders, 1) if tot_orders > 0 else 0.0
+
+            mom_trends.append({
+                "month_ym": ym,
+                "loss_total": round(l_row["loss_amt"] or 0.0, 2),
+                "dq_loss": round(l_row["dq_amt"] or 0.0, 2),
+                "shrinkage": round(l_row["shrink_amt"] or 0.0, 2),
+                "loss_incidents": l_row["loss_incidents"] or 0,
+                "skus_affected": l_row["skus_affected"] or 0,
+                "scheduled_shifts": att_row["scheduled_shifts"] or 0,
+                "present_count": pres,
+                "absent_count": absn,
+                "active_headcount": att_row["active_headcount"] or 0,
+                "attendance_rate_pct": att_rate,
+                "total_work_hours": round((att_row["total_work_mins"] or 0) / 60.0, 1),
+                "total_gmv": tot_gmv,
+                "total_orders": tot_orders,
+                "aov": aov,
+                "avg_ipp": round(met_row["avg_ipp"] or util_row["avg_picker_ipp"] or 0.0, 1),
+                "avg_sla_adherence_pct": round(met_row["avg_sla"] or 100.0, 1),
+                "items_picked": util_row["total_picked"] or 0,
+            })
+
+        # 3. Day-on-Day (DoD) Granular Timeline Breakdown
+        # Filtered by active_month if specified (e.g. 2026-09), or across all days
+        day_date_filter = "substr(dt, 1, 7) = ?" if (active_month and active_month != "ALL") else "1=1"
+        day_params = [active_month] if (active_month and active_month != "ALL") else []
+
+        q_days = f"""
+        SELECT DISTINCT dt FROM (
+            SELECT DISTINCT record_date AS dt FROM zepto_loss_records WHERE record_date IS NOT NULL
+            UNION
+            SELECT DISTINCT shift_date AS dt FROM zepto_attendance_records WHERE shift_date IS NOT NULL
+            UNION
+            SELECT DISTINCT metric_date AS dt FROM zepto_store_metrics WHERE metric_date IS NOT NULL
+            UNION
+            SELECT DISTINCT util_date AS dt FROM zepto_manpower_utilization WHERE util_date IS NOT NULL
+        ) WHERE dt IS NOT NULL AND length(dt) = 10 AND {day_date_filter}
+        ORDER BY dt ASC
+        """
+        day_rows = conn.execute(q_days, day_params).fetchall()
+        distinct_dates = [r["dt"] for r in day_rows if r["dt"]]
+
+        dod_metrics = []
+        for dt in distinct_dates:
+            # Loss for day
+            l_d = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(amount), 0.0) AS loss_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COUNT(*) AS loss_incidents,
+                    COALESCE(SUM(sku_count), 0) AS skus_affected
+                FROM zepto_loss_records
+                WHERE record_date = ? AND category != 'EMAIL_INGESTED'
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Attendance for day
+            att_d = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_shifts,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) AS present_count,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) AS absent_count,
+                    SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) AS week_off_count,
+                    COALESCE(SUM(work_duration_mins), 0) AS total_mins
+                FROM zepto_attendance_records
+                WHERE shift_date = ?
+                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Store metrics for day
+            met_d = conn.execute(
+                """
+                SELECT
+                    sales_gmv, order_count, aov, packer_ipp, sla_adherence_pct
+                FROM zepto_store_metrics
+                WHERE metric_date = ?
+                LIMIT 1
+                """,
+                (dt,),
+            ).fetchone()
+
+            # Utilization for day
+            util_d = conn.execute(
+                """
+                SELECT
+                    COALESCE(SUM(items_picked), 0) AS total_picked,
+                    AVG(NULLIF(ipp, 0.0)) AS avg_ipp
+                FROM zepto_manpower_utilization
+                WHERE util_date = ?
+                """,
+                (dt,),
+            ).fetchone()
+
+            d_pres = att_d["present_count"] or 0
+            d_abs = att_d["absent_count"] or 0
+            d_denom = d_pres + d_abs
+            d_att_rate = round((d_pres / d_denom) * 100.0, 1) if d_denom > 0 else (100.0 if d_pres > 0 else 0.0)
+
+            d_orders = met_d["order_count"] if met_d else 0
+            d_gmv = met_d["sales_gmv"] if met_d else 0.0
+            d_ipp = met_d["packer_ipp"] if (met_d and met_d["packer_ipp"]) else (util_d["avg_ipp"] or 0.0)
+            d_sla = met_d["sla_adherence_pct"] if (met_d and met_d["sla_adherence_pct"]) else 100.0
+
+            dod_metrics.append({
+                "date": dt,
+                "loss_total": round(l_d["loss_amt"] or 0.0, 2),
+                "dq_loss": round(l_d["dq_amt"] or 0.0, 2),
+                "shrinkage": round(l_d["shrink_amt"] or 0.0, 2),
+                "loss_incidents": l_d["loss_incidents"] or 0,
+                "skus_affected": l_d["skus_affected"] or 0,
+                "shifts_scheduled": att_d["total_shifts"] or 0,
+                "shifts_present": d_pres,
+                "shifts_absent": d_abs,
+                "shifts_week_off": att_d["week_off_count"] or 0,
+                "attendance_rate_pct": d_att_rate,
+                "hours_worked": round((att_d["total_mins"] or 0) / 60.0, 1),
+                "orders_dispatched": d_orders or 0,
+                "sales_gmv": round(d_gmv or 0.0, 2),
+                "packer_ipp": round(d_ipp or 0.0, 1),
+                "sla_adherence_pct": round(d_sla or 100.0, 1),
+                "items_picked": util_d["total_picked"] or 0,
+            })
+
+        # Summary KPIs for the active scope
+        tot_loss = sum(d["loss_total"] for d in dod_metrics)
+        tot_shifts = sum(d["shifts_scheduled"] for d in dod_metrics)
+        tot_present = sum(d["shifts_present"] for d in dod_metrics)
+        tot_absent = sum(d["shifts_absent"] for d in dod_metrics)
+        tot_orders = sum(d["orders_dispatched"] for d in dod_metrics)
+        tot_gmv = sum(d["sales_gmv"] for d in dod_metrics)
+        avg_ipp = round(sum(d["packer_ipp"] for d in dod_metrics if d["packer_ipp"] > 0) / max(1, sum(1 for d in dod_metrics if d["packer_ipp"] > 0)), 1)
+        avg_att = round((tot_present / max(1, tot_present + tot_absent)) * 100.0, 1) if (tot_present + tot_absent) > 0 else 0.0
+
+        return {
+            "selected_month": active_month,
+            "available_months": available_months,
+            "summary_kpis": {
+                "total_loss": round(tot_loss, 2),
+                "total_shifts": tot_shifts,
+                "total_present": tot_present,
+                "total_absent": tot_absent,
+                "attendance_rate_pct": avg_att,
+                "total_orders": tot_orders,
+                "total_gmv": round(tot_gmv, 2),
+                "avg_packer_ipp": avg_ipp,
+                "days_count": len(dod_metrics),
+            },
+            "mom_trends": mom_trends,
+            "dod_metrics": dod_metrics,
         }
 
 
