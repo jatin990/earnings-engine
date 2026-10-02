@@ -485,8 +485,6 @@ async def api_get_metric_glossary():
     except Exception as e:
         logger.exception("Error in api_get_metric_glossary: %s", e)
         raise HTTPException(status_code=500, detail=f"Error retrieving metric glossary: {e}")
-
-
 @router.get("/api/v1/dashboard/market-macro")
 async def api_get_market_macro():
     """Retrieve concise market sentiment and volatility regime summary."""

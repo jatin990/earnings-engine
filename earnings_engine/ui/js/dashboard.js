@@ -610,7 +610,6 @@ const API_BASE = window.location.origin;
                     this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
                     this.initGlobalPriceRefresh?.();
                 }, 1200);
-
                 this.updateTopRateLimitPill();
                 setInterval(() => {
                     this.updateTopRateLimitPill();
@@ -994,7 +993,7 @@ const API_BASE = window.location.origin;
 
                 document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-                
+
                 const targetContent = document.getElementById('tab-' + name);
                 if (targetContent) targetContent.classList.add('active');
 
@@ -1175,6 +1174,12 @@ const API_BASE = window.location.origin;
                 if (name === 'commodities') {
                     if (window.commoditiesModule && typeof window.commoditiesModule.init === 'function') {
                         window.commoditiesModule.init();
+                    }
+                }
+                if (name === 'gainers') {
+                    const activeSub = (app._subtabState && app._subtabState['gainers']) || localStorage.getItem('subtab_gainers') || 'gainers';
+                    if (typeof this.switchGainersSubTab === 'function') {
+                        this.switchGainersSubTab(activeSub);
                     }
                 }
                 if (name === 'gainers') {

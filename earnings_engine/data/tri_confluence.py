@@ -522,11 +522,17 @@ def compute_ticker_tri_confluence(
     else:
         try:
             t_row = local_conn.execute(
-                "SELECT name, sector, industry, market_cap FROM tickers WHERE ticker = ? OR ticker = ?",
+                "SELECT name, sector, industry, market_cap, current_price FROM tickers WHERE ticker = ? OR ticker = ?",
                 (target_sym, clean_sym),
             ).fetchone()
-        except Exception as e:
-            logger.debug("Ticker info fetch notice: %s", e)
+        except Exception:
+            try:
+                t_row = local_conn.execute(
+                    "SELECT name, sector, industry, market_cap FROM tickers WHERE ticker = ? OR ticker = ?",
+                    (target_sym, clean_sym),
+                ).fetchone()
+            except Exception as e:
+                logger.debug("Ticker info fetch notice: %s", e)
 
     if t_row:
         company_name = t_row[0] or company_name
@@ -534,6 +540,8 @@ def compute_ticker_tri_confluence(
         industry = t_row[2] or industry
         if t_row[3] and float(t_row[3]) > 0:
             mcap_cr = round(float(t_row[3]) / 1e7, 1)
+        if len(t_row) > 4 and t_row[4] and float(t_row[4]) > 0:
+            curr_price = float(t_row[4])
 
     # 2. Fetch quarterly shareholding patterns (support both dii_mf_pct and dii_pct column names)
     sh_rows: list[Any] = []

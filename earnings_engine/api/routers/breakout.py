@@ -65,6 +65,9 @@ async def get_breakout_radar_endpoint(
         # Reject any test or dummy tickers
         candidates = [c for c in candidates if not any(x in str(c.get("ticker", "")).upper() for x in ("TEST", "MOCK", "DUMMY"))]
 
+        # Reject any test or dummy tickers
+        candidates = [c for c in candidates if not any(x in str(c.get("ticker", "")).upper() for x in ("TEST", "MOCK", "DUMMY"))]
+
         # Apply min_score filter
         candidates = [c for c in candidates if (c.get("composite_score") or 0) >= min_score]
 
