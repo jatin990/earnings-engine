@@ -11,9 +11,13 @@ from earnings_engine.data.commodities_chart_engine import (
     get_supported_commodity_symbols,
     resolve_commodity_symbol,
     get_commodity_chart_intelligence,
+    get_commodity_latest_tick,
     _calculate_session_vwap,
     _calculate_orb,
     _detect_order_blocks_and_fvg,
+    _detect_liquidity_sweeps,
+    _calculate_volume_profile_poc,
+    _calculate_microstructure_depth,
     _detect_trendlines,
     _calculate_classical_pivots,
     _generate_tactical_signals,
@@ -91,7 +95,55 @@ def test_detect_order_blocks_and_fvg():
         assert "type" in ob
         assert "top" in ob
         assert "bottom" in ob
+        assert "midpoint" in ob
+        assert "volume_surge" in ob
+        assert "status" in ob
+        assert "formation_time_iso" in ob
+        assert "distance_pts" in ob
+        assert "distance_pct" in ob
         assert ob["short_label"] in ("D-OB", "S-OB")
+
+    if fvgs:
+        fvg = fvgs[0]
+        assert "type" in fvg
+        assert "top" in fvg
+        assert "bottom" in fvg
+        assert "midpoint" in fvg
+        assert "gap_size" in fvg
+        assert "status" in fvg
+        assert "distance_pts" in fvg
+
+
+def test_detect_liquidity_sweeps():
+    df = _make_dummy_intraday_df(60, 78000.0)
+    sweeps = _detect_liquidity_sweeps(df)
+    assert isinstance(sweeps, list)
+    for sw in sweeps:
+        assert sw["type"] in ("BSL_SWEEP", "SSL_SWEEP")
+        assert "level" in sw
+        assert "sweep_extreme" in sw
+        assert "status" in sw
+
+
+def test_calculate_volume_profile_poc():
+    df = _make_dummy_intraday_df(60, 78000.0)
+    vp = _calculate_volume_profile_poc(df)
+    assert "poc" in vp
+    assert "vah" in vp
+    assert "val" in vp
+    assert vp["poc"] > 0
+    assert vp["vah"] >= vp["poc"] or vp["vah"] >= vp["val"]
+    assert vp["val"] <= vp["vah"]
+
+
+def test_calculate_microstructure_depth():
+    df = _make_dummy_intraday_df(60, 78000.0)
+    micro = _calculate_microstructure_depth(df, 78000.0)
+    assert "resting_buy_depth_pct" in micro
+    assert "resting_sell_depth_pct" in micro
+    assert "cvd_bias" in micro
+    assert "spread_proxy" in micro
+    assert round(micro["resting_buy_depth_pct"] + micro["resting_sell_depth_pct"], 1) == 100.0
 
 
 def test_detect_trendlines():
@@ -139,3 +191,20 @@ def test_get_commodity_chart_intelligence_structure():
     assert "candles" in data
     assert "indicators" in data
     assert "tactical_hud" in data
+    ind = data["indicators"]
+    assert "poc" in ind
+    assert "vah" in ind
+    assert "val" in ind
+    assert "volume_profile" in ind
+    assert "liquidity_sweeps" in ind
+    assert "microstructure" in ind
+
+
+def test_get_commodity_latest_tick():
+    tick = get_commodity_latest_tick("GOLD", interval="5m")
+    assert tick["success"] is True
+    assert tick["symbol"] == "GOLD"
+    assert "spot_price" in tick
+    assert "change_24h" in tick
+    assert "currency_symbol" in tick
+    assert "timestamp" in tick

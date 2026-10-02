@@ -99,11 +99,31 @@
             <div id="commKpiAtr" style="font-size:1.4rem;font-weight:800;color:#10b981;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
             <div id="commKpiPivotFloor" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Pivot: --</div>
         </div>
+
+        <!-- Order Book & Microstructure Imbalance Widget -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#f59e0b;letter-spacing:0.04em;">Microstructure Imbalance</div>
+                <span id="commKpiCvdBadge" style="font-size:0.65rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:4px;background:rgba(16,185,129,0.15);color:#10b981;font-family:var(--font-mono);">BALANCED</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;">
+                <span id="commKpiBuyDepth" style="font-size:0.75rem;font-weight:800;color:#10b981;font-family:var(--font-mono);">50%</span>
+                <div style="flex:1;height:8px;background:rgba(244,63,94,0.6);border-radius:4px;overflow:hidden;display:flex;">
+                    <div id="commKpiBuyDepthBar" style="width:50%;height:100%;background:#10b981;transition:width 0.3s ease;"></div>
+                </div>
+                <span id="commKpiSellDepth" style="font-size:0.75rem;font-weight:800;color:#f43f5e;font-family:var(--font-mono);">50%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--text-secondary);margin-top:0.25rem;">
+                <span>Resting Buy</span>
+                <span id="commKpiSpreadProxy">Spread: ~$0.05</span>
+                <span>Resting Sell</span>
+            </div>
+        </div>
     </div>
 
     <!-- 4. Main Interactive TradingView Lightweight Chart & Layers Deck -->
     <div id="commoditiesChartCard" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;">
                 <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin:0;display:flex;align-items:center;gap:0.4rem;">
                     <span id="commChartSymbolTitle">GOLD</span> · Dynamic SMC &amp; Key Levels Chart
@@ -129,6 +149,25 @@
                     <input type="checkbox" id="commToggleTrendlines" checked onchange="commoditiesModule.toggleLayer('trendlines', this.checked)" /> Trendlines
                 </label>
                 <button type="button" class="btn btn-secondary btn-sm" id="commFullscreenBtn" onclick="commoditiesModule.toggleFullscreen()" title="Toggle Fullscreen" style="display:flex;align-items:center;gap:0.35rem;background:#18181b;border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:6px;padding:0.25rem 0.6rem;font-size:0.75rem;cursor:pointer;"><span>⛶</span> <span id="commFsText">Fullscreen</span></button>
+            </div>
+        </div>
+
+        <!-- Sticky Hover Inspector Bar -->
+        <div id="commHoverInspectorCard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;background:#09090b;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.5rem 0.85rem;margin-bottom:0.75rem;font-family:var(--font-mono);font-size:0.75rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                <span style="color:var(--text-secondary);font-weight:600;">BAR:</span>
+                <span id="commInspectTime" style="color:#ededed;">--</span>
+                <span>O: <strong id="commInspectOpen" style="color:#fff;">--</strong></span>
+                <span>H: <strong id="commInspectHigh" style="color:#10b981;">--</strong></span>
+                <span>L: <strong id="commInspectLow" style="color:#f43f5e;">--</strong></span>
+                <span>C: <strong id="commInspectClose" style="color:#fff;">--</strong></span>
+                <span style="color:var(--text-secondary);">TR: <strong id="commInspectTr" style="color:#fbbf24;">--</strong></span>
+                <span id="commInspectVol" class="badge" style="background:rgba(255,255,255,0.08);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:4px;font-size:0.7rem;">Vol: --</span>
+                <span id="commInspectDelta" class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;padding:0.1rem 0.35rem;border-radius:4px;font-size:0.7rem;">Delta: --</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="color:var(--text-secondary);font-weight:600;">ACTIVE ZONE:</span>
+                <span id="commInspectZone" style="color:#a855f7;font-weight:700;">Hover over chart / SMC zones</span>
             </div>
         </div>
 
@@ -234,5 +273,93 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- 6. SMC & Leading Indicators Playbook Section -->
+    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+        <details style="cursor:pointer;" open>
+            <summary style="font-size:1.05rem;font-weight:800;color:var(--text-primary);letter-spacing:-0.01em;display:flex;align-items:center;justify-content:space-between;user-select:none;list-style:none;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span>📖</span>
+                    <span>SMC &amp; Leading Indicators Playbook</span>
+                    <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.7rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;">
+                        WHY YOU SEE SETUPS BEFORE THE MOVE
+                    </span>
+                </div>
+                <span style="color:var(--text-secondary);font-size:0.85rem;font-weight:600;">▼ Click to Toggle</span>
+            </summary>
+
+            <div style="margin-top:1.25rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+                <!-- Card 1: Demand & Supply Order Blocks -->
+                <div style="background:#0e0e11;border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.1rem;">🧱</span>
+                        <h5 style="font-size:0.875rem;font-weight:800;color:#10b981;margin:0;">Demand (D-OB) &amp; Supply (S-OB) Blocks</h5>
+                    </div>
+                    <p style="font-size:0.775rem;color:var(--text-secondary);line-height:1.45;margin:0 0 0.5rem 0;">
+                        The origin down/up candle before an aggressive expansion marks where institutional algorithmic limit orders were filled. When price retraces to this unmitigated block, institutions defend their orders—giving you precise entry and tight stop loss in advance.
+                    </p>
+                    <div style="font-size:0.7rem;font-family:var(--font-mono);color:#10b981;background:rgba(16,185,129,0.08);padding:0.35rem 0.5rem;border-radius:6px;">
+                        🎯 Rule: Enter on 1st retest of D-OB; invalidation strictly below block bottom.
+                    </div>
+                </div>
+
+                <!-- Card 2: Fair Value Gaps (FVG) -->
+                <div style="background:#0e0e11;border:1px solid rgba(56,189,248,0.25);border-radius:10px;padding:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.1rem;">⚡</span>
+                        <h5 style="font-size:0.875rem;font-weight:800;color:#38bdf8;margin:0;">Fair Value Gaps (3-Bar Imbalance)</h5>
+                    </div>
+                    <p style="font-size:0.775rem;color:var(--text-secondary);line-height:1.45;margin:0 0 0.5rem 0;">
+                        Occurs when a violent candle leaves a gap between Bar 1 wick and Bar 3 wick. Algorithmic engines treat unfilled imbalances as price voids and rebalance back to the 50% midpoint (Consequent Encroachment) before continuation.
+                    </p>
+                    <div style="font-size:0.7rem;font-family:var(--font-mono);color:#38bdf8;background:rgba(56,189,248,0.08);padding:0.35rem 0.5rem;border-radius:6px;">
+                        🎯 Rule: Unfilled FVGs act as high-probability magnet targets and elastic pullback zones.
+                    </div>
+                </div>
+
+                <!-- Card 3: Liquidity Sweeps (BSL / SSL) -->
+                <div style="background:#0e0e11;border:1px solid rgba(244,63,94,0.25);border-radius:10px;padding:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.1rem;">🪤</span>
+                        <h5 style="font-size:0.875rem;font-weight:800;color:#f43f5e;margin:0;">Liquidity Sweeps (BSL &amp; SSL Hunts)</h5>
+                    </div>
+                    <p style="font-size:0.775rem;color:var(--text-secondary);line-height:1.45;margin:0 0 0.5rem 0;">
+                        Retail stops cluster above equal swing highs (Buy-Side Liquidity) and below equal lows (Sell-Side Liquidity). Market makers spike through these levels to trigger stop cascades, absorb counterparty volume, and reverse instantly.
+                    </p>
+                    <div style="font-size:0.7rem;font-family:var(--font-mono);color:#f43f5e;background:rgba(244,63,94,0.08);padding:0.35rem 0.5rem;border-radius:6px;">
+                        🎯 Rule: Never chase breakout wicks outside range; wait for the sweep rejection candle to close.
+                    </div>
+                </div>
+
+                <!-- Card 4: Session Anchored VWAP (±1.5σ) -->
+                <div style="background:#0e0e11;border:1px solid rgba(168,85,247,0.25);border-radius:10px;padding:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.1rem;">📐</span>
+                        <h5 style="font-size:0.875rem;font-weight:800;color:#a855f7;margin:0;">Session VWAP &amp; ±1.5σ Dispersion</h5>
+                    </div>
+                    <p style="font-size:0.775rem;color:var(--text-secondary);line-height:1.45;margin:0 0 0.5rem 0;">
+                        VWAP is the institutional fair value benchmark for the session. The ±1.5σ standard deviation bands quantify statistical overextension. Trend days ride the upper band; mean-reversion days bounce between upper and lower extremes.
+                    </p>
+                    <div style="font-size:0.7rem;font-family:var(--font-mono);color:#a855f7;background:rgba(168,85,247,0.08);padding:0.35rem 0.5rem;border-radius:6px;">
+                        🎯 Rule: Bullish bias while above VWAP; take profit / reverse at outer 1.5σ exhaustion band.
+                    </div>
+                </div>
+
+                <!-- Card 5: Volume Profile POC & Value Area -->
+                <div style="background:#0e0e11;border:1px solid rgba(234,179,8,0.25);border-radius:10px;padding:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                        <span style="font-size:1.1rem;">📊</span>
+                        <h5 style="font-size:0.875rem;font-weight:800;color:#eab308;margin:0;">Volume Profile POC &amp; Value Area (VAH/VAL)</h5>
+                    </div>
+                    <p style="font-size:0.775rem;color:var(--text-secondary);line-height:1.45;margin:0 0 0.5rem 0;">
+                        Point of Control (POC) is the single price level with the highest traded volume. The Value Area (70% of session volume between VAH and VAL) reveals where buyers and sellers agree on price. Breaks outside the Value Area trigger fast expansions.
+                    </p>
+                    <div style="font-size:0.7rem;font-family:var(--font-mono);color:#eab308;background:rgba(234,179,8,0.08);padding:0.35rem 0.5rem;border-radius:6px;">
+                        🎯 Rule: POC acts as institutional gravity center; trade breakouts from VAL to VAH.
+                    </div>
+                </div>
+            </div>
+        </details>
     </div>
 </div>

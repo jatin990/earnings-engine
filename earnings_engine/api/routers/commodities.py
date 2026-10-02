@@ -42,6 +42,26 @@ async def get_commodity_symbols(
     }
 
 
+@router.get("/api/v1/commodities/latest-tick")
+async def get_commodity_latest_tick(
+    symbol: str = Query("GOLD", description="Commodity symbol (GOLD, SILVER, CRUDEOIL, NATGAS, COPPER, etc.)"),
+    interval: str = Query("5m", description="Candle interval (1m, 5m, 15m, 30m, 1h, 1d)"),
+) -> dict[str, Any]:
+    """Fetch fast real-time tick and current forming candle for incremental chart polling."""
+    clean_sym = symbol.strip().upper()
+    try:
+        data = await asyncio.to_thread(
+            cce_mod.get_commodity_latest_tick,
+            symbol=clean_sym,
+            interval=interval,
+            settings=_get_settings(),
+        )
+        return data
+    except Exception as e:
+        logger.error("[COMMODITIES-API] Error fetching latest tick for %s: %s", clean_sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch tick for {clean_sym}: {str(e)}")
+
+
 @router.get("/api/v1/commodities/chart-intelligence")
 async def get_commodity_chart_intelligence(
     symbol: str = Query("GOLD", description="Commodity symbol (GOLD, SILVER, CRUDEOIL, NATGAS, COPPER, etc.)"),

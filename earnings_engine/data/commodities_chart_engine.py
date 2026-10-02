@@ -274,43 +274,91 @@ def _calculate_orb(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Detect Smart Money Concepts (SMC): Bullish & Bearish Order Blocks and Fair Value Gaps."""
+    """Detect Smart Money Concepts (SMC): Bullish & Bearish Order Blocks and Fair Value Gaps with rich metadata."""
     order_blocks: list[dict[str, Any]] = []
     fvgs: list[dict[str, Any]] = []
 
     if len(df) < 10:
         return order_blocks, fvgs
 
-    # 1. Fair Value Gaps (3-bar imbalance)
+    spot_price = float(df["close"].iloc[-1]) if not df.empty else 0.0
+    vol_avg_20 = float(df["volume"].tail(20).mean()) if "volume" in df.columns and len(df) >= 20 else (float(df["volume"].mean()) if "volume" in df.columns else 1.0)
+    if vol_avg_20 <= 0:
+        vol_avg_20 = 1.0
+
+    # 1. Fair Value Gaps (3-bar algorithmic liquidity imbalance)
     for i in range(2, len(df)):
         c1 = df.iloc[i - 2]
         c3 = df.iloc[i]
         t_sec = int(df.index[i].timestamp())
+        formation_iso = df.index[i].strftime("%Y-%m-%d %H:%M") if hasattr(df.index[i], "strftime") else str(df.index[i])
 
         # Bullish FVG: Low of bar 3 is higher than High of bar 1
         if c3["low"] > c1["high"]:
+            top = round(float(c3["low"]), 2)
+            bottom = round(float(c1["high"]), 2)
+            midpoint = round(float((top + bottom) / 2.0), 2)
+            gap_size = round(top - bottom, 2)
+
+            subsequent_lows = df["low"].iloc[i:]
+            if len(subsequent_lows) > 0 and subsequent_lows.min() <= bottom:
+                status = "MITIGATED"
+                mitigated = True
+            elif len(subsequent_lows) > 0 and subsequent_lows.min() <= top:
+                status = "PARTIALLY_FILLED"
+                mitigated = False
+            else:
+                status = "UNFILLED"
+                mitigated = False
+
             fvgs.append({
                 "type": "BULLISH_FVG",
                 "time": t_sec,
-                "top": round(float(c3["low"]), 2),
-                "bottom": round(float(c1["high"]), 2),
-                "midpoint": round(float((c3["low"] + c1["high"]) / 2.0), 2),
-                "mitigated": bool(df["low"].iloc[i:].min() <= c1["high"]),
+                "formation_time_iso": formation_iso,
+                "top": top,
+                "bottom": bottom,
+                "midpoint": midpoint,
+                "gap_size": gap_size,
+                "status": status,
+                "mitigated": mitigated,
+                "distance_pts": round(abs(spot_price - midpoint), 2),
+                "distance_pct": round(((spot_price - midpoint) / midpoint) * 100.0, 2) if midpoint > 0 else 0.0,
             })
 
         # Bearish FVG: High of bar 3 is lower than Low of bar 1
         elif c3["high"] < c1["low"]:
+            top = round(float(c1["low"]), 2)
+            bottom = round(float(c3["high"]), 2)
+            midpoint = round(float((c1["low"] + c3["high"]) / 2.0), 2)
+            gap_size = round(top - bottom, 2)
+
+            subsequent_highs = df["high"].iloc[i:]
+            if len(subsequent_highs) > 0 and subsequent_highs.max() >= top:
+                status = "MITIGATED"
+                mitigated = True
+            elif len(subsequent_highs) > 0 and subsequent_highs.max() >= bottom:
+                status = "PARTIALLY_FILLED"
+                mitigated = False
+            else:
+                status = "UNFILLED"
+                mitigated = False
+
             fvgs.append({
                 "type": "BEARISH_FVG",
                 "time": t_sec,
-                "top": round(float(c1["low"]), 2),
-                "bottom": round(float(c3["high"]), 2),
-                "midpoint": round(float((c1["low"] + c3["high"]) / 2.0), 2),
-                "mitigated": bool(df["high"].iloc[i:].max() >= c1["low"]),
+                "formation_time_iso": formation_iso,
+                "top": top,
+                "bottom": bottom,
+                "midpoint": midpoint,
+                "gap_size": gap_size,
+                "status": status,
+                "mitigated": mitigated,
+                "distance_pts": round(abs(spot_price - midpoint), 2),
+                "distance_pct": round(((spot_price - midpoint) / midpoint) * 100.0, 2) if midpoint > 0 else 0.0,
             })
 
     # 2. Bullish and Bearish Order Blocks
-    # Find rolling swing high/low points
+    # Find rolling swing high/low expansion points
     for i in range(5, len(df) - 1):
         prev_slice = df.iloc[i - 5 : i]
         current_bar = df.iloc[i]
@@ -321,13 +369,37 @@ def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]]
             if down_candles:
                 ob_candle = down_candles[-1]
                 t_ob = int(ob_candle.name.timestamp())
+                formation_iso = ob_candle.name.strftime("%Y-%m-%d %H:%M") if hasattr(ob_candle.name, "strftime") else str(ob_candle.name)
+                top = round(float(max(ob_candle["open"], ob_candle["close"])), 2)
+                bottom = round(float(min(ob_candle["open"], ob_candle["close"])), 2)
+                midpoint = round(float((top + bottom) / 2.0), 2)
+                ob_vol = float(ob_candle["volume"]) if "volume" in ob_candle and not pd.isna(ob_candle["volume"]) else 0.0
+                volume_surge = round(ob_vol / vol_avg_20, 2) if vol_avg_20 > 0 else 1.0
+
+                subsequent_lows = df["low"].iloc[i:]
+                if len(subsequent_lows) > 0 and subsequent_lows.min() <= bottom:
+                    status = "MITIGATED"
+                    mitigated = True
+                elif len(subsequent_lows) > 0 and subsequent_lows.min() <= top:
+                    status = "TESTED"
+                    mitigated = False
+                else:
+                    status = "UNMITIGATED"
+                    mitigated = False
+
                 order_blocks.append({
                     "type": "BULLISH_OB",
                     "short_label": "D-OB",
                     "time": t_ob,
-                    "top": round(float(max(ob_candle["open"], ob_candle["close"])), 2),
-                    "bottom": round(float(min(ob_candle["open"], ob_candle["close"])), 2),
-                    "mitigated": bool(df["low"].iloc[i:].min() <= min(ob_candle["open"], ob_candle["close"])),
+                    "formation_time_iso": formation_iso,
+                    "top": top,
+                    "bottom": bottom,
+                    "midpoint": midpoint,
+                    "volume_surge": volume_surge,
+                    "status": status,
+                    "mitigated": mitigated,
+                    "distance_pts": round(abs(spot_price - midpoint), 2),
+                    "distance_pct": round(((spot_price - midpoint) / midpoint) * 100.0, 2) if midpoint > 0 else 0.0,
                 })
 
         # Breakdown to new swing low -> Find last up-close candle before expansion (Supply OB)
@@ -336,17 +408,213 @@ def _detect_order_blocks_and_fvg(df: pd.DataFrame) -> tuple[list[dict[str, Any]]
             if up_candles:
                 ob_candle = up_candles[-1]
                 t_ob = int(ob_candle.name.timestamp())
+                formation_iso = ob_candle.name.strftime("%Y-%m-%d %H:%M") if hasattr(ob_candle.name, "strftime") else str(ob_candle.name)
+                top = round(float(max(ob_candle["open"], ob_candle["close"])), 2)
+                bottom = round(float(min(ob_candle["open"], ob_candle["close"])), 2)
+                midpoint = round(float((top + bottom) / 2.0), 2)
+                ob_vol = float(ob_candle["volume"]) if "volume" in ob_candle and not pd.isna(ob_candle["volume"]) else 0.0
+                volume_surge = round(ob_vol / vol_avg_20, 2) if vol_avg_20 > 0 else 1.0
+
+                subsequent_highs = df["high"].iloc[i:]
+                if len(subsequent_highs) > 0 and subsequent_highs.max() >= top:
+                    status = "MITIGATED"
+                    mitigated = True
+                elif len(subsequent_highs) > 0 and subsequent_highs.max() >= bottom:
+                    status = "TESTED"
+                    mitigated = False
+                else:
+                    status = "UNMITIGATED"
+                    mitigated = False
+
                 order_blocks.append({
                     "type": "BEARISH_OB",
                     "short_label": "S-OB",
                     "time": t_ob,
-                    "top": round(float(max(ob_candle["open"], ob_candle["close"])), 2),
-                    "bottom": round(float(min(ob_candle["open"], ob_candle["close"])), 2),
-                    "mitigated": bool(df["high"].iloc[i:].max() >= max(ob_candle["open"], ob_candle["close"])),
+                    "formation_time_iso": formation_iso,
+                    "top": top,
+                    "bottom": bottom,
+                    "midpoint": midpoint,
+                    "volume_surge": volume_surge,
+                    "status": status,
+                    "mitigated": mitigated,
+                    "distance_pts": round(abs(spot_price - midpoint), 2),
+                    "distance_pct": round(((spot_price - midpoint) / midpoint) * 100.0, 2) if midpoint > 0 else 0.0,
                 })
 
-    # Return top 4 freshest order blocks & FVGs
-    return order_blocks[-4:], fvgs[-4:]
+    # Return top freshest order blocks & FVGs
+    return order_blocks[-6:], fvgs[-6:]
+
+
+def _detect_liquidity_sweeps(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Detect Buy-Side Liquidity (BSL) sweeps above equal highs and Sell-Side Liquidity (SSL) sweeps below equal lows."""
+    if len(df) < 15:
+        return []
+
+    sweeps: list[dict[str, Any]] = []
+    highs = df["high"].values
+    lows = df["low"].values
+    closes = df["close"].values
+    n = len(df)
+
+    # 1. Detect rolling swing pivots
+    swing_highs: list[tuple[int, float]] = []
+    swing_lows: list[tuple[int, float]] = []
+
+    for i in range(2, n - 2):
+        if highs[i] >= max(highs[i - 2 : i + 3]):
+            swing_highs.append((i, float(highs[i])))
+        if lows[i] <= min(lows[i - 2 : i + 3]):
+            swing_lows.append((i, float(lows[i])))
+
+    # 2. Check subsequent bars for stop sweeps (piercing beyond pivot level but closing back within range)
+    for sh_idx, sh_val in swing_highs:
+        for j in range(sh_idx + 1, min(sh_idx + 25, n)):
+            if highs[j] > sh_val and closes[j] < sh_val:
+                t_sweep = int(df.index[j].timestamp())
+                sweeps.append({
+                    "type": "BSL_SWEEP",
+                    "time": t_sweep,
+                    "level": round(sh_val, 2),
+                    "sweep_extreme": round(float(highs[j]), 2),
+                    "status": "REJECTED",
+                    "label": "BSL Sweep (Buy-Side Liquidity Hunt)",
+                })
+                break
+
+    for sl_idx, sl_val in swing_lows:
+        for j in range(sl_idx + 1, min(sl_idx + 25, n)):
+            if lows[j] < sl_val and closes[j] > sl_val:
+                t_sweep = int(df.index[j].timestamp())
+                sweeps.append({
+                    "type": "SSL_SWEEP",
+                    "time": t_sweep,
+                    "level": round(sl_val, 2),
+                    "sweep_extreme": round(float(lows[j]), 2),
+                    "status": "REJECTED",
+                    "label": "SSL Sweep (Sell-Side Liquidity Hunt)",
+                })
+                break
+
+    # Return the 4 most recent liquidity sweeps
+    return sweeps[-4:]
+
+
+def _calculate_volume_profile_poc(df: pd.DataFrame) -> dict[str, Any]:
+    """Calculate Point of Control (POC), Value Area High (VAH, 70% volume), and Value Area Low (VAL)."""
+    if df.empty or len(df) < 5:
+        return {"poc": 0.0, "vah": 0.0, "val": 0.0, "value_area_pct": 70.0}
+
+    min_p = float(df["low"].min())
+    max_p = float(df["high"].max())
+
+    if max_p <= min_p:
+        return {"poc": round(min_p, 2), "vah": round(min_p, 2), "val": round(min_p, 2), "value_area_pct": 70.0}
+
+    num_bins = 30
+    bin_width = (max_p - min_p) / num_bins
+    bin_centers = [min_p + (i + 0.5) * bin_width for i in range(num_bins)]
+    bin_volumes = np.zeros(num_bins)
+
+    for _, row in df.iterrows():
+        v = float(row["volume"]) if "volume" in row and not pd.isna(row["volume"]) and row["volume"] > 0 else 1.0
+        typical = float((row["high"] + row["low"] + row["close"]) / 3.0)
+        bin_idx = min(int((typical - min_p) / bin_width), num_bins - 1)
+        bin_idx = max(0, bin_idx)
+        bin_volumes[bin_idx] += v
+
+    poc_idx = int(np.argmax(bin_volumes))
+    poc_price = bin_centers[poc_idx]
+
+    total_vol = np.sum(bin_volumes)
+    target_va_vol = total_vol * 0.70
+
+    va_vol = bin_volumes[poc_idx]
+    low_idx = poc_idx
+    high_idx = poc_idx
+
+    while va_vol < target_va_vol and (low_idx > 0 or high_idx < num_bins - 1):
+        vol_below = bin_volumes[low_idx - 1] if low_idx > 0 else 0
+        vol_above = bin_volumes[high_idx + 1] if high_idx < num_bins - 1 else 0
+        if vol_below >= vol_above and low_idx > 0:
+            low_idx -= 1
+            va_vol += vol_below
+        elif high_idx < num_bins - 1:
+            high_idx += 1
+            va_vol += vol_above
+        elif low_idx > 0:
+            low_idx -= 1
+            va_vol += vol_below
+        else:
+            break
+
+    vah = bin_centers[high_idx] + 0.5 * bin_width
+    val = bin_centers[low_idx] - 0.5 * bin_width
+
+    return {
+        "poc": round(float(poc_price), 2),
+        "vah": round(float(vah), 2),
+        "val": round(float(val), 2),
+        "value_area_pct": 70.0,
+    }
+
+
+def _calculate_microstructure_depth(df: pd.DataFrame, spot_price: float) -> dict[str, Any]:
+    """Calculate synthetic resting buy/sell depth, CVD bias, and delta pressure from candle wicks."""
+    if df.empty:
+        return {
+            "resting_buy_depth_pct": 50.0,
+            "resting_sell_depth_pct": 50.0,
+            "cvd_bias": "NEUTRAL",
+            "delta_pressure": "NEUTRAL",
+            "spread_proxy": 0.01,
+        }
+
+    recent = df.tail(20)
+    deltas = []
+    buy_vols = 0.0
+    sell_vols = 0.0
+
+    for _, row in recent.iterrows():
+        h, l, c = float(row["high"]), float(row["low"]), float(row["close"])
+        v = float(row["volume"]) if "volume" in row and not pd.isna(row["volume"]) and row["volume"] > 0 else 100.0
+        rng = max(h - l, 0.001)
+        buy_ratio = (c - l) / rng
+        sell_ratio = (h - c) / rng
+        b_vol = v * buy_ratio
+        s_vol = v * sell_ratio
+        buy_vols += b_vol
+        sell_vols += s_vol
+        deltas.append(b_vol - s_vol)
+
+    tot_v = buy_vols + sell_vols
+    if tot_v > 0:
+        buy_pct = round((buy_vols / tot_v) * 100.0, 1)
+        buy_pct = max(15.0, min(85.0, buy_pct))
+        sell_pct = round(100.0 - buy_pct, 1)
+    else:
+        buy_pct = 50.0
+        sell_pct = 50.0
+
+    cvd_sum = sum(deltas)
+    if cvd_sum > 0.05 * (tot_v or 1.0):
+        cvd_bias = "BULLISH_DELTA"
+        delta_pressure = "ACCUMULATION"
+    elif cvd_sum < -0.05 * (tot_v or 1.0):
+        cvd_bias = "BEARISH_DELTA"
+        delta_pressure = "DISTRIBUTION"
+    else:
+        cvd_bias = "NEUTRAL"
+        delta_pressure = "BALANCED"
+
+    spread_proxy = round(spot_price * 0.0002, 4) if spot_price > 0 else 0.01
+
+    return {
+        "resting_buy_depth_pct": buy_pct,
+        "resting_sell_depth_pct": sell_pct,
+        "cvd_bias": cvd_bias,
+        "delta_pressure": delta_pressure,
+        "spread_proxy": spread_proxy,
+    }
 
 
 def _detect_trendlines(df: pd.DataFrame) -> list[dict[str, Any]]:
@@ -523,6 +791,64 @@ def _generate_tactical_signals(
     }
 
 
+def get_commodity_latest_tick(
+    symbol: str = "GOLD",
+    interval: str = "5m",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Fast method returning latest tick and current forming candlestick."""
+    clean_sym = symbol.strip().upper()
+    meta = COMMODITY_MAP.get(clean_sym, {
+        "symbol": clean_sym,
+        "name": f"{clean_sym} Commodity",
+        "category": "Commodities",
+        "unit": "$",
+        "currency_symbol": "$",
+        "icon": "💎",
+    })
+
+    curr_sym = meta.get("currency_symbol", "$")
+    df = fetch_commodity_candles(clean_sym, interval=interval, period="1d", settings=settings)
+    if df.empty:
+        df = fetch_commodity_candles(clean_sym, interval=interval, period="5d", settings=settings)
+
+    if df.empty:
+        return {
+            "success": True,
+            "symbol": clean_sym,
+            "spot_price": 0.0,
+            "change_24h": 0.0,
+            "latest_candle": None,
+            "currency_symbol": curr_sym,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S IST"),
+        }
+
+    last_row = df.iloc[-1]
+    spot_price = round(float(last_row["close"]), 2)
+    prev_close = float(df["close"].iloc[-2]) if len(df) >= 2 else spot_price
+    change_24h = round(((spot_price - prev_close) / prev_close) * 100.0, 2) if prev_close > 0 else 0.0
+
+    t_sec = int(df.index[-1].timestamp())
+    latest_candle = {
+        "time": t_sec,
+        "open": round(float(last_row["open"]), 2),
+        "high": round(float(last_row["high"]), 2),
+        "low": round(float(last_row["low"]), 2),
+        "close": spot_price,
+        "volume": int(last_row["volume"]) if "volume" in last_row and not pd.isna(last_row["volume"]) else 0,
+    }
+
+    return {
+        "success": True,
+        "symbol": clean_sym,
+        "spot_price": spot_price,
+        "change_24h": change_24h,
+        "latest_candle": latest_candle,
+        "currency_symbol": curr_sym,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S IST"),
+    }
+
+
 def get_commodity_chart_intelligence(
     symbol: str = "GOLD",
     interval: str = "5m",
@@ -573,8 +899,20 @@ def get_commodity_chart_intelligence(
                 "vwap_lower": [],
                 "orb": {"active": False, "high": 0.0, "low": 0.0},
                 "pivots": {"p": 0.0, "r1": 0.0, "s1": 0.0},
+                "poc": 0.0,
+                "vah": 0.0,
+                "val": 0.0,
+                "volume_profile": {"poc": 0.0, "vah": 0.0, "val": 0.0, "value_area_pct": 70.0},
                 "order_blocks": [],
                 "fvgs": [],
+                "liquidity_sweeps": [],
+                "microstructure": {
+                    "resting_buy_depth_pct": 50.0,
+                    "resting_sell_depth_pct": 50.0,
+                    "cvd_bias": "NEUTRAL",
+                    "delta_pressure": "NEUTRAL",
+                    "spread_proxy": 0.01,
+                },
                 "trendlines": [],
             },
             "tactical_hud": {
@@ -610,6 +948,9 @@ def get_commodity_chart_intelligence(
     vwap, vwap_upper, vwap_lower = _calculate_session_vwap(df)
     orb = _calculate_orb(df)
     obs, fvgs = _detect_order_blocks_and_fvg(df)
+    sweeps = _detect_liquidity_sweeps(df)
+    poc_data = _calculate_volume_profile_poc(df)
+    microstructure = _calculate_microstructure_depth(df, spot_price)
     trendlines = _detect_trendlines(df)
     pivots = _calculate_classical_pivots(df)
     currency_symbol = meta.get("currency_symbol", "$")
@@ -647,8 +988,14 @@ def get_commodity_chart_intelligence(
             "vwap_lower": vwap_lower,
             "orb": orb,
             "pivots": pivots,
+            "poc": poc_data.get("poc", 0.0),
+            "vah": poc_data.get("vah", 0.0),
+            "val": poc_data.get("val", 0.0),
+            "volume_profile": poc_data,
             "order_blocks": obs,
             "fvgs": fvgs,
+            "liquidity_sweeps": sweeps,
+            "microstructure": microstructure,
             "trendlines": trendlines,
         },
         "tactical_hud": tactical_hud,

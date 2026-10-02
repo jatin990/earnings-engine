@@ -5,8 +5,9 @@
  * - Real-time / intraday candlesticks for Gold, Silver, Crude Oil, Natural Gas, Copper
  * - Dynamic Session VWAP (±1.5σ dispersion bands)
  * - 15-minute Opening Range Breakout (ORB-15) and expansion targets
- * - Smart Money Concepts (SMC): Bullish (D-OB) and Bearish (S-OB) Order Blocks and Fair Value Gaps
- * - Algorithmic Support & Resistance Trendlines
+ * - Smart Money Concepts (SMC): Bullish (D-OB) and Bearish (S-OB) Order Blocks, Fair Value Gaps, and Liquidity Sweeps
+ * - Sticky Hover Inspector Bar & Microstructure Depth Widget
+ * - Fast Real-Time Incremental Tick Poller (3s)
  * - Actionable 3-Column Tactical Trade HUD Deck (Where to Buy / Where to Sell)
  */
 (function (window) {
@@ -36,22 +37,42 @@
     mod._priceLines = [];
     mod._chartData = null;
     mod._pollTimer = null;
+    mod._tickTimer = null;
     mod._hasFitted = false;
     mod._isFullscreen = false;
     mod._escListenerBound = false;
+
+    /**
+     * Check if commodities tab is active / visible in viewport
+     */
+    mod.isTabActive = function () {
+        const tab = document.getElementById('tab-commodities');
+        if (!tab) return false;
+        return tab.style.display !== 'none' || tab.classList.contains('active') || window.location.hash === '#commodities';
+    };
 
     /**
      * Initialize the module
      */
     mod.init = function () {
         mod.loadChart(false);
+
+        // 1. 30s full chart intelligence refresh timer
         if (!mod._pollTimer) {
             mod._pollTimer = setInterval(() => {
-                const tab = document.getElementById('tab-commodities');
-                if (tab && (tab.style.display !== 'none' || tab.classList.contains('active'))) {
+                if (mod.isTabActive()) {
                     mod.loadChart(false);
                 }
-            }, 30000); // 30s live poll
+            }, 30000);
+        }
+
+        // 2. 3s lightweight incremental tick poller
+        if (!mod._tickTimer) {
+            mod._tickTimer = setInterval(() => {
+                if (mod.isTabActive() && mod._chart && mod._candleSeries) {
+                    mod.pollLatestTick();
+                }
+            }, 3000);
         }
     };
 
@@ -113,7 +134,7 @@
     };
 
     /**
-     * Fetch chart intelligence from REST API
+     * Fetch full chart intelligence from REST API
      */
     mod.loadChart = async function (forceRefresh = false) {
         const loadingEl = document.getElementById('commChartLoading');
@@ -136,7 +157,7 @@
             const data = await res.json();
             mod._chartData = data;
 
-            // Render KPI cards & Tactical Trade HUD
+            // Render KPI cards, Microstructure widget & Tactical Trade HUD
             mod.renderTacticalHUD(data);
 
             // Render Lightweight Chart
@@ -151,6 +172,52 @@
                 refreshBtn.disabled = false;
                 refreshBtn.innerHTML = '<span>🔄</span> Refresh';
             }
+        }
+    };
+
+    /**
+     * Fast incremental tick poller (3s)
+     */
+    mod.pollLatestTick = async function () {
+        try {
+            const url = `/api/v1/commodities/latest-tick?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (data && data.success && data.latest_candle && mod._candleSeries) {
+                const c = data.latest_candle;
+                mod._candleSeries.update(c);
+
+                if (mod._volumeSeries && c.volume !== undefined) {
+                    mod._volumeSeries.update({
+                        time: c.time,
+                        value: c.volume,
+                        color: c.close >= c.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
+                    });
+                }
+
+                // Update real-time spot price & change HUD
+                const curr = data.currency_symbol || '$';
+                const spotEl = document.getElementById('commKpiSpotPrice');
+                const spotChangeEl = document.getElementById('commKpiSpotChange');
+                const timeEl = document.getElementById('commChartTimestamp');
+
+                if (spotEl && data.spot_price !== undefined) {
+                    spotEl.textContent = `${curr}${data.spot_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                }
+                if (spotChangeEl && data.change_24h !== undefined) {
+                    const chg = data.change_24h;
+                    const sign = chg >= 0 ? '+' : '';
+                    spotChangeEl.textContent = `24h: ${sign}${chg}%`;
+                    spotChangeEl.style.color = chg >= 0 ? '#10b981' : '#f43f5e';
+                }
+                if (timeEl && data.timestamp) {
+                    timeEl.textContent = `As of ${data.timestamp}`;
+                }
+            }
+        } catch (e) {
+            // Silently suppress background tick polling errors
         }
     };
 
@@ -191,6 +258,11 @@
                 },
             });
 
+            // Crosshair Movement Subscription for Sticky Hover Inspector
+            mod._chart.subscribeCrosshairMove((param) => {
+                mod.handleCrosshairMove(param);
+            });
+
             window.addEventListener('resize', () => {
                 if (mod._chart && container) {
                     const h = mod._isFullscreen ? Math.max(window.innerHeight - 120, 400) : 640;
@@ -205,6 +277,131 @@
                     }
                 });
                 mod._escListenerBound = true;
+            }
+        }
+    };
+
+    /**
+     * Handle crosshair movement for sticky hover inspector bar
+     */
+    mod.handleCrosshairMove = function (param) {
+        const inspectTime = document.getElementById('commInspectTime');
+        const inspectOpen = document.getElementById('commInspectOpen');
+        const inspectHigh = document.getElementById('commInspectHigh');
+        const inspectLow = document.getElementById('commInspectLow');
+        const inspectClose = document.getElementById('commInspectClose');
+        const inspectTr = document.getElementById('commInspectTr');
+        const inspectVol = document.getElementById('commInspectVol');
+        const inspectDelta = document.getElementById('commInspectDelta');
+        const inspectZone = document.getElementById('commInspectZone');
+
+        if (!param || !param.time || !param.seriesData || !mod._candleSeries) {
+            return;
+        }
+
+        const candle = param.seriesData.get(mod._candleSeries);
+        if (!candle) return;
+
+        const curr = mod._chartData?.currency_symbol || '$';
+        const d = new Date(param.time * 1000);
+        const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+        if (inspectTime) inspectTime.textContent = timeStr;
+        if (inspectOpen) inspectOpen.textContent = `${curr}${candle.open !== undefined ? candle.open.toFixed(2) : '--'}`;
+        if (inspectHigh) inspectHigh.textContent = `${curr}${candle.high !== undefined ? candle.high.toFixed(2) : '--'}`;
+        if (inspectLow) inspectLow.textContent = `${curr}${candle.low !== undefined ? candle.low.toFixed(2) : '--'}`;
+        if (inspectClose) inspectClose.textContent = `${curr}${candle.close !== undefined ? candle.close.toFixed(2) : '--'}`;
+
+        const tr = Math.max((candle.high || 0) - (candle.low || 0), 0);
+        if (inspectTr) inspectTr.textContent = `${curr}${tr.toFixed(2)}`;
+
+        const volItem = mod._volumeSeries ? param.seriesData.get(mod._volumeSeries) : null;
+        if (inspectVol && volItem) {
+            const v = volItem.value || 0;
+            inspectVol.textContent = `Vol: ${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`;
+        }
+
+        if (inspectDelta && candle.high !== undefined && candle.low !== undefined) {
+            const rng = Math.max(candle.high - candle.low, 0.001);
+            const buyRatio = Math.round(((candle.close - candle.low) / rng) * 100);
+            const sellRatio = 100 - buyRatio;
+            inspectDelta.textContent = `Delta: ${buyRatio}% B / ${sellRatio}% S`;
+            inspectDelta.style.color = buyRatio >= 50 ? '#10b981' : '#f43f5e';
+            inspectDelta.style.background = buyRatio >= 50 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)';
+        }
+
+        // Zone intersection check
+        if (inspectZone && mod._chartData && mod._chartData.indicators) {
+            const ind = mod._chartData.indicators;
+            let matchedZone = null;
+            let zoneColor = '#a855f7';
+
+            let hoverPrice = candle.close;
+            if (param.point && param.point.y !== undefined && mod._candleSeries.coordinateToPrice) {
+                const p = mod._candleSeries.coordinateToPrice(param.point.y);
+                if (p) hoverPrice = p;
+            }
+
+            // 1. Check Order Blocks
+            const obs = ind.order_blocks || [];
+            for (const ob of obs) {
+                const bMin = Math.min(ob.bottom, ob.top);
+                const bMax = Math.max(ob.bottom, ob.top);
+                if ((hoverPrice >= bMin && hoverPrice <= bMax) || param.time === ob.time) {
+                    matchedZone = `${ob.short_label || (ob.type === 'BULLISH_OB' ? 'D-OB' : 'S-OB')} @ ${curr}${ob.bottom}–${ob.top} (${ob.status || 'ACTIVE'} · ${ob.volume_surge || 1.0}x Vol · ${ob.distance_pts || 0} pts away)`;
+                    zoneColor = ob.type === 'BULLISH_OB' ? '#10b981' : '#f43f5e';
+                    break;
+                }
+            }
+
+            // 2. Check FVGs
+            if (!matchedZone) {
+                const fvgs = ind.fvgs || [];
+                for (const fvg of fvgs) {
+                    const fMin = Math.min(fvg.bottom, fvg.top);
+                    const fMax = Math.max(fvg.bottom, fvg.top);
+                    if ((hoverPrice >= fMin && hoverPrice <= fMax) || param.time === fvg.time) {
+                        matchedZone = `${fvg.type?.replace('_', ' ') || 'FVG'} @ ${curr}${fvg.bottom}–${fvg.top} (${fvg.status || 'UNFILLED'} · Mid: ${curr}${fvg.midpoint})`;
+                        zoneColor = '#38bdf8';
+                        break;
+                    }
+                }
+            }
+
+            // 3. Check Volume Profile POC & Value Area
+            if (!matchedZone && ind.poc) {
+                const poc = ind.poc;
+                const vah = ind.vah;
+                const val = ind.val;
+                if (Math.abs(hoverPrice - poc) <= (poc * 0.002)) {
+                    matchedZone = `Volume Profile POC (Point of Control) @ ${curr}${poc.toFixed(2)}`;
+                    zoneColor = '#eab308';
+                } else if (vah && Math.abs(hoverPrice - vah) <= (vah * 0.002)) {
+                    matchedZone = `Value Area High (VAH 70%) @ ${curr}${vah.toFixed(2)}`;
+                    zoneColor = '#f59e0b';
+                } else if (val && Math.abs(hoverPrice - val) <= (val * 0.002)) {
+                    matchedZone = `Value Area Low (VAL 70%) @ ${curr}${val.toFixed(2)}`;
+                    zoneColor = '#f59e0b';
+                }
+            }
+
+            // 4. Check Liquidity Sweeps
+            if (!matchedZone && ind.liquidity_sweeps && ind.liquidity_sweeps.length > 0) {
+                for (const sw of ind.liquidity_sweeps) {
+                    if (param.time === sw.time || Math.abs(hoverPrice - sw.level) <= (sw.level * 0.001)) {
+                        matchedZone = `${sw.label || sw.type} @ ${curr}${sw.level} (Extreme: ${curr}${sw.sweep_extreme})`;
+                        zoneColor = '#f43f5e';
+                        break;
+                    }
+                }
+            }
+
+            if (matchedZone) {
+                inspectZone.textContent = matchedZone;
+                inspectZone.style.color = zoneColor;
+            } else {
+                inspectZone.textContent = 'Free Flow / Fair Value Zone';
+                inspectZone.style.color = 'var(--text-secondary)';
             }
         }
     };
@@ -429,7 +626,7 @@
     };
 
     /**
-     * Render KPI cards and 3-column Tactical Trade HUD Deck
+     * Render KPI cards, Microstructure widget, and 3-column Tactical Trade HUD Deck
      */
     mod.renderTacticalHUD = function (data) {
         if (!data) return;
@@ -490,7 +687,41 @@
             pivotFloorEl.textContent = `Pivot: ${curr}${ind.pivots.p !== undefined && ind.pivots.p !== null ? ind.pivots.p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
         }
 
-        // 3. 3-Column Tactical Trade HUD Deck
+        // 3. Microstructure Imbalance Widget
+        const micro = ind.microstructure || {};
+        const buyDepthEl = document.getElementById('commKpiBuyDepth');
+        const sellDepthEl = document.getElementById('commKpiSellDepth');
+        const buyDepthBar = document.getElementById('commKpiBuyDepthBar');
+        const cvdBadge = document.getElementById('commKpiCvdBadge');
+        const spreadProxyEl = document.getElementById('commKpiSpreadProxy');
+
+        const buyPct = micro.resting_buy_depth_pct !== undefined ? micro.resting_buy_depth_pct : 50.0;
+        const sellPct = micro.resting_sell_depth_pct !== undefined ? micro.resting_sell_depth_pct : 50.0;
+
+        if (buyDepthEl) buyDepthEl.textContent = `${buyPct}%`;
+        if (sellDepthEl) sellDepthEl.textContent = `${sellPct}%`;
+        if (buyDepthBar) buyDepthBar.style.width = `${buyPct}%`;
+
+        if (cvdBadge) {
+            const bias = micro.cvd_bias || 'NEUTRAL';
+            cvdBadge.textContent = bias.replace(/_/g, ' ');
+            if (bias.includes('BULLISH')) {
+                cvdBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                cvdBadge.style.color = '#10b981';
+            } else if (bias.includes('BEARISH')) {
+                cvdBadge.style.background = 'rgba(244, 63, 94, 0.15)';
+                cvdBadge.style.color = '#f43f5e';
+            } else {
+                cvdBadge.style.background = 'rgba(234, 179, 8, 0.15)';
+                cvdBadge.style.color = '#eab308';
+            }
+        }
+
+        if (spreadProxyEl && micro.spread_proxy !== undefined) {
+            spreadProxyEl.textContent = `Spread: ~${curr}${micro.spread_proxy}`;
+        }
+
+        // 4. 3-Column Tactical Trade HUD Deck
         const hud = data.tactical_hud || {};
         const buy = hud.where_to_buy || {};
         const sell = hud.where_to_sell || {};
