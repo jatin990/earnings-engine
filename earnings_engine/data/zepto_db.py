@@ -315,9 +315,12 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 record_date TEXT NOT NULL,
                 loss_type TEXT NOT NULL,
                 category TEXT NOT NULL,
+                sku_id TEXT,
+                item_name TEXT,
                 amount REAL DEFAULT 0.0,
                 sku_count INTEGER DEFAULT 0,
                 notes TEXT,
+                source_email_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -454,13 +457,19 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                     except Exception:
                         pass
 
-        # Migration: Ensure source_email_id exists on domain tables
+        # Migration: Ensure sku_id, item_name, and source_email_id exist on zepto_loss_records
         loss_cols = _get_table_columns(conn, "zepto_loss_records")
-        if loss_cols and "source_email_id" not in loss_cols:
-            try:
-                conn.execute("ALTER TABLE zepto_loss_records ADD COLUMN source_email_id TEXT")
-            except Exception:
-                pass
+        if loss_cols:
+            for col_name, col_type in [
+                ("sku_id", "TEXT"),
+                ("item_name", "TEXT"),
+                ("source_email_id", "TEXT"),
+            ]:
+                if col_name not in loss_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE zepto_loss_records ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
 
         met_cols = _get_table_columns(conn, "zepto_store_metrics")
         if met_cols and "source_email_id" not in met_cols:
@@ -3759,38 +3768,67 @@ def get_store_metrics_summary(
 # ---------------------------------------------------------------------------
 
 def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
-    """Persist a dark store loss / shrinkage record."""
+    """Persist a dark store loss / shrinkage record with idempotent deterministic hashing."""
+    import hashlib
     settings = settings or Settings()
     ensure_zepto_schema(settings)
-    rec_id = data.get("id") or f"loss_{uuid.uuid4().hex[:12]}"
     store = data.get("store_name", "JMU-Sainik Colony").strip()
     date_str = data.get("record_date", datetime.now().strftime("%Y-%m-%d")).strip()
+    loss_type = data.get("loss_type", "DQ_LOSS").strip().upper()
+    category = data.get("category", "GENERAL").strip().upper()
+    sku_id = str(data.get("sku_id") or "").strip()
+    item_name = str(data.get("item_name") or "").strip()
+    notes = str(data.get("notes") or "").strip()
+    amount = float(data.get("amount", 0.0))
+    sku_count = int(data.get("sku_count", 0))
     source_email_id = data.get("source_email_id")
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    if data.get("id"):
+        rec_id = str(data["id"])
+    else:
+        sku_identifier = sku_id or item_name or notes or "general"
+        email_part = str(source_email_id or "")
+        raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{amount}|{email_part}".encode("utf-8")
+        rec_id = f"loss_{hashlib.md5(raw_key).hexdigest()[:16]}"
 
     with _connect(settings) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO zepto_loss_records (
-                id, store_name, record_date, loss_type, category, amount,
-                sku_count, notes, source_email_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO zepto_loss_records (
+                id, store_name, record_date, loss_type, category, sku_id, item_name,
+                amount, sku_count, notes, source_email_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                store_name = excluded.store_name,
+                record_date = excluded.record_date,
+                loss_type = excluded.loss_type,
+                category = excluded.category,
+                sku_id = CASE WHEN excluded.sku_id != '' THEN excluded.sku_id ELSE zepto_loss_records.sku_id END,
+                item_name = CASE WHEN excluded.item_name != '' THEN excluded.item_name ELSE zepto_loss_records.item_name END,
+                amount = excluded.amount,
+                sku_count = excluded.sku_count,
+                notes = excluded.notes,
+                source_email_id = CASE WHEN excluded.source_email_id IS NOT NULL THEN excluded.source_email_id ELSE zepto_loss_records.source_email_id END,
+                updated_at = excluded.updated_at
             """,
             (
                 rec_id,
                 store,
                 date_str,
-                data.get("loss_type", "DQ_LOSS").strip().upper(),
-                data.get("category", "GENERAL").strip().upper(),
-                float(data.get("amount", 0.0)),
-                int(data.get("sku_count", 0)),
-                data.get("notes", ""),
+                loss_type,
+                category,
+                sku_id,
+                item_name,
+                amount,
+                sku_count,
+                notes,
                 source_email_id,
                 now_iso,
                 now_iso,
             ),
         )
-    return {"id": rec_id, "amount": data.get("amount", 0.0)}
+    return {"id": rec_id, "amount": amount}
 
 
 def get_loss_summary(
@@ -3886,7 +3924,28 @@ def get_loss_summary(
             float(i.get("amount") or 0.0) for i in active_items
             if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
         )
-        total_skus = sum(int(i.get("sku_count") or 0) for i in active_items)
+        total_units_affected = sum(int(i.get("sku_count") or 0) for i in active_items)
+
+        # Helper to normalize SKU identifier across incremental logs
+        def _get_sku_norm_key(it: dict[str, Any]) -> str:
+            sku_id = str(it.get("sku_id") or "").strip().upper()
+            if sku_id and sku_id not in ("NONE", "NULL", "0", ""):
+                return f"SKU:{sku_id}"
+            item_name = str(it.get("item_name") or "").strip().upper()
+            if item_name and item_name not in ("NONE", "NULL", ""):
+                return f"NAME:{item_name}"
+            notes = str(it.get("notes") or "").strip().upper()
+            if notes and notes not in ("NONE", "NULL", "DAMAGED", "EXPIRED", "DEFECT", "DEFECT ITEM", ""):
+                return f"NOTE:{notes}"
+            # Fallback to category + loss record ID if completely anonymous
+            return f"REC:{it.get('category', 'GEN')}:{it.get('id', '')}"
+
+        overall_distinct_skus = set()
+        for it in active_items:
+            norm_key = _get_sku_norm_key(it)
+            overall_distinct_skus.add(norm_key)
+
+        unique_skus_count = len(overall_distinct_skus)
 
         # Category Matrix Breakdown (DQ vs Shrinkage vs Spoilage by Department)
         cat_map: dict[str, dict[str, Any]] = {}
@@ -3895,6 +3954,7 @@ def get_loss_summary(
             l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
             amt = float(it.get("amount") or 0.0)
             sku_cnt = int(it.get("sku_count") or 0)
+            norm_key = _get_sku_norm_key(it)
 
             if cat not in cat_map:
                 cat_map[cat] = {
@@ -3904,12 +3964,17 @@ def get_loss_summary(
                     "shrinkage_amount": 0.0,
                     "spoilage_amount": 0.0,
                     "total_skus": 0,
+                    "distinct_skus": 0,
+                    "total_units": 0,
+                    "_sku_set": set(),
                     "incident_count": 0,
                     "pct_of_total": 0.0,
                 }
 
             cat_map[cat]["total_amount"] += amt
+            cat_map[cat]["total_units"] += sku_cnt
             cat_map[cat]["total_skus"] += sku_cnt
+            cat_map[cat]["_sku_set"].add(norm_key)
             cat_map[cat]["incident_count"] += 1
 
             if l_type == "DQ_LOSS":
@@ -3919,9 +3984,10 @@ def get_loss_summary(
             else:
                 cat_map[cat]["spoilage_amount"] += amt
 
-        # Format and calculate percentage share
+        # Format and calculate percentage share & distinct SKUs per category
         cat_list = []
         for c_data in cat_map.values():
+            c_data["distinct_skus"] = len(c_data.pop("_sku_set"))
             c_data["total_amount"] = round(c_data["total_amount"], 2)
             c_data["dq_loss_amount"] = round(c_data["dq_loss_amount"], 2)
             c_data["shrinkage_amount"] = round(c_data["shrinkage_amount"], 2)
@@ -3941,7 +4007,8 @@ def get_loss_summary(
             others_dq = round(sum(c["dq_loss_amount"] for c in tail_cats), 2)
             others_shrink = round(sum(c["shrinkage_amount"] for c in tail_cats), 2)
             others_spoil = round(sum(c["spoilage_amount"] for c in tail_cats), 2)
-            others_skus = sum(c["total_skus"] for c in tail_cats)
+            others_distinct = sum(c.get("distinct_skus", 0) for c in tail_cats)
+            others_units = sum(c.get("total_units", c.get("total_skus", 0)) for c in tail_cats)
             others_incidents = sum(c["incident_count"] for c in tail_cats)
             others_pct = round((others_total / total_loss * 100), 1) if total_loss > 0 else 0.0
 
@@ -3952,7 +4019,9 @@ def get_loss_summary(
                     "dq_loss_amount": others_dq,
                     "shrinkage_amount": others_shrink,
                     "spoilage_amount": others_spoil,
-                    "total_skus": others_skus,
+                    "total_skus": others_units,
+                    "distinct_skus": others_distinct,
+                    "total_units": others_units,
                     "incident_count": others_incidents,
                     "pct_of_total": others_pct,
                     "is_composite": True,
@@ -4138,8 +4207,10 @@ def get_loss_summary(
             "dq_loss_total": round(dq_total, 2),
             "shrinkage_total": round(shrinkage_total, 2),
             "spoilage_total": round(spoilage_total, 2),
-            "total_skus_affected": total_skus,
-            "total_sku_count": total_skus,
+            "total_skus_affected": unique_skus_count,
+            "unique_skus_count": unique_skus_count,
+            "total_units_affected": total_units_affected,
+            "total_sku_count": total_units_affected,
             "total_loss_records": len(active_items),
             "total_records": len(active_items),
             "category_breakdown": grouped_category_breakdown,
@@ -4188,8 +4259,8 @@ def get_loss_records(
         params.append(loss_type)
     if search:
         s_pat = f"%{search.strip().lower()}%"
-        where.append("(LOWER(notes) LIKE ? OR LOWER(category) LIKE ? OR LOWER(loss_type) LIKE ? OR LOWER(store_name) LIKE ?)")
-        params.extend([s_pat, s_pat, s_pat, s_pat])
+        where.append("(LOWER(notes) LIKE ? OR LOWER(sku_id) LIKE ? OR LOWER(item_name) LIKE ? OR LOWER(category) LIKE ? OR LOWER(loss_type) LIKE ? OR LOWER(store_name) LIKE ?)")
+        params.extend([s_pat, s_pat, s_pat, s_pat, s_pat, s_pat])
 
     where_sql = " AND ".join(where)
 

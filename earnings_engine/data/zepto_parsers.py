@@ -479,9 +479,11 @@ def parse_zepto_loss_shrinkage_excel(
         "store_name": ["store", "store name", "darkstore", "hub"],
         "loss_type": ["loss type", "type", "defect type", "classification", "loss category"],
         "category": ["category", "dept", "department", "sku category", "item group"],
+        "sku_id": ["sku id", "sku_id", "sku code", "sku_code", "sku", "item code", "item_code", "article id", "article_id", "barcode", "product code"],
+        "item_name": ["item name", "item_name", "product name", "product_name", "sku name", "sku_name", "item description", "product description", "item"],
         "amount": ["amount", "loss amount", "value", "total loss", "cost", "damage value", "cost value"],
-        "sku_count": ["sku count", "skus", "quantity", "qty", "units", "items", "defect count"],
-        "notes": ["notes", "remarks", "reason", "description", "item name", "sku name"],
+        "sku_count": ["sku count", "skus", "quantity", "qty", "units", "items", "defect count", "count"],
+        "notes": ["notes", "remarks", "reason", "defect reason", "root cause", "comments", "description"],
     }
 
     header_idx = -1
@@ -558,7 +560,26 @@ def parse_zepto_loss_shrinkage_excel(
         elif raw_cat:
             category = raw_cat
 
-        notes = str(row[col_map["notes"]]).strip() if "notes" in col_map and col_map["notes"] < len(row) else ""
+        sku_id = (
+            str(row[col_map["sku_id"]]).strip()
+            if "sku_id" in col_map and col_map["sku_id"] < len(row) and row[col_map["sku_id"]] is not None and str(row[col_map["sku_id"]]).strip() != "None"
+            else ""
+        )
+        item_name = (
+            str(row[col_map["item_name"]]).strip()
+            if "item_name" in col_map and col_map["item_name"] < len(row) and row[col_map["item_name"]] is not None and str(row[col_map["item_name"]]).strip() != "None"
+            else ""
+        )
+        notes = (
+            str(row[col_map["notes"]]).strip()
+            if "notes" in col_map and col_map["notes"] < len(row) and row[col_map["notes"]] is not None and str(row[col_map["notes"]]).strip() != "None"
+            else ""
+        )
+
+        if not notes:
+            notes = item_name or sku_id or "Defect item"
+        if not item_name and notes and not sku_id:
+            item_name = notes
 
         if amount > 0 or sku_count > 0:
             records.append({
@@ -566,6 +587,8 @@ def parse_zepto_loss_shrinkage_excel(
                 "record_date": record_date,
                 "loss_type": loss_type,
                 "category": category,
+                "sku_id": sku_id,
+                "item_name": item_name,
                 "amount": amount,
                 "sku_count": sku_count,
                 "notes": notes,

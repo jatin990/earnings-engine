@@ -4342,10 +4342,18 @@ const zeptoApp = {
         const dqLoss = data.dq_loss_total || 0;
         const shrinkLoss = data.shrinkage_total || 0;
         const spoilLoss = data.spoilage_total || 0;
+        const uniqueSkus = data.unique_skus_count ?? data.total_skus_affected ?? 0;
+        const totalUnits = data.total_units_affected ?? data.total_sku_count ?? 0;
 
         if (totAmtEl) totAmtEl.textContent = this.formatCurrency(totalLoss);
         if (countBadge) countBadge.textContent = `${(data.total_loss_records || 0).toLocaleString('en-IN')} Incidents`;
-        if (skuCountEl) skuCountEl.textContent = `${(data.total_skus_affected || 0).toLocaleString('en-IN')}`;
+        if (skuCountEl) {
+            if (uniqueSkus === totalUnits || totalUnits === 0) {
+                skuCountEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} SKUs`;
+            } else {
+                skuCountEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} unique (${totalUnits.toLocaleString('en-IN')} units)`;
+            }
+        }
 
         if (dqAmtEl) dqAmtEl.textContent = this.formatCurrency(dqLoss);
         if (dqShareEl) dqShareEl.textContent = totalLoss > 0 ? `${((dqLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
@@ -4384,6 +4392,9 @@ const zeptoApp = {
                 catTableBody.innerHTML = cats.map(c => {
                     const pct = c.pct_of_total || 0;
                     const isOthers = c.category === 'OTHERS' || c.is_composite;
+                    const dSkus = c.distinct_skus ?? c.total_skus ?? 0;
+                    const tUnits = c.total_units ?? c.total_skus ?? 0;
+                    const skuDisplay = dSkus === tUnits ? `${dSkus.toLocaleString('en-IN')}` : `${dSkus.toLocaleString('en-IN')} (${tUnits.toLocaleString('en-IN')}u)`;
                     return `
                         <tr class="hover:bg-white/[0.02] transition ${isOthers ? 'bg-white/[0.015] border-t border-white/10 font-medium' : ''}">
                             <td class="py-2.5 px-3">
@@ -4411,7 +4422,7 @@ const zeptoApp = {
                                     <span class="text-[10px] font-mono text-slate-400 w-10 text-right">${pct}%</span>
                                 </div>
                             </td>
-                            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${(c.total_skus || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-300" title="${dSkus} distinct SKUs, ${tUnits} total units">${skuDisplay}</td>
                             <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(c.incident_count || 0).toLocaleString('en-IN')}</td>
                             <td class="py-2.5 px-3 text-center">
                                 ${!isOthers ? `
@@ -4512,11 +4523,13 @@ const zeptoApp = {
         const filtered = search
             ? records.filter(r => {
                 const notes = (r.notes || '').toLowerCase();
+                const sku = (r.sku_id || '').toLowerCase();
+                const item = (r.item_name || '').toLowerCase();
                 const cat = (r.category || '').toLowerCase();
                 const type = (r.loss_type || '').toLowerCase();
                 const store = (r.store_name || '').toLowerCase();
                 const date = (r.record_date || '').toLowerCase();
-                return notes.includes(search) || cat.includes(search) || type.includes(search) || store.includes(search) || date.includes(search);
+                return notes.includes(search) || sku.includes(search) || item.includes(search) || cat.includes(search) || type.includes(search) || store.includes(search) || date.includes(search);
             })
             : records;
 
@@ -4524,7 +4537,7 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No matching stored Excel records found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No matching stored Excel records found.</td></tr>`;
             return;
         }
 
@@ -4533,6 +4546,10 @@ const zeptoApp = {
             if (r.loss_type === 'DQ_LOSS') typeBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
             else if (r.loss_type === 'SHRINKAGE') typeBadgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
             else if (r.loss_type === 'SPOILAGE') typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+
+            const skuDisplay = r.sku_id
+                ? `<span class="font-mono text-sky-300 font-bold">${r.sku_id}</span>${r.item_name ? `<span class="text-slate-400 ml-1">· ${r.item_name}</span>` : ''}`
+                : (r.item_name || '<span class="text-slate-500 italic">Unspecified</span>');
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
@@ -4544,9 +4561,10 @@ const zeptoApp = {
                         </span>
                     </td>
                     <td class="py-2 px-2.5 text-slate-300 font-medium">${(r.category || 'GENERAL').replace(/_/g, ' ')}</td>
+                    <td class="py-2 px-2.5 text-xs text-slate-200 max-w-[200px] truncate" title="${r.sku_id ? `SKU: ${r.sku_id}` : ''} ${r.item_name || ''}">${skuDisplay}</td>
                     <td class="py-2 px-2.5 text-right font-mono text-slate-300">${(r.sku_count || 0).toLocaleString('en-IN')}</td>
                     <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(r.amount || 0)}</td>
-                    <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-sm truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
+                    <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-xs truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
                     <td class="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">${r.source_email_id ? r.source_email_id.substring(0, 12) + '...' : 'Direct Upload'}</td>
                 </tr>
             `;
@@ -4560,7 +4578,7 @@ const zeptoApp = {
             return;
         }
 
-        const headers = ['Record Date', 'Store Name', 'Loss Type', 'Category', 'SKU Count', 'Loss Amount (INR)', 'Notes', 'Source Email ID'];
+        const headers = ['Record Date', 'Store Name', 'Loss Type', 'Category', 'SKU ID', 'Item Name', 'Units', 'Loss Amount (INR)', 'Notes', 'Source Email ID'];
         const csvRows = [headers.join(',')];
 
         records.forEach(r => {
@@ -4569,6 +4587,8 @@ const zeptoApp = {
                 `"${r.store_name || ''}"`,
                 `"${r.loss_type || ''}"`,
                 `"${(r.category || '').replace(/"/g, '""')}"`,
+                `"${(r.sku_id || '').replace(/"/g, '""')}"`,
+                `"${(r.item_name || '').replace(/"/g, '""')}"`,
                 r.sku_count || 0,
                 r.amount || 0,
                 `"${(r.notes || '').replace(/"/g, '""')}"`,

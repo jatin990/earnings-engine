@@ -188,3 +188,108 @@ def test_loss_summary_monthly_and_category_matrix_calculations():
     if len(summary["all_categories"]) > 10:
         assert any(c["category"] == "OTHERS" for c in summary["category_breakdown"])
 
+
+def test_save_loss_record_idempotency_and_sku_deduplication():
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    test_store = f"TEST_STORE_{uuid.uuid4().hex[:8]}"
+    test_email_1 = f"email_shift1_{uuid.uuid4().hex[:8]}"
+    test_email_2 = f"email_shift2_{uuid.uuid4().hex[:8]}"
+    test_date = "2026-09-22"
+
+    # 1. Shift 1 incremental email: reports SKU_101 (Amul Butter, 3 units, Rs. 600) and SKU_102 (Tomato, 5 units, Rs. 250)
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": test_date,
+        "loss_type": "DQ_LOSS",
+        "category": "DAIRY",
+        "sku_id": "SKU_101",
+        "item_name": "Amul Butter 500g",
+        "amount": 600.0,
+        "sku_count": 3,
+        "notes": "Packaging puncture",
+        "source_email_id": test_email_1,
+    }, settings=settings)
+
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": test_date,
+        "loss_type": "DQ_LOSS",
+        "category": "FRUITS_VEG",
+        "sku_id": "SKU_102",
+        "item_name": "Tomato Hybrid 1kg",
+        "amount": 250.0,
+        "sku_count": 5,
+        "notes": "Crushed during pick",
+        "source_email_id": test_email_1,
+    }, settings=settings)
+
+    # 2. Re-ingesting shift 1 (e.g. duplicate webhook / re-sync) should NOT duplicate records due to deterministic hashing
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": test_date,
+        "loss_type": "DQ_LOSS",
+        "category": "DAIRY",
+        "sku_id": "SKU_101",
+        "item_name": "Amul Butter 500g",
+        "amount": 600.0,
+        "sku_count": 3,
+        "notes": "Packaging puncture",
+        "source_email_id": test_email_1,
+    }, settings=settings)
+
+    # 3. Shift 2 incremental email: reports SKU_101 again in a separate incremental incident (2 more units, Rs. 400) and net-new SKU_103 (Bread, 1 unit, Rs. 50)
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": test_date,
+        "loss_type": "DQ_LOSS",
+        "category": "DAIRY",
+        "sku_id": "SKU_101",
+        "item_name": "Amul Butter 500g",
+        "amount": 400.0,
+        "sku_count": 2,
+        "notes": "Shift 2 drop damage",
+        "source_email_id": test_email_2,
+    }, settings=settings)
+
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": test_date,
+        "loss_type": "SHRINKAGE",
+        "category": "FMCG_PACKAGED",
+        "sku_id": "SKU_103",
+        "item_name": "Brown Bread 400g",
+        "amount": 50.0,
+        "sku_count": 1,
+        "notes": "Cycle count missing",
+        "source_email_id": test_email_2,
+    }, settings=settings)
+
+    # 4. Fetch summary for the isolated test store
+    summary = zepto_db.get_loss_summary(store_name=test_store, start_date=test_date, end_date=test_date, settings=settings)
+
+    # Total financial loss: 600 + 250 + 400 + 50 = 1300.0
+    assert summary["total_loss_amount"] == 1300.0
+    assert summary["dq_loss_total"] == 1250.0   # 600 + 250 + 400
+    assert summary["shrinkage_total"] == 50.0   # 50
+
+    # Total physical defect units: 3 + 5 + 2 + 1 = 11 units
+    assert summary["total_units_affected"] == 11
+
+    # Unique distinct SKUs affected: SKU_101, SKU_102, SKU_103 = EXACTLY 3 unique SKUs!
+    # SKU_101 was affected in two incremental shift logs, but represents only 1 unique SKU!
+    assert summary["unique_skus_count"] == 3
+    assert summary["total_skus_affected"] == 3
+
+    # Category Breakdown Verification
+    dairy_cat = next((c for c in summary["category_breakdown"] if c["category"] == "DAIRY"), None)
+    assert dairy_cat is not None
+    assert dairy_cat["total_amount"] == 1000.0  # 600 + 400
+    assert dairy_cat["total_units"] == 5        # 3 + 2 units
+    assert dairy_cat["distinct_skus"] == 1      # Only SKU_101 in DAIRY
+    assert dairy_cat["incident_count"] == 2     # 2 separate shift incidents
+
+
