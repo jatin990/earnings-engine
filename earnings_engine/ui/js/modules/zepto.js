@@ -5252,8 +5252,8 @@ const zeptoApp = {
 
             let itemsDisplay = '—';
             let hoursDisplay = '—';
-            let ippDisplay = 'UNLOGGED';
-            let tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">UNLOGGED</span>';
+            let ippDisplay = '—';
+            let tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">PENDING DATA</span>';
 
             if (realUtil) {
                 const items = realUtil.items_picked || realUtil.items_count || 0;
@@ -5323,7 +5323,7 @@ const zeptoApp = {
                     <td class="py-2.5 px-3 text-right font-mono text-slate-400">₹0</td>
                     <td class="py-2.5 px-3 text-center">
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">
-                            UNLOGGED
+                            CLEAN
                         </span>
                     </td>
                     <td class="py-2.5 px-3 text-center">
