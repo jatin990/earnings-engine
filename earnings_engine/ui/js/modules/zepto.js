@@ -1143,6 +1143,47 @@ const zeptoApp = {
     // Staff & Payroll Slide-Out Inspector Drawer (sumi:desktop-app-design)
     // -----------------------------------------------------------------------
 
+    staffDrawerWidth: 'normal', // 'normal' (max-w-2xl), 'wide' (max-w-5xl), 'full' (max-w-[98vw])
+
+    toggleStaffDrawerExpand() {
+        const drawer = document.getElementById('staffEmployeeDrawer');
+        const icon = document.getElementById('staffDrawerExpandIcon');
+        const btn = document.getElementById('staffDrawerExpandBtn');
+        if (!drawer) return;
+
+        // Cycle through width states: normal -> wide -> full -> normal
+        const widths = ['normal', 'wide', 'full'];
+        const currentIndex = widths.indexOf(this.staffDrawerWidth);
+        const nextIndex = (currentIndex + 1) % widths.length;
+        this.staffDrawerWidth = widths[nextIndex];
+
+        // Remove existing width classes
+        drawer.classList.remove('max-w-2xl', 'max-w-5xl', 'max-w-[98vw]');
+
+        if (this.staffDrawerWidth === 'wide') {
+            drawer.classList.add('max-w-5xl');
+            drawer.setAttribute('data-drawer-width', 'wide');
+            if (btn) btn.title = 'Expanded: Wide (~1024px) - Click for Fullscreen';
+            if (icon) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6M4 4v6M4 4l7 7m9-7h-6m6 0v6m0-6l-7 7m-9 9h6m-6 0v-6m0 6l7-7m9 7h-6m6 0v-6m0 6l-7-7" />';
+            }
+        } else if (this.staffDrawerWidth === 'full') {
+            drawer.classList.add('max-w-[98vw]');
+            drawer.setAttribute('data-drawer-width', 'full');
+            if (btn) btn.title = 'Expanded: Fullscreen (~98vw) - Click for Standard';
+            if (icon) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0l5 5M4 4h5M4 4v5m11 5l5 5m0 0l-5-5m5 5v-5m0 5h-5M9 15l-5 5m0 0l5-5m-5 5h5m-5 0v-5m11-9l5-5m0 0l-5 5m5-5v5m0-5h-5" />';
+            }
+        } else {
+            drawer.classList.add('max-w-2xl');
+            drawer.setAttribute('data-drawer-width', 'normal');
+            if (btn) btn.title = 'Standard View (~672px) - Click to Expand Wide';
+            if (icon) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />';
+            }
+        }
+    },
+
     async openStaffDrawer(empId, yearMonth = null) {
         if (!empId) return;
         this.currentStaffDrawerEmpId = empId;
@@ -5231,14 +5272,38 @@ const zeptoApp = {
             return;
         }
 
-        // Map real utilization telemetry if available from utilization summary
+        // Aggregate multi-shift utilization telemetry by worker across the selected period
         const utilMap = {};
         if (this.utilizationData && Array.isArray(this.utilizationData.records)) {
             this.utilizationData.records.forEach(r => {
-                const key = (r.employee_name || r.name || '').trim().toLowerCase();
+                const nameKey = (r.employee_name || r.name || '').trim().toLowerCase();
                 const idKey = (r.employee_id || r.id || '').trim().toLowerCase();
-                if (key) utilMap[key] = r;
-                if (idKey) utilMap[idKey] = r;
+                const targetKey = idKey || nameKey;
+                if (!targetKey) return;
+
+                const items = parseFloat(r.items_picked || r.day_ob_packed_qty || r.items_count || 0);
+                const hours = parseFloat(r.active_pick_hours || r.ob_hour || r.thor_work_hour || r.hours_worked || 0);
+
+                if (!utilMap[targetKey]) {
+                    utilMap[targetKey] = {
+                        items: 0,
+                        hours: 0,
+                        shifts: 0,
+                        raw_ipp_sum: 0,
+                        record_count: 0
+                    };
+                }
+                utilMap[targetKey].items += items;
+                utilMap[targetKey].hours += hours;
+                utilMap[targetKey].shifts += 1;
+                if (r.packer_ipp || r.day_ob_ipp || r.ipp) {
+                    utilMap[targetKey].raw_ipp_sum += parseFloat(r.packer_ipp || r.day_ob_ipp || r.ipp || 0);
+                    utilMap[targetKey].record_count += 1;
+                }
+
+                // Also map alias keys for fuzzy matching
+                if (nameKey && nameKey !== targetKey) utilMap[nameKey] = utilMap[targetKey];
+                if (idKey && idKey !== targetKey) utilMap[idKey] = utilMap[targetKey];
             });
         }
 
@@ -5248,28 +5313,35 @@ const zeptoApp = {
 
             const nameKey = (emp.name || '').trim().toLowerCase();
             const idKey = (emp.id || '').trim().toLowerCase();
-            const realUtil = utilMap[nameKey] || utilMap[idKey] || null;
+            const realUtil = (idKey && utilMap[idKey]) ? utilMap[idKey] : (nameKey && utilMap[nameKey] ? utilMap[nameKey] : null);
 
             let itemsDisplay = '—';
             let hoursDisplay = '—';
             let ippDisplay = '—';
             let tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">PENDING DATA</span>';
 
-            if (realUtil) {
-                const items = realUtil.items_picked || realUtil.items_count || 0;
-                const hours = realUtil.hours_worked || realUtil.active_hours || 0;
-                const ipp = realUtil.packer_ipp || realUtil.ipp || (hours > 0 ? Math.round(items / hours) : 0);
+            if (realUtil && (realUtil.items > 0 || realUtil.hours > 0 || realUtil.record_count > 0)) {
+                const items = realUtil.items;
+                const hours = realUtil.hours;
 
-                itemsDisplay = items > 0 ? items.toLocaleString('en-IN') : '0';
+                // Calculate weighted IPP: Total Items / Total Active Pick Hours
+                let ipp = 0;
+                if (hours > 0 && items > 0) {
+                    ipp = Math.round(items / hours);
+                } else if (realUtil.record_count > 0) {
+                    ipp = Math.round(realUtil.raw_ipp_sum / realUtil.record_count);
+                }
+
+                itemsDisplay = items > 0 ? Math.round(items).toLocaleString('en-IN') : '0';
                 hoursDisplay = hours > 0 ? `${hours.toFixed(1)}h` : '0.0h';
                 ippDisplay = ipp > 0 ? `${ipp} IPP` : '—';
 
                 if (ipp >= 140) {
-                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ELITE</span>';
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">⚡ ELITE (≥140)</span>';
                 } else if (ipp >= 120) {
-                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">STANDARD</span>';
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">🎯 STANDARD (120-139)</span>';
                 } else if (ipp > 0) {
-                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">TRAINING</span>';
+                    tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">⚠️ TRAINING (<120)</span>';
                 }
             }
 
@@ -5286,7 +5358,7 @@ const zeptoApp = {
                     <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${ippDisplay}</td>
                     <td class="py-2.5 px-3 text-center">${tierBadge}</td>
                     <td class="py-2.5 px-3 text-center">
-                        <button type="button" onclick="zeptoApp.openEmployeeDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition">
+                        <button type="button" onclick="zeptoApp.openStaffDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition shadow-sm" title="Open comprehensive staff profile, IPP analytics, and rating ledger">
                             📊 Drilldown
                         </button>
                     </td>

@@ -246,10 +246,11 @@
 
     <aside
         id="staffEmployeeDrawer"
-        class="fixed top-0 right-0 z-50 h-full w-full max-w-2xl bg-[#0d121c] border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-out flex flex-col overflow-hidden"
+        class="fixed top-0 right-0 z-50 h-full w-full max-w-2xl bg-[#0d121c] border-l border-white/10 shadow-2xl transform translate-x-full transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-labelledby="staffDrawerName"
+        data-drawer-width="normal"
     >
         <!-- Drawer Header -->
         <div class="p-4 sm:p-5 border-b border-white/10 bg-white/[0.02] flex items-center justify-between shrink-0">
@@ -278,7 +279,20 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-1.5 shrink-0">
+                <!-- Expand / Compact Toggle Button -->
+                <button
+                    type="button"
+                    id="staffDrawerExpandBtn"
+                    onclick="zeptoApp.toggleStaffDrawerExpand()"
+                    class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors focus:outline-none"
+                    title="Expand Drawer (Standard / Wide / Fullscreen)"
+                    aria-label="Expand drawer width"
+                >
+                    <svg id="staffDrawerExpandIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                </button>
                 <button
                     type="button"
                     onclick="zeptoApp.closeStaffDrawer()"
