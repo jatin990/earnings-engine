@@ -1308,11 +1308,11 @@ async def ingest_all_emails_endpoint(
                     email_parsed_count += 1
 
                 # If email contains Manpower Utilization numbers, record in metrics and utilization
-                if category == "MANPOWER_UTILIZATION" and (body_metrics.get("packer_d1_hc") or body_metrics.get("packer_ipp")):
-                    packer_hc = float(body_metrics.get("packer_d1_hc") or 0.0)
-                    packer_ipp = float(body_metrics.get("packer_ipp") or 0.0)
-                    flex_deduction = float(body_metrics.get("total_flex_deduction_d1") or 0.0)
-                    if packer_ipp > 0 or packer_hc > 0:
+                if category == "MANPOWER_UTILIZATION" and (body_metrics.get("packer_d1_hc") or body_metrics.get("packer_ipp") or body_metrics.get("d1_ipp")):
+                    packer_hc = float(body_metrics.get("packer_d1_hc") or body_metrics.get("packer_headcount") or 0.0)
+                    packer_ipp = float(body_metrics.get("packer_ipp") or body_metrics.get("d1_ipp") or 0.0)
+                    flex_deduction = float(body_metrics.get("total_flex_deduction_d1") or body_metrics.get("flex_deductions") or 0.0)
+                    if packer_ipp > 0 or packer_hc > 0 or flex_deduction > 0:
                         zepto_db.save_store_metrics({
                             "store_name": store_name,
                             "metric_date": iso_date,
@@ -1395,7 +1395,7 @@ async def ingest_all_emails_endpoint(
                                     if email_parsed_status != "PARSED":
                                         email_parsed_status = "FAILED"
 
-                            elif "metric" in fname.lower() or category == "STORE_METRICS":
+                            elif "metric" in fname.lower() or "manpower" in fname.lower() or "utilization" in fname.lower() or category in ("STORE_METRICS", "MANPOWER_UTILIZATION"):
                                 try:
                                     parsed_met = parse_zepto_store_metrics_excel(file_bytes, file_name=fname)
                                     for r in parsed_met.get("records", []):
@@ -1459,12 +1459,17 @@ async def ingest_all_emails_endpoint(
             if emails_to_save:
                 zepto_db.save_gmail_messages(emails_to_save, settings=_settings)
 
+            # Synchronize zepto_employees master roster from unique attendance records
+            roster_res = zepto_db.sync_roster_from_attendance(settings=_settings)
+            logger.info("[GMAIL-INGEST] Synced employee roster from attendance: %s", roster_res)
+
             return {
                 "success": True,
                 "status": "success",
                 "message": f"Successfully ingested {processed_details['emails_scanned']} emails for {clean_month} and synchronized metrics to database.",
                 "category_counts": ingested_counts,
                 "processed_details": processed_details,
+                "roster_sync": roster_res,
             }
     except HTTPException:
         raise

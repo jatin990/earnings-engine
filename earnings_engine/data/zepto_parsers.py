@@ -608,14 +608,14 @@ def parse_zepto_manpower_utilization_html(
         record_date = datetime.now().strftime("%Y-%m-%d")
 
     def _clean_num(v_str: str) -> float:
-        clean_v = re.sub(r"[₹$,Rs\.\s]", "", v_str)
+        clean_v = re.sub(r"[₹$,Rs\s]", "", v_str).strip()
         try:
             return float(clean_v) if clean_v and clean_v != "-" else 0.0
         except ValueError:
             return 0.0
 
     def _clean_float(v_str: str) -> float:
-        clean_v = re.sub(r"[^\d\.]", "", v_str)
+        clean_v = re.sub(r"[^\d\.]", "", v_str).strip()
         try:
             return float(clean_v) if clean_v else 0.0
         except ValueError:
@@ -628,13 +628,19 @@ def parse_zepto_manpower_utilization_html(
     headers: list[str] = []
     horizontal_parsed = False
 
-    # Check for horizontal table format (Header row with column names, data row with values)
+    # Check for horizontal table format (e.g. headers: [Store, Packer HC, IPP, ...])
+    # vs vertical matrix (headers: [Metrics, Plan, D-1 Actuals, MTD Actuals])
     for row_html in row_chunks:
         th_cells = re.findall(r"<th[^>]*>(.*?)</th>", row_html, re.DOTALL | re.IGNORECASE)
         td_cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.DOTALL | re.IGNORECASE)
 
         if th_cells and not headers:
             headers = [re.sub(r"<[^>]+>", "", c).strip().lower() for c in th_cells]
+            # If headers are ['metrics', 'plan', 'd-1 actuals', 'mtd actuals'], this is vertical matrix
+            if any("metric" in h for h in headers) or any("actual" in h for h in headers):
+                headers = []
+                horizontal_parsed = False
+                break
             continue
 
         if headers and td_cells:

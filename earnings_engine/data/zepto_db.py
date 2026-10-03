@@ -4552,13 +4552,15 @@ def purge_zepto_operational_data(
     store_name: str | None = None,
     month: str | None = None,
     include_emails: bool = False,
+    include_employees: bool = False,
+    include_salaries: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, int]:
     """
     Purge historical Zepto operational data to allow clean re-ingestion with updated parsers.
     Cleans zepto_manpower_utilization, zepto_loss_records, zepto_store_metrics,
     zepto_attendance_records, and zepto_attendance_imports.
-    Optionally purges zepto_gmail_messages if include_emails is True.
+    Optionally purges zepto_gmail_messages, zepto_employees, zepto_salaries, zepto_monthly_ratings.
     """
     settings = settings or Settings()
     ensure_zepto_schema(settings)
@@ -4570,6 +4572,9 @@ def purge_zepto_operational_data(
         "attendance_records": 0,
         "attendance_imports": 0,
         "gmail_messages": 0,
+        "employees": 0,
+        "salaries": 0,
+        "monthly_ratings": 0,
     }
 
     with _connect(settings) as conn:
@@ -4609,7 +4614,22 @@ def purge_zepto_operational_data(
         cur = conn.execute(f"DELETE FROM zepto_attendance_imports WHERE {w_imp}", p_imp)
         purged_counts["attendance_imports"] = cur.rowcount
 
-        # 5. Gmail Messages (optional)
+        # 5. Salaries & Ratings (optional)
+        if include_salaries:
+            cur_sal = conn.execute("DELETE FROM zepto_salaries")
+            purged_counts["salaries"] = cur_sal.rowcount
+            cur_rat = conn.execute("DELETE FROM zepto_monthly_ratings")
+            purged_counts["monthly_ratings"] = cur_rat.rowcount
+
+        # 6. Employees (optional)
+        if include_employees:
+            if not include_salaries:
+                conn.execute("DELETE FROM zepto_salaries")
+                conn.execute("DELETE FROM zepto_monthly_ratings")
+            cur_emp = conn.execute("DELETE FROM zepto_employees")
+            purged_counts["employees"] = cur_emp.rowcount
+
+        # 7. Gmail Messages (optional)
         if include_emails:
             w_msg, p_msg = build_filter("iso_date")
             cur = conn.execute(f"DELETE FROM zepto_gmail_messages WHERE {w_msg}", p_msg)
