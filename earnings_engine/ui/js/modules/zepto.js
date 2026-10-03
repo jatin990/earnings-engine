@@ -550,7 +550,7 @@ const zeptoApp = {
         if (totalGmvEl) totalGmvEl.textContent = this.formatCurrency(kpis.total_gmv || 0);
 
         const avgIppEl = document.getElementById('dashAvgIpp');
-        if (avgIppEl) avgIppEl.textContent = `${kpis.avg_packer_ipp || 0} IPP`;
+        if (avgIppEl) avgIppEl.textContent = kpis.avg_packer_ipp > 0 ? `${kpis.avg_packer_ipp} IPP` : '—';
 
         const daysCountEl = document.getElementById('dashDaysCount');
         if (daysCountEl) daysCountEl.textContent = kpis.days_count || dod.length || 0;
@@ -582,7 +582,7 @@ const zeptoApp = {
                             <td class="py-2.5 px-3 text-right font-mono ${m.absent_count > 0 ? 'text-rose-400' : 'text-slate-500'}">${m.absent_count || 0}</td>
                             <td class="py-2.5 px-3 text-right font-mono font-bold ${m.attendance_rate_pct >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${m.attendance_rate_pct}%</td>
                             <td class="py-2.5 px-3 text-right font-mono text-white">${(m.total_orders || 0).toLocaleString('en-IN')}</td>
-                            <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.avg_ipp || 0}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.avg_ipp > 0 ? `${m.avg_ipp} IPP` : '—'}</td>
                             <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-400">${this.formatCurrency(m.loss_total || 0)}</td>
                             <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(m.loss_incidents || 0).toLocaleString('en-IN')}</td>
                             <td class="py-2.5 px-3 text-center">
@@ -622,7 +622,7 @@ const zeptoApp = {
                 <td class="py-2 px-3 text-right font-mono font-bold ${d.attendance_rate_pct >= 90 ? 'text-emerald-400' : 'text-amber-300'}">${d.attendance_rate_pct}%</td>
                 <td class="py-2 px-3 text-right font-mono text-white">${(d.orders_dispatched || 0).toLocaleString('en-IN')}</td>
                 <td class="py-2 px-3 text-right font-mono text-slate-300">${this.formatCurrency(d.sales_gmv || 0)}</td>
-                <td class="py-2 px-3 text-right font-mono text-amber-300">${d.packer_ipp || 0}</td>
+                <td class="py-2 px-3 text-right font-mono text-amber-300">${d.packer_ipp > 0 ? `${d.packer_ipp} IPP` : '—'}</td>
                 <td class="py-2 px-3 text-right font-mono font-bold text-rose-400">${this.formatCurrency(d.loss_total || 0)}</td>
                 <td class="py-2 px-3 text-right font-mono text-slate-400">${d.loss_incidents || 0}</td>
                 <td class="py-2 px-3 text-right font-mono text-slate-300">${d.skus_affected || 0}</td>
@@ -4280,8 +4280,8 @@ const zeptoApp = {
         if (ordersEl) ordersEl.textContent = agg.totalOrders.toLocaleString('en-IN');
         if (ordersCountEl) ordersCountEl.textContent = `${agg.ordersCount} Dispatch Reports`;
         if (aovEl) aovEl.textContent = `₹${agg.avgAov.toLocaleString('en-IN')}`;
-        if (slaEl) slaEl.textContent = `${agg.avgSla}%`;
-        if (ippEl) ippEl.textContent = agg.avgIpp;
+        if (slaEl) slaEl.textContent = agg.avgSla > 0 ? `${agg.avgSla}%` : '—';
+        if (ippEl) ippEl.textContent = agg.avgIpp > 0 ? `${agg.avgIpp} IPP` : '—';
         if (lossEl) lossEl.textContent = `₹${agg.totalLoss.toLocaleString('en-IN')}`;
         if (lossCountEl) lossCountEl.textContent = `${agg.lossCount} Loss Audits`;
         if (emailsAnalyzedEl) emailsAnalyzedEl.textContent = `${agg.emailCount} Emails In View`;
@@ -4610,7 +4610,7 @@ const zeptoApp = {
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${(r.items_picked || 0).toLocaleString('en-IN')}</td>
                 <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${r.active_pick_hours} hrs</td>
                 <td class="py-2.5 px-3 text-right font-mono text-rose-400">${r.idle_hours} hrs</td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${r.ipp} IPP</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${r.ipp > 0 ? `${r.ipp} IPP` : '—'}</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${this.formatCurrency(r.flex_labor_cost || 0)}</td>
             </tr>
         `).join('');
@@ -5198,7 +5198,7 @@ const zeptoApp = {
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-300">${this.formatCurrency(m.sales_gmv || 0)}</td>
                 <td class="py-2.5 px-3 text-right font-mono text-white">${(m.order_count || 0).toLocaleString('en-IN')}</td>
                 <td class="py-2.5 px-3 text-right font-mono text-slate-300">₹${m.aov || 0}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.packer_ipp} IPP</td>
+                <td class="py-2.5 px-3 text-right font-mono text-amber-300">${m.packer_ipp > 0 ? `${m.packer_ipp} IPP` : '—'}</td>
                 <td class="py-2.5 px-3 text-right font-mono text-cyan-300">${m.inbound_hours}h</td>
                 <td class="py-2.5 px-3 text-right font-mono text-indigo-300">${m.outbound_hours}h</td>
                 <td class="py-2.5 px-3 text-center font-mono font-bold ${m.sla_adherence_pct >= 98.0 ? 'text-emerald-400' : 'text-amber-300'}">${m.sla_adherence_pct}%</td>
