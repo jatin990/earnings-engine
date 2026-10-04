@@ -79,8 +79,19 @@
                 });
             }
             app._stockDrawerContext = { list, currentIndex: Math.max(0, idx) };
-        } else if (!app._stockDrawerContext.list || app._stockDrawerContext.list.length === 0) {
-            app._stockDrawerContext = { list: [sym], currentIndex: 0 };
+        } else {
+            // Auto-detect context list from active tab/table rows
+            let detectedList = [];
+            const resultsRows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr.results-row:not([style*="display: none"])');
+            if (resultsRows && resultsRows.length > 0) {
+                detectedList = Array.from(resultsRows).map(r => r.getAttribute('data-ticker')).filter(Boolean);
+            }
+            if (detectedList.length > 0 && detectedList.includes(sym)) {
+                const idx = detectedList.indexOf(sym);
+                app._stockDrawerContext = { list: detectedList, currentIndex: Math.max(0, idx) };
+            } else if (!app._stockDrawerContext.list || app._stockDrawerContext.list.length === 0) {
+                app._stockDrawerContext = { list: [sym], currentIndex: 0 };
+            }
         }
 
         app._updateDrawerStepperHUD();

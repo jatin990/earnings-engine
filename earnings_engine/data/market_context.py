@@ -548,6 +548,241 @@ def calculate_trading_range_by_method(
     }
 
 
+def calculate_smart_sr_levels(
+    closes: pd.Series,
+    prices_df: pd.DataFrame | None = None,
+) -> dict[str, Any]:
+    """Calculate multi-timeframe structural support & resistance with dynamic breakout/breakdown buffers.
+
+    Avoids 0% distance artifacts when price is at 20D highs or lows by using 65D macro levels,
+    20-day EMAs, and ATR volatility buffers.
+    """
+    if closes is None or (hasattr(closes, "empty") and closes.empty):
+        return {
+            "current_support": None,
+            "next_resistance": None,
+            "dist_to_support_pct": None,
+            "dist_to_resistance_pct": None,
+            "channel_position_pct": None,
+            "support_source": None,
+            "resistance_source": None,
+        }
+
+    if isinstance(closes, pd.DataFrame):
+        closes = closes["close"] if "close" in closes.columns else closes.iloc[:, 0]
+
+    clean_closes = pd.to_numeric(closes, errors="coerce").dropna()
+    if clean_closes.empty:
+        return {
+            "current_support": None,
+            "next_resistance": None,
+            "dist_to_support_pct": None,
+            "dist_to_resistance_pct": None,
+            "channel_position_pct": None,
+            "support_source": None,
+            "resistance_source": None,
+        }
+
+    current_price = float(clean_closes.iloc[-1])
+    n = len(clean_closes)
+
+    # Use High/Low from prices_df if available for intraday precision
+    if prices_df is not None and not prices_df.empty and "high" in prices_df.columns and "low" in prices_df.columns:
+        highs = pd.to_numeric(prices_df["high"], errors="coerce").dropna()
+        lows = pd.to_numeric(prices_df["low"], errors="coerce").dropna()
+    else:
+        highs = clean_closes
+        lows = clean_closes
+
+    r20_high = float(highs.tail(20).max()) if len(highs) >= 20 else float(highs.max())
+    r20_low = float(lows.tail(20).min()) if len(lows) >= 20 else float(lows.min())
+    r65_high = float(highs.tail(65).max()) if len(highs) >= 65 else float(highs.max())
+    r65_low = float(lows.tail(65).min()) if len(lows) >= 65 else float(lows.min())
+    all_high = float(highs.max())
+    all_low = float(lows.min())
+
+    # ATR approximation over last 14 bars for volatility band extension
+    if len(clean_closes) >= 14:
+        diffs = clean_closes.diff().abs().tail(14)
+        atr_14 = float(diffs.mean()) if not diffs.empty else (current_price * 0.02)
+    else:
+        atr_14 = current_price * 0.02
+
+    # 20 EMA
+    ema_20 = float(clean_closes.ewm(span=min(20, n)).mean().iloc[-1])
+
+    # Dynamic Resistance Resolution
+    if current_price >= r20_high * 0.99:
+        if r65_high > current_price * 1.01:
+            next_res = r65_high
+            res_source = "65D Swing High"
+        elif all_high > current_price * 1.01:
+            next_res = all_high
+            res_source = "52W High"
+        else:
+            next_res = round(current_price + max(atr_14 * 2.0, current_price * 0.05), 2)
+            res_source = "ATR Extension"
+    else:
+        next_res = r20_high
+        res_source = "20D Resistance"
+
+    # Dynamic Support Resolution
+    if current_price <= r20_low * 1.01:
+        if r65_low < current_price * 0.99:
+            curr_sup = r65_low
+            sup_source = "65D Swing Low"
+        elif all_low < current_price * 0.99:
+            curr_sup = all_low
+            sup_source = "52W Low"
+        else:
+            curr_sup = round(max(0.01, current_price - max(atr_14 * 2.0, current_price * 0.05)), 2)
+            sup_source = "ATR Floor"
+    else:
+        if ema_20 < current_price and ema_20 > r20_low:
+            curr_sup = round(ema_20, 2)
+            sup_source = "EMA 20"
+        else:
+            curr_sup = r20_low
+            sup_source = "20D Support"
+
+    curr_sup = round(curr_sup, 2)
+    next_res = round(next_res, 2)
+    if curr_sup >= next_res:
+        next_res = round(curr_sup + max(atr_14 * 2.0, current_price * 0.05), 2)
+
+    span = next_res - curr_sup
+    if span > 0:
+        channel_pos = round(max(0.0, min(100.0, ((current_price - curr_sup) / span) * 100.0)), 1)
+    else:
+        channel_pos = 50.0
+
+    dist_to_sup_pct = round(((current_price - curr_sup) / current_price) * 100.0, 1) if current_price > 0 else 0.0
+    dist_to_res_pct = round(((next_res - current_price) / current_price) * 100.0, 1) if current_price > 0 else 0.0
+
+    return {
+        "current_support": curr_sup,
+        "next_resistance": next_res,
+        "dist_to_support_pct": dist_to_sup_pct,
+        "dist_to_resistance_pct": dist_to_res_pct,
+        "channel_position_pct": channel_pos,
+        "support_source": sup_source,
+        "resistance_source": res_source,
+    }
+
+
+def classify_technical_setup(
+    current_price: float | None,
+    current_support: float | None,
+    next_resistance: float | None,
+    dist_to_support_pct: float | None,
+    dist_to_resistance_pct: float | None,
+    rel_vol_5d_vs_63d: float | None,
+    seven_day_return_pct: float | None,
+    thirty_day_return_pct: float | None,
+    three_day_return_pct: float | None,
+    channel_position_pct: float | None,
+    pct_from_52w_high: float | None,
+) -> dict[str, Any]:
+    """Classify the current price action and technical setup to give clear, actionable buying context."""
+    if current_price is None or current_price <= 0:
+        return {
+            "label": "Neutral",
+            "badge_class": "badge-neutral",
+            "description": "Price data unavailable",
+            "icon": "⚖️",
+        }
+
+    vol = rel_vol_5d_vs_63d or 1.0
+    r7 = seven_day_return_pct or 0.0
+    r30 = thirty_day_return_pct or 0.0
+    r3 = three_day_return_pct or 0.0
+    c_pos = channel_position_pct if channel_position_pct is not None else 50.0
+    d_sup = dist_to_support_pct if dist_to_support_pct is not None else 99.0
+    d_res = dist_to_resistance_pct if dist_to_resistance_pct is not None else 99.0
+    p_high = pct_from_52w_high if pct_from_52w_high is not None else -99.0
+
+    # 1. 52-Week High Base / ATH Breakout
+    if abs(p_high) <= 2.5 and vol >= 1.1:
+        return {
+            "label": "52W High Base",
+            "badge_class": "badge-bullish",
+            "description": f"Consolidating {abs(p_high):.1f}% from 52W high with {vol:.1f}x volume",
+            "icon": "👑",
+        }
+
+    # 2. Base Breakout (testing or pushing through resistance with volume)
+    if (d_res <= 2.5 or c_pos >= 90.0) and (vol >= 1.2 or r7 >= 3.0):
+        return {
+            "label": "Base Breakout",
+            "badge_class": "badge-bullish",
+            "description": f"Testing upper range ({d_res:.1f}% to res) on {vol:.1f}x surge",
+            "icon": "🚀",
+        }
+
+    # 3. Support Bounce (sitting on support floor, starting to turn upward)
+    if d_sup <= 3.0 or c_pos <= 20.0:
+        if r3 >= 0:
+            return {
+                "label": "Support Bounce",
+                "badge_class": "badge-support",
+                "description": f"Holding support with {d_sup:.1f}% downside buffer; 3D +{r3:.1f}%",
+                "icon": "🟢",
+            }
+        else:
+            return {
+                "label": "At Support Floor",
+                "badge_class": "badge-support",
+                "description": f"Testing key support floor ({d_sup:.1f}% away); watch for bounce",
+                "icon": "🛡️",
+            }
+
+    # 4. Trend Pullback (strong 30D trend, short-term healthy dip)
+    if r30 >= 6.0 and r7 <= 1.0 and d_sup <= 5.0:
+        return {
+            "label": "Trend Pullback",
+            "badge_class": "badge-momentum",
+            "description": f"Pullback in uptrend (30D +{r30:.1f}%, 7D {r7:+.1f}%), {d_sup:.1f}% to sup",
+            "icon": "📈",
+        }
+
+    # 5. Volume Expansion Surge
+    if vol >= 1.75 and r7 >= 2.0:
+        return {
+            "label": "Volume Expansion",
+            "badge_class": "badge-momentum",
+            "description": f"Heavy accumulation: {vol:.1f}x vs 63D avg, 7D momentum +{r7:.1f}%",
+            "icon": "⚡",
+        }
+
+    # 6. Tight Volatility Squeeze
+    if current_support and next_resistance and current_price > 0:
+        spread = ((next_resistance - current_support) / current_price) * 100.0
+        if spread <= 5.5:
+            return {
+                "label": "Vol Squeeze",
+                "badge_class": "badge-squeeze",
+                "description": f"Tightly compressed range ({spread:.1f}% band) prior to earnings",
+                "icon": "📦",
+            }
+
+    # 7. Overextended near resistance without breakout volume
+    if c_pos >= 88.0 and vol < 1.0:
+        return {
+            "label": "Near Resistance",
+            "badge_class": "badge-caution",
+            "description": f"Hovering at top of channel ({c_pos:.0f}%), low volume",
+            "icon": "⚠️",
+        }
+
+    # 8. Mid-Range Base
+    return {
+        "label": "Range Base",
+        "badge_class": "badge-neutral",
+        "description": f"Channel center ({c_pos:.0f}%), {d_sup:.1f}% to sup / {d_res:.1f}% to res",
+        "icon": "🎯",
+    }
+
+
 def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, force: bool = False) -> pd.DataFrame:
     """Append market-cap, price, and recent earnings context for each ticker.
 
@@ -833,21 +1068,24 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         if earnings_week_move_pct is None:
                             earnings_week_move_pct = ((latest - prior_week) / prior_week) * 100 if prior_week else None
 
-                # resistance/support and auto-range detection
+                # resistance/support and auto-range detection using multi-timeframe structural S/R
                 if not closes.empty:
-                    recent_high = float(closes.tail(20).max()) if len(closes) >= 20 else float(closes.max())
-                    recent_low = float(closes.tail(20).min()) if len(closes) >= 20 else float(closes.min())
-                    next_resistance = recent_high
-                    current_support = recent_low
-
-                    # Auto-detect swing range
-                    auto_rng = detect_swing_range(closes)
-                    if current_price is not None and current_support is not None and next_resistance is not None:
-                        span = next_resistance - current_support
-                        if span > 0:
-                            channel_position_pct = round(((current_price - current_support) / span) * 100.0, 1)
-                        else:
-                            channel_position_pct = 50.0
+                    sr_data = calculate_smart_sr_levels(closes, prices)
+                    current_support = sr_data.get("current_support")
+                    next_resistance = sr_data.get("next_resistance")
+                    dist_to_support_pct = sr_data.get("dist_to_support_pct")
+                    dist_to_resistance_pct = sr_data.get("dist_to_resistance_pct")
+                    support_source = sr_data.get("support_source")
+                    resistance_source = sr_data.get("resistance_source")
+                    channel_position_pct = sr_data.get("channel_position_pct", channel_position_pct)
+                    sr_levels = sr_data
+                else:
+                    sr_data = {}
+                    dist_to_support_pct = None
+                    dist_to_resistance_pct = None
+                    support_source = None
+                    resistance_source = None
+                    sr_levels = None
 
             # Compute relative volume surge (5D average volume vs 63D baseline average)
             rel_vol_5d_vs_63d = None
@@ -1069,6 +1307,15 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             else:
                 pct_from_low = pct_from_52w_low
 
+            technical_setup = classify_technical_setup(
+                closes=closes,
+                prices_df=prices,
+                sr_info=sr_levels,
+                pct_from_52w_high=pct_from_high,
+                pct_from_52w_low=pct_from_low,
+                rel_vol_5d_vs_63d=rel_vol_5d_vs_63d,
+            )
+
             metrics_payload = {
                 "company_name": company_name,
                 "market_cap": market_cap,
@@ -1127,6 +1374,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "last_week_low_date": last_week_low_date.strftime("%Y-%m-%d") if last_week_low_date is not None else None,
                 "next_resistance": next_resistance,
                 "current_support": current_support,
+                "dist_to_support_pct": dist_to_support_pct,
+                "dist_to_resistance_pct": dist_to_resistance_pct,
+                "support_source": support_source,
+                "resistance_source": resistance_source,
+                "technical_setup": technical_setup,
                 "swing_range": sr_map.get(ticker),
                 "rel_vol_5d_vs_63d": rel_vol_5d_vs_63d,
                 "beat_rate_pct": beat_rate_pct,
@@ -1156,6 +1408,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "seven_day_return_pct": seven_day_return_pct,
                 "three_day_return_pct": three_day_return_pct,
                 "rel_vol_5d_vs_63d": rel_vol_5d_vs_63d,
+                "dist_to_support_pct": dist_to_support_pct,
+                "dist_to_resistance_pct": dist_to_resistance_pct,
+                "support_source": support_source,
+                "resistance_source": resistance_source,
+                "technical_setup": technical_setup,
                 "beat_rate_pct": beat_rate_pct,
                 "beat_count": beat_count,
                 "total_historical_quarters": total_historical_quarters,

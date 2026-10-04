@@ -119,13 +119,13 @@ def render_predictions(preds: pd.DataFrame, name: str = "predictions") -> tuple[
 # Dark-theme-friendly palette for per-day color grouping (cycles after 8 days).
 _DAY_COLORS = [
     "#38bdf8",  # sky blue
-    "#10b981",  # emerald green
+    "#34d399",  # emerald green
+    "#818cf8",  # indigo
     "#f59e0b",  # amber
+    "#2dd4bf",  # teal
+    "#a78bfa",  # purple
     "#06b6d4",  # cyan
-    "#6366f1",  # indigo
-    "#f97316",  # orange
-    "#14b8a6",  # teal
-    "#f43f5e",  # rose
+    "#94a3b8",  # slate
 ]
 
 
@@ -368,40 +368,22 @@ def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
 
 
 def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
-    """Build a compact next-gen interactive operations table HTML with grouped headers."""
+    """Build a compact next-gen interactive operations table HTML with 8 clean, high-density columns."""
     if not rows:
         return ""
     return (
         '<div class="table-wrapper results-terminal-wrapper">'
         '<table class="results-table results-terminal-table">'
         "<thead>"
-        '<tr class="header-group-row" style="background:#07080e;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;">'
-        '<th colspan="2" style="text-align:left;color:#94a3b8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🏢 Stock & Catalyst</th>'
-        '<th colspan="6" style="text-align:center;color:#38bdf8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">⚡ Live Market & Momentum</th>'
-        '<th colspan="3" style="text-align:center;color:#34d399;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">📐 Technical Price Structure</th>'
-        '<th colspan="4" style="text-align:center;color:#c084fc;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🎯 Historical Beat & Quality</th>'
-        '<th colspan="2" style="text-align:center;color:#818cf8;padding:0.25rem 0.45rem;border-right:1px solid rgba(255,255,255,0.06);">🤖 AI Intelligence</th>'
-        '<th style="text-align:center;color:#fbbf24;padding:0.25rem 0.45rem;">⚡ Controls</th>'
-        "</tr>"
         "<tr>"
         '<th onclick="app.sortResultsTable(this, 0, \'text\')" title="Sort by Stock Symbol">Stock</th>'
-        '<th onclick="app.sortResultsTable(this, 1, \'date\')" title="Sort by Announcement Date">Result Date</th>'
-        '<th onclick="app.sortResultsTable(this, 2, \'num\')" title="Sort by Market Cap">Mkt Cap</th>'
-        '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by Current Price">Price</th>'
-        '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by 3-Day Return">3D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 5, \'num\')" title="Sort by 7-Day Return">7D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 6, \'num\')" title="Sort by 30-Day Pre-Event Momentum">30D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 7, \'num\')" title="Sort by Relative Volume (5D vs 63D Volume Surge)">Rel Vol</th>'
-        '<th onclick="app.sortResultsTable(this, 8, \'text\')" title="Price Channel Structure (Support ⟵ Current ⟶ Resistance)">Support / Resistance</th>'
-        '<th onclick="app.sortResultsTable(this, 9, \'num\')" title="Channel Position % (0%=Support, 100%=Resistance)">Range Pos</th>'
-        '<th onclick="app.sortResultsTable(this, 10, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 11, \'num\')" title="Historical Earnings Beat Rate %">Beat Rate</th>'
-        '<th onclick="app.sortResultsTable(this, 12, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 13, \'text\')" title="Quality Scores (Q1 | Q2 | Q3)">Quality</th>'
-        '<th onclick="app.sortResultsTable(this, 14, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
-        '<th onclick="app.sortResultsTable(this, 15, \'text\')" title="Kronos 14-Day AI Forecast">Kronos 14D</th>'
-        '<th onclick="app.sortResultsTable(this, 16, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
-        '<th style="text-align:center;">Actions</th>'
+        '<th onclick="app.sortResultsTable(this, 1, \'date\')" title="Sort by Result Date">Result Date</th>'
+        '<th onclick="app.sortResultsTable(this, 2, \'num\')" title="Sort by Current Price">Price / MCap</th>'
+        '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by 7-Day Return">7D / 30D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 4, \'text\')" title="Actionable Technical Setup Classifier">Technical Setup</th>'
+        '<th onclick="app.sortResultsTable(this, 5, \'text\')" title="Multi-Timeframe Support / Resistance Channel">S/R Structure</th>'
+        '<th onclick="app.sortResultsTable(this, 6, \'text\')" title="52-Week High/Low Distance">52W Range</th>'
+        '<th onclick="app.sortResultsTable(this, 7, \'num\')" style="text-align:center;" title="Relative Volume (5D vs 63D Surge)">Rel Vol</th>'
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table></div>"
@@ -1111,6 +1093,75 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
         full_badges = (seq_badge_html + " " + status_badge).strip() if (seq_badge_html or status_badge) else ""
 
+        # Relative date badge
+        relative_date_badge_html = ""
+        if pd.notna(ed_val):
+            try:
+                days_diff = (pd.Timestamp(ed_val).normalize() - pd.Timestamp.today().normalize()).days
+                if days_diff == 0:
+                    relative_date_badge_html = '<span class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.62rem;padding:0.04rem 0.25rem;border-radius:3px;font-weight:700;">Today</span>'
+                elif days_diff == 1:
+                    relative_date_badge_html = '<span style="font-size:0.65rem;color:#38bdf8;font-weight:600;">Tomorrow</span>'
+                elif days_diff > 1:
+                    relative_date_badge_html = f'<span style="font-size:0.65rem;color:#94a3b8;">In {days_diff}d</span>'
+                elif days_diff == -1:
+                    relative_date_badge_html = '<span style="font-size:0.65rem;color:#94a3b8;">Yesterday</span>'
+                else:
+                    relative_date_badge_html = f'<span style="font-size:0.65rem;color:#64748b;">{abs(days_diff)}d ago</span>'
+            except Exception:
+                relative_date_badge_html = ""
+
+        # Consolidated 7D / 30D returns HTML
+        r7_val = row.get("seven_day_return_pct")
+        r30_val = row.get("thirty_day_return_pct")
+        r7_f = _to_float(r7_val) if (r7_val is not None and not pd.isna(r7_val)) else None
+        r30_f = _to_float(r30_val) if (r30_val is not None and not pd.isna(r30_val)) else None
+
+        c7 = "#34d399" if (r7_f is not None and r7_f > 0) else ("#f87171" if (r7_f is not None and r7_f < 0) else "#94a3b8")
+        c30 = "#34d399" if (r30_f is not None and r30_f > 0) else ("#f87171" if (r30_f is not None and r30_f < 0) else "#94a3b8")
+        txt7 = f"{'+' if r7_f > 0 else ''}{r7_f:.1f}%" if r7_f is not None else "—"
+        txt30 = f"{'+' if r30_f > 0 else ''}{r30_f:.1f}%" if r30_f is not None else "—"
+        returns_consolidated_html = (
+            f'<div style="display:flex;flex-direction:column;gap:0.1rem;" title="7D Return: {txt7} | 30D Return: {txt30} | 3D: {three_day_return}">'
+            f'<div style="display:flex;align-items:center;gap:0.35rem;justify-content:space-between;">'
+            f'<span style="font-size:0.66rem;color:#64748b;">7D:</span>'
+            f'<span style="color:{c7};font-weight:600;">{txt7}</span>'
+            f'</div>'
+            f'<div style="display:flex;align-items:center;gap:0.35rem;justify-content:space-between;">'
+            f'<span style="font-size:0.66rem;color:#64748b;">30D:</span>'
+            f'<span style="color:{c30};font-weight:600;">{txt30}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+        # Technical Setup Classifier Badge
+        tech_setup = row.get("technical_setup")
+        if not isinstance(tech_setup, dict):
+            try:
+                from earnings_engine.data.market_context import classify_technical_setup
+                tech_setup = classify_technical_setup(
+                    current_price=_to_float(row.get("current_price")),
+                    current_support=_to_float(row.get("current_support")),
+                    next_resistance=_to_float(row.get("next_resistance")),
+                    dist_to_support_pct=_to_float(row.get("dist_to_support_pct")),
+                    dist_to_resistance_pct=_to_float(row.get("dist_to_resistance_pct")),
+                    rel_vol_5d_vs_63d=_to_float(row.get("rel_vol_5d_vs_63d")),
+                    seven_day_return_pct=r7_f,
+                    thirty_day_return_pct=r30_f,
+                    three_day_return_pct=_to_float(row.get("three_day_return_pct")),
+                    channel_position_pct=_to_float(row.get("channel_position_pct")),
+                    pct_from_52w_high=_to_float(row.get("pct_from_52w_high")),
+                )
+            except Exception:
+                tech_setup = {"label": "🎯 Range Base", "badge_color": "#38bdf8", "badge_bg": "rgba(56,189,248,0.12)", "badge_border": "rgba(56,189,248,0.3)", "description": "Trading in normal consolidation structure."}
+
+        ts_label = tech_setup.get("label", "🎯 Range Base")
+        ts_color = tech_setup.get("badge_color", "#38bdf8")
+        ts_bg = tech_setup.get("badge_bg", "rgba(56,189,248,0.12)")
+        ts_border = tech_setup.get("badge_border", "rgba(56,189,248,0.3)")
+        ts_desc = html.escape(str(tech_setup.get("description", "")))
+        technical_setup_badge_html = f'<span class="signal-badge" style="background:{ts_bg};color:{ts_color};border:1px solid {ts_border};font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;font-weight:600;white-space:nowrap;" title="{ts_desc}">{ts_label}</span>'
+
         # Determine cap category: large cap > 1000 Cr (1e10 rupees)
         mcap_value = _to_float(row.get("market_cap"))
         is_large = mcap_value > LARGE_CAP_THRESHOLD
@@ -1123,6 +1174,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "company_name": company_name,
             "result_sequence_badge_html": full_badges,
             "earnings_date": earnings_date_display,
+            "relative_date_badge_html": relative_date_badge_html,
             "day_class": day_class,
             "market_cap": market_cap,
             "current_price": current_price,
@@ -1131,6 +1183,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "three_day_return": three_day_return,
             "seven_day_return": seven_day_return,
             "thirty_day_return": thirty_day_return,
+            "returns_consolidated_html": returns_consolidated_html,
+            "technical_setup_badge_html": technical_setup_badge_html,
             "rel_vol_html": rel_vol_html,
             "rel_vol_plain": rel_vol_plain,
             "beat_rate_html": beat_rate_html,

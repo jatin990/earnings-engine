@@ -56,7 +56,7 @@
                     </div>
 
                     <!-- Right Controls -->
-                    <div style="display: flex; gap: 0.25rem; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
                         <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="height: 28px; padding: 0 0.45rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; background: #000000; color: #ededed; font-size: 0.72rem; font-weight: 600; font-family: var(--font-sans); outline: none;">
                             <option value="next3" selected>⚡ Upcoming 3 Days</option>
                             <option value="next7">⚡ Upcoming 7 Days</option>
@@ -76,24 +76,24 @@
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', 'app.onResultsMarketChange(this.value)') }}
                         <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="height:28px;font-size:0.75rem;padding:0 0.65rem;">▶ Load</button>
-                        <button type="button" onclick="app.recalculateAllVisibleResults(this)" id="resultsRecalcAllBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Recalculate live prices & metrics for all loaded window stocks">🔄 Recalc</button>
+                        <button type="button" onclick="app.syncResultsCalendar(this)" id="resultsSyncBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.55rem;background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.35);" title="Sync Results Calendar from NSE & active data feeds">📅 Sync Calendar</button>
+                        <button type="button" onclick="app.recalculateResultsPrices(this)" id="resultsRecalcAllBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.55rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Recalculate live prices & S/R metrics for all window stocks">⚡ Recalc Prices</button>
                         <button type="button" onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-danger btn-sm" style="height:28px;font-size:0.72rem;display:none;" title="Cancel pending load request">⏹ Cancel</button>
                         <button type="button" onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="height:28px;font-size:0.72rem;display:none;">📅 Next Date</button>
                         <button type="button" onclick="app.summarizeResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;">✨ AI Summary</button>
-                        <button type="button" onclick="app.refreshResults()" class="btn btn-sm" style="height:28px;font-size:0.72rem;padding:0 0.5rem;">🔄 Sync</button>
                     </div>
                 </div>
 
-                <!-- 🛠️ Ultra-Clean Compact Operations Toolbar -->
+                <!-- 🛠️ Operations Toolbar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; background: rgba(7, 8, 14, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.35rem;">
 
                     <!-- Search Input -->
-                    <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 200px; max-width: 380px;">
+                    <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 200px; max-width: 420px;">
                         <span style="font-size: 0.72rem; color: #71717a;">🔍</span>
-                        <input type="text" id="resultsLiveSearch" oninput="app.filterResultsTable(this.value)" placeholder="Filter by symbol, company, industry, or signal..." style="width: 100%; height: 26px; padding: 0 0.45rem; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
+                        <input type="text" id="resultsLiveSearch" oninput="app.filterResultsTable(this.value)" placeholder="Filter by symbol, company, setup, or date..." style="width: 100%; height: 26px; padding: 0 0.45rem; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
                     </div>
 
-                    <!-- Toolbar Operations: Match count, Cap filters, Split Toggle, Density, Export -->
+                    <!-- Toolbar Operations: Match count, Cap filters, Density, Export -->
                     <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; flex-wrap: wrap;">
                         <span id="resultsFilterMatchCount" style="color: #38bdf8; font-family: var(--font-mono); font-weight: 700; font-size: 0.68rem;"></span>
 
@@ -103,9 +103,6 @@
                             <button type="button" onclick="app.setResultsCapFilter('large')" id="capFilterBtnLarge" class="btn-micro" style="background:transparent;color:#94a3b8;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Show Large Cap (>1000 Cr)">💎 Large</button>
                             <button type="button" onclick="app.setResultsCapFilter('small')" id="capFilterBtnSmall" class="btn-micro" style="background:transparent;color:#94a3b8;font-size:0.62rem;padding:0.1rem 0.35rem;" title="Show Small Cap (≤1000 Cr)">🌱 Small</button>
                         </div>
-
-                        <!-- Split Inspector Toggle -->
-                        <button type="button" onclick="app.toggleResultsSplitView()" id="resultsSplitToggleBtn" class="btn-micro" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.4rem;font-size:0.62rem;font-weight:700;" title="Toggle 60-40 Split Quant Inspector Panel">⚡ Split View</button>
 
                         <!-- Density Toggle -->
                         <div style="display: flex; align-items: center; background: #000000; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 1px;">
@@ -122,39 +119,23 @@
                 <!-- 📅 Month Breakdown Sub-Tabs -->
                 <div id="resultsMonthTabs" style="display: none; gap: 0.3rem; margin: 0.3rem 0 0.5rem 0; flex-wrap: wrap; align-items: center; padding: 0.3rem 0.5rem; background: rgba(6, 7, 12, 0.8); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.4rem;"></div>
 
-                <!-- 🎛️ Master-Detail Workspace: Table on Left + Sticky Quant Inspector on Right -->
-                <div id="resultsSplitWorkspace" style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr); gap: 0.6rem; align-items: start;">
+                <!-- 🎛️ Full-Width Clean Results Ledger Table Container -->
+                <div id="resultsTablePane" style="width: 100%; min-width: 0;">
+                    <div id="resultsReportLegend" class="day-legend" style="margin-bottom:0.35rem;"></div>
 
-                    <!-- Left: Table Stream Container -->
-                    <div id="resultsTablePane" style="min-width: 0;">
-                        <div id="resultsReportLegend" class="day-legend" style="margin-bottom:0.35rem;"></div>
-
-                        <!-- Results Report Table Container -->
-                        <div id="resultsReportSections">
-                            <div class="card" style="text-align:center;padding:2rem 1rem;color:var(--text-muted);background:rgba(5, 5, 8, 0.7);border:1px dashed rgba(255,255,255,0.1);border-radius:0.6rem;margin:0.4rem 0;">
-                                <div style="font-size:1.8rem;margin-bottom:0.4rem;">📅</div>
-                                <h4 id="resultsCenterTitle" style="margin:0 0 0.3rem 0;color:var(--light);font-size:1rem;font-family:'Space Grotesk',sans-serif;">Corporate Earnings Ready to Load</h4>
-                                <p style="max-width:460px;margin:0 auto 0.85rem auto;font-size:0.75rem;line-height:1.5;color:var(--text-muted);">
-                                    Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts and previous quarter performance.
-                                </p>
-                                <button type="button" onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.4rem 1.1rem;font-size:0.78rem;font-weight:700;">▶ Load Results Report</button>
-                            </div>
-                        </div>
-                        <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.35rem; font-size: 0.7rem;"></div>
-                    </div>
-
-                    <!-- Right: Sticky Glassmorphic Quant Catalyst Inspector -->
-                    <div id="resultsQuantInspectorPane" class="card sticky-inspector" style="position: sticky; top: 0.5rem; background: rgba(9, 10, 18, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 0.6rem; padding: 0.65rem 0.8rem; max-height: calc(100vh - 120px); overflow-y: auto;">
-                        <div id="resultsInspectorEmptyState" style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8;">
-                            <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">🎯</div>
-                            <h4 style="margin: 0 0 0.25rem 0; color: #ffffff; font-size: 0.9rem; font-family: 'Space Grotesk', sans-serif;">Quant Catalyst Inspector</h4>
-                            <p style="font-size: 0.72rem; color: #64748b; margin: 0 auto; max-width: 280px; line-height: 1.4;">
-                                Click any stock row in the results ledger or use <kbd style="background:#1e293b;padding:0.1rem 0.3rem;border-radius:3px;font-size:0.65rem;color:#38bdf8;">↑</kbd> <kbd style="background:#1e293b;padding:0.1rem 0.3rem;border-radius:3px;font-size:0.65rem;color:#38bdf8;">↓</kbd> keyboard keys to inspect 8-quarter beat/miss history, technical channel geometry, and volume flow forensics.
+                    <!-- Results Report Table Container -->
+                    <div id="resultsReportSections">
+                        <div class="card" style="text-align:center;padding:2rem 1rem;color:var(--text-muted);background:rgba(5, 5, 8, 0.7);border:1px dashed rgba(255,255,255,0.1);border-radius:0.6rem;margin:0.4rem 0;">
+                            <div style="font-size:1.8rem;margin-bottom:0.4rem;">📅</div>
+                            <h4 id="resultsCenterTitle" style="margin:0 0 0.3rem 0;color:var(--light);font-size:1rem;font-family:'Space Grotesk',sans-serif;">Corporate Earnings Ready to Load</h4>
+                            <p style="max-width:460px;margin:0 auto 0.85rem auto;font-size:0.75rem;line-height:1.5;color:var(--text-muted);">
+                                Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts, technical setups, and support/resistance structures. Click any stock row to open the interactive slide-over drawer with candlestick charts and AI consensus.
                             </p>
+                            <button type="button" onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.4rem 1.1rem;font-size:0.78rem;font-weight:700;">▶ Load Results Report</button>
                         </div>
-                        <div id="resultsInspectorContent" style="display: none;"></div>
                     </div>
-
+                    <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.35rem; font-size: 0.7rem;"></div>
                 </div>
+
             </section>
         </div>

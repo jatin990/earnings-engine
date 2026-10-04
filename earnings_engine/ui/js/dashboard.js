@@ -1557,6 +1557,132 @@ const API_BASE = window.location.origin;
                 }
             },
 
+            async syncResultsCalendar(btn) {
+                const origHtml = btn ? btn.innerHTML : '📅 Sync Calendar';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Syncing...';
+                }
+                const statusEl = document.getElementById('resultsReportStatus');
+                if (statusEl) statusEl.textContent = 'Syncing Results Calendar from NSE & active data feeds...';
+
+                const preset = document.getElementById('resultsRangePreset')?.value || 'next3';
+                const details = this.getResultsPresetDetails(preset);
+                const days = Math.max(details.days || 30, 30);
+                const market = document.getElementById('resultsMarket')?.value || 'ALL';
+
+                try {
+                    const res = await fetch(API_BASE + `/api/v1/dashboard/results/sync-calendar?days=${days}&market=${encodeURIComponent(market)}`, {
+                        method: 'POST'
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (statusEl) statusEl.textContent = `✅ Results calendar synced (${data.synced_count || 0} events verified, ${data.inserted_count || 0} new). Reloading...`;
+                        await this.loadResultsReport();
+                    } else {
+                        if (statusEl) statusEl.textContent = `❌ Sync failed: ${data.detail || data.error || 'Unknown error'}`;
+                        alert(`Calendar sync failed: ${data.detail || data.error || 'Unknown error'}`);
+                    }
+                } catch (e) {
+                    console.error('Error syncing results calendar:', e);
+                    if (statusEl) statusEl.textContent = `❌ Network error syncing calendar: ${e.message || e}`;
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async recalculateResultsPrices(btn) {
+                const origHtml = btn ? btn.innerHTML : '⚡ Recalc Prices';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Recalculating...';
+                }
+                const statusEl = document.getElementById('resultsReportStatus');
+                if (statusEl) statusEl.textContent = 'Recalculating live prices, technical setups, and S/R metrics...';
+
+                const preset = document.getElementById('resultsRangePreset')?.value || 'next3';
+                const details = this.getResultsPresetDetails(preset);
+                const pastDays = details.pastDays;
+                const days = details.days;
+                const market = document.getElementById('resultsMarket')?.value || 'ALL';
+
+                try {
+                    const res = await fetch(API_BASE + `/api/v1/dashboard/results/recalculate-prices?days=${days}&past_days=${pastDays}&market=${encodeURIComponent(market)}`, {
+                        method: 'POST'
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (statusEl) statusEl.textContent = `✅ Prices & technical setups recalculated for ${data.recalculated_count || 0} stocks. Reloading...`;
+                        await this.loadResultsReport();
+                    } else {
+                        if (statusEl) statusEl.textContent = `❌ Recalculation failed: ${data.detail || data.error || 'Unknown error'}`;
+                        alert(`Price recalculation failed: ${data.detail || data.error || 'Unknown error'}`);
+                    }
+                } catch (e) {
+                    console.error('Error recalculating results prices:', e);
+                    if (statusEl) statusEl.textContent = `❌ Network error recalculating prices: ${e.message || e}`;
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async refreshSingleStockPrice(ticker, btn, event) {
+                if (event) event.stopPropagation();
+                if (!ticker) return;
+                const origHtml = btn ? btn.innerHTML : '↻';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '⏳';
+                    btn.style.opacity = '0.7';
+                }
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/ticker/recalculate?ticker=' + encodeURIComponent(ticker), {
+                        method: 'POST'
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (data.updated_metrics && typeof this.updateDomRowWithMetrics === 'function') {
+                            this.updateDomRowWithMetrics(ticker, data.updated_metrics);
+                        }
+                        if (btn) {
+                            btn.innerHTML = '✓';
+                            btn.style.color = '#34d399';
+                            setTimeout(() => {
+                                btn.innerHTML = origHtml;
+                                btn.style.color = '#64748b';
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                            }, 1500);
+                        }
+                    } else {
+                        if (btn) {
+                            btn.innerHTML = '✗';
+                            btn.style.color = '#f87171';
+                            setTimeout(() => {
+                                btn.innerHTML = origHtml;
+                                btn.style.color = '#64748b';
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                            }, 1500);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error refreshing price for ' + ticker, e);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        btn.style.opacity = '1';
+                    }
+                }
+            },
+
             renderResultsMonthTabs() {
                 let el = document.getElementById('resultsMonthTabs');
                 if (!el) {

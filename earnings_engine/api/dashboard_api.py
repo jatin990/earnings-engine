@@ -448,6 +448,57 @@ def run_prediction_for_ticker(
         return {"success": False, "error": str(e)}
 
 
+def sync_results_calendar(days: int = 60, market: str | None = None) -> dict[str, Any]:
+    """Force re-fetch of corporate earnings calendar announcements from official NSE and source calendars."""
+    settings = _settings()
+    tickers = _resolve_tickers(market)
+    try:
+        # 1. Sync official NSE result calendar
+        nse_res = earnings_mod.ingest_nse_result_calendar(settings, days=days)
+        # 2. Sync present day delta
+        delta_res = earnings_mod.sync_present_day_earnings_delta(settings, force=True)
+        # 3. Clear all cached dashboard datasets
+        clear_dashboard_caches()
+        total_events = delta_res.get("events_count", 0) or nse_res.get("total", 0)
+        mark_refreshed("results", rows=total_events, message=f"{total_events} events synced")
+        return {
+            "success": True,
+            "synced_count": total_events,
+            "inserted_count": nse_res.get("inserted", 0),
+            "message": f"Successfully synced results calendar ({total_events} corporate events loaded)",
+        }
+    except Exception as e:
+        logger.exception("Failed to sync results calendar: %s", e)
+        return {"success": False, "error": str(e)}
+
+
+def recalculate_results_prices(days: int = 60, market: str | None = None) -> dict[str, Any]:
+    """Force re-fetch of price bars and recalculate technical support/resistance levels."""
+    settings = _settings()
+    tickers = _resolve_tickers(market)
+    if not tickers:
+        return {"success": False, "error": "No tickers found for the specified market universe"}
+    try:
+        # Re-fetch prices for upcoming earnings tickers
+        df = earnings_mod.upcoming_earnings(tickers, settings, days=days)
+        active_tickers = list(df["ticker"].dropna().unique()) if not df.empty else tickers[:50]
+        if not active_tickers:
+            active_tickers = tickers[:50]
+        res = prices_mod.ingest_prices(active_tickers, settings, force=True)
+        ok = sum(1 for v in res.values() if v > 0)
+        clear_dashboard_caches()
+        mark_refreshed("prices", rows=ok, message=f"{ok}/{len(active_tickers)} prices updated")
+        return {
+            "success": True,
+            "recalculated_count": ok,
+            "total_tickers": len(active_tickers),
+            "message": f"Successfully recalculated prices & S/R levels for {ok}/{len(active_tickers)} companies",
+        }
+    except Exception as e:
+        logger.exception("Failed to recalculate results prices: %s", e)
+        return {"success": False, "error": str(e)}
+
+
 @ttl_cache(seconds=60)
 def get_event_dataset_summary() -> dict[str, Any]:
     """Get summary stats from event_dataset table."""

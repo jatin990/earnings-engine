@@ -143,6 +143,42 @@ async def dashboard_results_report(
         raise HTTPException(status_code=500, detail=f"Error generating report components: {str(e)}")
 
 
+@router.post("/api/v1/dashboard/results/sync-calendar")
+async def dashboard_results_sync_calendar(
+    market: str = Query("ALL", description="Market universe (ALL, IN, NSE_ALL, US, etc.)"),
+    days: int = Query(60, description="Look-ahead calendar window in days", ge=1, le=180),
+):
+    """Force re-fetch of corporate earnings calendar announcements from official sources."""
+    try:
+        res = await asyncio.to_thread(
+            dashboard_api.sync_results_calendar,
+            days=days,
+            market=market,
+        )
+        return res
+    except Exception as e:
+        logger.exception("Error in dashboard_results_sync_calendar: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to sync results calendar: {str(e)}")
+
+
+@router.post("/api/v1/dashboard/results/recalculate-prices")
+async def dashboard_results_recalculate_prices(
+    market: str = Query("ALL", description="Market universe (ALL, IN, NSE_ALL, US, etc.)"),
+    days: int = Query(60, description="Look-ahead window in days", ge=1, le=180),
+):
+    """Force re-fetch of price bars and recalculate technical support/resistance levels."""
+    try:
+        res = await asyncio.to_thread(
+            dashboard_api.recalculate_results_prices,
+            days=days,
+            market=market,
+        )
+        return res
+    except Exception as e:
+        logger.exception("Error in dashboard_results_recalculate_prices: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to recalculate prices: {str(e)}")
+
+
 @router.get("/api/v1/dashboard/results/summarize")
 async def dashboard_results_summarize(
     market: str = Query("ALL", description="Market universe"),
