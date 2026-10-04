@@ -45,6 +45,16 @@
                 <option value="ALL">All Categories</option>
             </select>
 
+            <!-- Purge & Reprocess Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.reprocessGmailEmails()"
+                class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Purge operational database records and re-parse all email attachments month-wise"
+            >
+                <span>🧹</span> Purge & Reprocess
+            </button>
+
             <!-- Upload Excel Action -->
             <button
                 type="button"
