@@ -21,8 +21,9 @@
 
 ## 2. Critical Operating Rules & Constraints
 
-### 2.1 Git Commit & Remote Push Protocol
-- **Strict Rule**: **Always create a git commit and push changes to the remote branch upon completing each task.**
+### 2.1 Git Branch, Commit & Remote Push Protocol
+- **Target Branch**: **Always work directly on the `new_report` branch.** All changes, commits, and pushes must be made directly to `new_report` (do not leave changes unmerged in separate branches/worktrees).
+- **Strict Rule**: **Always create a git commit and push changes directly to `origin/new_report` upon completing each task.**
 - Follow conventional commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`) and include required co-authorship attribution.
 
 ### 2.2 Error Ledger & Self-Healing Protocol
