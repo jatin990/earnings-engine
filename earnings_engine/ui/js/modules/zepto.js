@@ -2554,6 +2554,10 @@ const zeptoApp = {
 
     formatCurrency(val) {
         const n = parseFloat(val || 0);
+        if (isNaN(n)) return '₹0';
+        if (n < 0) {
+            return '-₹' + Math.abs(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        }
         return '₹' + n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
     },
 
@@ -4805,15 +4809,15 @@ const zeptoApp = {
                                 </div>
                             </td>
                             <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">
-                                ${c.dq_loss_amount > 0 ? this.formatCurrency(c.dq_loss_amount) : '—'}
+                                ${Math.abs(c.dq_loss_amount || 0) > 0 ? this.formatCurrency(c.dq_loss_amount) : '—'}
                             </td>
-                            <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">
-                                ${c.shrinkage_amount > 0 ? this.formatCurrency(c.shrinkage_amount) : '—'}
+                            <td class="py-2.5 px-3 text-right font-mono font-bold ${c.shrinkage_amount < 0 ? 'text-emerald-400' : 'text-purple-300'}">
+                                ${Math.abs(c.shrinkage_amount || 0) > 0 ? this.formatCurrency(c.shrinkage_amount) : '—'}
                             </td>
                             <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-300">
-                                ${c.spoilage_amount > 0 ? this.formatCurrency(c.spoilage_amount) : '—'}
+                                ${Math.abs(c.spoilage_amount || 0) > 0 ? this.formatCurrency(c.spoilage_amount) : '—'}
                             </td>
-                            <td class="py-2.5 px-3 text-right font-mono font-black text-rose-400">
+                            <td class="py-2.5 px-3 text-right font-mono font-black ${c.total_amount < 0 ? 'text-emerald-400' : 'text-rose-400'}">
                                 ${this.formatCurrency(c.total_amount)}
                             </td>
                             <td class="py-2.5 px-3">
@@ -4965,7 +4969,7 @@ const zeptoApp = {
                     <td class="py-2 px-2.5 text-slate-300 font-medium">${(r.category || 'GENERAL').replace(/_/g, ' ')}</td>
                     <td class="py-2 px-2.5 text-xs text-slate-200 max-w-[200px] truncate" title="${r.sku_id ? `SKU: ${r.sku_id}` : ''} ${r.item_name || ''}">${skuDisplay}</td>
                     <td class="py-2 px-2.5 text-right font-mono text-slate-300">${(r.sku_count || 0).toLocaleString('en-IN')}</td>
-                    <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(r.amount || 0)}</td>
+                    <td class="py-2 px-2.5 text-right font-mono font-bold ${r.amount < 0 ? 'text-emerald-400' : 'text-rose-400'}">${this.formatCurrency(r.amount || 0)}</td>
                     <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-xs truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
                     <td class="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">${r.source_email_id ? r.source_email_id.substring(0, 12) + '...' : 'Direct Upload'}</td>
                 </tr>

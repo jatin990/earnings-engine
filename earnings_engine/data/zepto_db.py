@@ -4073,14 +4073,14 @@ def get_loss_summary(
             c_data["pct_of_total"] = round((c_data["total_amount"] / total_loss * 100), 1) if total_loss > 0 else 0.0
             cat_list.append(c_data)
 
-        # Filter categories to only those where loss has occurred (total_amount > 0)
-        positive_cats = [c for c in cat_list if c["total_amount"] > 0]
-        positive_cats.sort(key=lambda x: x["total_amount"], reverse=True)
+        # Filter categories to only those with recorded transactions (non-zero amount or units/incidents)
+        non_zero_cats = [c for c in cat_list if abs(c["total_amount"]) > 0 or c["total_units"] != 0 or c["incident_count"] > 0]
+        non_zero_cats.sort(key=lambda x: x["total_amount"], reverse=True)
 
         # Group categories below Top 10 as "OTHERS"
-        if len(positive_cats) > 10:
-            top_10_cats = positive_cats[:10]
-            tail_cats = positive_cats[10:]
+        if len(non_zero_cats) > 10:
+            top_10_cats = non_zero_cats[:10]
+            tail_cats = non_zero_cats[10:]
             others_total = round(sum(c["total_amount"] for c in tail_cats), 2)
             others_dq = round(sum(c["dq_loss_amount"] for c in tail_cats), 2)
             others_shrink = round(sum(c["shrinkage_amount"] for c in tail_cats), 2)
@@ -4106,7 +4106,7 @@ def get_loss_summary(
                 }
             ]
         else:
-            grouped_category_breakdown = positive_cats
+            grouped_category_breakdown = non_zero_cats
 
         # 3. Email Body vs. Excel Verification / Reconciliation Ledger
         recon_where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
@@ -4292,7 +4292,7 @@ def get_loss_summary(
             "total_loss_records": len(active_items),
             "total_records": len(active_items),
             "category_breakdown": grouped_category_breakdown,
-            "all_categories": positive_cats,
+            "all_categories": non_zero_cats,
             "reconciliation": {
                 "items": recon_items,
                 "total_audits": total_audits,

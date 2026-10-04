@@ -847,8 +847,18 @@ def parse_zepto_loss_shrinkage_excel(
         if val is None or val == "":
             return default
         try:
-            clean_v = re.sub(r"[₹$,% ]", "", str(val).strip())
-            return float(clean_v)
+            s_val = str(val).strip()
+            # Handle accounting negative numbers e.g. (123.45) or (₹123.45)
+            is_negative = False
+            if s_val.startswith("(") and s_val.endswith(")"):
+                is_negative = True
+                s_val = s_val[1:-1]
+            elif s_val.startswith("-"):
+                is_negative = True
+                s_val = s_val[1:]
+            clean_v = re.sub(r"[₹$,% ]", "", s_val.strip())
+            parsed = float(clean_v)
+            return -parsed if is_negative else parsed
         except (ValueError, TypeError):
             return default
 
@@ -997,7 +1007,7 @@ def parse_zepto_loss_shrinkage_excel(
         if not item_name and notes and not sku_id:
             item_name = notes
 
-        if amount > 0 or sku_count > 0:
+        if amount != 0 or sku_count != 0:
             records.append({
                 "store_name": store,
                 "record_date": record_date,

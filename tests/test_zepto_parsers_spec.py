@@ -236,6 +236,59 @@ def test_shrinkage_report_spec():
     assert rec_0["record_date"] == "2026-09-17"
 
 
+def test_negative_shrinkage_and_surplus_reconciliation_spec():
+    """
+    Verify that negative shrinkage values (inventory cycle count surpluses, stock found reconciliations,
+    accounting formatted negative numbers '(275.0)' or '-275.0') are correctly extracted and aggregated as net shrinkage.
+    """
+    inhouse_dod_header = [
+        "date", "store_name", "city", "sku_name", "rto", "adjustment", "fcc",
+        "short_pick", "others", "inhouse_net", "rto_amount", "adjustment_amount",
+        "fcc_amount", "short_pick_amount", "others_amount", "inhouse_net_amount",
+        "sku_id", "category", "sub_category", "level_3_category", "_____dp_update_ts"
+    ]
+    # Row 1: Loss of 500.0
+    row_loss = [
+        "46282", "JMU-Sainik Colony", "Jammu", "Cadbury Dairy Milk 150g", "0", "0", "0",
+        "2", "0", "2", "0.0", "0.0",
+        "0.0", "500.0", "0.0", "500.0",
+        "100999", "Chocolates", "Bars", "Milk Chocolate", "2026-09-17T04:00:00"
+    ]
+    # Row 2: Negative shrinkage (Surplus stock found: adjustment_amount = -200.0, inhouse_net_amount = -200.0)
+    row_surplus = [
+        "46282", "JMU-Sainik Colony", "Jammu", "Amul Salted Butter 500g", "0", "-1", "0",
+        "0", "0", "-1", "0.0", "-200.0",
+        "0.0", "0.0", "0.0", "-200.0",
+        "100234", "Dairy", "Butter", "Salted Butter", "2026-09-17T04:00:00"
+    ]
+    # Row 3: Accounting parentheses formatted negative amount e.g. "(100.0)"
+    row_paren_surplus = [
+        "46282", "JMU-Sainik Colony", "Jammu", "Fortune Oil 1L", "0", "-1", "0",
+        "0", "0", "-1", "0.0", "(100.0)",
+        "0.0", "0.0", "0.0", "(100.0)",
+        "100333", "Staples", "Edible Oil", "Mustard Oil", "2026-09-17T04:00:00"
+    ]
+
+    xlsx_bytes = _create_mock_xlsx({"Inhouse_DOD": [inhouse_dod_header, row_loss, row_surplus, row_paren_surplus]})
+    result = parse_zepto_loss_shrinkage_excel(xlsx_bytes, file_name="JMU-Sainik_Colony-Shrinkage-report.xlsx")
+
+    assert result["total_records"] == 3
+    # Net shrinkage: 500.0 + (-200.0) + (-100.0) = 200.0
+    assert result["total_amount"] == 200.0
+    assert result["records"][1]["amount"] == -200.0
+    assert result["records"][1]["sku_count"] == -1
+    assert result["records"][2]["amount"] == -100.0
+
+    # Test DAL save and get_loss_summary integration
+    settings = Settings()
+    save_res = save_loss_records_batch(result["records"], settings=settings)
+    assert save_res == 3
+
+    summary = get_loss_summary(month="2026-09", store_name="JMU-Sainik Colony", settings=settings)
+    assert any(c["category"] == "DAIRY" and c["shrinkage_amount"] < 0 for c in summary["category_breakdown"])
+
+
+
 # ---------------------------------------------------------------------------
 # 4. Spec Test: Store Metric Summary & Manpower Utilization (Packer_Thor_Raw)
 # ---------------------------------------------------------------------------
