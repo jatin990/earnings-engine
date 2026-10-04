@@ -1290,6 +1290,32 @@ async def ingest_all_emails_endpoint(
                 email_parsed_status = "PENDING"
                 email_parsed_count = 0
 
+                # Inspect and download attachments (.xlsx)
+                all_parts = []
+                def collect_parts(p_list):
+                    for p in p_list:
+                        all_parts.append(p)
+                        if "parts" in p:
+                            collect_parts(p["parts"])
+                collect_parts(payload.get("parts", []))
+
+                # Collect attachment metadata for email object
+                attachments = []
+                for p in all_parts:
+                    fname = p.get("filename")
+                    if fname:
+                        attachments.append({
+                            "filename": fname,
+                            "mime_type": p.get("mimeType", ""),
+                            "size_bytes": p.get("body", {}).get("size", 0),
+                        })
+
+                has_loss_attachment = any(
+                    p.get("filename", "").lower().endswith((".xlsx", ".xlsm")) and
+                    ("loss" in p.get("filename", "").lower() or "shrinkage" in p.get("filename", "").lower())
+                    for p in all_parts
+                )
+
                 # If email contains store metrics text numbers, persist them
                 if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count") or body_metrics.get("packer_ipp")):
                     zepto_db.save_store_metrics({
@@ -1324,8 +1350,8 @@ async def ingest_all_emails_endpoint(
                         email_parsed_status = "PARSED"
                         email_parsed_count += 1
 
-                # If email contains DQ loss / shrinkage text numbers, persist them
-                if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount"):
+                # If email contains DQ loss / shrinkage text numbers, persist only if no Excel attachment exists (prevents double-counting)
+                if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount") and not has_loss_attachment:
                     zepto_db.save_loss_record({
                         "store_name": store_name,
                         "record_date": iso_date,
@@ -1339,26 +1365,6 @@ async def ingest_all_emails_endpoint(
                     processed_details["loss_records"] += 1
                     email_parsed_status = "PARSED"
                     email_parsed_count += 1
-
-                # Inspect and download attachments (.xlsx)
-                all_parts = []
-                def collect_parts(p_list):
-                    for p in p_list:
-                        all_parts.append(p)
-                        if "parts" in p:
-                            collect_parts(p["parts"])
-                collect_parts(payload.get("parts", []))
-
-                # Collect attachment metadata for email object
-                attachments = []
-                for p in all_parts:
-                    fname = p.get("filename")
-                    if fname:
-                        attachments.append({
-                            "filename": fname,
-                            "mime_type": p.get("mimeType", ""),
-                            "size_bytes": p.get("body", {}).get("size", 0),
-                        })
 
                 for part in all_parts:
                     fname = part.get("filename", "")
