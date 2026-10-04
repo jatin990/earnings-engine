@@ -4037,6 +4037,55 @@ const zeptoApp = {
         }
     },
 
+    async reprocessGmailEmails() {
+        const btn = document.getElementById('btnReprocessGmail');
+        const icon = document.getElementById('btnReprocessGmailIcon');
+        const text = document.getElementById('btnReprocessGmailText');
+
+        const monthFilter = document.getElementById('gmailMonthFilter')?.value || 'CURRENT';
+        const queryMonth = monthFilter === 'CURRENT' ? new Date().toISOString().slice(0, 7) : monthFilter;
+
+        const scopeLabel = queryMonth === 'ALL' ? 'ALL historical months' : `month ${queryMonth}`;
+        if (!confirm(`⚠️ Purge and Reprocess Confirmation:\n\nAre you sure you want to purge existing operational database records for ${scopeLabel} and re-parse all email attachments from scratch?`)) {
+            return;
+        }
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.className = 'inline-block animate-spin';
+        if (text) text.textContent = 'Purging & Reprocessing...';
+
+        try {
+            const url = `/api/v1/zepto/gmail/ingest-all-emails?month=${encodeURIComponent(queryMonth)}&force=true&purge_existing=true`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Purge & Reprocess failed');
+
+            this.showToast(`🧹 ${data.message || 'Purged and successfully reprocessed email attachments'}`);
+
+            if (data.category_counts) {
+                Object.keys(data.category_counts).forEach(cat => {
+                    const countEl = document.getElementById(`gmailCatCount-${cat}`);
+                    if (countEl) countEl.textContent = data.category_counts[cat];
+                });
+            }
+
+            await this.loadRecentEmails();
+            await this.loadOverview();
+            if (this.currentTab === 'attendance') await this.loadAttendanceData();
+            if (this.currentTab === 'metrics') await this.loadMetrics();
+            if (this.currentTab === 'loss') await this.loadLoss();
+        } catch (err) {
+            this.showToast(`Error during purge & reprocess: ${err.message}`, true);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) icon.className = '';
+            if (text) text.textContent = 'Purge & Reprocess';
+        }
+    },
+
     filterGmailEmails() {
         const query = (document.getElementById('gmailSearchInput')?.value || '').toLowerCase().trim();
         const catFilter = document.getElementById('gmailCategoryFilter')?.value || 'ALL';
