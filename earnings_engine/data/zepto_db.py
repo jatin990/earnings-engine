@@ -3864,9 +3864,10 @@ def save_loss_record(data: dict[str, Any], settings: Settings | None = None) -> 
     if data.get("id"):
         rec_id = str(data["id"])
     else:
+        # Idempotent deduplication key: exclude transient email ID so incremental daily attachments don't multiply historical days
         sku_identifier = sku_id or item_name or notes or "general"
-        email_part = str(source_email_id or "")
-        raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{amount}|{email_part}".encode("utf-8")
+        rounded_amount = round(amount, 2)
+        raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{rounded_amount}|{sku_count}".encode("utf-8")
         rec_id = f"loss_{hashlib.md5(raw_key).hexdigest()[:16]}"
 
     with _connect(settings) as conn:
