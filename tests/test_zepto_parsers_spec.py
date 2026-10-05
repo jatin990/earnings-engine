@@ -28,6 +28,7 @@ from earnings_engine.data.zepto_db import (
     save_attendance_batch,
     save_loss_records_batch,
     save_manpower_utilization_batch,
+    get_attendance_records,
     get_attendance_summary,
     get_loss_summary,
     get_manpower_utilization_summary,
@@ -365,6 +366,8 @@ def test_store_metric_summary_and_manpower_spec():
     assert worker_1["employee_id"] == "10469614"
     assert worker_1["employee_name"] == "Ashish Sharma"
     assert worker_1["role"] == "PACKER"
+    assert worker_1["punch_in"] == "06:00:00"
+    assert worker_1["punch_out"] == "14:30:00"
     assert worker_1["thor_work_hours"] == 8.3
     assert worker_1["ob_work_hours"] == 6.5
     assert worker_1["ib_work_hours"] == 1.5
@@ -389,7 +392,10 @@ def test_e2e_dal_batch_ingestion_and_analytics():
     # 1. Ingest Attendance
     att_header = ["store_name", "scheduled_date", "full_name", "employee_code", "DOJ", "current_role_name", "user_status", "muster_status"]
     att_row = ["JMU-Sainik Colony", "2026-09-17", "Ashish Sharma", "10469614", "2026-01-01", "PACKER", "ACTIVE", "P"]
-    att_parsed = parse_zepto_attendance_excel(_create_mock_xlsx({"Attendance": [att_header, att_row]}))
+    att_parsed = parse_zepto_attendance_excel(
+        _create_mock_xlsx({"Attendance": [att_header, att_row]}),
+        file_name="JMU-Sainik_Colony-Attendance-report.xlsx"
+    )
     save_res = save_attendance_batch(att_parsed, source="TEST_FIXTURE", settings=settings)
     assert save_res["status"] == "success"
 
@@ -400,13 +406,16 @@ def test_e2e_dal_batch_ingestion_and_analytics():
     saved_loss_cnt = save_loss_records_batch(loss_parsed["records"], settings=settings)
     assert saved_loss_cnt == 1
 
-    # 3. Ingest Manpower Utilization
+    # 3. Ingest Manpower Utilization (with punch times for cross-table sync)
     worker_rec = [{
         "store_name": "JMU-Sainik Colony",
         "util_date": "2026-09-17",
         "employee_id": "10469614",
         "employee_name": "Ashish Sharma",
         "role": "PACKER",
+        "punch_in": "06:00:00",
+        "punch_out": "14:30:00",
+        "thor_work_hours": 8.5,
         "items_picked": 180,
         "active_pick_hours": 6.5,
         "idle_hours": 0.3,
@@ -415,6 +424,14 @@ def test_e2e_dal_batch_ingestion_and_analytics():
     }]
     saved_manpower_cnt = save_manpower_utilization_batch(worker_rec, settings=settings)
     assert saved_manpower_cnt == 1
+
+    # Verify cross-table attendance enrichment
+    records = get_attendance_records(store_name="JMU-Sainik Colony", employee_id="10469614", year_month="2026-09", settings=settings)
+    assert len(records) >= 1
+    matched_att = next(r for r in records if r["employee_id"] == "10469614" and r["shift_date"] == "2026-09-17")
+    assert matched_att["punch_in"] == "06:00:00"
+    assert matched_att["punch_out"] == "14:30:00"
+    assert matched_att["work_duration_mins"] == 510
 
     # 4. Verify Unified Analytics
     analytics = get_zepto_dashboard_analytics(month="2026-09", store_name="JMU-Sainik Colony", settings=settings)

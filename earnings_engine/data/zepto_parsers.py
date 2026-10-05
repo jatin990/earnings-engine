@@ -17,6 +17,7 @@ from earnings_engine.data.zepto_attendance_parser import (
     _extract_xlsx_sheets_native,
     excel_date_to_iso,
     parse_duration_to_mins,
+    parse_time_str,
 )
 
 
@@ -346,6 +347,9 @@ def parse_zepto_store_metrics_excel(
             "day_task_adherence": ["day_task_adherence", "day task adherence", "adherence"],
             "mtd_orders": ["mtd_orders_handled", "mtd orders handled"],
             "mtd_ob_ipp": ["mtd_ob_ipp", "mtd ob ipp"],
+            "packman_punch_in": ["packman_punch_in_time", "packman punch in time", "packman_punch_in", "punch_in_time", "punch_in", "punch in", "in_time", "actual_in_time", "actual in time"],
+            "thor_punch_in": ["thor_punch_in_time", "thor punch in time", "thor_punch_in"],
+            "packman_punch_out": ["packman_punch_out_time", "packman punch out time", "packman_punch_out", "punch_out_time", "punch_out", "punch out", "out_time", "actual_out_time", "actual out time"],
         }
 
         for idx, row in enumerate(matrix[:25]):
@@ -411,6 +415,14 @@ def parse_zepto_store_metrics_excel(
                 if 0 < day_adh <= 1.0:
                     day_adh = round(day_adh * 100.0, 2)
 
+                raw_punch_in = row[col_map["packman_punch_in"]] if "packman_punch_in" in col_map and col_map["packman_punch_in"] < len(row) else (
+                    row[col_map["thor_punch_in"]] if "thor_punch_in" in col_map and col_map["thor_punch_in"] < len(row) else ""
+                )
+                raw_punch_out = row[col_map["packman_punch_out"]] if "packman_punch_out" in col_map and col_map["packman_punch_out"] < len(row) else ""
+
+                punch_in_str = parse_time_str(raw_punch_in)
+                punch_out_str = parse_time_str(raw_punch_out)
+
                 worker_rec = {
                     "store_name": raw_store or detected_store or inferred_store,
                     "util_date": metric_date,
@@ -427,6 +439,8 @@ def parse_zepto_store_metrics_excel(
                     "thor_work_hours": thor_hr,
                     "ib_work_hours": ib_hr,
                     "ob_work_hours": ob_hr,
+                    "punch_in": punch_in_str,
+                    "punch_out": punch_out_str,
                 }
                 worker_records.append(worker_rec)
 

@@ -3206,9 +3206,12 @@ def get_attendance_summary(
         emp_rows = conn.execute("SELECT id, name, role, status, joining_date, base_salary_monthly FROM zepto_employees").fetchall()
         emp_info_map = {}
         for er in emp_rows:
-            emp_info_map[str(er["id"])] = er
+            if er["id"]:
+                emp_info_map[str(er["id"]).strip().lower()] = er
+                emp_info_map[str(er["id"]).strip()] = er
             if er["name"]:
                 emp_info_map[str(er["name"]).strip().lower()] = er
+                emp_info_map[str(er["name"]).strip()] = er
 
         days_in_m = 30
         if year_month and year_month.upper() != "ALL" and len(year_month) >= 7:
@@ -3238,13 +3241,17 @@ def get_attendance_summary(
             elif s_abs >= 1:
                 risk_tier = "MODERATE"
 
-            emp_info = emp_info_map.get(str(s["employee_id"])) or emp_info_map.get(str(s["employee_name"]).strip().lower())
+            emp_key_id = str(s["employee_id"] or "").strip().lower()
+            emp_key_name = str(s["employee_name"] or "").strip().lower()
+            emp_info = emp_info_map.get(emp_key_id) or emp_info_map.get(emp_key_name)
             profile_salary = float(emp_info["base_salary_monthly"]) if emp_info and emp_info["base_salary_monthly"] else 0.0
             role_str = (emp_info["role"] if emp_info and emp_info["role"] else s["designation"] or "").upper()
             if profile_salary > 0:
                 base_salary = profile_salary
-            elif "INCHARGE" in role_str or "MANAGER" in role_str or "LEAD" in role_str:
+            elif any(k in role_str for k in ("INCHARGE", "MANAGER", "LEAD", "SUPERVISOR", "HEAD", "CAPTAIN", "SI")):
                 base_salary = 20000.0
+            elif "SECURITY" in role_str or "GUARD" in role_str:
+                base_salary = 16000.0
             else:
                 base_salary = 14000.0
 
@@ -3716,8 +3723,10 @@ def get_employee_profile_analytics(
         base_salary = float(employee.get("base_salary_monthly") or 0.0)
         if base_salary <= 0:
             role_upper = (employee.get("role") or "").upper()
-            if "INCHARGE" in role_upper or "MANAGER" in role_upper or "LEAD" in role_upper:
+            if any(k in role_upper for k in ("INCHARGE", "MANAGER", "LEAD", "SUPERVISOR", "HEAD", "CAPTAIN", "SI")):
                 base_salary = 20000.0
+            elif "SECURITY" in role_upper or "GUARD" in role_upper:
+                base_salary = 16000.0
             else:
                 base_salary = 14000.0
 
@@ -4664,6 +4673,53 @@ def save_manpower_utilization_batch(
             """,
             rows,
         )
+
+        # Cross-Table Synchronization: update punch_in, punch_out, and work_duration_mins
+        # in zepto_attendance_records if an attendance record exists for that date and employee
+        for r in records:
+            store = str(r.get("store_name") or "JMU-Sainik Colony").strip()
+            date_str = str(r.get("util_date") or r.get("scheduled_date") or r.get("shift_date") or "").strip()
+            emp_id = str(r.get("employee_id") or r.get("employee_code") or r.get("packer_id") or "").strip()
+            emp_name = str(r.get("employee_name") or "").strip()
+            punch_in = str(r.get("punch_in") or "").strip()
+            punch_out = str(r.get("punch_out") or "").strip()
+            thor_hr = float(r.get("thor_work_hours") or r.get("thor_work_hour") or r.get("active_pick_hours") or 0.0)
+            duration_mins = int(round(thor_hr * 60)) if thor_hr > 0 else 0
+
+            if not date_str or (not emp_id and not emp_name):
+                continue
+            if not punch_in and not punch_out and duration_mins <= 0:
+                continue
+
+            conn.execute(
+                """
+                UPDATE zepto_attendance_records
+                SET punch_in = CASE WHEN ? != '' THEN ? ELSE punch_in END,
+                    punch_out = CASE WHEN ? != '' THEN ? ELSE punch_out END,
+                    work_duration_mins = CASE WHEN ? > 0 THEN ? ELSE work_duration_mins END,
+                    updated_at = ?
+                WHERE shift_date = ?
+                  AND (
+                      LOWER(TRIM(store_name)) = LOWER(TRIM(?))
+                      OR (? = 'JMU-Sainik Colony' AND store_name LIKE '%Sainik%')
+                  )
+                  AND (
+                      (? != '' AND LOWER(TRIM(employee_id)) = LOWER(TRIM(?)))
+                      OR
+                      (? != '' AND LOWER(TRIM(employee_name)) = LOWER(TRIM(?)))
+                  )
+                """,
+                (
+                    punch_in, punch_in,
+                    punch_out, punch_out,
+                    duration_mins, duration_mins,
+                    now_iso,
+                    date_str,
+                    store, store,
+                    emp_id, emp_id,
+                    emp_name, emp_name,
+                ),
+            )
     return len(rows)
 
 
