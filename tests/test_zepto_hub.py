@@ -151,8 +151,9 @@ def test_persisted_emails_local_crud_and_lineage(client):
         "subject": "Store JMU-Sainik Colony - Daily Shift Summary & DQ Loss Audit - 2026-09-15",
         "from": "audit@zepto.com",
         "date": "Tue, 15 Sep 2026 18:30:00 +0530",
-        "iso_date": "2026-09-15",
-        "month_ym": "2026-09",
+        "iso_date": "2026-07-15",
+        "month_ym": "2026-07",
+        "internal_date": "9999999999999",
         "snippet": "DQ Loss recorded: Rs 1450 for damaged dairy items.",
         "body_text": "DQ Loss recorded: Rs 1450 for damaged dairy items. Total SKU Count: 3.",
         "body_html": "<p>DQ Loss recorded: Rs 1450 for damaged dairy items.</p>",
@@ -192,7 +193,7 @@ def test_persisted_emails_local_crud_and_lineage(client):
     assert saved["linked_loss_records"][0]["amount"] == 1450.0
 
     # Query via REST API
-    res = client.get(f"/api/v1/zepto/gmail/emails?month=2026-09&category=DQ_LOSS")
+    res = client.get(f"/api/v1/zepto/gmail/emails?month=2026-07&category=DQ_LOSS")
     assert res.status_code == 200
     res_data = res.json()
     assert res_data["success"] is True
