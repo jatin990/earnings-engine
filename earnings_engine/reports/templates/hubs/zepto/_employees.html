@@ -201,7 +201,8 @@
             <table class="w-full text-left text-xs border-collapse select-none">
                 <thead>
                     <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                        <th class="p-2.5 pl-3.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('name')">
+                        <th class="p-2.5 pl-3.5 text-center font-mono w-10">#</th>
+                        <th class="p-2.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('name')">
                             <span class="inline-flex items-center gap-1">Staff Member <span id="sortIcon-name" class="text-slate-500 font-mono text-[9px]">⇅</span></span>
                         </th>
                         <th class="p-2.5 cursor-pointer hover:text-white transition group" onclick="zeptoApp.sortEmployees('role')">
@@ -513,6 +514,7 @@
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
                             <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase bg-black/40">
+                                <th class="py-2 px-2.5 text-center font-mono w-8">#</th>
                                 <th class="py-2 px-2.5">Month</th>
                                 <th class="py-2 px-2.5 text-right font-mono">Base Pay</th>
                                 <th class="py-2 px-2.5 text-right font-mono">Bonus</th>
@@ -523,7 +525,7 @@
                         </thead>
                         <tbody id="staffDrawerSalaryTableBody" class="divide-y divide-white/5 font-mono text-[11px]">
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-slate-500">
+                                <td colspan="7" class="text-center py-4 text-slate-500">
                                     No salary payout records logged.
                                 </td>
                             </tr>

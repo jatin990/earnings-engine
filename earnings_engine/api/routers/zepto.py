@@ -1889,10 +1889,13 @@ async def sync_attendance_from_gmail_endpoint() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.get("/api/v1/zepto/attendance/employee/{employee_id}", summary="Get Employee Attendance Detail & 30-Day Punch History")
-async def get_employee_attendance_detail_endpoint(employee_id: str) -> dict[str, Any]:
-    """Retrieve individual employee profile, metrics, risk tier, and 30-day punch ledger for slide-out drawer."""
+async def get_employee_attendance_detail_endpoint(
+    employee_id: str,
+    month: str | None = Query(None),
+) -> dict[str, Any]:
+    """Retrieve individual employee profile, metrics, risk tier, and punch ledger for slide-out drawer."""
     try:
-        detail = zepto_db.get_employee_attendance_detail(employee_id, settings=_settings)
+        detail = zepto_db.get_employee_attendance_detail(employee_id, month=month, settings=_settings)
         if not detail:
             raise HTTPException(status_code=404, detail=f"Employee '{employee_id}' not found.")
         return {"success": True, "detail": detail}

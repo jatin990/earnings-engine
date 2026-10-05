@@ -3375,6 +3375,7 @@ def delete_attendance_import(import_id: str, settings: Settings | None = None) -
 
 def get_employee_attendance_detail(
     employee_id: str,
+    month: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any] | None:
     """Retrieve 30-day comprehensive punch history, hours worked, and adherence scorecard for a single employee."""
@@ -3384,14 +3385,25 @@ def get_employee_attendance_detail(
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
 
-        records = conn.execute(
-            """
-            SELECT * FROM zepto_attendance_records
-            WHERE employee_id = ? OR employee_name = ?
-            ORDER BY shift_date DESC
-            """,
-            (employee_id, employee_id),
-        ).fetchall()
+        if month:
+            records = conn.execute(
+                """
+                SELECT * FROM zepto_attendance_records
+                WHERE (employee_id = ? OR employee_name = ?)
+                  AND shift_date LIKE ?
+                ORDER BY shift_date DESC
+                """,
+                (employee_id, employee_id, f"{month}%"),
+            ).fetchall()
+        else:
+            records = conn.execute(
+                """
+                SELECT * FROM zepto_attendance_records
+                WHERE employee_id = ? OR employee_name = ?
+                ORDER BY shift_date DESC
+                """,
+                (employee_id, employee_id),
+            ).fetchall()
 
         if not records:
             emp = conn.execute(

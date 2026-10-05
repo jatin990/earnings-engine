@@ -1054,7 +1054,7 @@ const zeptoApp = {
         if (items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="p-8 text-center text-slate-500">
+                    <td colspan="10" class="p-8 text-center text-slate-500">
                         No employees found matching filter criteria. Click "Add New Staff" to create one.
                     </td>
                 </tr>
@@ -1080,7 +1080,7 @@ const zeptoApp = {
             return this.empSortDirection === 'asc' ? cmp : -cmp;
         });
 
-        tbody.innerHTML = sortedItems.map(emp => {
+        tbody.innerHTML = sortedItems.map((emp, idx) => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
             const ratingStars = this.getRatingStars(emp.rating);
@@ -1090,7 +1090,8 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-white/[0.04] transition cursor-pointer ${isHidden ? 'opacity-50 bg-white/[0.01]' : ''}" onclick="zeptoApp.openStaffDrawer('${emp.id}')" title="Click row to open employee performance, attendance & IPP drawer">
-                    <td class="p-3.5 pl-4">
+                    <td class="p-3.5 pl-4 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
+                    <td class="p-3.5">
                         <div class="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
                             <span>${emp.name}</span>
                             <span class="text-[10px] text-purple-400 opacity-60">↗</span>
@@ -1187,8 +1188,9 @@ const zeptoApp = {
 
     async openStaffDrawer(empId, yearMonth = null) {
         if (!empId) return;
+        const targetMonth = yearMonth || (this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : null);
         this.currentStaffDrawerEmpId = empId;
-        this.currentStaffDrawerMonth = yearMonth;
+        this.currentStaffDrawerMonth = targetMonth;
 
         const drawer = document.getElementById('staffEmployeeDrawer');
         const backdrop = document.getElementById('staffEmployeeDrawerBackdrop');
@@ -1202,7 +1204,7 @@ const zeptoApp = {
         }
 
         try {
-            const url = `/api/v1/zepto/employees/${encodeURIComponent(empId)}/profile-analytics${yearMonth ? '?year_month=' + encodeURIComponent(yearMonth) : ''}`;
+            const url = `/api/v1/zepto/employees/${encodeURIComponent(empId)}/profile-analytics${targetMonth ? '?year_month=' + encodeURIComponent(targetMonth) : ''}`;
             const res = await fetch(url);
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Failed to fetch staff analytics');
@@ -1387,10 +1389,11 @@ const zeptoApp = {
             const salTbody = document.getElementById('staffDrawerSalaryTableBody');
             if (salTbody) {
                 if (salaries.length === 0) {
-                    salTbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-slate-500 text-xs">No compensation slips recorded yet.</td></tr>`;
+                    salTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-500 text-xs">No compensation slips recorded yet.</td></tr>`;
                 } else {
-                    salTbody.innerHTML = salaries.map(s => `
+                    salTbody.innerHTML = salaries.map((s, idx) => `
                         <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2 px-2.5 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
                             <td class="py-2 px-2.5 font-bold text-white">${s.year_month}</td>
                             <td class="py-2 px-2.5 text-right font-mono text-slate-300">${this.formatCurrency(s.base_amount)}</td>
                             <td class="py-2 px-2.5 text-right font-mono text-purple-400">${s.bonus_amount > 0 ? '+' + this.formatCurrency(s.bonus_amount) : '₹0'}</td>
@@ -1613,7 +1616,7 @@ const zeptoApp = {
 
             // Prefill slip form
             const today = new Date();
-            const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+            const ym = (this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL') ? this.currentGlobalMonth : `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
             document.getElementById('salSlipMonth').value = ym;
             document.getElementById('salSlipBase').value = emp.base_salary_monthly;
             document.getElementById('salSlipBonus').value = emp.current_month_bonus || 0;
@@ -1630,16 +1633,17 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (salaries.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">No monthly payout slips recorded yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-500">No monthly payout slips recorded yet.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = salaries.map(sal => {
+        tbody.innerHTML = salaries.map((sal, idx) => {
             const rVal = parseFloat(sal.performance_rating || 5.0).toFixed(1);
             const feedbackText = sal.rating_feedback ? ` · "${sal.rating_feedback}"` : '';
 
             return `
                 <tr>
+                    <td class="p-2.5 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
                     <td class="p-2.5 font-bold text-white">${sal.year_month}</td>
                     <td class="p-2.5 text-center font-mono font-bold text-amber-300">
                         <span class="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 inline-flex items-center gap-1" title="${sal.year_month} Rating${feedbackText}">
@@ -1667,7 +1671,8 @@ const zeptoApp = {
 
     openMonthlyRatingModal(empId, yearMonth, currentRating = 5.0, currentFeedback = '') {
         document.getElementById('ratingEmpId').value = empId;
-        document.getElementById('ratingMonthInput').value = yearMonth || new Date().toISOString().slice(0, 7);
+        const targetMonth = yearMonth || (this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : new Date().toISOString().slice(0, 7));
+        document.getElementById('ratingMonthInput').value = targetMonth;
         const r = parseFloat(currentRating || 5.0);
         document.getElementById('ratingRangeInput').value = r;
         document.getElementById('ratingScoreDisplay').textContent = `⭐ ${r.toFixed(1)}`;
@@ -1884,7 +1889,7 @@ const zeptoApp = {
         if (items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="p-8 text-center text-slate-500">
+                    <td colspan="10" class="p-8 text-center text-slate-500">
                         No expenses match the selected filters. Click "Record Expense" to track out-of-pocket store costs.
                     </td>
                 </tr>
@@ -1893,7 +1898,7 @@ const zeptoApp = {
         }
 
         // 3. Render Table Rows
-        tbody.innerHTML = items.map(exp => {
+        tbody.innerHTML = items.map((exp, idx) => {
             const catBadge = this.getCategoryBadge(exp.category);
             const proofLink = exp.document_url
                 ? `<a href="${exp.document_url}" target="_blank" class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold hover:underline">📄 View Bill</a>`
@@ -1902,7 +1907,7 @@ const zeptoApp = {
             // Reimbursement status toggle button/badge
             let reimbBadgeHtml = '';
             const isClaimable = exp.is_reimbursable !== undefined && exp.is_reimbursable !== null ? exp.is_reimbursable : 1;
-            
+
             if (exp.incurred_by === 'STORE_CASH') {
                 reimbBadgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30">Store Cash</span>`;
             } else if (isClaimable === 0) {
@@ -1927,7 +1932,8 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
-                    <td class="p-3.5 pl-4 font-bold text-white">${exp.title}</td>
+                    <td class="p-2.5 pl-3.5 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
+                    <td class="p-3.5 font-bold text-white">${exp.title}</td>
                     <td class="p-3.5">${catBadge}</td>
                     <td class="p-3.5 font-mono text-slate-400 text-[11px]">${exp.expense_date}</td>
                     <td class="p-3.5">
@@ -3391,7 +3397,7 @@ const zeptoApp = {
         if (!watchlist || watchlist.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="text-center py-6 text-emerald-400 text-xs font-semibold">
+                    <td colspan="6" class="text-center py-6 text-emerald-400 text-xs font-semibold">
                         ✨ 100% Roster Reliability · No chronic absenteeism flagged!
                     </td>
                 </tr>
@@ -3399,7 +3405,7 @@ const zeptoApp = {
             return;
         }
 
-        tbody.innerHTML = watchlist.map(w => {
+        tbody.innerHTML = watchlist.map((w, idx) => {
             const riskBadge = w.risk_tier === 'CRITICAL'
                 ? '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">CRITICAL</span>'
                 : (w.risk_tier === 'HIGH'
@@ -3408,6 +3414,7 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-rose-500/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${w.employee_id}')" title="Click to view full 30-day drilldown for ${w.employee_name}">
+                    <td class="py-2 px-2.5 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2 px-2.5">
                         <div class="font-bold text-white text-xs">${w.employee_name}</div>
                         <div class="text-[9px] font-mono text-slate-500">${w.employee_id}</div>
@@ -3498,6 +3505,29 @@ const zeptoApp = {
         this.renderAttendanceTable();
     },
 
+    toggleAttendanceTableExpand() {
+        const container = document.getElementById('attTableContainer');
+        const btn = document.getElementById('attTableExpandBtn');
+        if (!container) return;
+
+        const isExpanded = container.classList.contains('max-h-none');
+        if (isExpanded) {
+            container.classList.remove('max-h-none');
+            container.classList.add('max-h-[520px]');
+            if (btn) {
+                btn.innerHTML = '<span>⤢</span> <span id="attTableExpandBtnText">Expand Table</span>';
+                btn.setAttribute('title', 'Expand to view entire roster without inner scroll');
+            }
+        } else {
+            container.classList.remove('max-h-[520px]');
+            container.classList.add('max-h-none');
+            if (btn) {
+                btn.innerHTML = '<span>⤡</span> <span id="attTableExpandBtnText">Collapse Table</span>';
+                btn.setAttribute('title', 'Collapse back to scrollable window');
+            }
+        }
+    },
+
     renderAttendanceTable() {
         const tbody = document.getElementById('attTableBody');
         const badge = document.getElementById('attRecordCountBadge');
@@ -3509,7 +3539,7 @@ const zeptoApp = {
         if (staffList.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center py-8 text-slate-500 text-xs">
+                    <td colspan="10" class="text-center py-8 text-slate-500 text-xs">
                         No active employees match the selected criteria for this period.
                     </td>
                 </tr>
@@ -3517,7 +3547,7 @@ const zeptoApp = {
             return;
         }
 
-        tbody.innerHTML = staffList.map(s => {
+        tbody.innerHTML = staffList.map((s, idx) => {
             let riskBadge = '';
             if (s.risk_tier === 'CRITICAL') {
                 riskBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">CRITICAL</span>';
@@ -3534,6 +3564,7 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${s.employee_id}')" title="Click to view full shift punches & work duration ledger for ${s.employee_name}">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2.5 px-3">
                         <div class="font-bold text-white flex items-center gap-1.5">
                             <span>${s.employee_name || '—'}</span>
@@ -3618,7 +3649,9 @@ const zeptoApp = {
         document.body.style.overflow = 'hidden';
 
         try {
-            const res = await fetch(`/api/v1/zepto/attendance/employee/${encodeURIComponent(employeeId)}`);
+            const targetMonth = this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : null;
+            const queryParams = targetMonth ? `?month=${encodeURIComponent(targetMonth)}` : '';
+            const res = await fetch(`/api/v1/zepto/attendance/employee/${encodeURIComponent(employeeId)}${queryParams}`);
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.detail || 'Failed to load employee details');
@@ -4734,12 +4767,13 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = records.map(r => `
+        tbody.innerHTML = records.map((r, idx) => `
             <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                 <td class="py-2.5 px-3 font-mono text-slate-300 font-medium">${r.util_date}</td>
                 <td class="py-2.5 px-3">
                     <div class="font-bold text-white">${r.employee_name || '—'}</div>
@@ -5366,7 +5400,7 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (activeStaff.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active roster staff members found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No active roster staff members found.</td></tr>`;
             return;
         }
 
@@ -5405,7 +5439,7 @@ const zeptoApp = {
             });
         }
 
-        tbody.innerHTML = activeStaff.map(emp => {
+        tbody.innerHTML = activeStaff.map((emp, idx) => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
 
@@ -5445,6 +5479,7 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2.5 px-3">
                         <div class="font-bold text-white">${emp.name}</div>
                         <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
@@ -5463,6 +5498,7 @@ const zeptoApp = {
                 </tr>
             `;
         }).join('');
+    },
     },
 
     renderActiveStaffLoss(activeStaff) {
@@ -5513,17 +5549,18 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (activeStaff.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = activeStaff.map(emp => {
+        tbody.innerHTML = activeStaff.map((emp, idx) => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
             const stars = this.getRatingStars(emp.rating);
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2.5 px-3">
                         <div class="font-bold text-white">${emp.name}</div>
                         <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
@@ -5551,16 +5588,17 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (activeStaff.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No active staff members found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = activeStaff.map(emp => {
+        tbody.innerHTML = activeStaff.map((emp, idx) => {
             const roleBadge = this.getRoleBadge(emp.role);
             const statusBadge = this.getStatusBadge(emp.status);
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2.5 px-3">
                         <div class="font-bold text-white">${emp.name}</div>
                         <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
