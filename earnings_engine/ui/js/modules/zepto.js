@@ -1397,6 +1397,9 @@ const zeptoApp = {
             const punches = att.punch_history || [];
             if (punchCountEl) punchCountEl.textContent = `${punches.length} Shifts`;
 
+            // Render interactive GitHub-style contribution heatmap
+            this.renderContributionHeatmap('staffDrawerHeatmapContainer', punches, 'staffDrawerPunchTableBody');
+
             if (punchTbody) {
                 if (punches.length === 0) {
                     punchTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-500 text-xs">No shift records found for ${selMonth}.</td></tr>`;
@@ -1412,11 +1415,11 @@ const zeptoApp = {
                         const durHours = (durMins / 60).toFixed(1);
 
                         return `
-                            <tr class="hover:bg-white/[0.02] transition">
-                                <td class="py-2 px-2.5 font-bold text-white">${p.shift_date}</td>
+                            <tr class="hover:bg-white/[0.04] transition" data-shift-date="${p.shift_date}">
+                                <td class="py-2 px-2.5 font-bold text-white font-mono">${p.shift_date}</td>
                                 <td class="py-2 px-2.5 text-slate-300 text-[10px]">${p.shift_name || 'General Shift'}</td>
                                 <td class="py-2 px-2.5 text-sky-300 font-mono text-[10px]">${p.shift_time || '09:00 - 18:00'}</td>
-                                <td class="py-2 px-2.5 text-right font-mono text-purple-300">${durMins > 0 ? `${durHours}h (${durMins}m)` : '—'}</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-purple-300 font-bold">${durMins > 0 ? `${durHours}h (${durMins}m)` : '—'}</td>
                                 <td class="py-2 px-2.5 text-center">${stBadge}</td>
                             </tr>
                         `;
@@ -1462,6 +1465,403 @@ const zeptoApp = {
         if (backdrop) {
             backdrop.classList.remove('opacity-100');
             backdrop.classList.add('opacity-0', 'pointer-events-none');
+        }
+    },
+
+    toggleStaffDrawerExpand() {
+        const drawer = document.getElementById('staffEmployeeDrawer');
+        if (!drawer) return;
+        const currentWidth = drawer.getAttribute('data-drawer-width') || 'normal';
+        let nextWidth = 'wide';
+        if (currentWidth === 'normal') {
+            nextWidth = 'wide';
+            drawer.classList.remove('max-w-4xl', 'max-w-[98vw]');
+            drawer.classList.add('max-w-6xl');
+        } else if (currentWidth === 'wide') {
+            nextWidth = 'full';
+            drawer.classList.remove('max-w-4xl', 'max-w-6xl');
+            drawer.classList.add('max-w-[98vw]');
+        } else {
+            nextWidth = 'normal';
+            drawer.classList.remove('max-w-6xl', 'max-w-[98vw]');
+            drawer.classList.add('max-w-4xl');
+        }
+        drawer.setAttribute('data-drawer-width', nextWidth);
+        const btn = document.getElementById('staffDrawerExpandBtn');
+        if (btn) {
+            btn.title = nextWidth === 'full' ? 'Reset Drawer Size (Standard 4XL)' : nextWidth === 'wide' ? 'Expand to Fullscreen' : 'Expand Drawer (Extra-Wide 6XL)';
+        }
+    },
+
+    toggleAttDrawerExpand() {
+        const drawer = document.getElementById('attEmployeeDrawer');
+        if (!drawer) return;
+        const currentWidth = drawer.getAttribute('data-drawer-width') || 'normal';
+        let nextWidth = 'wide';
+        if (currentWidth === 'normal') {
+            nextWidth = 'wide';
+            drawer.classList.remove('max-w-4xl', 'max-w-[98vw]');
+            drawer.classList.add('max-w-6xl');
+        } else if (currentWidth === 'wide') {
+            nextWidth = 'full';
+            drawer.classList.remove('max-w-4xl', 'max-w-6xl');
+            drawer.classList.add('max-w-[98vw]');
+        } else {
+            nextWidth = 'normal';
+            drawer.classList.remove('max-w-6xl', 'max-w-[98vw]');
+            drawer.classList.add('max-w-4xl');
+        }
+        drawer.setAttribute('data-drawer-width', nextWidth);
+        const btn = document.getElementById('attDrawerExpandBtn');
+        if (btn) {
+            btn.title = nextWidth === 'full' ? 'Reset Drawer Size (Standard 4XL)' : nextWidth === 'wide' ? 'Expand to Fullscreen' : 'Expand Drawer (Extra-Wide 6XL)';
+        }
+    },
+
+    parseShiftScheduledMins(shiftTime) {
+        if (!shiftTime || typeof shiftTime !== 'string') return 540; // Default: 9.0h (540m)
+        const match = shiftTime.match(/(\d{1,2}):(\d{2})\s*(?:-|to)\s*(\d{1,2}):(\d{2})/i);
+        if (!match) return 540;
+        const startH = parseInt(match[1], 10);
+        const startM = parseInt(match[2], 10);
+        const endH = parseInt(match[3], 10);
+        const endM = parseInt(match[4], 10);
+        const startTotal = startH * 60 + startM;
+        let endTotal = endH * 60 + endM;
+        if (endTotal < startTotal) {
+            // Overnight shift spanning midnight
+            endTotal += 24 * 60;
+        }
+        const diff = endTotal - startTotal;
+        return diff > 0 ? diff : 540;
+    },
+
+    classifyShiftContribution(punch) {
+        const status = (punch.status || '').toUpperCase();
+        const durMins = Number(punch.work_duration_mins) || 0;
+        const schedMins = this.parseShiftScheduledMins(punch.shift_time);
+        const deltaMins = durMins - schedMins;
+
+        if (status === 'WEEK_OFF' || status === 'WO' || status === 'OFF') {
+            return {
+                type: 'week_off',
+                label: 'Week Off',
+                category: 'WEEK_OFF',
+                deltaMins: 0,
+                schedMins,
+                colorClass: 'bg-slate-700/60 border-slate-600/70 text-slate-300 hover:border-slate-400 hover:scale-110',
+                badgeClass: 'bg-slate-500/20 text-slate-300 border-white/10',
+                badgeText: '⚪ Week Off',
+                desc: 'Scheduled Weekly Rest Day'
+            };
+        }
+        if (status === 'HOLIDAY' || status === 'LEAVE') {
+            return {
+                type: 'holiday',
+                label: 'Holiday',
+                category: 'HOLIDAY',
+                deltaMins: 0,
+                schedMins,
+                colorClass: 'bg-slate-700/60 border-slate-600/70 text-slate-300 hover:border-slate-400 hover:scale-110',
+                badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+                badgeText: '🌴 Holiday / Leave',
+                desc: 'Paid / Scheduled Holiday or Leave'
+            };
+        }
+        if (status === 'ABSENT' || (durMins <= 0 && status !== 'WEEK_OFF' && status !== 'HOLIDAY')) {
+            return {
+                type: 'absent',
+                label: 'Absent',
+                category: 'ABSENT',
+                deltaMins: -schedMins,
+                schedMins,
+                colorClass: 'bg-rose-600/70 border-rose-500/80 text-rose-100 hover:border-rose-400 hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] hover:scale-110',
+                badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+                badgeText: '🔴 Absent',
+                desc: 'Unplanned Absence / Zero Logged Work Hours'
+            };
+        }
+
+        // Worked hours check
+        if (status === 'HALF_DAY' || deltaMins < -30) {
+            return {
+                type: 'undertime',
+                label: 'Undertime',
+                category: 'UNDERTIME',
+                deltaMins,
+                schedMins,
+                colorClass: 'bg-emerald-400/40 border-emerald-400/60 text-emerald-200 hover:border-emerald-300 hover:shadow-[0_0_8px_rgba(52,211,153,0.4)] hover:scale-110',
+                badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                badgeText: `🟡 Undertime (${deltaMins}m)`,
+                desc: `Short by ${Math.abs(deltaMins)} mins vs scheduled shift (${(schedMins / 60).toFixed(1)}h)`
+            };
+        }
+
+        if (deltaMins >= 30) {
+            return {
+                type: 'overtime',
+                label: 'Overtime',
+                category: 'OVERTIME',
+                deltaMins,
+                schedMins,
+                colorClass: 'bg-sky-500/85 border-sky-400/90 text-white font-bold hover:border-sky-300 hover:shadow-[0_0_12px_rgba(56,189,248,0.65)] hover:scale-110',
+                badgeClass: 'bg-sky-500/25 text-sky-200 border-sky-400/40',
+                badgeText: `🔵 Overtime (+${deltaMins}m)`,
+                desc: `Exceeded scheduled shift by +${deltaMins} mins (+${(deltaMins / 60).toFixed(1)}h OT)`
+            };
+        }
+
+        // On-time (within ±30 mins of scheduled shift)
+        return {
+            type: 'on_time',
+            label: 'On-Time',
+            category: 'ON_TIME',
+            deltaMins,
+            schedMins,
+            colorClass: 'bg-emerald-500/85 border-emerald-400/90 text-white font-bold hover:border-emerald-300 hover:shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:scale-110',
+            badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+            badgeText: `🟢 On-Time (${deltaMins >= 0 ? '+' + deltaMins + 'm' : deltaMins + 'm'})`,
+            desc: `Completed full shift (${(durMins / 60).toFixed(1)}h / ${(schedMins / 60).toFixed(1)}h scheduled)`
+        };
+    },
+
+    renderContributionHeatmap(containerId, punches, targetTbodyId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (!punches || punches.length === 0) {
+            container.innerHTML = `
+                <div class="p-4 rounded-lg bg-black/20 border border-white/5 text-center text-slate-500 text-xs font-mono">
+                    No shift muster records available to generate contribution matrix.
+                </div>
+            `;
+            return;
+        }
+
+        // Sort chronologically by shift_date
+        const sortedPunches = [...punches].sort((a, b) => (a.shift_date || '').localeCompare(b.shift_date || ''));
+
+        let otCount = 0;
+        let otMins = 0;
+        let onTimeCount = 0;
+        let underTimeCount = 0;
+        let underTimeMins = 0;
+        let woCount = 0;
+        let absentCount = 0;
+
+        const tileItems = sortedPunches.map(p => {
+            const cls = this.classifyShiftContribution(p);
+            if (cls.category === 'OVERTIME') {
+                otCount++;
+                otMins += Math.max(0, cls.deltaMins);
+            } else if (cls.category === 'ON_TIME') {
+                onTimeCount++;
+            } else if (cls.category === 'UNDERTIME') {
+                underTimeCount++;
+                underTimeMins += Math.abs(cls.deltaMins);
+            } else if (cls.category === 'WEEK_OFF' || cls.category === 'HOLIDAY') {
+                woCount++;
+            } else if (cls.category === 'ABSENT') {
+                absentCount++;
+            }
+
+            const dayNum = p.shift_date ? p.shift_date.split('-')[2] || p.shift_date : '•';
+            const durMins = Number(p.work_duration_mins) || 0;
+
+            const tooltipPayload = {
+                date: p.shift_date,
+                shiftName: p.shift_name || 'General Shift',
+                shiftTime: p.shift_time || '09:00 - 18:00',
+                punchIn: p.punch_in || null,
+                punchOut: p.punch_out || null,
+                workMins: durMins,
+                schedMins: cls.schedMins,
+                deltaMins: cls.deltaMins,
+                status: p.status || 'UNKNOWN',
+                badgeText: cls.badgeText,
+                badgeClass: cls.badgeClass,
+                desc: cls.desc
+            };
+
+            const encodedPayload = encodeURIComponent(JSON.stringify(tooltipPayload));
+
+            return `
+                <button
+                    type="button"
+                    class="w-7 h-7 sm:w-8 sm:h-8 rounded-[4px] border text-[10px] font-mono flex items-center justify-center transition-all cursor-pointer select-none focus:outline-none focus:ring-1 focus:ring-sky-400 ${cls.colorClass}"
+                    data-shift-date="${p.shift_date}"
+                    data-tooltip="${encodedPayload}"
+                    onmouseenter="zeptoApp.showHeatmapTooltip(event, this.getAttribute('data-tooltip'))"
+                    onmousemove="zeptoApp.moveHeatmapTooltip(event)"
+                    onmouseleave="zeptoApp.hideHeatmapTooltip()"
+                    onclick="zeptoApp.highlightShiftRow('${targetTbodyId}', '${p.shift_date}')"
+                    aria-label="Shift ${p.shift_date}: ${cls.label}"
+                >
+                    ${dayNum}
+                </button>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="p-3.5 rounded-xl bg-black/30 border border-white/10 space-y-3">
+                <!-- Summary Metric Ribbon -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-white/5 text-[10px] font-mono">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-200 border border-sky-400/30 font-bold" title="Total Overtime Shifts">
+                            🔵 ${otCount} OT (${(otMins / 60).toFixed(1)}h)
+                        </span>
+                        <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold" title="On-Time Shifts (within ±30m of shift)">
+                            🟢 ${onTimeCount} On-Time
+                        </span>
+                        <span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold" title="Undertime / Partial Shifts">
+                            🟡 ${underTimeCount} Undertime (${(underTimeMins / 60).toFixed(1)}h)
+                        </span>
+                        <span class="px-2 py-0.5 rounded bg-slate-500/15 text-slate-300 border border-white/10 font-bold" title="Week Offs & Holidays">
+                            ⚪ ${woCount} Off
+                        </span>
+                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold" title="Absences">
+                            🔴 ${absentCount} Absent
+                        </span>
+                    </div>
+                    <span class="text-slate-400 text-[10px]">
+                        ${sortedPunches.length} Days Tracked
+                    </span>
+                </div>
+
+                <!-- GitHub Contribution Matrix Grid -->
+                <div class="flex flex-wrap gap-1.5 items-center justify-start py-1">
+                    ${tileItems}
+                </div>
+
+                <!-- Footer Legend & Interaction Hint -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-[10px] text-slate-400">
+                    <div class="flex items-center gap-3">
+                        <span class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Legend:</span>
+                        <div class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-[2px] bg-slate-700/70 border border-slate-600/70 inline-block"></span>
+                            <span class="text-[9px]">Week Off</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-[2px] bg-rose-600/70 border border-rose-500/80 inline-block"></span>
+                            <span class="text-[9px]">Absent</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-[2px] bg-emerald-400/40 border border-emerald-400/60 inline-block"></span>
+                            <span class="text-[9px]">Undertime</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-[2px] bg-emerald-500/85 border border-emerald-400/90 inline-block"></span>
+                            <span class="text-[9px]">On-Time</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="w-3 h-3 rounded-[2px] bg-sky-500/85 border border-sky-400/90 inline-block"></span>
+                            <span class="text-[9px]">Overtime</span>
+                        </div>
+                    </div>
+                    <span class="text-[9px] text-slate-400 italic">
+                        💡 Click any tile to jump to shift details
+                    </span>
+                </div>
+            </div>
+        `;
+    },
+
+    showHeatmapTooltip(event, encodedData) {
+        if (!encodedData) return;
+        let data = {};
+        try {
+            data = JSON.parse(decodeURIComponent(encodedData));
+        } catch (e) {
+            return;
+        }
+
+        let popover = document.getElementById('zeptoHeatmapPopover');
+        if (!popover) {
+            popover = document.createElement('div');
+            popover.id = 'zeptoHeatmapPopover';
+            popover.className = 'fixed z-[9999] pointer-events-none transition-opacity duration-150 p-3 rounded-xl bg-[#090d16]/95 border border-white/20 shadow-2xl backdrop-blur-xl text-xs max-w-xs space-y-2 opacity-0 font-sans';
+            document.body.appendChild(popover);
+        }
+
+        const dateFormatted = data.date ? new Date(data.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : data.date;
+
+        const inPunch = data.punchIn ? `<span class="text-emerald-300 font-mono font-bold">${data.punchIn}</span>` : '<span class="text-slate-500 font-mono">—</span>';
+        const outPunch = data.punchOut ? `<span class="text-sky-300 font-mono font-bold">${data.punchOut}</span>` : '<span class="text-slate-500 font-mono">—</span>';
+
+        popover.innerHTML = `
+            <div class="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+                <div class="font-bold text-white font-mono text-[11px]">${dateFormatted || 'Shift Date'}</div>
+                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono border ${data.badgeClass || 'bg-white/10 text-white'}">${data.badgeText || data.status}</span>
+            </div>
+            <div class="space-y-1.5 text-[10px]">
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Shift Name:</span>
+                    <span class="font-semibold text-slate-200">${data.shiftName || 'General Shift'}</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Scheduled:</span>
+                    <span class="font-mono text-sky-300 font-bold">${data.shiftTime || '09:00 - 18:00'} (${(data.schedMins / 60).toFixed(1)}h)</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Actual Punches:</span>
+                    <span>${inPunch} → ${outPunch}</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-300">
+                    <span class="text-slate-400">Logged Work:</span>
+                    <span class="font-mono font-bold ${data.workMins > 0 ? 'text-white' : 'text-slate-500'}">${data.workMins > 0 ? `${(data.workMins / 60).toFixed(1)}h (${data.workMins}m)` : '0 mins'}</span>
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-white/5 font-mono">
+                    <span class="text-slate-400">Shift Delta:</span>
+                    <span class="font-bold ${data.deltaMins > 0 ? 'text-sky-300' : data.deltaMins < 0 ? 'text-amber-300' : 'text-emerald-400'}">
+                        ${data.deltaMins > 0 ? `+${data.deltaMins}m Overtime 🔵` : data.deltaMins < 0 ? `${data.deltaMins}m Shortage 🟡` : '0m (On-Time) 🟢'}
+                    </span>
+                </div>
+                ${data.desc ? `<p class="text-[9px] text-slate-400 italic pt-0.5">${data.desc}</p>` : ''}
+            </div>
+        `;
+
+        this.moveHeatmapTooltip(event);
+        popover.classList.remove('opacity-0');
+        popover.classList.add('opacity-100');
+    },
+
+    moveHeatmapTooltip(event) {
+        const popover = document.getElementById('zeptoHeatmapPopover');
+        if (!popover) return;
+        const pad = 12;
+        let left = event.clientX + pad;
+        let top = event.clientY + pad;
+
+        const rect = popover.getBoundingClientRect();
+        if (left + rect.width > window.innerWidth - 10) {
+            left = event.clientX - rect.width - pad;
+        }
+        if (top + rect.height > window.innerHeight - 10) {
+            top = event.clientY - rect.height - pad;
+        }
+
+        popover.style.left = `${Math.max(10, left)}px`;
+        popover.style.top = `${Math.max(10, top)}px`;
+    },
+
+    hideHeatmapTooltip() {
+        const popover = document.getElementById('zeptoHeatmapPopover');
+        if (popover) {
+            popover.classList.remove('opacity-100');
+            popover.classList.add('opacity-0');
+        }
+    },
+
+    highlightShiftRow(tbodyId, shiftDate) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        const row = tbody.querySelector(`tr[data-shift-date="${shiftDate}"]`);
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.classList.add('!bg-sky-500/20', 'ring-1', 'ring-sky-400');
+            setTimeout(() => {
+                row.classList.remove('!bg-sky-500/20', 'ring-1', 'ring-sky-400');
+            }, 2000);
         }
     },
 
@@ -3790,6 +4190,9 @@ const zeptoApp = {
         const history = emp.punch_history || [];
         if (histCountEl) histCountEl.textContent = `${history.length} shifts`;
 
+        // Render interactive GitHub-style contribution heatmap
+        this.renderContributionHeatmap('attDrawerHeatmapContainer', history, 'drawerPunchHistoryBody');
+
         const tbody = document.getElementById('drawerPunchHistoryBody');
         if (!tbody) return;
 
@@ -3816,7 +4219,7 @@ const zeptoApp = {
             const outTimeStr = p.punch_out ? `<span class="text-sky-300 font-mono font-bold">${p.punch_out}</span>` : '<span class="text-slate-600">—</span>';
 
             return `
-                <tr class="hover:bg-white/[0.02] transition">
+                <tr class="hover:bg-white/[0.04] transition" data-shift-date="${p.shift_date}">
                     <td class="py-2 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">${p.shift_date}</td>
                     <td class="py-2 px-2.5 text-[10px] text-slate-300 truncate max-w-[110px]" title="${p.shift_name || 'General Shift'}">${p.shift_name || 'General Shift'}</td>
                     <td class="py-2 px-2.5 font-mono text-[10px] whitespace-nowrap">${inTimeStr}</td>

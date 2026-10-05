@@ -613,10 +613,11 @@
 
     <aside
         id="attEmployeeDrawer"
-        class="fixed top-0 right-0 z-50 h-full w-full max-w-lg glass-panel !rounded-none border-l border-white/10 shadow-2xl transform translate-x-full transition-transform duration-300 ease-out flex flex-col overflow-hidden"
+        class="fixed top-0 right-0 z-50 h-full w-full max-w-4xl glass-panel !rounded-none border-l border-white/10 shadow-2xl transform translate-x-full transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawerEmpName"
+        data-drawer-width="normal"
     >
         <!-- Drawer Header -->
         <div class="p-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between shrink-0">
@@ -636,10 +637,23 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
                 <span id="drawerRiskBadge" class="text-[9px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
                     --
                 </span>
+                <!-- Expand / Compact Toggle Button -->
+                <button
+                    type="button"
+                    id="attDrawerExpandBtn"
+                    onclick="zeptoApp.toggleAttDrawerExpand()"
+                    class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition focus:outline-none"
+                    title="Expand Drawer (Standard / Wide / Fullscreen)"
+                    aria-label="Expand drawer width"
+                >
+                    <svg id="attDrawerExpandIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                </button>
                 <button
                     onclick="zeptoApp.closeEmployeeDrawer()"
                     class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition focus:outline-none"
@@ -678,13 +692,19 @@
             </div>
 
             <!-- 30-Day Shift History Timeline & Ledger -->
-            <div class="space-y-2">
+            <div class="space-y-3">
                 <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                        Shift & Attendance Ledger (30 Days)
-                    </h4>
-                    <span class="text-[10px] text-slate-500 font-mono" id="drawerHistoryCount">0 shifts</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🕒</span> Shift Muster & Contribution Heatmap
+                        </h4>
+                        <p class="text-[10px] text-slate-400">Interactive contribution matrix, shift timings & work duration deltas.</p>
+                    </div>
+                    <span class="text-[10px] text-slate-300 font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10" id="drawerHistoryCount">0 shifts</span>
                 </div>
+
+                <!-- GitHub-Style Contribution Heatmap Container -->
+                <div id="attDrawerHeatmapContainer" class="w-full"></div>
 
                 <div class="overflow-x-auto rounded-lg border border-white/5 bg-black/20">
                     <table class="w-full text-left text-xs border-collapse">
@@ -726,6 +746,6 @@
     {% include "hubs/zepto/_modals.html" %}
 
     <!-- Zepto Module Script -->
-    <script src="/static/js/modules/zepto.js?v=20261005_v15_syntax_fix"></script>
+    <script src="/static/js/modules/zepto.js?v=20261005_v16_github_heatmap"></script>
 </body>
 </html>

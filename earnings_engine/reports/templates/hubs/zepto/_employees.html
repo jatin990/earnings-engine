@@ -247,7 +247,7 @@
 
     <aside
         id="staffEmployeeDrawer"
-        class="fixed top-0 right-0 z-50 h-full w-full max-w-2xl bg-[#0d121c] border-l border-white/10 shadow-2xl transform translate-x-full transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
+        class="fixed top-0 right-0 z-50 h-full w-full max-w-4xl bg-[#0d121c] border-l border-white/10 shadow-2xl transform translate-x-full transition-all duration-300 ease-in-out flex flex-col overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-labelledby="staffDrawerName"
@@ -508,18 +508,21 @@
             </div>
 
             <!-- Granular Shift & Work Log (Selected Month) -->
-            <div class="glass-panel-sub p-3 space-y-2">
+            <div class="glass-panel-sub p-3.5 space-y-3">
                 <div class="flex items-center justify-between">
                     <div>
                         <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                            <span>🕒</span> Shift Muster & Daily Work Logs
+                            <span>🕒</span> Shift Muster & Contribution Heatmap
                         </h4>
-                        <p class="text-[10px] text-slate-400">Granular daily shift assignments, shift timings & scheduled work duration.</p>
+                        <p class="text-[10px] text-slate-400">Interactive contribution matrix, shift timings, punch logs & work duration deltas.</p>
                     </div>
                     <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300" id="staffDrawerPunchCount">
                         0 Days
                     </span>
                 </div>
+
+                <!-- GitHub-Style Contribution Heatmap Container -->
+                <div id="staffDrawerHeatmapContainer" class="w-full"></div>
 
                 <div class="overflow-x-auto custom-scrollbar max-h-60 rounded border border-white/10">
                     <table class="w-full text-left text-xs border-collapse">
