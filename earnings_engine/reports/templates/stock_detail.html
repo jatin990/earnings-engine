@@ -5654,7 +5654,6 @@
                     updateHudWithLastBar();
                     return;
                 }
-                const volData = param.seriesData.get(volumeSeries);
                 if (candleData) {
                     if (el('hudDate')) el('hudDate').textContent = timeVal || param.time;
                     if (el('hudOpen')) el('hudOpen').textContent = candleData.open != null ? '₹' + candleData.open.toFixed(2) : '—';
