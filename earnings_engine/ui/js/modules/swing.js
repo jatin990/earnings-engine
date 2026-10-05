@@ -19,24 +19,6 @@
         _swingAuditOpen: false,
 
         // -------------------------------------------------------------------------
-        // Stock Intelligence Slide-Out Drawer Integration
-        // -------------------------------------------------------------------------
-        openStockDrawer(ticker) {
-            if (!ticker) return;
-            const clean = String(ticker).trim().toUpperCase();
-            const cleanTicker = (clean.endsWith('.NS') || clean.endsWith('.BO')) ? clean : (clean.includes('.') ? clean : clean + '.NS');
-            if (typeof app.openStockIntelligencePanel === 'function') {
-                app.openStockIntelligencePanel(cleanTicker);
-            } else if (typeof app.openBreakoutInspectorDrawer === 'function') {
-                app.openBreakoutInspectorDrawer(cleanTicker);
-            } else if (typeof app.selectBreakoutCandidate === 'function') {
-                app.selectBreakoutCandidate(cleanTicker, false, true);
-            } else {
-                window.open('/stock/' + encodeURIComponent(cleanTicker), '_blank');
-            }
-        },
-
-        // -------------------------------------------------------------------------
         // Sub-Tab Navigation Controller (Synced with Sidebar Tree & Context Label)
         // -------------------------------------------------------------------------
         switchSwingSubTab(tabName) {
