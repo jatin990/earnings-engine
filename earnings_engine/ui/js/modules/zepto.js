@@ -5562,7 +5562,6 @@ const zeptoApp = {
             `;
         }).join('');
     },
-    },
 
     renderActiveStaffLoss(activeStaff) {
         const tbody = document.getElementById('lossActiveStaffTableBody');

@@ -438,11 +438,13 @@ def test_expected_monthly_salary_calculations():
 
     picker_id = f"EMP_PAY_PICK_{uuid.uuid4().hex[:4]}"
     incharge_id = f"EMP_PAY_INC_{uuid.uuid4().hex[:4]}"
+    picker_name = f"Ramesh Picker {uuid.uuid4().hex[:4]}"
+    incharge_name = f"Suresh Incharge {uuid.uuid4().hex[:4]}"
 
     # Create employee profiles with explicit roles & baseline salaries
     zepto_db.create_employee({
         "id": picker_id,
-        "name": "Ramesh Picker",
+        "name": picker_name,
         "role": "PICKER",
         "status": "ACTIVE",
         "base_salary_monthly": 14000.0,
@@ -450,7 +452,7 @@ def test_expected_monthly_salary_calculations():
 
     zepto_db.create_employee({
         "id": incharge_id,
-        "name": "Suresh Incharge",
+        "name": incharge_name,
         "role": "SHIFT_INCHARGE",
         "status": "ACTIVE",
         "base_salary_monthly": 20000.0,
@@ -465,7 +467,7 @@ def test_expected_monthly_salary_calculations():
         "records": [
             {
                 "employee_id": picker_id,
-                "employee_name": "Ramesh Picker",
+                "employee_name": picker_name,
                 "store_name": test_store,
                 "shift_date": "2026-09-01",
                 "status": "PRESENT",
@@ -474,7 +476,7 @@ def test_expected_monthly_salary_calculations():
             },
             {
                 "employee_id": picker_id,
-                "employee_name": "Ramesh Picker",
+                "employee_name": picker_name,
                 "store_name": test_store,
                 "shift_date": "2026-09-02",
                 "status": "PRESENT",
@@ -483,7 +485,7 @@ def test_expected_monthly_salary_calculations():
             },
             {
                 "employee_id": picker_id,
-                "employee_name": "Ramesh Picker",
+                "employee_name": picker_name,
                 "store_name": test_store,
                 "shift_date": "2026-09-03",
                 "status": "WEEK_OFF",
@@ -492,7 +494,7 @@ def test_expected_monthly_salary_calculations():
             },
             {
                 "employee_id": picker_id,
-                "employee_name": "Ramesh Picker",
+                "employee_name": picker_name,
                 "store_name": test_store,
                 "shift_date": "2026-09-04",
                 "status": "ABSENT",
@@ -503,7 +505,7 @@ def test_expected_monthly_salary_calculations():
             # Expected salary = 1 * 666.67 = 666.67
             {
                 "employee_id": incharge_id,
-                "employee_name": "Suresh Incharge",
+                "employee_name": incharge_name,
                 "store_name": test_store,
                 "shift_date": "2026-09-01",
                 "status": "PRESENT",
