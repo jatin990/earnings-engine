@@ -563,16 +563,88 @@
     </section>
 
     <!-- Active Staff Monthly Attendance & Time Inspector Table -->
-    <section class="glass-panel p-4 space-y-3">
+    <section class="glass-panel p-4 space-y-3" id="attTableSection">
+        <!-- Active Daily Timeline Filter Banner (Visible when a day bar on timeline is clicked) -->
+        <div id="attDateActiveFilterBanner" class="hidden rounded-xl p-3 bg-purple-950/40 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg shadow-purple-950/20">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-base">
+                    <span>📅</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-200">Daily Picker & Staff Deployment</span>
+                        <span id="attSelectedDateBadge" class="text-xs font-black font-mono px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-500/50">--</span>
+                        <span id="attDailyPresentPctBadge" class="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">--% Present</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mt-0.5" id="attDailyTimelineSummaryText">
+                        Showing pickers and staff roster deployed for this day.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Quick Segment Filter Buttons & Clear Action -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Filter: All Pickers -->
+                <button
+                    type="button"
+                    id="attBtnPickersAll"
+                    onclick="zeptoApp.setDailyStatusFilter('PICKERS_ALL')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-purple-500/30 bg-purple-500/20 text-purple-200 hover:bg-purple-500/30 transition flex items-center gap-1.5"
+                >
+                    <span>🛒</span> All Pickers (<span id="attCountPickersAll" class="font-mono font-bold">0</span>)
+                </button>
+
+                <!-- Filter: Present Pickers -->
+                <button
+                    type="button"
+                    id="attBtnPickersPresent"
+                    onclick="zeptoApp.setDailyStatusFilter('PICKERS_PRESENT')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/25 transition flex items-center gap-1.5"
+                >
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Present (<span id="attCountPickersPresent" class="font-mono font-bold">0</span>)
+                </button>
+
+                <!-- Filter: Absent Pickers -->
+                <button
+                    type="button"
+                    id="attBtnPickersAbsent"
+                    onclick="zeptoApp.setDailyStatusFilter('PICKERS_ABSENT')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/25 transition flex items-center gap-1.5"
+                >
+                    <span class="w-2 h-2 rounded-full bg-rose-400"></span> Absent (<span id="attCountPickersAbsent" class="font-mono font-bold">0</span>)
+                </button>
+
+                <!-- Filter: All Staff on that day -->
+                <button
+                    type="button"
+                    id="attBtnStaffAll"
+                    onclick="zeptoApp.setDailyStatusFilter('ALL_STAFF')"
+                    class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition flex items-center gap-1.5"
+                >
+                    <span>👥</span> All Roles (<span id="attCountStaffAll" class="font-mono font-bold">0</span>)
+                </button>
+
+                <!-- Clear Filter Button -->
+                <button
+                    type="button"
+                    onclick="zeptoApp.clearDateFilter()"
+                    class="px-3 py-1 rounded-lg text-xs font-bold border border-white/20 bg-white/10 text-white hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 transition flex items-center gap-1"
+                    title="Return to full monthly staff roster view"
+                >
+                    <span>✕</span> Clear Filter
+                </button>
+            </div>
+        </div>
+
         <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pb-2 border-b border-white/5">
             <div>
                 <div class="flex items-center gap-2">
-                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Active Staff Attendance & Work Log</h4>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider" id="attTableHeadingTitle">Active Staff Attendance & Work Log</h4>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="attRecordCountBadge">
                         0 Active Employees
                     </span>
                 </div>
-                <p class="text-[10px] text-slate-400 mt-0.5">Click any employee row to open the side drawer for full shift timings, scheduled duration & work logs.</p>
+                <p class="text-[10px] text-slate-400 mt-0.5" id="attTableSubheadingText">Click any employee row to open the side drawer for full shift timings, scheduled duration & work logs.</p>
             </div>
 
             <!-- Filters -->
@@ -627,7 +699,7 @@
         <!-- Table Container -->
         <div id="attTableContainer" class="overflow-x-auto custom-scrollbar max-h-[520px] transition-all duration-300">
             <table class="w-full text-left text-xs border-collapse">
-                <thead>
+                <thead id="attTableHead">
                     <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
                         <th class="py-2.5 px-3 text-center font-mono w-10">#</th>
                         <th class="py-2.5 px-3">Employee Name</th>

@@ -33,7 +33,18 @@ const zeptoApp = {
     expenses: [],
     candidates: [],
     security: null,
-    attendance: { summary: null, records: [], filtered: [], staff_roster: [], filtered_staff: [], roles: [] },
+    attendance: {
+        summary: null,
+        records: [],
+        filtered: [],
+        staff_roster: [],
+        filtered_staff: [],
+        roles: [],
+        selected_date: null,
+        daily_status_filter: 'PICKERS_ALL',
+        daily_records: [],
+        filtered_daily_records: [],
+    },
     gmail: {
         emails: [],
         filtered: [],
@@ -3780,6 +3791,12 @@ const zeptoApp = {
         }
     },
 
+    isPickerRole(role) {
+        if (!role) return false;
+        const r = String(role).toLowerCase();
+        return r.includes('packer') || r.includes('picker') || r.includes('flex');
+    },
+
     renderAttendanceTimeline(trend, pickerSummary = {}, siSummary = {}) {
         const container = document.getElementById('attDailyTimelineContainer');
         const pickerAvgBadge = document.getElementById('attTimelinePickerAvgBadge');
@@ -3802,6 +3819,7 @@ const zeptoApp = {
         }
 
         const maxScheduled = Math.max(...trend.map(d => d.scheduled || 1), 15);
+        const selectedDate = this.attendance.selected_date;
 
         container.innerHTML = trend.map(d => {
             const scheduled = d.scheduled || 0;
@@ -3826,32 +3844,35 @@ const zeptoApp = {
             const hPct = scheduled > 0 ? (holiday / scheduled) * 100 : 0;
 
             const isLowAttendance = scheduled >= 5 && (present / scheduled) < 0.6;
-            const borderHighlight = isLowAttendance ? 'border-b-2 border-b-rose-500' : '';
+            const isSelected = selectedDate === d.date;
 
             const siTooltipText = sisSched > 0 ? ` | ⚡ ${sisPres}/${sisSched} SIs (Avg ${sisAvgShift}h)` : '';
-            const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift)${siTooltipText} | ${absent} Absent | ${weekOff} WO`;
+            const borderHighlight = isSelected
+                ? 'ring-2 ring-purple-400 bg-purple-500/20 rounded-lg scale-[1.04] p-1 shadow-lg shadow-purple-500/30'
+                : (isLowAttendance ? 'border-b-2 border-b-rose-500' : '');
 
+            const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift)${siTooltipText} | ${absent} Absent | ${weekOff} WO (Click to filter roster)`;
             const siBadgeChip = sisPres > 0 ? `<span class="text-amber-300 ml-1">${sisPres}⚡</span>` : '';
 
             return `
                 <div
-                    class="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer ${borderHighlight}"
-                    onclick="zeptoApp.filterByDate('${d.date}')"
+                    class="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer transition-all duration-200 ${borderHighlight}"
+                    onclick="zeptoApp.selectTimelineDate('${d.date}')"
                     title="${tooltipText}"
                 >
                     <!-- Top Daily Picker & SI Count Chip -->
-                    <div class="text-[8px] font-mono font-extrabold text-purple-300 opacity-80 group-hover:opacity-100 mb-1 leading-none whitespace-nowrap">
+                    <div class="text-[8px] font-mono font-extrabold ${isSelected ? 'text-purple-200 scale-110 font-black' : 'text-purple-300 opacity-80 group-hover:opacity-100'} mb-1 leading-none whitespace-nowrap">
                         ${pickersPres > 0 ? `${pickersPres}🛒` : ''}${siBadgeChip}
                     </div>
                     <!-- Bar Stack Container -->
-                    <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125 border border-white/5" style="height: ${totalHeightPct}%;">
+                    <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125 border ${isSelected ? 'border-purple-400/80 shadow-md shadow-purple-500/40' : 'border-white/5'}" style="height: ${totalHeightPct}%;">
                         <div class="bg-emerald-500/80 w-full" style="height: ${pPct}%;"></div>
                         <div class="bg-rose-500/80 w-full" style="height: ${aPct}%;"></div>
                         <div class="bg-slate-600/80 w-full" style="height: ${wPct}%;"></div>
                         <div class="bg-sky-500/80 w-full" style="height: ${hPct}%;"></div>
                     </div>
                     <!-- Date Label -->
-                    <div class="text-[9px] font-mono font-bold text-slate-400 mt-1.5 group-hover:text-white">
+                    <div class="text-[9px] font-mono font-bold ${isSelected ? 'text-purple-200 underline' : 'text-slate-400'} mt-1.5 group-hover:text-white">
                         ${dayLabel}/${monthLabel}
                     </div>
                 </div>
@@ -3859,13 +3880,209 @@ const zeptoApp = {
         }).join('');
     },
 
-    filterByDate(dateStr) {
-        const dateInput = document.getElementById('attDateFilter');
-        if (dateInput) {
-            dateInput.value = dateStr;
-            this.filterAttendance();
-            this.showToast(`📅 Filtered attendance ledger to ${dateStr}`);
+    async selectTimelineDate(dateStr) {
+        if (!dateStr) return;
+
+        // If user clicks the currently selected date, toggle/clear filter
+        if (this.attendance.selected_date === dateStr) {
+            this.clearDateFilter();
+            return;
         }
+
+        this.attendance.selected_date = dateStr;
+        this.attendance.daily_status_filter = this.attendance.daily_status_filter || 'PICKERS_ALL';
+
+        // Re-render timeline to immediately highlight active date bar
+        const sum = this.attendance.summary || {};
+        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {}, sum.si_summary || {});
+
+        // Show banner in loading state
+        const banner = document.getElementById('attDateActiveFilterBanner');
+        if (banner) banner.classList.remove('hidden');
+
+        const dateBadge = document.getElementById('attSelectedDateBadge');
+        if (dateBadge) dateBadge.textContent = dateStr;
+
+        const summaryText = document.getElementById('attDailyTimelineSummaryText');
+        if (summaryText) summaryText.textContent = `Loading picker deployments and shift records for ${dateStr}...`;
+
+        try {
+            const res = await fetch(`/api/v1/zepto/attendance/records?date=${encodeURIComponent(dateStr)}&limit=500`);
+            if (res.ok) {
+                const data = await res.json();
+                this.attendance.daily_records = data.records || [];
+            } else {
+                this.attendance.daily_records = [];
+            }
+        } catch (err) {
+            console.error('[ZEPTO] Failed to fetch daily attendance records:', err);
+            this.attendance.daily_records = [];
+        }
+
+        this.applyDailyFilters();
+        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {}, sum.si_summary || {});
+
+        // Scroll to table smoothly
+        const tableSection = document.getElementById('attTableSection');
+        if (tableSection) {
+            tableSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    },
+
+    setDailyStatusFilter(filterKey) {
+        this.attendance.daily_status_filter = filterKey;
+        this.applyDailyFilters();
+    },
+
+    clearDateFilter() {
+        this.attendance.selected_date = null;
+        this.attendance.daily_records = [];
+        this.attendance.filtered_daily_records = [];
+
+        const banner = document.getElementById('attDateActiveFilterBanner');
+        if (banner) banner.classList.add('hidden');
+
+        const sum = this.attendance.summary || {};
+        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {}, sum.si_summary || {});
+
+        this.filterAttendance();
+        this.showToast('📅 Cleared daily filter · Showing monthly staff roster');
+    },
+
+    applyDailyFilters() {
+        if (!this.attendance.selected_date) {
+            this.filterAttendance();
+            return;
+        }
+
+        const records = this.attendance.daily_records || [];
+        const query = (document.getElementById('attSearchInput')?.value || '').toLowerCase().trim();
+        const roleFilter = document.getElementById('attRoleFilter')?.value || '';
+        const riskFilter = document.getElementById('attRiskFilter')?.value || '';
+
+        // Calculate segment counts across all records for this date
+        let pickersAllCount = 0;
+        let pickersPresentCount = 0;
+        let pickersAbsentCount = 0;
+        let staffAllCount = records.length;
+
+        records.forEach(r => {
+            const isPicker = this.isPickerRole(r.designation);
+            const isPres = (r.status || '').toUpperCase() === 'PRESENT';
+            const isAbs = (r.status || '').toUpperCase() === 'ABSENT';
+
+            if (isPicker) {
+                pickersAllCount++;
+                if (isPres) pickersPresentCount++;
+                if (isAbs) pickersAbsentCount++;
+            }
+        });
+
+        // Update banner badges and button counters
+        const banner = document.getElementById('attDateActiveFilterBanner');
+        if (banner) banner.classList.remove('hidden');
+
+        const dateBadge = document.getElementById('attSelectedDateBadge');
+        if (dateBadge) dateBadge.textContent = this.attendance.selected_date;
+
+        const presentPctBadge = document.getElementById('attDailyPresentPctBadge');
+        if (presentPctBadge) {
+            const pickerPct = pickersAllCount > 0 ? Math.round((pickersPresentCount / pickersAllCount) * 100) : 0;
+            presentPctBadge.textContent = `${pickerPct}% Present (${pickersPresentCount}/${pickersAllCount} Pickers)`;
+            presentPctBadge.className = pickerPct >= 85
+                ? 'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : (pickerPct >= 70
+                    ? 'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30');
+        }
+
+        const summaryText = document.getElementById('attDailyTimelineSummaryText');
+        if (summaryText) {
+            summaryText.innerHTML = `<strong>${pickersPresentCount}</strong> of <strong>${pickersAllCount}</strong> pickers present · <strong>${pickersAbsentCount}</strong> absent · <strong>${staffAllCount}</strong> total staff on roster.`;
+        }
+
+        // Counters on buttons
+        const countPickersAllEl = document.getElementById('attCountPickersAll');
+        if (countPickersAllEl) countPickersAllEl.textContent = pickersAllCount;
+
+        const countPickersPresEl = document.getElementById('attCountPickersPresent');
+        if (countPickersPresEl) countPickersPresEl.textContent = pickersPresentCount;
+
+        const countPickersAbsEl = document.getElementById('attCountPickersAbsent');
+        if (countPickersAbsEl) countPickersAbsEl.textContent = pickersAbsentCount;
+
+        const countStaffAllEl = document.getElementById('attCountStaffAll');
+        if (countStaffAllEl) countStaffAllEl.textContent = staffAllCount;
+
+        // Active button state styling
+        const filter = this.attendance.daily_status_filter || 'PICKERS_ALL';
+        this.updateDailyButtonStyles(filter);
+
+        // Apply filtering to daily records
+        this.attendance.filtered_daily_records = records.filter(r => {
+            const isPicker = this.isPickerRole(r.designation);
+            const st = (r.status || '').toUpperCase();
+
+            // 1. Daily segment filter
+            if (filter === 'PICKERS_ALL' && !isPicker) return false;
+            if (filter === 'PICKERS_PRESENT' && (!isPicker || st !== 'PRESENT')) return false;
+            if (filter === 'PICKERS_ABSENT' && (!isPicker || st !== 'ABSENT')) return false;
+            // ALL_STAFF includes everyone
+
+            // 2. Search query filter
+            if (query) {
+                const name = (r.employee_name || '').toLowerCase();
+                const code = (r.employee_id || '').toLowerCase();
+                if (!name.includes(query) && !code.includes(query)) return false;
+            }
+
+            // 3. Role dropdown filter
+            if (roleFilter && r.designation !== roleFilter) return false;
+
+            // 4. Risk / status filter
+            if (riskFilter) {
+                if (['LOW', 'MODERATE', 'HIGH', 'CRITICAL'].includes(riskFilter)) {
+                    const staffMember = (this.attendance.staff_roster || []).find(s => s.employee_id === r.employee_id);
+                    if (staffMember && staffMember.risk_tier !== riskFilter) return false;
+                } else if (r.status !== riskFilter) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        this.renderAttendanceTable();
+    },
+
+    updateDailyButtonStyles(activeFilter) {
+        const btnAll = document.getElementById('attBtnPickersAll');
+        const btnPres = document.getElementById('attBtnPickersPresent');
+        const btnAbs = document.getElementById('attBtnPickersAbsent');
+        const btnStaff = document.getElementById('attBtnStaffAll');
+
+        const activeClasses = {
+            PICKERS_ALL: 'px-2.5 py-1 rounded-lg text-xs font-bold border border-purple-400 bg-purple-500/30 text-purple-100 ring-2 ring-purple-400/50 shadow-md shadow-purple-950/40 transition flex items-center gap-1.5',
+            PICKERS_PRESENT: 'px-2.5 py-1 rounded-lg text-xs font-bold border border-emerald-400 bg-emerald-500/30 text-emerald-100 ring-2 ring-emerald-400/50 shadow-md shadow-emerald-950/40 transition flex items-center gap-1.5',
+            PICKERS_ABSENT: 'px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-400 bg-rose-500/30 text-rose-100 ring-2 ring-rose-400/50 shadow-md shadow-rose-950/40 transition flex items-center gap-1.5',
+            ALL_STAFF: 'px-2.5 py-1 rounded-lg text-xs font-bold border border-white/40 bg-white/20 text-white ring-2 ring-white/50 shadow-md transition flex items-center gap-1.5',
+        };
+
+        const inactiveClasses = {
+            PICKERS_ALL: 'px-2.5 py-1 rounded-lg text-xs font-semibold border border-purple-500/20 bg-purple-500/10 text-purple-300/80 hover:bg-purple-500/20 hover:text-purple-200 transition flex items-center gap-1.5',
+            PICKERS_PRESENT: 'px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-500/20 bg-emerald-500/10 text-emerald-300/80 hover:bg-emerald-500/20 hover:text-emerald-200 transition flex items-center gap-1.5',
+            PICKERS_ABSENT: 'px-2.5 py-1 rounded-lg text-xs font-semibold border border-rose-500/20 bg-rose-500/10 text-rose-300/80 hover:bg-rose-500/20 hover:text-rose-200 transition flex items-center gap-1.5',
+            ALL_STAFF: 'px-2.5 py-1 rounded-lg text-xs font-semibold border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200 transition flex items-center gap-1.5',
+        };
+
+        if (btnAll) btnAll.className = activeFilter === 'PICKERS_ALL' ? activeClasses.PICKERS_ALL : inactiveClasses.PICKERS_ALL;
+        if (btnPres) btnPres.className = activeFilter === 'PICKERS_PRESENT' ? activeClasses.PICKERS_PRESENT : inactiveClasses.PICKERS_PRESENT;
+        if (btnAbs) btnAbs.className = activeFilter === 'PICKERS_ABSENT' ? activeClasses.PICKERS_ABSENT : inactiveClasses.PICKERS_ABSENT;
+        if (btnStaff) btnStaff.className = activeFilter === 'ALL_STAFF' ? activeClasses.ALL_STAFF : inactiveClasses.ALL_STAFF;
+    },
+
+    filterByDate(dateStr) {
+        this.selectTimelineDate(dateStr);
     },
 
     renderAttendanceWatchlist(watchlist) {
@@ -3973,6 +4190,11 @@ const zeptoApp = {
     },
 
     filterAttendance() {
+        if (this.attendance.selected_date) {
+            this.applyDailyFilters();
+            return;
+        }
+
         const query = (document.getElementById('attSearchInput')?.value || '').toLowerCase().trim();
         const role = document.getElementById('attRoleFilter')?.value || '';
         const risk = document.getElementById('attRiskFilter')?.value || '';
@@ -4016,12 +4238,158 @@ const zeptoApp = {
     },
 
     renderAttendanceTable() {
+        const thead = document.getElementById('attTableHead');
         const tbody = document.getElementById('attTableBody');
         const badge = document.getElementById('attRecordCountBadge');
-        const staffList = this.attendance.filtered_staff || [];
 
-        if (badge) badge.textContent = `${staffList.length} Active Employees`;
         if (!tbody) return;
+
+        // Mode 1: Daily Staff & Picker Shift Ledger
+        if (this.attendance.selected_date) {
+            const dailyRecords = this.attendance.filtered_daily_records || [];
+            const selDate = this.attendance.selected_date;
+
+            if (badge) badge.textContent = `${dailyRecords.length} Staff on ${selDate}`;
+
+            if (thead) {
+                thead.innerHTML = `
+                    <tr>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase w-10">#</th>
+                        <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Employee / Staff</th>
+                        <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Designation</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Shift Status</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Shift Window</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">In Punch</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Out Punch</th>
+                        <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Duration</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punctuality / Lateness</th>
+                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punch Drilldown</th>
+                    </tr>
+                `;
+            }
+
+            if (dailyRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center py-10 text-slate-400 text-xs">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <span class="text-2xl">🔍</span>
+                                <span class="font-bold text-white">No deployment records found for this filter on ${selDate}.</span>
+                                <span class="text-slate-500">Try switching to "All Pickers" or "All Roles" above.</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = dailyRecords.map((r, idx) => {
+                const st = (r.status || '').toUpperCase();
+                let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">PRESENT</span>';
+                if (st === 'ABSENT') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">ABSENT</span>';
+                } else if (st === 'HALF_DAY') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">HALF DAY</span>';
+                } else if (st === 'WEEK_OFF') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-400 border border-white/10">WEEK OFF</span>';
+                } else if (st === 'HOLIDAY') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">HOLIDAY</span>';
+                }
+
+                const isPicker = this.isPickerRole(r.designation);
+                const pickerTag = isPicker
+                    ? '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-1.5">🛒 PICKER</span>'
+                    : '';
+
+                let punctualityBadge = '—';
+                if (st === 'PRESENT') {
+                    if (r.late_by && r.late_by !== '00:00' && r.late_by !== '—') {
+                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/25">Late: ${r.late_by}</span>`;
+                    } else if (r.early_by && r.early_by !== '00:00' && r.early_by !== '—') {
+                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/25">Early: ${r.early_by}</span>`;
+                    } else {
+                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/25">On Time</span>`;
+                    }
+                } else if (st === 'ABSENT') {
+                    punctualityBadge = `<span class="text-[10px] font-mono text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/25">Unexcused</span>`;
+                }
+
+                const durationStr = r.work_duration_hours != null
+                    ? `${parseFloat(r.work_duration_hours).toFixed(1)}h`
+                    : (r.work_duration || '—');
+
+                return `
+                    <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view complete shift punches for ${r.employee_name}">
+                        <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
+                        <td class="py-2.5 px-3">
+                            <div class="font-bold text-white flex items-center gap-1.5">
+                                <span>${r.employee_name || '—'}</span>
+                                <span class="text-[10px] text-emerald-400 opacity-60">↗</span>
+                            </div>
+                            <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300 whitespace-nowrap inline-flex items-center">
+                                ${r.designation || 'Unassigned'}
+                                ${pickerTag}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-300">
+                            ${r.shift_name || r.shift || '—'}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-mono text-xs ${r.in_time ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+                            ${r.in_time || '—'}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-mono text-xs ${r.out_time ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+                            ${r.out_time || '—'}
+                        </td>
+                        <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">
+                            ${durationStr}
+                        </td>
+                        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                            ${punctualityBadge}
+                        </td>
+                        <td class="py-2.5 px-3 text-center">
+                            <button
+                                type="button"
+                                onclick="event.stopPropagation(); zeptoApp.openEmployeeDrawer('${r.employee_id}')"
+                                class="px-2.5 py-1 rounded bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-semibold transition"
+                            >
+                                <span>🔍</span> View Punch
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            return;
+        }
+
+        // Mode 2: Monthly Aggregate Staff Roster
+        const staffList = this.attendance.filtered_staff || [];
+        if (badge) badge.textContent = `${staffList.length} Active Employees`;
+
+        if (thead) {
+            thead.innerHTML = `
+                <tr>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase w-10">#</th>
+                    <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Employee / Staff</th>
+                    <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Designation</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Scheduled Shifts</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">P / A / WO</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Payable Days</th>
+                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Base Pay</th>
+                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Expected Salary</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Attendance %</th>
+                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Total Hours</th>
+                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Avg Daily Hrs</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Reliability Tier</th>
+                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punch Drilldown</th>
+                </tr>
+            `;
+        }
 
         if (staffList.length === 0) {
             tbody.innerHTML = `
