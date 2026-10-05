@@ -495,10 +495,11 @@ const zeptoApp = {
             const res = await fetch(`/api/v1/zepto/operations/analytics?${params.toString()}`);
             if (!res.ok) throw new Error('Failed to load operational analytics');
             const data = await res.json();
+            if (!data || typeof data !== 'object') return;
 
             this.dashboard = this.dashboard || {};
             this.dashboard.analytics = data;
-            this.dashboard.dod_filtered = data.dod_metrics || [];
+            this.dashboard.dod_filtered = Array.isArray(data.dod_metrics) ? data.dod_metrics : [];
 
             if (data.available_months && Array.isArray(data.available_months)) {
                 this.updateAvailableMonths(data.available_months);
