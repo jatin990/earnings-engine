@@ -1313,6 +1313,45 @@ const zeptoApp = {
             const barTitle = document.getElementById('staffDrawerAttBarTitle');
             if (barTitle) barTitle.textContent = `${selMonth} (${att.total_shifts || 0} Shifts Total)`;
 
+            // 5b. Attendance-Derived Expected Monthly Salary & Payout Forensics Card
+            const calc = data.payroll_calculation || {};
+            const expSalEl = document.getElementById('staffDrawerExpectedSalary');
+            const calcBaseEl = document.getElementById('staffDrawerCalcBase');
+            const calcDailyEl = document.getElementById('staffDrawerCalcDaily');
+            const calcPayableEl = document.getElementById('staffDrawerCalcPayable');
+            const calcPayableSubEl = document.getElementById('staffDrawerCalcPayableSub');
+            const calcDeductionEl = document.getElementById('staffDrawerCalcDeduction');
+            const calcAbsentDaysEl = document.getElementById('staffDrawerCalcAbsentDays');
+            const calcDaysInMonthEl = document.getElementById('staffDrawerCalcDaysInMonth');
+            const calcTenureEl = document.getElementById('staffDrawerCalcTenure');
+
+            const expSalaryVal = calc.expected_salary != null ? calc.expected_salary : (att.expected_salary || 0);
+            if (expSalEl) expSalEl.textContent = this.formatCurrency(expSalaryVal);
+            if (calcBaseEl) calcBaseEl.textContent = this.formatCurrency(calc.base_salary_monthly || emp.base_salary_monthly || 0);
+            if (calcDailyEl) calcDailyEl.textContent = `${this.formatCurrency(calc.daily_rate || att.daily_rate || 0)} / day`;
+            if (calcPayableEl) calcPayableEl.textContent = `${calc.payable_days != null ? calc.payable_days : (att.payable_days != null ? att.payable_days : att.present_count || 0)} d`;
+            if (calcPayableSubEl) {
+                const pDays = calc.present_days != null ? calc.present_days : (att.present_count || 0);
+                const woDays = calc.week_off_days != null ? calc.week_off_days : (att.week_off_count || 0);
+                const hlDays = calc.holiday_days != null ? calc.holiday_days : (att.holiday_count || 0);
+                const hdDays = calc.half_days != null ? calc.half_days : (att.half_day_count || 0);
+                calcPayableSubEl.textContent = `${pDays} P + ${woDays} WO + ${hlDays} HL${hdDays > 0 ? ` + ${hdDays} HD` : ''}`;
+            }
+            if (calcDeductionEl) {
+                const ded = calc.absent_deduction != null ? calc.absent_deduction : (att.absent_deduction || 0);
+                calcDeductionEl.textContent = ded > 0 ? `-${this.formatCurrency(ded)}` : '₹0.00';
+            }
+            if (calcAbsentDaysEl) {
+                const absDays = calc.absent_days != null ? calc.absent_days : (att.absent_count || 0);
+                calcAbsentDaysEl.textContent = `${absDays} days lost`;
+            }
+            if (calcDaysInMonthEl) {
+                calcDaysInMonthEl.textContent = calc.days_in_month || 30;
+            }
+            if (calcTenureEl) {
+                calcTenureEl.textContent = `Tenure: ${emp.joining_date ? emp.joining_date + ' to present' : 'Active roster'}`;
+            }
+
             // 6. MoM Performance Ratings Container
             const ratContainer = document.getElementById('staffDrawerRatingsContainer');
             const ratBadge = document.getElementById('staffDrawerLatestRatingBadge');
@@ -3203,6 +3242,19 @@ const zeptoApp = {
             avgHoursSubEl.textContent = `Avg ~${avg} hrs / shift`;
         }
 
+        // 5. Expected Payroll (MTD)
+        const expPay = sum.payroll_summary || {};
+        const attExpPayrollEl = document.getElementById('attExpectedPayroll');
+        const attExpPayrollSubEl = document.getElementById('attExpectedPayrollSub');
+        if (attExpPayrollEl) {
+            attExpPayrollEl.textContent = this.formatCurrency(expPay.total_expected_payroll || 0);
+        }
+        if (attExpPayrollSubEl) {
+            const inchargePay = this.formatCurrency(expPay.incharge_expected_payroll || 0);
+            const pickerPay = this.formatCurrency(expPay.picker_expected_payroll || 0);
+            attExpPayrollSubEl.textContent = `Incharge: ${inchargePay} · Picker: ${pickerPay}`;
+        }
+
         // Picker & Packer MTD Operations Intelligence
         const pSum = sum.picker_summary || {};
         const attMtdOpDays = document.getElementById('attMtdOpDays');
@@ -3539,7 +3591,7 @@ const zeptoApp = {
         if (staffList.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="text-center py-8 text-slate-500 text-xs">
+                    <td colspan="13" class="text-center py-8 text-slate-500 text-xs">
                         No active employees match the selected criteria for this period.
                     </td>
                 </tr>
@@ -3580,10 +3632,21 @@ const zeptoApp = {
                     <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-300">
                         ${s.total_shifts} shifts
                     </td>
-                    <td class="py-2.5 px-3 text-center font-mono">
+                    <td class="py-2.5 px-3 text-center font-mono whitespace-nowrap">
                         <span class="text-emerald-400 font-bold">${s.present_count} P</span>
                         <span class="text-slate-600">/</span>
                         <span class="${s.absent_count > 0 ? 'text-rose-400 font-bold' : 'text-slate-500'}">${s.absent_count} A</span>
+                        <span class="text-slate-600">/</span>
+                        <span class="text-slate-400">${s.week_off_count || 0} WO</span>
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono font-bold text-emerald-400">
+                        ${s.payable_days != null ? s.payable_days : s.present_count} d
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono text-slate-400">
+                        ${this.formatCurrency(s.base_salary_monthly || 0)}
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono">
+                        <span class="font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25">${this.formatCurrency(s.expected_salary || 0)}</span>
                     </td>
                     <td class="py-2.5 px-3 text-center font-mono font-extrabold ${rateColor}">
                         ${attRate.toFixed(1)}%

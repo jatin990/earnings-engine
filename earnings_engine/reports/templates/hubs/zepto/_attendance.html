@@ -74,7 +74,7 @@
     </section>
 
     <!-- KPI Summary Metric Cards -->
-    <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+    <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         <!-- 1. Present Rate -->
         <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-start">
@@ -153,6 +153,26 @@
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Roster Compliance:</span>
                 <span class="font-mono font-bold text-emerald-400">Normal</span>
+            </div>
+        </div>
+
+        <!-- 5. Expected Payroll (MTD) -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between border-emerald-500/20 bg-emerald-950/[0.08]">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300/80">Expected Payroll</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                    ₹ / MTD
+                </span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-2xl font-black font-mono text-emerald-400 tracking-tight" id="attExpectedPayroll">₹0</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 truncate font-mono" id="attExpectedPayrollSub">
+                    Incharge: ₹0 · Picker: ₹0
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Proration Policy:</span>
+                <span class="font-mono font-bold text-emerald-400">Scheduled WO & HL fully paid</span>
             </div>
         </div>
     </section>
@@ -502,7 +522,10 @@
                         <th class="py-2.5 px-3">Employee Name</th>
                         <th class="py-2.5 px-3">Role Profile</th>
                         <th class="py-2.5 px-3 text-center">Scheduled Shifts</th>
-                        <th class="py-2.5 px-3 text-center">Present / Absent</th>
+                        <th class="py-2.5 px-3 text-center">Present / Absent / Off</th>
+                        <th class="py-2.5 px-3 text-center">Payable Days</th>
+                        <th class="py-2.5 px-3 text-right">Base Pay</th>
+                        <th class="py-2.5 px-3 text-right">Expected Salary</th>
                         <th class="py-2.5 px-3 text-center">Attendance %</th>
                         <th class="py-2.5 px-3 text-right">Total Hours</th>
                         <th class="py-2.5 px-3 text-right">Avg Daily Hrs</th>
@@ -512,7 +535,7 @@
                 </thead>
                 <tbody id="attTableBody" class="divide-y divide-white/5 font-sans">
                     <tr>
-                        <td colspan="10" class="text-center py-8 text-slate-500 text-xs">
+                        <td colspan="13" class="text-center py-8 text-slate-500 text-xs">
                             Loading monthly staff attendance...
                         </td>
                     </tr>

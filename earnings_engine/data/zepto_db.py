@@ -6,6 +6,7 @@ spend-per-person metrics, hiring pipeline conversions, and 50-50 partner equity 
 
 from __future__ import annotations
 
+import calendar
 import json
 import logging
 import math
@@ -3201,12 +3202,31 @@ def get_attendance_summary(
             params,
         ).fetchall()
 
+        # Fetch employee master records for base salary and metadata mapping
+        emp_rows = conn.execute("SELECT id, name, role, status, joining_date, base_salary_monthly FROM zepto_employees").fetchall()
+        emp_info_map = {}
+        for er in emp_rows:
+            emp_info_map[str(er["id"])] = er
+            if er["name"]:
+                emp_info_map[str(er["name"]).strip().lower()] = er
+
+        days_in_m = 30
+        if year_month and year_month.upper() != "ALL" and len(year_month) >= 7:
+            try:
+                y, m = int(year_month[:4]), int(year_month[5:7])
+                days_in_m = calendar.monthrange(y, m)[1]
+            except Exception:
+                days_in_m = 30
+
         staff_roster = []
         for s in staff_summary_rows:
             s_denom = (s["present_count"] or 0) + (s["absent_count"] or 0) + (s["half_day_count"] or 0)
             s_rate = round((((s["present_count"] or 0) + 0.5 * (s["half_day_count"] or 0)) / s_denom) * 100.0, 1) if s_denom > 0 else 0.0
             s_pres = s["present_count"] or 0
             s_abs = s["absent_count"] or 0
+            s_wo = s["week_off_count"] or 0
+            s_hd = s["half_day_count"] or 0
+            s_hol = s["holiday_count"] or 0
             s_mins = s["total_work_mins"] or 0
             avg_daily_hrs = round((s_mins / 60.0) / s_pres, 1) if s_pres > 0 else 0.0
 
@@ -3218,22 +3238,53 @@ def get_attendance_summary(
             elif s_abs >= 1:
                 risk_tier = "MODERATE"
 
+            emp_info = emp_info_map.get(str(s["employee_id"])) or emp_info_map.get(str(s["employee_name"]).strip().lower())
+            profile_salary = float(emp_info["base_salary_monthly"]) if emp_info and emp_info["base_salary_monthly"] else 0.0
+            role_str = (emp_info["role"] if emp_info and emp_info["role"] else s["designation"] or "").upper()
+            if profile_salary > 0:
+                base_salary = profile_salary
+            elif "INCHARGE" in role_str or "MANAGER" in role_str or "LEAD" in role_str:
+                base_salary = 20000.0
+            else:
+                base_salary = 14000.0
+
+            daily_rate = round(base_salary / days_in_m, 2)
+            payable_days = round(s_pres + s_wo + s_hol + 0.5 * s_hd, 1)
+            expected_salary = round(payable_days * daily_rate, 2)
+            absent_deduction = round(s_abs * daily_rate, 2)
+
             staff_roster.append({
                 "employee_id": s["employee_id"],
                 "employee_name": s["employee_name"],
                 "designation": s["designation"],
+                "role": emp_info["role"] if emp_info and emp_info["role"] else s["designation"],
+                "joining_date": emp_info["joining_date"] if emp_info else None,
+                "base_salary_monthly": base_salary,
+                "daily_rate": daily_rate,
+                "payable_days": payable_days,
+                "expected_salary": expected_salary,
+                "absent_deduction": absent_deduction,
                 "total_shifts": s["total_shifts"],
                 "present_count": s_pres,
                 "absent_count": s_abs,
-                "half_day_count": s["half_day_count"] or 0,
-                "week_off_count": s["week_off_count"] or 0,
-                "holiday_count": s["holiday_count"] or 0,
+                "half_day_count": s_hd,
+                "week_off_count": s_wo,
+                "holiday_count": s_hol,
                 "attendance_rate_pct": s_rate,
                 "total_hours_worked": round(s_mins / 60.0, 1),
                 "avg_daily_hours": avg_daily_hrs,
                 "risk_tier": risk_tier,
                 "last_shift_date": s["last_shift_date"],
             })
+
+        # Aggregated payroll summary for the month / period
+        payroll_summary = {
+            "total_expected_payroll": round(sum(item["expected_salary"] for item in staff_roster), 2),
+            "incharge_expected_payroll": round(sum(item["expected_salary"] for item in staff_roster if "INCHARGE" in (item.get("role") or "").upper() or "MANAGER" in (item.get("role") or "").upper() or "LEAD" in (item.get("role") or "").upper()), 2),
+            "picker_expected_payroll": round(sum(item["expected_salary"] for item in staff_roster if not ("INCHARGE" in (item.get("role") or "").upper() or "MANAGER" in (item.get("role") or "").upper() or "LEAD" in (item.get("role") or "").upper())), 2),
+            "total_payable_days": round(sum(item["payable_days"] for item in staff_roster), 1),
+            "days_in_month": days_in_m,
+        }
 
         # Available months across attendance records
         att_months_rows = conn.execute(
@@ -3272,6 +3323,7 @@ def get_attendance_summary(
             "absenteeism_watchlist": absenteeism_watchlist,
             "role_capacity_summary": capacity_summary,
             "staff_roster": staff_roster,
+            "payroll_summary": payroll_summary,
         }
 
 
@@ -3652,6 +3704,44 @@ def get_employee_profile_analytics(
         salaries = get_employee_salaries(emp_db_id, settings)
         ratings = get_employee_monthly_ratings(emp_db_id, settings)
 
+        # Expected Salary calculation for selected month
+        days_in_m = 30
+        if selected_month and len(selected_month) >= 7:
+            try:
+                y, m = int(selected_month[:4]), int(selected_month[5:7])
+                days_in_m = calendar.monthrange(y, m)[1]
+            except Exception:
+                days_in_m = 30
+
+        base_salary = float(employee.get("base_salary_monthly") or 0.0)
+        if base_salary <= 0:
+            role_upper = (employee.get("role") or "").upper()
+            if "INCHARGE" in role_upper or "MANAGER" in role_upper or "LEAD" in role_upper:
+                base_salary = 20000.0
+            else:
+                base_salary = 14000.0
+
+        daily_rate = round(base_salary / days_in_m, 2)
+        payable_days = round(present + week_off + holiday + 0.5 * half_day, 1)
+        expected_salary = round(payable_days * daily_rate, 2)
+        absent_deduction = round(absent * daily_rate, 2)
+        formula_str = f"({present} P + {week_off} WO + {holiday} HL + {0.5 * half_day} HD) × ₹{daily_rate:.2f}/d"
+
+        payroll_calculation = {
+            "base_salary_monthly": base_salary,
+            "days_in_month": days_in_m,
+            "daily_rate": daily_rate,
+            "present_days": present,
+            "week_off_days": week_off,
+            "holiday_days": holiday,
+            "half_days": half_day,
+            "absent_days": absent,
+            "payable_days": payable_days,
+            "absent_deduction": absent_deduction,
+            "expected_salary": expected_salary,
+            "formula": formula_str,
+        }
+
         return {
             "employee": employee,
             "selected_month": selected_month,
@@ -3668,6 +3758,10 @@ def get_employee_profile_analytics(
                 "avg_shift_hours": avg_shift_hours,
                 "avg_break_mins": avg_break_mins,
                 "risk_tier": risk_tier,
+                "payable_days": payable_days,
+                "daily_rate": daily_rate,
+                "expected_salary": expected_salary,
+                "absent_deduction": absent_deduction,
                 "punch_history": records_list,
                 "mom_trend": mom_attendance,
             },
@@ -3678,6 +3772,7 @@ def get_employee_profile_analytics(
                 "total_idle_hours": round(total_idle_hrs, 1),
                 "daily_ipp_logs": ipp_list,
             },
+            "payroll_calculation": payroll_calculation,
             "salaries": salaries,
             "ratings": ratings,
         }

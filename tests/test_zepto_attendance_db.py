@@ -425,3 +425,140 @@ def test_picker_summary_and_punch_timing_metrics():
     assert day2["pickers_absent"] == 1
     assert day2["pickers_avg_shift_hours"] == 8.0  # 480 / 60 / 1 = 8.0
 
+
+def test_expected_monthly_salary_calculations():
+    """Test prorated daily rate, payable days, absent deductions, and expected payroll summary."""
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    ensure_zepto_schema(settings)
+    test_store = f"TEST_PAYROLL_STORE_{uuid.uuid4().hex[:8]}"
+
+    picker_id = f"EMP_PAY_PICK_{uuid.uuid4().hex[:4]}"
+    incharge_id = f"EMP_PAY_INC_{uuid.uuid4().hex[:4]}"
+
+    # Create employee profiles with explicit roles & baseline salaries
+    zepto_db.create_employee({
+        "id": picker_id,
+        "name": "Ramesh Picker",
+        "role": "PICKER",
+        "status": "ACTIVE",
+        "base_salary_monthly": 14000.0,
+    }, settings=settings)
+
+    zepto_db.create_employee({
+        "id": incharge_id,
+        "name": "Suresh Incharge",
+        "role": "SHIFT_INCHARGE",
+        "status": "ACTIVE",
+        "base_salary_monthly": 20000.0,
+    }, settings=settings)
+
+    # Insert attendance records for September (30-day month)
+    # Picker: 2 Present, 1 Week-Off, 1 Absent => 3 Payable Days (Daily rate = 14000 / 30 = 466.67)
+    # Expected salary = 3 * 466.67 = 1400.01, Absent deduction = 1 * 466.67 = 466.67
+    zepto_db.save_attendance_batch({
+        "store_name": test_store,
+        "file_name": "test_payroll_sep.xlsx",
+        "records": [
+            {
+                "employee_id": picker_id,
+                "employee_name": "Ramesh Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-01",
+                "status": "PRESENT",
+                "work_duration_mins": 480,
+                "designation": "Picker",
+            },
+            {
+                "employee_id": picker_id,
+                "employee_name": "Ramesh Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-02",
+                "status": "PRESENT",
+                "work_duration_mins": 480,
+                "designation": "Picker",
+            },
+            {
+                "employee_id": picker_id,
+                "employee_name": "Ramesh Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-03",
+                "status": "WEEK_OFF",
+                "work_duration_mins": 0,
+                "designation": "Picker",
+            },
+            {
+                "employee_id": picker_id,
+                "employee_name": "Ramesh Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-04",
+                "status": "ABSENT",
+                "work_duration_mins": 0,
+                "designation": "Picker",
+            },
+            # Incharge: 1 Present => 1 Payable Day (Daily rate = 20000 / 30 = 666.67)
+            # Expected salary = 1 * 666.67 = 666.67
+            {
+                "employee_id": incharge_id,
+                "employee_name": "Suresh Incharge",
+                "store_name": test_store,
+                "shift_date": "2026-09-01",
+                "status": "PRESENT",
+                "work_duration_mins": 540,
+                "designation": "Shift Incharge",
+            },
+        ]
+    }, settings=settings)
+
+    # 1. Test get_attendance_summary payroll aggregations
+    summary = zepto_db.get_attendance_summary(year_month="2026-09", store_name=test_store, settings=settings)
+    payroll = summary.get("payroll_summary", {})
+
+    assert payroll["days_in_month"] == 30
+    assert payroll["total_payable_days"] == 4.0  # 3 (picker) + 1 (incharge)
+    assert payroll["picker_expected_payroll"] == 1400.01
+    assert payroll["incharge_expected_payroll"] == 666.67
+    assert payroll["total_expected_payroll"] == 2066.68
+
+    # Check staff roster individual payroll fields
+    roster_picker = next((s for s in summary["staff_roster"] if s["employee_id"] == picker_id), None)
+    assert roster_picker is not None
+    assert roster_picker["base_salary_monthly"] == 14000.0
+    assert roster_picker["daily_rate"] == 466.67
+    assert roster_picker["payable_days"] == 3.0
+    assert roster_picker["expected_salary"] == 1400.01
+    assert roster_picker["absent_deduction"] == 466.67
+
+    roster_incharge = next((s for s in summary["staff_roster"] if s["employee_id"] == incharge_id), None)
+    assert roster_incharge is not None
+    assert roster_incharge["base_salary_monthly"] == 20000.0
+    assert roster_incharge["daily_rate"] == 666.67
+    assert roster_incharge["payable_days"] == 1.0
+    assert roster_incharge["expected_salary"] == 666.67
+
+    # 2. Test get_employee_profile_analytics payroll breakdown
+    analytics = zepto_db.get_employee_profile_analytics(picker_id, year_month="2026-09", settings=settings)
+    assert "payroll_calculation" in analytics
+    calc = analytics["payroll_calculation"]
+    assert calc["base_salary_monthly"] == 14000.0
+    assert calc["days_in_month"] == 30
+    assert calc["daily_rate"] == 466.67
+    assert calc["present_days"] == 2
+    assert calc["week_off_days"] == 1
+    assert calc["absent_days"] == 1
+    assert calc["payable_days"] == 3.0
+    assert calc["absent_deduction"] == 466.67
+    assert calc["expected_salary"] == 1400.01
+    assert "₹466.67/d" in calc["formula"]
+
+    # Check attendance dict has the payroll fields
+    att = analytics["attendance"]
+    assert att["expected_salary"] == 1400.01
+    assert att["payable_days"] == 3.0
+    assert att["daily_rate"] == 466.67
+    assert att["absent_deduction"] == 466.67
+
+
