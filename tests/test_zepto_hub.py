@@ -458,6 +458,19 @@ def test_zepto_api_endpoints(client):
     assert del_tranche.status_code == 200
 
     # 7. Staffing Targets & Base Pay API
+    # Ensure default configs are reset
+    client.put(
+        "/api/v1/zepto/staffing-targets",
+        json={
+            "role_configs": {
+                "PICKER": {"target_count": 9, "base_pay": 14000.0},
+                "SHIFT_INCHARGE": {"target_count": 3, "base_pay": 20000.0},
+                "SECURITY_GUARD": {"target_count": 2, "base_pay": 16000.0},
+                "HOUSEKEEPING": {"target_count": 1, "base_pay": 14000.0},
+            }
+        }
+    )
+
     target_resp = client.get("/api/v1/zepto/staffing-targets")
     assert target_resp.status_code == 200
     target_json = target_resp.json()
@@ -485,13 +498,37 @@ def test_zepto_api_endpoints(client):
     assert put_resp.json()["base_pays"]["PICKER"] == 18500.0
     assert put_resp.json()["base_pays"]["SHIFT_INCHARGE"] == 26000.0
 
+    # Reset back to default base pay
+    client.put(
+        "/api/v1/zepto/staffing-targets",
+        json={
+            "role_configs": {
+                "PICKER": {"target_count": 9, "base_pay": 14000.0},
+                "SHIFT_INCHARGE": {"target_count": 3, "base_pay": 20000.0},
+                "SECURITY_GUARD": {"target_count": 2, "base_pay": 16000.0},
+                "HOUSEKEEPING": {"target_count": 1, "base_pay": 14000.0},
+            }
+        }
+    )
+
 
 def test_customizable_staffing_targets_and_base_pay():
     settings = Settings()
+    # Reset configs to default at start of test
+    zepto_db.update_role_configs(
+        {
+            "PICKER": {"target_count": 9, "base_pay": 14000.0},
+            "SHIFT_INCHARGE": {"target_count": 3, "base_pay": 20000.0},
+            "SECURITY_GUARD": {"target_count": 2, "base_pay": 16000.0},
+            "HOUSEKEEPING": {"target_count": 1, "base_pay": 14000.0},
+        },
+        settings,
+    )
+
     # Check default thresholds & base pays
     configs = zepto_db.get_role_configs(settings)
     assert configs["PICKER"]["target_count"] == 9
-    assert configs["PICKER"]["base_pay"] == 18500.0 or configs["PICKER"]["base_pay"] == 14000.0
+    assert configs["PICKER"]["base_pay"] == 14000.0
     assert configs["SHIFT_INCHARGE"]["target_count"] == 3
     assert configs["SECURITY_GUARD"]["target_count"] == 2
     assert configs["HOUSEKEEPING"]["target_count"] == 1
