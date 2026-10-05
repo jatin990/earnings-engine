@@ -684,12 +684,12 @@ const zeptoApp = {
 
     getBasePayForRole(role) {
         const basePays = this.overviewData?.headcount?.base_pays || {
-            'PICKER': 18000,
-            'SHIFT_INCHARGE': 25000,
+            'PICKER': 14000,
+            'SHIFT_INCHARGE': 20000,
             'SECURITY_GUARD': 16000,
             'HOUSEKEEPING': 14000,
         };
-        return basePays[role] || 15000;
+        return basePays[role] || 14000;
     },
 
     renderStaffingCapacity(hc) {
@@ -708,7 +708,7 @@ const zeptoApp = {
 
         const capacity = hc.capacity || {};
         ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
-            const cap = capacity[role] || { current: 0, target: 1, deficit: 1, pct: 0, fulfilled: false, base_pay: 15000 };
+            const cap = capacity[role] || { current: 0, target: 1, deficit: 1, pct: 0, fulfilled: false, base_pay: 14000 };
 
             const badgeEl = document.getElementById(`capBadge-${role}`);
             if (badgeEl) badgeEl.textContent = `${cap.current} / ${cap.target}`;
@@ -741,8 +741,8 @@ const zeptoApp = {
             'HOUSEKEEPING': 1,
         };
         const basePays = this.overviewData?.headcount?.base_pays || {
-            'PICKER': 18000,
-            'SHIFT_INCHARGE': 25000,
+            'PICKER': 14000,
+            'SHIFT_INCHARGE': 20000,
             'SECURITY_GUARD': 16000,
             'HOUSEKEEPING': 14000,
         };
@@ -755,7 +755,7 @@ const zeptoApp = {
             }
             const payInput = document.getElementById(`payInput-${role}`);
             if (payInput) {
-                payInput.value = basePays[role] !== undefined ? basePays[role] : 15000;
+                payInput.value = basePays[role] !== undefined ? basePays[role] : 14000;
                 payInput.oninput = () => this.updateModalTargetTotal();
             }
         });
@@ -801,11 +801,11 @@ const zeptoApp = {
             const role_configs = {
                 'PICKER': {
                     target_count: parseInt(document.getElementById('targetInput-PICKER')?.value || '9', 10),
-                    base_pay: parseFloat(document.getElementById('payInput-PICKER')?.value || '18000')
+                    base_pay: parseFloat(document.getElementById('payInput-PICKER')?.value || '14000')
                 },
                 'SHIFT_INCHARGE': {
                     target_count: parseInt(document.getElementById('targetInput-SHIFT_INCHARGE')?.value || '3', 10),
-                    base_pay: parseFloat(document.getElementById('payInput-SHIFT_INCHARGE')?.value || '25000')
+                    base_pay: parseFloat(document.getElementById('payInput-SHIFT_INCHARGE')?.value || '20000')
                 },
                 'SECURITY_GUARD': {
                     target_count: parseInt(document.getElementById('targetInput-SECURITY_GUARD')?.value || '2', 10),

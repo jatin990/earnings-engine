@@ -125,15 +125,15 @@ DEFAULT_STAFFING_TARGETS = {
 }
 
 DEFAULT_ROLE_BASE_PAY = {
-    "PICKER": 18000.0,
-    "SHIFT_INCHARGE": 25000.0,
+    "PICKER": 14000.0,
+    "SHIFT_INCHARGE": 20000.0,
     "SECURITY_GUARD": 16000.0,
     "HOUSEKEEPING": 14000.0,
 }
 
 ROLE_METADATA = {
-    "PICKER": {"label": "Picker", "icon": "🛒", "color": "purple", "desc": "Item picking, bin staging & UPT speed", "default_salary": 18000.0},
-    "SHIFT_INCHARGE": {"label": "Shift Incharge", "icon": "⚡", "color": "indigo", "desc": "Shift management, inventory & dispatch audits", "default_salary": 25000.0},
+    "PICKER": {"label": "Picker", "icon": "🛒", "color": "purple", "desc": "Item picking, bin staging & UPT speed", "default_salary": 14000.0},
+    "SHIFT_INCHARGE": {"label": "Shift Incharge", "icon": "⚡", "color": "indigo", "desc": "Shift management, inventory & dispatch audits", "default_salary": 20000.0},
     "SECURITY_GUARD": {"label": "Security Guard", "icon": "🛡️", "color": "blue", "desc": "Store entry, asset safety & night surveillance", "default_salary": 16000.0},
     "HOUSEKEEPING": {"label": "House Keeping", "icon": "🧹", "color": "emerald", "desc": "Warehouse cleaning, sanitation & spill management", "default_salary": 14000.0},
 }
@@ -605,10 +605,10 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
     employees = [
         ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", f"{m3_ym}-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
         ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", f"{m3_ym}-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
-        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", f"{m2_ym}-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
+        ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", f"{m2_ym}-01", None, None, "ACTIVE", 4.5, 14000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
         ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", f"{m3_ym}-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
         ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", f"{m3_ym}-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
-        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", f"{m3_ym}-20", f"{m1_ym}-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
+        ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", f"{m3_ym}-20", f"{m1_ym}-01", "Relocated to hometown", "RESIGNED", 3.8, 14000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -1505,7 +1505,7 @@ def sync_roster_from_attendance(settings: Settings | None = None) -> dict[str, A
             desig_lower = desig.lower()
             if "incharge" in desig_lower or "lead" in desig_lower or "shift" in desig_lower:
                 role = "SHIFT_INCHARGE"
-                base_sal = 25000.0
+                base_sal = 20000.0
             elif "security" in desig_lower or "guard" in desig_lower:
                 role = "SECURITY_GUARD"
                 base_sal = 16000.0
@@ -1514,7 +1514,7 @@ def sync_roster_from_attendance(settings: Settings | None = None) -> dict[str, A
                 base_sal = 14000.0
             else:
                 role = "PICKER"
-                base_sal = 18000.0
+                base_sal = 14000.0
 
             # Insert or update
             existing = conn.execute("SELECT id FROM zepto_employees WHERE id = ?", (emp_id,)).fetchone()
@@ -1883,7 +1883,7 @@ def create_candidate(data: dict[str, Any], settings: Settings | None = None) -> 
                 data.get("phone", ""),
                 data.get("email", ""),
                 data.get("target_role", "PICKER").strip().upper(),
-                float(data.get("expected_salary", 18000.0)) if data.get("expected_salary") else None,
+                float(data.get("expected_salary", 14000.0)) if data.get("expected_salary") else None,
                 float(data.get("rating", 4.0)),
                 data.get("stage", "APPLIED").strip().upper(),
                 data.get("resume_doc_url"),
@@ -1939,7 +1939,7 @@ def convert_candidate_to_employee(
         cand_dict = dict(cand)
         emp_id = f"emp_{uuid.uuid4().hex[:8]}"
         joining = joining_date or datetime.now().strftime("%Y-%m-%d")
-        salary = base_salary if base_salary is not None else (cand_dict.get("expected_salary") or 18000.0)
+        salary = base_salary if base_salary is not None else (cand_dict.get("expected_salary") or 14000.0)
 
         # 1. Create employee
         emp_data = {
@@ -3451,7 +3451,7 @@ def get_employee_profile_analytics(
                 "resignation_reason": None,
                 "status": "ACTIVE",
                 "rating": 5.0,
-                "base_salary_monthly": 18000.0,
+                "base_salary_monthly": 14000.0,
                 "current_month_bonus": 0.0,
                 "is_hidden": 0,
                 "aadhar_doc_url": None,
