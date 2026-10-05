@@ -3679,6 +3679,30 @@ const zeptoApp = {
         if (attPickerTotalHours) attPickerTotalHours.textContent = `${pSum.total_picker_hours || 0} hrs`;
         if (attPickerAbsentShifts) attPickerAbsentShifts.textContent = `${pSum.absent_shifts || 0} absences`;
 
+        // 4b. MTD Shift Incharge (SI) Operations Intelligence
+        const siSum = sum.si_summary || {};
+        const attSiMtdOpDays = document.getElementById('attSiMtdOpDays');
+        const attSiAdherence = document.getElementById('attSiAdherence');
+        const attMtdAvgSIs = document.getElementById('attMtdAvgSIs');
+        const attMtdSchedSIsSub = document.getElementById('attMtdSchedSIsSub');
+        const attSiPresentShifts = document.getElementById('attSiPresentShifts');
+        const attSiAvgShift = document.getElementById('attSiAvgShift');
+        const attSiHeadcount = document.getElementById('attSiHeadcount');
+        const attSiTotalShifts = document.getElementById('attSiTotalShifts');
+        const attSiTotalHours = document.getElementById('attSiTotalHours');
+        const attSiAbsentShifts = document.getElementById('attSiAbsentShifts');
+
+        if (attSiMtdOpDays) attSiMtdOpDays.textContent = siSum.operational_days != null ? siSum.operational_days : (sum.operational_days || 0);
+        if (attSiAdherence) attSiAdherence.textContent = `${siSum.si_attendance_rate_pct != null ? siSum.si_attendance_rate_pct : 0}%`;
+        if (attMtdAvgSIs) attMtdAvgSIs.textContent = `${siSum.avg_sis_per_day != null ? siSum.avg_sis_per_day : '--'} / day`;
+        if (attMtdSchedSIsSub) attMtdSchedSIsSub.textContent = `Sched: ${siSum.avg_scheduled_sis_per_day != null ? siSum.avg_scheduled_sis_per_day : '--'} / day`;
+        if (attSiPresentShifts) attSiPresentShifts.textContent = `${siSum.present_shifts || 0} shifts`;
+        if (attSiAvgShift) attSiAvgShift.textContent = `${siSum.avg_si_shift_hours != null ? siSum.avg_si_shift_hours : '--'} hrs`;
+        if (attSiHeadcount) attSiHeadcount.textContent = siSum.headcount != null ? siSum.headcount : 0;
+        if (attSiTotalShifts) attSiTotalShifts.textContent = `${siSum.total_shifts || 0} shifts`;
+        if (attSiTotalHours) attSiTotalHours.textContent = `${siSum.total_si_hours || 0} hrs`;
+        if (attSiAbsentShifts) attSiAbsentShifts.textContent = `${siSum.absent_shifts || 0} absences`;
+
         // Role Breakdown Grid & Role Filter Dropdown
         this.renderAttendanceRoles(sum.role_breakdown || []);
 
@@ -3686,7 +3710,7 @@ const zeptoApp = {
         this.renderAttendanceCapacity(sum.role_capacity_summary || {});
 
         // 6. Daily Staffing Timeline & Heatmap
-        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {});
+        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {}, sum.si_summary || {});
 
         // 7. Absenteeism & Churn Risk Watchlist
         this.renderAttendanceWatchlist(sum.absenteeism_watchlist || []);
@@ -3756,13 +3780,18 @@ const zeptoApp = {
         }
     },
 
-    renderAttendanceTimeline(trend, pickerSummary = {}) {
+    renderAttendanceTimeline(trend, pickerSummary = {}, siSummary = {}) {
         const container = document.getElementById('attDailyTimelineContainer');
         const pickerAvgBadge = document.getElementById('attTimelinePickerAvgBadge');
         const pickerAvgVal = document.getElementById('attTimelinePickerAvgVal');
+        const siAvgBadge = document.getElementById('attTimelineSiAvgBadge');
+        const siAvgVal = document.getElementById('attTimelineSiAvgVal');
 
         if (pickerAvgVal && pickerSummary.avg_pickers_per_day != null) {
             pickerAvgVal.textContent = pickerSummary.avg_pickers_per_day;
+        }
+        if (siAvgVal && siSummary.avg_sis_per_day != null) {
+            siAvgVal.textContent = siSummary.avg_sis_per_day;
         }
 
         if (!container) return;
@@ -3783,6 +3812,9 @@ const zeptoApp = {
             const pickersPres = d.pickers_present != null ? d.pickers_present : 0;
             const pickersSched = d.pickers_scheduled != null ? d.pickers_scheduled : 0;
             const pickersAvgShift = d.pickers_avg_shift_hours != null ? d.pickers_avg_shift_hours : 0;
+            const sisPres = d.sis_present != null ? d.sis_present : 0;
+            const sisSched = d.sis_scheduled != null ? d.sis_scheduled : 0;
+            const sisAvgShift = d.sis_avg_shift_hours != null ? d.sis_avg_shift_hours : 0;
 
             const totalHeightPct = Math.min(100, Math.max(18, (scheduled / maxScheduled) * 100));
             const dayLabel = (d.date || '').slice(8, 10);
@@ -3796,7 +3828,10 @@ const zeptoApp = {
             const isLowAttendance = scheduled >= 5 && (present / scheduled) < 0.6;
             const borderHighlight = isLowAttendance ? 'border-b-2 border-b-rose-500' : '';
 
-            const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift) | ${absent} Absent | ${weekOff} WO`;
+            const siTooltipText = sisSched > 0 ? ` | ⚡ ${sisPres}/${sisSched} SIs (Avg ${sisAvgShift}h)` : '';
+            const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift)${siTooltipText} | ${absent} Absent | ${weekOff} WO`;
+
+            const siBadgeChip = sisPres > 0 ? `<span class="text-amber-300 ml-1">${sisPres}⚡</span>` : '';
 
             return `
                 <div
@@ -3804,9 +3839,9 @@ const zeptoApp = {
                     onclick="zeptoApp.filterByDate('${d.date}')"
                     title="${tooltipText}"
                 >
-                    <!-- Top Daily Picker Count Chip -->
+                    <!-- Top Daily Picker & SI Count Chip -->
                     <div class="text-[8px] font-mono font-extrabold text-purple-300 opacity-80 group-hover:opacity-100 mb-1 leading-none whitespace-nowrap">
-                        ${pickersPres > 0 ? `${pickersPres}🛒` : ''}
+                        ${pickersPres > 0 ? `${pickersPres}🛒` : ''}${siBadgeChip}
                     </div>
                     <!-- Bar Stack Container -->
                     <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125 border border-white/5" style="height: ${totalHeightPct}%;">

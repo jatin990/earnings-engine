@@ -89,6 +89,11 @@ def test_attendance_db_lifecycle():
     assert "packers" in summary["role_capacity_summary"]
     assert "leadership" in summary["role_capacity_summary"]
     assert "inbound_quality_nso" in summary["role_capacity_summary"]
+    assert "picker_summary" in summary
+    assert "si_summary" in summary
+    assert "headcount" in summary["si_summary"]
+    assert "avg_sis_per_day" in summary["si_summary"]
+    assert "avg_si_shift_hours" in summary["si_summary"]
 
     # Test records query with filtering
     records = get_attendance_records(employee_id="EMP_TEST_101")
@@ -409,7 +414,19 @@ def test_picker_summary_and_punch_timing_metrics():
     assert p_summary.get("avg_picker_shift_hours") == 8.3
     assert p_summary.get("total_picker_hours") == 25.0
 
-    # Validate daily trends contain picker breakdown
+    # Validate MTD SI (Shift Incharge) summary
+    si_sum = summary.get("si_summary", {})
+    assert si_sum.get("headcount") == 1
+    assert si_sum.get("total_shifts") == 1
+    assert si_sum.get("present_shifts") == 1
+    assert si_sum.get("absent_shifts") == 0
+    assert si_sum.get("operational_days") == 1
+    assert si_sum.get("avg_sis_per_day") == 1.0
+    assert si_sum.get("avg_si_shift_hours") == 10.0  # 600 / 60 / 1 = 10.0
+    assert si_sum.get("total_si_hours") == 10.0
+    assert si_sum.get("si_attendance_rate_pct") == 100.0
+
+    # Validate daily trends contain picker and SI breakdown
     daily_trends = summary.get("daily_trend", [])
     day1 = next((d for d in daily_trends if d["date"] == "2026-09-01"), None)
     assert day1 is not None
@@ -417,6 +434,10 @@ def test_picker_summary_and_punch_timing_metrics():
     assert day1["pickers_scheduled"] == 2
     assert day1["pickers_absent"] == 0
     assert day1["pickers_avg_shift_hours"] == 8.5  # (540 + 480) / 60 / 2 = 1020 / 120 = 8.5
+    assert day1["sis_present"] == 1
+    assert day1["sis_scheduled"] == 1
+    assert day1["sis_absent"] == 0
+    assert day1["sis_avg_shift_hours"] == 10.0
 
     day2 = next((d for d in daily_trends if d["date"] == "2026-09-02"), None)
     assert day2 is not None

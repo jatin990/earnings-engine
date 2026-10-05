@@ -3036,7 +3036,11 @@ def get_attendance_summary(
                 SUM(CASE WHEN (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_scheduled,
                 SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_present,
                 SUM(CASE WHEN status = 'ABSENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_absent,
-                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN work_duration_mins ELSE 0 END) as pickers_work_mins
+                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN work_duration_mins ELSE 0 END) as pickers_work_mins,
+                SUM(CASE WHEN (LOWER(designation) LIKE '%incharge%' OR LOWER(designation) LIKE '%shift incharge%' OR LOWER(designation) LIKE '%shift_incharge%' OR LOWER(designation) LIKE '%shift lead%' OR LOWER(designation) LIKE '%lead%' OR LOWER(designation) LIKE '%supervisor%' OR LOWER(designation) = 'si' OR LOWER(designation) LIKE 'si %' OR LOWER(designation) LIKE '% si' OR LOWER(designation) LIKE '%(si)%') THEN 1 ELSE 0 END) as sis_scheduled,
+                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%incharge%' OR LOWER(designation) LIKE '%shift incharge%' OR LOWER(designation) LIKE '%shift_incharge%' OR LOWER(designation) LIKE '%shift lead%' OR LOWER(designation) LIKE '%lead%' OR LOWER(designation) LIKE '%supervisor%' OR LOWER(designation) = 'si' OR LOWER(designation) LIKE 'si %' OR LOWER(designation) LIKE '% si' OR LOWER(designation) LIKE '%(si)%') THEN 1 ELSE 0 END) as sis_present,
+                SUM(CASE WHEN status = 'ABSENT' AND (LOWER(designation) LIKE '%incharge%' OR LOWER(designation) LIKE '%shift incharge%' OR LOWER(designation) LIKE '%shift_incharge%' OR LOWER(designation) LIKE '%shift lead%' OR LOWER(designation) LIKE '%lead%' OR LOWER(designation) LIKE '%supervisor%' OR LOWER(designation) = 'si' OR LOWER(designation) LIKE 'si %' OR LOWER(designation) LIKE '% si' OR LOWER(designation) LIKE '%(si)%') THEN 1 ELSE 0 END) as sis_absent,
+                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%incharge%' OR LOWER(designation) LIKE '%shift incharge%' OR LOWER(designation) LIKE '%shift_incharge%' OR LOWER(designation) LIKE '%shift lead%' OR LOWER(designation) LIKE '%lead%' OR LOWER(designation) LIKE '%supervisor%' OR LOWER(designation) = 'si' OR LOWER(designation) LIKE 'si %' OR LOWER(designation) LIKE '% si' OR LOWER(designation) LIKE '%(si)%') THEN work_duration_mins ELSE 0 END) as sis_work_mins
             FROM zepto_attendance_records
             WHERE {where_sql}
             GROUP BY shift_date
@@ -3050,6 +3054,9 @@ def get_attendance_summary(
             p_pres = d["pickers_present"] or 0
             p_mins = d["pickers_work_mins"] or 0
             p_avg_hrs = round((p_mins / 60.0) / p_pres, 1) if p_pres > 0 else 0.0
+            si_pres = d["sis_present"] or 0
+            si_mins = d["sis_work_mins"] or 0
+            si_avg_hrs = round((si_mins / 60.0) / si_pres, 1) if si_pres > 0 else 0.0
             daily_trend.append({
                 "date": d["shift_date"],
                 "scheduled": d["scheduled"],
@@ -3063,6 +3070,11 @@ def get_attendance_summary(
                 "pickers_absent": d["pickers_absent"] or 0,
                 "pickers_work_mins": p_mins,
                 "pickers_avg_shift_hours": p_avg_hrs,
+                "sis_scheduled": d["sis_scheduled"] or 0,
+                "sis_present": si_pres,
+                "sis_absent": d["sis_absent"] or 0,
+                "sis_work_mins": si_mins,
+                "sis_avg_shift_hours": si_avg_hrs,
             })
 
         # MTD Picker Specific Aggregates
@@ -3103,6 +3115,46 @@ def get_attendance_summary(
             "avg_picker_shift_hours": avg_picker_shift_hours,
             "total_picker_hours": round(p_work_mins / 60.0, 1),
             "picker_attendance_rate_pct": round((p_present / (p_present + p_absent)) * 100.0, 1) if (p_present + p_absent) > 0 else 100.0,
+        }
+
+        # MTD Shift Incharge (SI) Specific Aggregates
+        si_stats = conn.execute(
+            f"""
+            SELECT
+                COUNT(DISTINCT employee_id) as si_headcount,
+                COUNT(*) as total_si_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as si_present,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as si_absent,
+                SUM(CASE WHEN status = 'PRESENT' THEN work_duration_mins ELSE 0 END) as si_work_mins,
+                COUNT(DISTINCT shift_date) as operational_days
+            FROM zepto_attendance_records
+            WHERE {where_sql} AND (LOWER(designation) LIKE '%incharge%' OR LOWER(designation) LIKE '%shift incharge%' OR LOWER(designation) LIKE '%shift_incharge%' OR LOWER(designation) LIKE '%shift lead%' OR LOWER(designation) LIKE '%lead%' OR LOWER(designation) LIKE '%supervisor%' OR LOWER(designation) = 'si' OR LOWER(designation) LIKE 'si %' OR LOWER(designation) LIKE '% si' OR LOWER(designation) LIKE '%(si)%')
+            """,
+            params,
+        ).fetchone()
+
+        si_headcount = si_stats["si_headcount"] if si_stats else 0
+        si_total_shifts = si_stats["total_si_shifts"] if si_stats else 0
+        si_present = si_stats["si_present"] or 0 if si_stats else 0
+        si_absent = si_stats["si_absent"] or 0 if si_stats else 0
+        si_work_mins = si_stats["si_work_mins"] or 0 if si_stats else 0
+        si_op_days = si_stats["operational_days"] or 0 if si_stats else 0
+
+        avg_sis_per_day = round(si_present / si_op_days, 1) if si_op_days > 0 else 0.0
+        avg_sched_sis_per_day = round(si_total_shifts / si_op_days, 1) if si_op_days > 0 else 0.0
+        avg_si_shift_hours = round((si_work_mins / 60.0) / si_present, 1) if si_present > 0 else 0.0
+
+        si_summary = {
+            "headcount": si_headcount,
+            "total_shifts": si_total_shifts,
+            "present_shifts": si_present,
+            "absent_shifts": si_absent,
+            "operational_days": si_op_days,
+            "avg_sis_per_day": avg_sis_per_day,
+            "avg_scheduled_sis_per_day": avg_sched_sis_per_day,
+            "avg_si_shift_hours": avg_si_shift_hours,
+            "total_si_hours": round(si_work_mins / 60.0, 1),
+            "si_attendance_rate_pct": round((si_present / (si_present + si_absent)) * 100.0, 1) if (si_present + si_absent) > 0 else 100.0,
         }
 
         # Absenteeism Watchlist (employees with absences >= 2 or high absence rate)
@@ -3326,6 +3378,7 @@ def get_attendance_summary(
             },
             "role_breakdown": role_breakdown,
             "picker_summary": picker_summary,
+            "si_summary": si_summary,
             "daily_trend": daily_trend,
             "absenteeism_watchlist": absenteeism_watchlist,
             "role_capacity_summary": capacity_summary,

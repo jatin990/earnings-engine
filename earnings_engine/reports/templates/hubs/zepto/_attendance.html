@@ -285,6 +285,114 @@
         </div>
     </section>
 
+    <!-- MTD Shift Incharge (SI) Operations Intelligence Section -->
+    <section class="glass-panel p-3.5 space-y-2 border border-amber-500/20 bg-amber-950/[0.07]">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/5 pb-2">
+            <div class="flex items-center gap-2">
+                <span class="text-base">⚡</span>
+                <div>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Shift Incharge (SI) MTD Operations Intelligence</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                            Shift Leadership
+                        </span>
+                    </h4>
+                    <p class="text-[10px] text-slate-400">Month-to-Date leadership deployment across active operational days, supervisory spans & shift oversight</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] font-mono text-slate-300">
+                <span class="bg-black/40 px-2 py-1 rounded border border-white/10">
+                    Operational Days: <strong class="text-amber-300 font-bold" id="attSiMtdOpDays">0</strong>
+                </span>
+                <span class="bg-black/40 px-2 py-1 rounded border border-white/10">
+                    SI Adherence: <strong class="text-emerald-400 font-bold" id="attSiAdherence">0%</strong>
+                </span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            <!-- Card 1: Avg SIs / Day -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300/80">Avg SIs / Day</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                        Daily Benchmark
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-white tracking-tight" id="attMtdAvgSIs">-- / day</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5" id="attMtdSchedSIsSub">
+                        Sched: -- / day
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Month Present Shifts:</span>
+                    <span class="text-amber-300 font-bold" id="attSiPresentShifts">0</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Avg Shift Duration -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300/80">Avg Shift Duration</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                        Per Shift
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-emerald-400 tracking-tight" id="attSiAvgShift">-- hrs</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        In/Out punch duration
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Target Shift Span:</span>
+                    <span class="text-slate-300">8.0 - 9.0 hrs</span>
+                </div>
+            </div>
+
+            <!-- Card 3: SI Headcount -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300">SI Headcount</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                        Active Roster
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-white tracking-tight" id="attSiHeadcount">0</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        Assigned Shift Incharges
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Total SI Shifts:</span>
+                    <span class="text-slate-200" id="attSiTotalShifts">0</span>
+                </div>
+            </div>
+
+            <!-- Card 4: SI Man-Hours -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300/80">SI Man-Hours</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                        Logged
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-amber-300 tracking-tight" id="attSiTotalHours">0 hrs</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        Supervisory labor deployed
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Absent SI Shifts:</span>
+                    <span class="text-rose-400 font-bold" id="attSiAbsentShifts">0</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Operational Capacity & Throughput Cards (Packers, Leadership, Inbound/Quality/NSO) -->
     <section class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <!-- 1. Packers Capacity -->
@@ -384,6 +492,9 @@
             <div class="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono">
                 <span id="attTimelinePickerAvgBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-bold">
                     <span>🛒</span> Month Avg: <strong id="attTimelinePickerAvgVal" class="text-white">--</strong> pickers/day
+                </span>
+                <span id="attTimelineSiAvgBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                    <span>⚡</span> Month Avg: <strong id="attTimelineSiAvgVal" class="text-white">--</strong> SIs/day
                 </span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Present</span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Pickers</span>
