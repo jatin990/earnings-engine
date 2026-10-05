@@ -742,20 +742,83 @@ def parse_zepto_manpower_utilization_html(
     return result
 
 
-def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
+def extract_metrics_from_email_body(text: str, html: str = "") -> Dict[str, Any]:
     """
-    Extract key operational numbers from plain text / snippet of Zepto operational emails.
-    Identifies GMV sales, order throughput, AOV, SLA adherence %, IPP, and losses.
+    Extract key operational numbers from plain text / HTML snippet of Zepto operational emails.
+    Identifies GMV sales, order throughput, AOV, SLA adherence %, IPP, signed DQ losses, and signed shrinkage.
     """
     metrics: Dict[str, Any] = {}
-    if not text:
+    combined_raw = f"{html} {text}".strip()
+    if not combined_raw:
         return metrics
 
-    clean_text = text.replace(",", "").strip()
+    # 1. Structured HTML Key-Value parsing (metric-row, tables, etc.)
+    if "<" in combined_raw and ">" in combined_raw:
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(combined_raw, "html.parser")
+            for row in soup.find_all(class_=re.compile(r"metric-row|top-box|bottom-box")):
+                left = row.find(class_=re.compile(r"metric-left|top-left"))
+                right = row.find(class_=re.compile(r"metric-right|top-right"))
+                if left and right:
+                    l_txt = left.get_text(strip=True).lower()
+                    r_txt = right.get_text(strip=True)
+                    clean_r = re.sub(r"[^\d\.\-+]", "", r_txt)
+                    if clean_r:
+                        try:
+                            val = float(clean_r)
+                            if "mtd shrinkage" in l_txt:
+                                metrics["mtd_shrinkage"] = val
+                                metrics["loss_amount"] = val
+                            elif "d-1 shrinkage" in l_txt:
+                                metrics["d1_shrinkage"] = val
+                                if "loss_amount" not in metrics:
+                                    metrics["loss_amount"] = val
+                            elif "mtd dq" in l_txt or "mtd defect" in l_txt:
+                                metrics["mtd_dq"] = val
+                                metrics["loss_amount"] = val
+                            elif "d-1 dq" in l_txt or "d-1 defect" in l_txt:
+                                metrics["d1_dq"] = val
+                                if "loss_amount" not in metrics:
+                                    metrics["loss_amount"] = val
+                        except ValueError:
+                            pass
+
+            for tr in soup.find_all("tr"):
+                cells = tr.find_all(["td", "th"])
+                if len(cells) == 2:
+                    k = cells[0].get_text(strip=True).lower()
+                    v = cells[1].get_text(strip=True)
+                    clean_v = re.sub(r"[^\d\.\-+]", "", v)
+                    if clean_v:
+                        try:
+                            val = float(clean_v)
+                            if "mtd shrinkage" in k:
+                                metrics["mtd_shrinkage"] = val
+                                metrics["loss_amount"] = val
+                            elif "d-1 shrinkage" in k:
+                                metrics["d1_shrinkage"] = val
+                            elif "mtd dq" in k:
+                                metrics["mtd_dq"] = val
+                                metrics["loss_amount"] = val
+                            elif "d-1 dq" in k:
+                                metrics["d1_dq"] = val
+                        except ValueError:
+                            pass
+        except Exception:
+            pass
+
+    # Strip style and script blocks before text regex matching
+    clean_text = re.sub(r"<style[^>]*>.*?</style>", " ", combined_raw, flags=re.DOTALL | re.I)
+    clean_text = re.sub(r"<script[^>]*>.*?</script>", " ", clean_text, flags=re.DOTALL | re.I)
+    clean_text = re.sub(r"<[^>]+>", " ", clean_text)
+    # Remove thousands separator commas between digits
+    clean_text = re.sub(r"(?<=\d),(?=\d)", "", clean_text)
+    clean_text = clean_text.replace(",", " ").strip()
 
     # 1. GMV / Sales (e.g. "GMV: ₹4,52,000", "Sales of 350000", "GMV 2.4L")
-    gmv_match = re.search(r"(?:gmv|sales|revenue)(?:\s+of)?[:\s\-]+(?:rs\.?|inr|₹)?\s*([\d\.]+(?:\s*(?:k|lakhs?|l|cr))?)", clean_text, re.I)
-    if gmv_match:
+    gmv_match = re.search(r"\b(?:gmv|sales|revenue)(?:\s+of)?[:\s\-]+(?:rs\.?|inr|₹)?\s*([\d\.]+(?:\s*(?:k|lakhs?|l|cr))?)", clean_text, re.I)
+    if gmv_match and "sales_gmv" not in metrics:
         val_str = gmv_match.group(1).lower().strip()
         val = 0.0
         if "l" in val_str or "lakh" in val_str:
@@ -775,33 +838,32 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
         if val > 0:
             metrics["sales_gmv"] = val
 
-    # 2. Orders count (e.g. "Orders: 1,420", "1250 orders dispatched", "Total Orders: 980")
-    order_match = re.search(r"(?:orders?|total orders|dispatched)[:\s\-]+(\d+)", clean_text, re.I)
+    # 2. Orders count with strict word boundary (e.g. "Orders: 1,420", "1250 orders dispatched", "Total Orders: 980")
+    order_match = re.search(r"\b(?:orders?|total\s+orders|dispatched)\b[:\s\-]+(\d+)", clean_text, re.I)
     if not order_match:
-        order_match = re.search(r"(\d+)\s+orders", clean_text, re.I)
-    if order_match:
+        order_match = re.search(r"\b(\d+)\s+orders\b", clean_text, re.I)
+    if order_match and "order_count" not in metrics:
         metrics["order_count"] = int(order_match.group(1))
 
     # 3. AOV (e.g. "AOV: ₹340", "Basket: 412")
-    aov_match = re.search(r"(?:aov|basket|avg order value)[:\s\-]+(?:rs\.?|inr|₹)?\s*([\d\.]+)", clean_text, re.I)
-    if aov_match:
+    aov_match = re.search(r"\b(?:aov|basket|avg\s+order\s+value)\b[:\s\-]+(?:rs\.?|inr|₹)?\s*([\d\.]+)", clean_text, re.I)
+    if aov_match and "aov" not in metrics:
         metrics["aov"] = float(aov_match.group(1))
 
     # 4. SLA Adherence % (e.g. "SLA: 98.4%", "10-min SLA 99.2%")
-    sla_match = re.search(r"(?:sla|10-?min(?:ute)? sla|adherence)[:\s\-]+([\d\.]+)%", clean_text, re.I)
-    if sla_match:
+    sla_match = re.search(r"\b(?:sla|10-?min(?:ute)?\s+sla|adherence)\b[:\s\-]+([\d\.]+)%", clean_text, re.I)
+    if sla_match and "sla_adherence_pct" not in metrics:
         metrics["sla_adherence_pct"] = float(sla_match.group(1))
 
     # 5. IPP Throughput (e.g. "IPP: 132", "Picker IPP 140", "Packer IPP: 138.2", "121.66 IPP", "D-1 IPP: 145")
     ipp_match = re.search(
-        r"(?:ipp|picker\s+ipp|packer\s+ipp|packing\s+ipp|picking\s+ipp|store\s+ipp|d-1\s+ipp|mtd\s+ipp|overall\s+ipp|packer\s+throughput|items\s*(?:picked|packed)?\s*(?:per\s+hour|/\s*hr|/\s*hour))\s*[:=\-]\s*([\d\.]+)",
+        r"\b(?:ipp|picker\s+ipp|packer\s+ipp|packing\s+ipp|picking\s+ipp|store\s+ipp|d-1\s+ipp|mtd\s+ipp|overall\s+ipp|packer\s+throughput|items\s*(?:picked|packed)?\s*(?:per\s+hour|/\s*hr|/\s*hour))\b\s*[:=\-]\s*([\d\.]+)",
         clean_text,
         re.I,
     )
     if not ipp_match:
-        # Check trailing e.g. "138.2 IPP" or "145 Picker IPP"
         ipp_match = re.search(r"\b([\d\.]+)\s*(?:picker\s+|packer\s+)?ipp\b", clean_text, re.I)
-    if ipp_match:
+    if ipp_match and "packer_ipp" not in metrics:
         try:
             val_ipp = float(ipp_match.group(1))
             if 30.0 <= val_ipp <= 500.0:  # Valid realistic IPP speed range
@@ -810,57 +872,63 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
             pass
 
     # 6. Loss / Shrinkage / DQ Metrics
-    # Parse explicit MTD and D-1 DQ losses
-    mtd_dq_match = re.search(r"mtd\s+dq[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
-    if mtd_dq_match:
-        try:
-            metrics["mtd_dq"] = float(mtd_dq_match.group(1))
-        except ValueError:
-            pass
+    def _extract_amount_by_pattern(pat: str, src: str) -> Optional[float]:
+        # Match pattern followed by optional separator/currency and signed numeric value
+        m = re.search(pat + r"[:\s\-=]*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)", src, re.I)
+        if not m:
+            m = re.search(pat + r"[:\s\-=]*(-?\s*(?:rs\.?|inr|₹)?\s*\d+(?:\.\d+)?)", src, re.I)
+        if m:
+            clean_val = re.sub(r"[^\d\.\-+]", "", m.group(1))
+            try:
+                return float(clean_val)
+            except ValueError:
+                pass
+        return None
 
-    d1_dq_match = re.search(r"d-?1\s+dq[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
-    if d1_dq_match:
-        try:
-            metrics["d1_dq"] = float(d1_dq_match.group(1))
-        except ValueError:
-            pass
+    if "loss_amount" not in metrics:
+        # Check MTD & D-1 Shrinkage / DQ patterns
+        mtd_s_val = _extract_amount_by_pattern(r"\bmtd\s+shrinkage\b", clean_text)
+        if mtd_s_val is not None:
+            metrics["mtd_shrinkage"] = mtd_s_val
+            metrics["loss_amount"] = mtd_s_val
 
-    # Parse explicit MTD and D-1 Shrinkage
-    mtd_shrink_match = re.search(r"mtd\s+shrinkage[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
-    if mtd_shrink_match:
-        try:
-            metrics["mtd_shrinkage"] = float(mtd_shrink_match.group(1))
-        except ValueError:
-            pass
+        d1_s_val = _extract_amount_by_pattern(r"\bd-?1\s+shrinkage\b", clean_text)
+        if d1_s_val is not None:
+            metrics["d1_shrinkage"] = d1_s_val
+            if "loss_amount" not in metrics:
+                metrics["loss_amount"] = d1_s_val
 
-    d1_shrink_match = re.search(r"d-?1\s+shrinkage[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
-    if d1_shrink_match:
-        try:
-            metrics["d1_shrinkage"] = float(d1_shrink_match.group(1))
-        except ValueError:
-            pass
+        mtd_dq_val = _extract_amount_by_pattern(r"\bmtd\s+(?:dq\s*loss|dq|defect)\b", clean_text)
+        if mtd_dq_val is not None:
+            metrics["mtd_dq"] = mtd_dq_val
+            if "loss_amount" not in metrics:
+                metrics["loss_amount"] = mtd_dq_val
 
-    # Generic Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages: Rs. 1,200", "Shrinkage: 1450")
-    # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture
-    sanitized_text = re.sub(r"\b202\d[-/]\d{2}[-/]\d{2}\b", " ", clean_text)
-    sanitized_text = re.sub(r"\b\d{2}[-/]\d{2}[-/]202\d\b", " ", sanitized_text)
-    loss_match = re.search(r"(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\s*[:=]\s*(?:rs\.?|inr|₹)?\s*([\d\.]+)", sanitized_text, re.I)
-    if not loss_match:
-        loss_match = re.search(r"(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\s*(?:of)?\s*(?:rs\.?|inr|₹)\s*([\d\.]+)", sanitized_text, re.I)
-    if not loss_match:
-        # Check for trailing monetary indicator e.g. "₹4,500 in DQ Loss" or "Rs. 1,200 damage"
-        loss_match = re.search(r"(?:rs\.?|inr|₹)\s*([\d\.]+)\s*(?:in\s+|of\s+)?(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)", sanitized_text, re.I)
-    if loss_match:
-        amt = float(loss_match.group(1))
-        # Ensure it is not a stray 4-digit calendar year unless explicit currency was matched
-        matched_str = loss_match.group(0).lower()
-        has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
-        if not (2020 <= amt <= 2035 and not has_curr):
-            metrics["loss_amount"] = amt
+        d1_dq_val = _extract_amount_by_pattern(r"\bd-?1\s+(?:dq\s*loss|dq|defect)\b", clean_text)
+        if d1_dq_val is not None:
+            metrics["d1_dq"] = d1_dq_val
+            if "loss_amount" not in metrics:
+                metrics["loss_amount"] = d1_dq_val
     elif "mtd_dq" in metrics:
         metrics["loss_amount"] = metrics["mtd_dq"]
     elif "mtd_shrinkage" in metrics:
         metrics["loss_amount"] = metrics["mtd_shrinkage"]
+
+    if "loss_amount" not in metrics:
+        # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture
+        sanitized_text = re.sub(r"\b202\d[-/]\d{2}[-/]\d{2}\b", " ", clean_text)
+        sanitized_text = re.sub(r"\b\d{2}[-/]\d{2}[-/]202\d\b", " ", sanitized_text)
+        loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*[:=]\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)", sanitized_text, re.I)
+        if not loss_match:
+            loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*(?:of)?\s*(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)", sanitized_text, re.I)
+        if not loss_match:
+            loss_match = re.search(r"(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)\s*(?:in\s+|of\s+)?(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b", sanitized_text, re.I)
+        if loss_match:
+            amt = float(loss_match.group(1))
+            matched_str = loss_match.group(0).lower()
+            has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
+            if not (2020 <= amt <= 2035 and not has_curr):
+                metrics["loss_amount"] = amt
 
     return metrics
 

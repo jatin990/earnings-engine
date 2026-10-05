@@ -1270,7 +1270,7 @@ async def ingest_all_emails_endpoint(
 
                 # Parse body text & HTML metrics
                 from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body, parse_zepto_manpower_utilization_html
-                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text}")
+                body_metrics = extract_metrics_from_email_body(f"{subject} {snippet} {body_text}", html=body_html)
                 if category == "MANPOWER_UTILIZATION" and body_html:
                     parsed_manpower = parse_zepto_manpower_utilization_html(body_html, subject=subject)
                     if parsed_manpower.get("metrics"):

@@ -4212,10 +4212,14 @@ def get_loss_summary(
                 continue
             active_items.append(it)
 
-        # Core metric calculations (losses are positive financial defect magnitudes)
+        # Core metric calculations (losses are positive financial defect magnitudes, shrinkage is algebraic net inventory delta)
         total_loss = sum(abs(float(i.get("amount") or 0.0)) for i in active_items)
         dq_total = sum(abs(float(i.get("amount") or 0.0)) for i in active_items if i.get("loss_type") == "DQ_LOSS")
-        shrinkage_total = sum(
+        shrinkage_net = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
+        )
+        shrinkage_gross = sum(
             abs(float(i.get("amount") or 0.0)) for i in active_items
             if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
         )
@@ -4386,23 +4390,31 @@ def get_loss_summary(
                 (msg_id, msg_date, msg_store),
             ).fetchall()
 
-            excel_sum = round(sum(abs(float(lr["amount"] or 0.0)) for lr in linked_excel_rows), 2)
+            excel_net_sum = round(sum(float(lr["amount"] or 0.0) for lr in linked_excel_rows), 2)
+            excel_gross_sum = round(sum(abs(float(lr["amount"] or 0.0)) for lr in linked_excel_rows), 2)
+
+            # Net shrinkage reflects negative values in emails (e.g. -9789); compare against net or gross sum based on proximity
+            if email_stated_amount < 0 or abs(excel_net_sum - email_stated_amount) < abs(excel_gross_sum - email_stated_amount):
+                excel_sum = excel_net_sum
+            else:
+                excel_sum = excel_gross_sum
+
             excel_sku_count = sum(abs(int(lr["sku_count"] or 0)) for lr in linked_excel_rows)
             excel_item_count = len(linked_excel_rows)
 
             variance = round(excel_sum - email_stated_amount, 2)
             status = "PENDING"
 
-            if excel_sum > 0 and email_stated_amount > 0:
-                if abs(variance) <= 1.0:
+            if excel_sum != 0 and email_stated_amount != 0:
+                if abs(variance) <= 50.0 or (abs(email_stated_amount) > 0 and abs(variance) / abs(email_stated_amount) < 0.05):
                     status = "MATCHED"
                     matched_count += 1
                 else:
                     status = "VARIANCE"
                     variance_count += 1
-            elif excel_sum > 0 and email_stated_amount == 0:
+            elif excel_sum != 0 and email_stated_amount == 0:
                 status = "EXCEL_ONLY"
-            elif excel_sum == 0 and email_stated_amount > 0:
+            elif excel_sum == 0 and email_stated_amount != 0:
                 status = "EMAIL_ONLY"
 
             recon_items.append({
@@ -4504,7 +4516,8 @@ def get_loss_summary(
             "available_months": sorted_months,
             "total_loss_amount": round(total_loss, 2),
             "dq_loss_total": round(dq_total, 2),
-            "shrinkage_total": round(shrinkage_total, 2),
+            "shrinkage_total": round(shrinkage_net, 2),
+            "shrinkage_gross": round(shrinkage_gross, 2),
             "spoilage_total": round(spoilage_total, 2),
             "total_skus_affected": unique_skus_count,
             "unique_skus_count": unique_skus_count,

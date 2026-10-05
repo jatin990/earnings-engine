@@ -3846,11 +3846,11 @@ const zeptoApp = {
             const isLowAttendance = scheduled >= 5 && (present / scheduled) < 0.6;
             const isSelected = selectedDate === d.date;
 
-            const siTooltipText = sisSched > 0 ? ` | ⚡ ${sisPres}/${sisSched} SIs (Avg ${sisAvgShift}h)` : '';
             const borderHighlight = isSelected
                 ? 'ring-2 ring-purple-400 bg-purple-500/20 rounded-lg scale-[1.04] p-1 shadow-lg shadow-purple-500/30'
                 : (isLowAttendance ? 'border-b-2 border-b-rose-500' : '');
 
+            const siTooltipText = sisSched > 0 ? ` | ⚡ ${sisPres}/${sisSched} SIs (Avg ${sisAvgShift}h)` : '';
             const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift)${siTooltipText} | ${absent} Absent | ${weekOff} WO (Click to filter roster)`;
             const siBadgeChip = sisPres > 0 ? `<span class="text-amber-300 ml-1">${sisPres}⚡</span>` : '';
 
@@ -4244,38 +4244,45 @@ const zeptoApp = {
 
         if (!tbody) return;
 
-        // Mode 1: Daily Staff & Picker Shift Ledger
+        // MODE 1: Daily Date Drilldown Mode
         if (this.attendance.selected_date) {
-            const dailyRecords = this.attendance.filtered_daily_records || [];
-            const selDate = this.attendance.selected_date;
+            const dailyList = this.attendance.filtered_daily_records || [];
+            const isPickerFilter = (this.attendance.daily_status_filter || '').startsWith('PICKERS');
 
-            if (badge) badge.textContent = `${dailyRecords.length} Staff on ${selDate}`;
+            if (badge) {
+                const filterLabel = this.attendance.daily_status_filter === 'PICKERS_PRESENT'
+                    ? 'Present Pickers'
+                    : (this.attendance.daily_status_filter === 'PICKERS_ABSENT'
+                        ? 'Absent Pickers'
+                        : (isPickerFilter ? 'Pickers' : 'Staff Members'));
+                badge.textContent = `${dailyList.length} ${filterLabel} on ${this.attendance.selected_date}`;
+            }
 
             if (thead) {
                 thead.innerHTML = `
-                    <tr>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase w-10">#</th>
-                        <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Employee / Staff</th>
-                        <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Designation</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Shift Status</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Shift Window</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">In Punch</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Out Punch</th>
-                        <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Duration</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punctuality / Lateness</th>
-                        <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punch Drilldown</th>
+                    <tr class="border-b border-purple-500/20 text-purple-200 font-bold text-[11px] uppercase tracking-wider bg-purple-950/20">
+                        <th class="py-2.5 px-3 text-center font-mono w-10">#</th>
+                        <th class="py-2.5 px-3 text-center">Status</th>
+                        <th class="py-2.5 px-3">Employee Name</th>
+                        <th class="py-2.5 px-3">Role Profile</th>
+                        <th class="py-2.5 px-3 text-center">Shift Window</th>
+                        <th class="py-2.5 px-3 text-center">In Punch</th>
+                        <th class="py-2.5 px-3 text-center">Out Punch</th>
+                        <th class="py-2.5 px-3 text-right">Work Duration</th>
+                        <th class="py-2.5 px-3 text-center">Punctuality / Lateness</th>
+                        <th class="py-2.5 px-3 text-center">Actions</th>
                     </tr>
                 `;
             }
 
-            if (dailyRecords.length === 0) {
+            if (dailyList.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="10" class="text-center py-10 text-slate-400 text-xs">
                             <div class="flex flex-col items-center justify-center gap-2">
-                                <span class="text-2xl">🔍</span>
-                                <span class="font-bold text-white">No deployment records found for this filter on ${selDate}.</span>
-                                <span class="text-slate-500">Try switching to "All Pickers" or "All Roles" above.</span>
+                                <span class="text-2xl">📋</span>
+                                <span class="font-semibold text-slate-300">No records found for the active filter on ${this.attendance.selected_date}.</span>
+                                <span class="text-[11px] text-slate-500">Try selecting "All Pickers" or "All Roles", or clear your search input.</span>
                             </div>
                         </td>
                     </tr>
@@ -4283,71 +4290,74 @@ const zeptoApp = {
                 return;
             }
 
-            tbody.innerHTML = dailyRecords.map((r, idx) => {
+            tbody.innerHTML = dailyList.map((r, idx) => {
                 const st = (r.status || '').toUpperCase();
-                let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">PRESENT</span>';
-                if (st === 'ABSENT') {
-                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">ABSENT</span>';
+                let statusBadge = '';
+                if (st === 'PRESENT') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">PRESENT</span>';
+                } else if (st === 'ABSENT') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono">ABSENT</span>';
+                } else if (st === 'WEEK_OFF' || st === 'WO') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-white/10 font-mono">WEEK OFF</span>';
+                } else if (st === 'HOLIDAY' || st === 'PH') {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">HOLIDAY</span>';
                 } else if (st === 'HALF_DAY') {
-                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">HALF DAY</span>';
-                } else if (st === 'WEEK_OFF') {
-                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-400 border border-white/10">WEEK OFF</span>';
-                } else if (st === 'HOLIDAY') {
-                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">HOLIDAY</span>';
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">HALF DAY</span>';
+                } else {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-slate-400 border border-white/10 font-mono">${st || '—'}</span>`;
                 }
 
                 const isPicker = this.isPickerRole(r.designation);
-                const pickerTag = isPicker
-                    ? '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-1.5">🛒 PICKER</span>'
-                    : '';
-
-                let punctualityBadge = '—';
+                const isLate = r.is_late || (r.late_minutes && r.late_minutes > 0);
+                let punctualityBadge = '';
                 if (st === 'PRESENT') {
-                    if (r.late_by && r.late_by !== '00:00' && r.late_by !== '—') {
-                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/25">Late: ${r.late_by}</span>`;
-                    } else if (r.early_by && r.early_by !== '00:00' && r.early_by !== '—') {
-                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/25">Early: ${r.early_by}</span>`;
+                    if (isLate) {
+                        punctualityBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">⚠️ Late +${r.late_minutes || 0}m</span>`;
+                    } else if (r.late_by && r.late_by !== '00:00' && r.late_by !== '—') {
+                        punctualityBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">Late: ${r.late_by}</span>`;
                     } else {
-                        punctualityBadge = `<span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/25">On Time</span>`;
+                        punctualityBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 font-mono">✓ On Time</span>';
                     }
                 } else if (st === 'ABSENT') {
-                    punctualityBadge = `<span class="text-[10px] font-mono text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/25">Unexcused</span>`;
+                    punctualityBadge = '<span class="text-[10px] font-mono text-rose-400 font-bold">Unexcused</span>';
+                } else {
+                    punctualityBadge = '<span class="text-[10px] font-mono text-slate-500">—</span>';
                 }
 
-                const durationStr = r.work_duration_hours != null
-                    ? `${parseFloat(r.work_duration_hours).toFixed(1)}h`
-                    : (r.work_duration || '—');
+                const durationHours = r.total_work_hours != null
+                    ? Number(r.total_work_hours).toFixed(1)
+                    : (r.work_duration_hours != null
+                        ? Number(r.work_duration_hours).toFixed(1)
+                        : (r.duration_minutes ? (r.duration_minutes / 60).toFixed(1) : '0.0'));
 
                 return `
-                    <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view complete shift punches for ${r.employee_name}">
+                    <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view full 30-day shift history for ${r.employee_name}">
                         <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
+                        <td class="py-2.5 px-3 text-center whitespace-nowrap">${statusBadge}</td>
                         <td class="py-2.5 px-3">
                             <div class="font-bold text-white flex items-center gap-1.5">
                                 <span>${r.employee_name || '—'}</span>
+                                ${isPicker ? '<span class="text-[9px] px-1 rounded bg-purple-500/20 text-purple-300 font-bold">🛒</span>' : ''}
                                 <span class="text-[10px] text-emerald-400 opacity-60">↗</span>
                             </div>
                             <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
                         </td>
                         <td class="py-2.5 px-3">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300 whitespace-nowrap inline-flex items-center">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300 whitespace-nowrap">
                                 ${r.designation || 'Unassigned'}
-                                ${pickerTag}
                             </span>
                         </td>
-                        <td class="py-2.5 px-3 text-center whitespace-nowrap">
-                            ${statusBadge}
+                        <td class="py-2.5 px-3 text-center font-mono text-slate-300 text-[11px]">
+                            ${r.shift_start && r.shift_end ? `${r.shift_start} - ${r.shift_end}` : (r.shift_name || r.shift || 'Standard')}
                         </td>
-                        <td class="py-2.5 px-3 text-center font-mono text-xs text-slate-300">
-                            ${r.shift_name || r.shift || '—'}
-                        </td>
-                        <td class="py-2.5 px-3 text-center font-mono text-xs ${r.in_time ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+                        <td class="py-2.5 px-3 text-center font-mono ${r.in_time ? 'text-emerald-300 font-bold' : 'text-slate-500'}">
                             ${r.in_time || '—'}
                         </td>
-                        <td class="py-2.5 px-3 text-center font-mono text-xs ${r.out_time ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+                        <td class="py-2.5 px-3 text-center font-mono ${r.out_time ? 'text-slate-200' : 'text-slate-500'}">
                             ${r.out_time || '—'}
                         </td>
-                        <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">
-                            ${durationStr}
+                        <td class="py-2.5 px-3 text-right font-mono font-bold ${Number(durationHours) > 0 ? 'text-purple-300' : 'text-slate-500'}">
+                            ${Number(durationHours) > 0 ? `${durationHours} hrs` : '—'}
                         </td>
                         <td class="py-2.5 px-3 text-center whitespace-nowrap">
                             ${punctualityBadge}
@@ -4356,9 +4366,9 @@ const zeptoApp = {
                             <button
                                 type="button"
                                 onclick="event.stopPropagation(); zeptoApp.openEmployeeDrawer('${r.employee_id}')"
-                                class="px-2.5 py-1 rounded bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-semibold transition"
+                                class="px-2.5 py-1 rounded bg-purple-500/15 hover:bg-purple-500/30 border border-purple-500/30 text-purple-200 text-[11px] font-semibold transition flex items-center gap-1 mx-auto"
                             >
-                                <span>🔍</span> View Punch
+                                <span>🔍</span> View History
                             </button>
                         </td>
                     </tr>
@@ -4367,26 +4377,26 @@ const zeptoApp = {
             return;
         }
 
-        // Mode 2: Monthly Aggregate Staff Roster
+        // MODE 2: Full Monthly Staff Roster Mode
         const staffList = this.attendance.filtered_staff || [];
         if (badge) badge.textContent = `${staffList.length} Active Employees`;
 
         if (thead) {
             thead.innerHTML = `
-                <tr>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase w-10">#</th>
-                    <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Employee / Staff</th>
-                    <th class="py-2.5 px-3 text-left text-slate-400 font-mono text-[10px] uppercase">Designation</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Scheduled Shifts</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">P / A / WO</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Payable Days</th>
-                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Base Pay</th>
-                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Expected Salary</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Attendance %</th>
-                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Total Hours</th>
-                    <th class="py-2.5 px-3 text-right text-slate-400 font-mono text-[10px] uppercase">Avg Daily Hrs</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Reliability Tier</th>
-                    <th class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px] uppercase">Punch Drilldown</th>
+                <tr class="border-b border-white/10 text-slate-400 font-bold text-[11px] uppercase tracking-wider bg-white/[0.02]">
+                    <th class="py-2.5 px-3 text-center font-mono w-10">#</th>
+                    <th class="py-2.5 px-3">Employee Name</th>
+                    <th class="py-2.5 px-3">Role Profile</th>
+                    <th class="py-2.5 px-3 text-center">Scheduled Shifts</th>
+                    <th class="py-2.5 px-3 text-center">Present / Absent / Off</th>
+                    <th class="py-2.5 px-3 text-center">Payable Days</th>
+                    <th class="py-2.5 px-3 text-right">Base Pay</th>
+                    <th class="py-2.5 px-3 text-right">Expected Salary</th>
+                    <th class="py-2.5 px-3 text-center">Attendance %</th>
+                    <th class="py-2.5 px-3 text-right">Total Hours</th>
+                    <th class="py-2.5 px-3 text-right">Avg Daily Hrs</th>
+                    <th class="py-2.5 px-3 text-center">Reliability Tier</th>
+                    <th class="py-2.5 px-3 text-center">Shift Drilldown</th>
                 </tr>
             `;
         }
@@ -5885,10 +5895,10 @@ const zeptoApp = {
                                 ${item.subject}
                             </td>
                             <td class="py-2 px-3 text-right font-mono font-bold text-slate-300">
-                                ${item.email_stated_amount > 0 ? this.formatCurrency(item.email_stated_amount) : '—'}
+                                ${item.email_stated_amount != null && item.email_stated_amount !== '' ? this.formatCurrency(item.email_stated_amount) : '—'}
                             </td>
                             <td class="py-2 px-3 text-right font-mono font-bold text-emerald-300">
-                                ${item.excel_parsed_sum > 0 ? this.formatCurrency(item.excel_parsed_sum) : '—'}
+                                ${item.excel_parsed_sum != null && item.excel_parsed_sum !== '' ? this.formatCurrency(item.excel_parsed_sum) : '—'}
                                 ${item.excel_item_count > 0 ? `<div class="text-[9px] text-slate-500 font-normal">(${item.excel_item_count} items)</div>` : ''}
                             </td>
                             <td class="py-2 px-3 text-right font-mono font-bold ${item.variance !== 0 ? 'text-rose-400' : 'text-slate-500'}">
