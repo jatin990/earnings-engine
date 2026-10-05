@@ -157,6 +157,114 @@
         </div>
     </section>
 
+    <!-- MTD Picker & Packer Fulfillment Intelligence Section -->
+    <section class="glass-panel p-3.5 space-y-2 border border-purple-500/20 bg-purple-950/[0.07]">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/5 pb-2">
+            <div class="flex items-center gap-2">
+                <span class="text-base">🛒</span>
+                <div>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Picker & Packer MTD Operations Intelligence</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+                            Fulfillment Force
+                        </span>
+                    </h4>
+                    <p class="text-[10px] text-slate-400">Month-to-Date averages across active operational days, individual shift spans & capacity</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] font-mono text-slate-300">
+                <span class="bg-black/40 px-2 py-1 rounded border border-white/10">
+                    Operational Days: <strong class="text-purple-300 font-bold" id="attMtdOpDays">0</strong>
+                </span>
+                <span class="bg-black/40 px-2 py-1 rounded border border-white/10">
+                    Picker Adherence: <strong class="text-emerald-400 font-bold" id="attPickerAdherence">0%</strong>
+                </span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            <!-- Card 1: Avg Pickers per Day -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300/80">Avg Pickers / Day</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono">
+                        Daily Benchmark
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-white tracking-tight" id="attMtdAvgPickers">-- / day</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5" id="attMtdSchedPickersSub">
+                        Sched: -- / day
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Month Present Shifts:</span>
+                    <span class="text-purple-300 font-bold" id="attPickerPresentShifts">0</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Avg Shift Duration -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-300/80">Avg Shift Duration</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                        Per Shift
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-emerald-400 tracking-tight" id="attPickerAvgShift">-- hrs</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        In/Out punch duration
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Target Shift Span:</span>
+                    <span class="text-slate-300">8.0 - 9.0 hrs</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Active Pickers Headcount -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Picker Headcount</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
+                        Active Roster
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-white tracking-tight" id="attPickerHeadcount">0</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        Assigned Packers/Pickers
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Total Picker Shifts:</span>
+                    <span class="text-slate-200" id="attPickerTotalShifts">0</span>
+                </div>
+            </div>
+
+            <!-- Card 4: Total Picker Hours -->
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-sky-300/80">Picker Man-Hours</span>
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono">
+                        Logged
+                    </span>
+                </div>
+                <div class="my-1">
+                    <div class="text-xl font-black font-mono text-sky-300 tracking-tight" id="attPickerTotalHours">0 hrs</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                        Fulfillment labor deployed
+                    </div>
+                </div>
+                <div class="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex justify-between font-mono">
+                    <span>Absent Picker Shifts:</span>
+                    <span class="text-rose-400 font-bold" id="attPickerAbsentShifts">0</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Operational Capacity & Throughput Cards (Packers, Leadership, Inbound/Quality/NSO) -->
     <section class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <!-- 1. Packers Capacity -->
@@ -249,15 +357,18 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
                 <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>📊</span> Daily Staffing Timeline & Roster Coverage
+                    <span>📊</span> Daily Staffing Timeline & Picker Capacity Graph
                 </h4>
-                <p class="text-[10px] text-slate-500">Day-by-day scheduled capacity. Click any day bar to filter ledger.</p>
+                <p class="text-[10px] text-slate-500">Day-by-day scheduled capacity vs active pickers & shift span. Click any day bar to filter ledger.</p>
             </div>
-            <div class="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+            <div class="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 font-mono">
+                <span id="attTimelinePickerAvgBadge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-bold">
+                    <span>🛒</span> Month Avg: <strong id="attTimelinePickerAvgVal" class="text-white">--</strong> pickers/day
+                </span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Present</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Pickers</span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-400"></span> Absent</span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500"></span> Week Off</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Holiday</span>
             </div>
         </div>
         <!-- Horizontal Scrollable Timeline Bar Chart -->

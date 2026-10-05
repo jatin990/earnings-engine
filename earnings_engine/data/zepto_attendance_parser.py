@@ -11,7 +11,7 @@ import os
 import re
 import zipfile
 import xml.etree.ElementTree as ET
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 from typing import Any, Dict, List, Optional, Union
 
 # Mapping of raw Zepto muster statuses to normalized status tags
@@ -107,16 +107,33 @@ def parse_time_str(val: Any) -> str:
 
     try:
         fval = float(val)
-        if 0 <= fval < 1:  # Fraction of day
-            total_seconds = int(round(fval * 86400))
+        frac = fval - int(fval) if fval >= 1 else fval
+        if 0 < frac < 1:  # Fraction of day
+            total_seconds = int(round(frac * 86400))
             hours = total_seconds // 3600
             minutes = (total_seconds % 3600) // 60
             seconds = total_seconds % 60
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        elif fval == 0:
+            return ""
     except (ValueError, TypeError):
         pass
 
     s = str(val).strip()
+    if not s or s.lower() in ("nan", "none", "null", "-", "—"):
+        return ""
+
+    m = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", s)
+    if m:
+        h, m_min, s_sec = m.groups()
+        sec_val = int(s_sec) if s_sec else 0
+        h_val = int(h)
+        if "pm" in s.lower() and h_val < 12:
+            h_val += 12
+        elif "am" in s.lower() and h_val == 12:
+            h_val = 0
+        return f"{h_val:02d}:{int(m_min):02d}:{sec_val:02d}"
+
     return s
 
 
@@ -437,6 +454,21 @@ def parse_zepto_attendance_excel(
 
         work_dur = parse_duration_to_mins(row[col_map["work_duration"]]) if "work_duration" in col_map and col_map["work_duration"] < len(row) else 0
         break_dur = parse_duration_to_mins(row[col_map["break_duration"]]) if "break_duration" in col_map and col_map["break_duration"] < len(row) else 0
+
+        # Auto-derive work duration from in/out punch if duration missing/zero
+        if work_dur == 0 and punch_in and punch_out:
+            try:
+                in_parts = [int(p) for p in punch_in.split(":")[:2]]
+                out_parts = [int(p) for p in punch_out.split(":")[:2]]
+                in_mins = in_parts[0] * 60 + in_parts[1]
+                out_mins = out_parts[0] * 60 + out_parts[1]
+                diff = out_mins - in_mins
+                if diff < 0:
+                    diff += 1440  # crossed midnight
+                if diff > 0:
+                    work_dur = diff
+            except Exception:
+                pass
 
         # Track aggregates
         if shift_date:

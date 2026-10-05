@@ -3196,6 +3196,30 @@ const zeptoApp = {
             avgHoursSubEl.textContent = `Avg ~${avg} hrs / shift`;
         }
 
+        // Picker & Packer MTD Operations Intelligence
+        const pSum = sum.picker_summary || {};
+        const attMtdOpDays = document.getElementById('attMtdOpDays');
+        const attPickerAdherence = document.getElementById('attPickerAdherence');
+        const attMtdAvgPickers = document.getElementById('attMtdAvgPickers');
+        const attMtdSchedPickersSub = document.getElementById('attMtdSchedPickersSub');
+        const attPickerPresentShifts = document.getElementById('attPickerPresentShifts');
+        const attPickerAvgShift = document.getElementById('attPickerAvgShift');
+        const attPickerHeadcount = document.getElementById('attPickerHeadcount');
+        const attPickerTotalShifts = document.getElementById('attPickerTotalShifts');
+        const attPickerTotalHours = document.getElementById('attPickerTotalHours');
+        const attPickerAbsentShifts = document.getElementById('attPickerAbsentShifts');
+
+        if (attMtdOpDays) attMtdOpDays.textContent = pSum.operational_days != null ? pSum.operational_days : (sum.operational_days || 0);
+        if (attPickerAdherence) attPickerAdherence.textContent = `${pSum.picker_attendance_rate_pct != null ? pSum.picker_attendance_rate_pct : 0}%`;
+        if (attMtdAvgPickers) attMtdAvgPickers.textContent = `${pSum.avg_pickers_per_day != null ? pSum.avg_pickers_per_day : '--'} / day`;
+        if (attMtdSchedPickersSub) attMtdSchedPickersSub.textContent = `Sched: ${pSum.avg_scheduled_pickers_per_day != null ? pSum.avg_scheduled_pickers_per_day : '--'} / day`;
+        if (attPickerPresentShifts) attPickerPresentShifts.textContent = `${pSum.present_shifts || 0} shifts`;
+        if (attPickerAvgShift) attPickerAvgShift.textContent = `${pSum.avg_picker_shift_hours != null ? pSum.avg_picker_shift_hours : '--'} hrs`;
+        if (attPickerHeadcount) attPickerHeadcount.textContent = pSum.headcount != null ? pSum.headcount : 0;
+        if (attPickerTotalShifts) attPickerTotalShifts.textContent = `${pSum.total_shifts || 0} shifts`;
+        if (attPickerTotalHours) attPickerTotalHours.textContent = `${pSum.total_picker_hours || 0} hrs`;
+        if (attPickerAbsentShifts) attPickerAbsentShifts.textContent = `${pSum.absent_shifts || 0} absences`;
+
         // Role Breakdown Grid & Role Filter Dropdown
         this.renderAttendanceRoles(sum.role_breakdown || []);
 
@@ -3203,7 +3227,7 @@ const zeptoApp = {
         this.renderAttendanceCapacity(sum.role_capacity_summary || {});
 
         // 6. Daily Staffing Timeline & Heatmap
-        this.renderAttendanceTimeline(sum.daily_trend || []);
+        this.renderAttendanceTimeline(sum.daily_trend || [], sum.picker_summary || {});
 
         // 7. Absenteeism & Churn Risk Watchlist
         this.renderAttendanceWatchlist(sum.absenteeism_watchlist || []);
@@ -3273,8 +3297,15 @@ const zeptoApp = {
         }
     },
 
-    renderAttendanceTimeline(trend) {
+    renderAttendanceTimeline(trend, pickerSummary = {}) {
         const container = document.getElementById('attDailyTimelineContainer');
+        const pickerAvgBadge = document.getElementById('attTimelinePickerAvgBadge');
+        const pickerAvgVal = document.getElementById('attTimelinePickerAvgVal');
+
+        if (pickerAvgVal && pickerSummary.avg_pickers_per_day != null) {
+            pickerAvgVal.textContent = pickerSummary.avg_pickers_per_day;
+        }
+
         if (!container) return;
 
         if (!trend || trend.length === 0) {
@@ -3290,8 +3321,11 @@ const zeptoApp = {
             const absent = d.absent || 0;
             const weekOff = d.week_off || 0;
             const holiday = d.holiday || 0;
+            const pickersPres = d.pickers_present != null ? d.pickers_present : 0;
+            const pickersSched = d.pickers_scheduled != null ? d.pickers_scheduled : 0;
+            const pickersAvgShift = d.pickers_avg_shift_hours != null ? d.pickers_avg_shift_hours : 0;
 
-            const totalHeightPct = Math.min(100, Math.max(15, (scheduled / maxScheduled) * 100));
+            const totalHeightPct = Math.min(100, Math.max(18, (scheduled / maxScheduled) * 100));
             const dayLabel = (d.date || '').slice(8, 10);
             const monthLabel = (d.date || '').slice(5, 7);
 
@@ -3303,14 +3337,20 @@ const zeptoApp = {
             const isLowAttendance = scheduled >= 5 && (present / scheduled) < 0.6;
             const borderHighlight = isLowAttendance ? 'border-b-2 border-b-rose-500' : '';
 
+            const tooltipText = `${d.date}: ${present}/${scheduled} Present | 🛒 ${pickersPres}/${pickersSched} Pickers (Avg ${pickersAvgShift}h shift) | ${absent} Absent | ${weekOff} WO`;
+
             return `
                 <div
                     class="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer ${borderHighlight}"
                     onclick="zeptoApp.filterByDate('${d.date}')"
-                    title="${d.date}: ${present} Present, ${absent} Absent, ${weekOff} Week Off (${scheduled} Total)"
+                    title="${tooltipText}"
                 >
+                    <!-- Top Daily Picker Count Chip -->
+                    <div class="text-[8px] font-mono font-extrabold text-purple-300 opacity-80 group-hover:opacity-100 mb-1 leading-none whitespace-nowrap">
+                        ${pickersPres > 0 ? `${pickersPres}🛒` : ''}
+                    </div>
                     <!-- Bar Stack Container -->
-                    <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125" style="height: ${totalHeightPct}%;">
+                    <div class="w-full max-w-[28px] bg-black/40 rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:brightness-125 border border-white/5" style="height: ${totalHeightPct}%;">
                         <div class="bg-emerald-500/80 w-full" style="height: ${pPct}%;"></div>
                         <div class="bg-rose-500/80 w-full" style="height: ${aPct}%;"></div>
                         <div class="bg-slate-600/80 w-full" style="height: ${wPct}%;"></div>
@@ -3657,7 +3697,7 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (history.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 text-xs">No shift history found for this staff member.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No shift history found for this staff member.</td></tr>`;
             return;
         }
 
@@ -3675,12 +3715,16 @@ const zeptoApp = {
                 statusBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-slate-300">${p.status}</span>`;
             }
 
+            const inTimeStr = p.punch_in ? `<span class="text-emerald-300 font-mono font-bold">${p.punch_in}</span>` : '<span class="text-slate-600">—</span>';
+            const outTimeStr = p.punch_out ? `<span class="text-sky-300 font-mono font-bold">${p.punch_out}</span>` : '<span class="text-slate-600">—</span>';
+
             return `
                 <tr class="hover:bg-white/[0.02] transition">
                     <td class="py-2 px-2.5 font-mono text-[11px] text-slate-300 whitespace-nowrap">${p.shift_date}</td>
-                    <td class="py-2 px-2.5 text-[10px] text-slate-300 truncate max-w-[120px]">${p.shift_name || 'General Shift'}</td>
-                    <td class="py-2 px-2.5 font-mono text-[10px] text-sky-300 whitespace-nowrap">${p.shift_time || '09:00 - 18:00'}</td>
-                    <td class="py-2 px-2.5 text-right font-mono text-[10px] ${p.work_duration_mins > 0 ? 'text-white' : 'text-slate-600'}">
+                    <td class="py-2 px-2.5 text-[10px] text-slate-300 truncate max-w-[110px]" title="${p.shift_name || 'General Shift'}">${p.shift_name || 'General Shift'}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] whitespace-nowrap">${inTimeStr}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] whitespace-nowrap">${outTimeStr}</td>
+                    <td class="py-2 px-2.5 text-right font-mono text-[10px] ${p.work_duration_mins > 0 ? 'text-white font-bold' : 'text-slate-600'}">
                         ${p.work_duration_mins > 0 ? `${(p.work_duration_mins / 60).toFixed(1)}h` : '—'}
                     </td>
                     <td class="py-2 px-2.5 text-center whitespace-nowrap">${statusBadge}</td>

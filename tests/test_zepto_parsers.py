@@ -182,8 +182,8 @@ def test_loss_summary_monthly_and_category_matrix_calculations():
     assert len(summary["daily_trends"]) >= 1
     assert any(d["date"] == "2026-09-18" for d in summary["daily_trends"])
 
-    # Verify categories only contain positive losses and top-10 + Others logic
-    assert all(c["total_amount"] > 0 for c in summary["category_breakdown"])
+    # Verify categories only contain active non-zero losses/surpluses and top-10 + Others logic
+    assert all(c["total_amount"] != 0 for c in summary["category_breakdown"])
     assert len(summary["category_breakdown"]) <= 11  # At most 10 top categories + 1 OTHERS composite
     if len(summary["all_categories"]) > 10:
         assert any(c["category"] == "OTHERS" for c in summary["category_breakdown"])

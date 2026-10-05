@@ -3031,7 +3031,11 @@ def get_attendance_summary(
                 SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent,
                 SUM(CASE WHEN status = 'WEEK_OFF' THEN 1 ELSE 0 END) as week_off,
                 SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as half_day,
-                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday
+                SUM(CASE WHEN status = 'HOLIDAY' THEN 1 ELSE 0 END) as holiday,
+                SUM(CASE WHEN (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_scheduled,
+                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_present,
+                SUM(CASE WHEN status = 'ABSENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN 1 ELSE 0 END) as pickers_absent,
+                SUM(CASE WHEN status = 'PRESENT' AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%') THEN work_duration_mins ELSE 0 END) as pickers_work_mins
             FROM zepto_attendance_records
             WHERE {where_sql}
             GROUP BY shift_date
@@ -3040,8 +3044,12 @@ def get_attendance_summary(
             params,
         ).fetchall()
 
-        daily_trend = [
-            {
+        daily_trend = []
+        for d in daily_rows:
+            p_pres = d["pickers_present"] or 0
+            p_mins = d["pickers_work_mins"] or 0
+            p_avg_hrs = round((p_mins / 60.0) / p_pres, 1) if p_pres > 0 else 0.0
+            daily_trend.append({
                 "date": d["shift_date"],
                 "scheduled": d["scheduled"],
                 "present": d["present"],
@@ -3049,9 +3057,52 @@ def get_attendance_summary(
                 "week_off": d["week_off"],
                 "half_day": d["half_day"],
                 "holiday": d["holiday"],
-            }
-            for d in daily_rows
-        ]
+                "pickers_scheduled": d["pickers_scheduled"] or 0,
+                "pickers_present": p_pres,
+                "pickers_absent": d["pickers_absent"] or 0,
+                "pickers_work_mins": p_mins,
+                "pickers_avg_shift_hours": p_avg_hrs,
+            })
+
+        # MTD Picker Specific Aggregates
+        picker_stats = conn.execute(
+            f"""
+            SELECT
+                COUNT(DISTINCT employee_id) as picker_headcount,
+                COUNT(*) as total_picker_shifts,
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as picker_present,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as picker_absent,
+                SUM(CASE WHEN status = 'PRESENT' THEN work_duration_mins ELSE 0 END) as picker_work_mins,
+                COUNT(DISTINCT shift_date) as operational_days
+            FROM zepto_attendance_records
+            WHERE {where_sql} AND (LOWER(designation) LIKE '%packer%' OR LOWER(designation) LIKE '%picker%' OR LOWER(designation) LIKE '%flex%')
+            """,
+            params,
+        ).fetchone()
+
+        p_headcount = picker_stats["picker_headcount"] if picker_stats else 0
+        p_total_shifts = picker_stats["total_picker_shifts"] if picker_stats else 0
+        p_present = picker_stats["picker_present"] or 0 if picker_stats else 0
+        p_absent = picker_stats["picker_absent"] or 0 if picker_stats else 0
+        p_work_mins = picker_stats["picker_work_mins"] or 0 if picker_stats else 0
+        op_days = picker_stats["operational_days"] or 0 if picker_stats else 0
+
+        avg_pickers_per_day = round(p_present / op_days, 1) if op_days > 0 else 0.0
+        avg_sched_pickers_per_day = round(p_total_shifts / op_days, 1) if op_days > 0 else 0.0
+        avg_picker_shift_hours = round((p_work_mins / 60.0) / p_present, 1) if p_present > 0 else 0.0
+
+        picker_summary = {
+            "headcount": p_headcount,
+            "total_shifts": p_total_shifts,
+            "present_shifts": p_present,
+            "absent_shifts": p_absent,
+            "operational_days": op_days,
+            "avg_pickers_per_day": avg_pickers_per_day,
+            "avg_scheduled_pickers_per_day": avg_sched_pickers_per_day,
+            "avg_picker_shift_hours": avg_picker_shift_hours,
+            "total_picker_hours": round(p_work_mins / 60.0, 1),
+            "picker_attendance_rate_pct": round((p_present / (p_present + p_absent)) * 100.0, 1) if (p_present + p_absent) > 0 else 100.0,
+        }
 
         # Absenteeism Watchlist (employees with absences >= 2 or high absence rate)
         emp_absent_rows = conn.execute(
@@ -3216,6 +3267,7 @@ def get_attendance_summary(
                 "LEAVE": leave,
             },
             "role_breakdown": role_breakdown,
+            "picker_summary": picker_summary,
             "daily_trend": daily_trend,
             "absenteeism_watchlist": absenteeism_watchlist,
             "role_capacity_summary": capacity_summary,
@@ -3991,18 +4043,18 @@ def get_loss_summary(
                 continue
             active_items.append(it)
 
-        # Core metric calculations
-        total_loss = sum(float(i.get("amount") or 0.0) for i in active_items)
-        dq_total = sum(float(i.get("amount") or 0.0) for i in active_items if i.get("loss_type") == "DQ_LOSS")
+        # Core metric calculations (losses are positive financial defect magnitudes)
+        total_loss = sum(abs(float(i.get("amount") or 0.0)) for i in active_items)
+        dq_total = sum(abs(float(i.get("amount") or 0.0)) for i in active_items if i.get("loss_type") == "DQ_LOSS")
         shrinkage_total = sum(
-            float(i.get("amount") or 0.0) for i in active_items
+            abs(float(i.get("amount") or 0.0)) for i in active_items
             if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
         )
         spoilage_total = sum(
-            float(i.get("amount") or 0.0) for i in active_items
+            abs(float(i.get("amount") or 0.0)) for i in active_items
             if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
         )
-        total_units_affected = sum(int(i.get("sku_count") or 0) for i in active_items)
+        total_units_affected = sum(abs(int(i.get("sku_count") or 0)) for i in active_items)
 
         # Helper to normalize SKU identifier across incremental logs
         def _get_sku_norm_key(it: dict[str, Any]) -> str:
@@ -4073,9 +4125,9 @@ def get_loss_summary(
             c_data["pct_of_total"] = round((c_data["total_amount"] / total_loss * 100), 1) if total_loss > 0 else 0.0
             cat_list.append(c_data)
 
-        # Filter categories to only those with recorded transactions (non-zero amount or units/incidents)
-        non_zero_cats = [c for c in cat_list if abs(c["total_amount"]) > 0 or c["total_units"] != 0 or c["incident_count"] > 0]
-        non_zero_cats.sort(key=lambda x: x["total_amount"], reverse=True)
+        # Filter categories to active categories with recorded financial loss or incidents
+        non_zero_cats = [c for c in cat_list if c["total_amount"] != 0 or c["incident_count"] > 0]
+        non_zero_cats.sort(key=lambda x: abs(x["total_amount"]), reverse=True)
 
         # Group categories below Top 10 as "OTHERS"
         if len(non_zero_cats) > 10:
@@ -4165,8 +4217,8 @@ def get_loss_summary(
                 (msg_id, msg_date, msg_store),
             ).fetchall()
 
-            excel_sum = round(sum(float(lr["amount"] or 0.0) for lr in linked_excel_rows), 2)
-            excel_sku_count = sum(int(lr["sku_count"] or 0) for lr in linked_excel_rows)
+            excel_sum = round(sum(abs(float(lr["amount"] or 0.0)) for lr in linked_excel_rows), 2)
+            excel_sku_count = sum(abs(int(lr["sku_count"] or 0)) for lr in linked_excel_rows)
             excel_item_count = len(linked_excel_rows)
 
             variance = round(excel_sum - email_stated_amount, 2)
@@ -4206,12 +4258,12 @@ def get_loss_summary(
         month_trend_rows = conn.execute(
             """
             SELECT substr(record_date, 1, 7) AS ym,
-                   SUM(amount) AS monthly_total,
-                   SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END) AS dq_total,
-                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END) AS shrink_total,
-                   SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN amount ELSE 0 END) AS spoil_total,
+                   SUM(abs(amount)) AS monthly_total,
+                   SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN abs(amount) ELSE 0 END) AS dq_total,
+                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN abs(amount) ELSE 0 END) AS shrink_total,
+                   SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN abs(amount) ELSE 0 END) AS spoil_total,
                    COUNT(*) AS item_count,
-                   SUM(sku_count) AS sku_count
+                   SUM(abs(sku_count)) AS sku_count
             FROM zepto_loss_records
             WHERE category != 'EMAIL_INGESTED' AND record_date IS NOT NULL AND length(record_date) >= 7
             GROUP BY substr(record_date, 1, 7)
@@ -4239,8 +4291,8 @@ def get_loss_summary(
             if not dt or len(dt) < 10:
                 continue
             l_type = (it.get("loss_type") or "DQ_LOSS").strip().upper()
-            amt = float(it.get("amount") or 0.0)
-            sku_cnt = int(it.get("sku_count") or 0)
+            amt = abs(float(it.get("amount") or 0.0))
+            sku_cnt = abs(int(it.get("sku_count") or 0))
 
             if dt not in daily_map:
                 daily_map[dt] = {

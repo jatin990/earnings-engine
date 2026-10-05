@@ -253,8 +253,9 @@ def test_hidden_staff_resigned_and_excluded_from_operational_queries():
     import uuid
     from earnings_engine.data import zepto_db
 
-    emp_id = f"test_hidden_{uuid.uuid4().hex[:6]}"
-    emp_name = "Test Hidden Staff"
+    uid = uuid.uuid4().hex[:6]
+    emp_id = f"test_hidden_{uid}"
+    emp_name = f"Test Hidden Staff {uid}"
 
     # Create active employee
     zepto_db.create_employee({
@@ -307,6 +308,120 @@ def test_hidden_staff_resigned_and_excluded_from_operational_queries():
     assert hidden_emp is not None
     assert hidden_emp["status"] == "RESIGNED"
 
-    # Cleanup
-    zepto_db.delete_employee(emp_id)
+
+def test_picker_summary_and_punch_timing_metrics():
+    """Test picker role segmentation, MTD whole month averages, and shift duration calculations."""
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+    from earnings_engine.data.zepto_attendance_parser import parse_time_str
+
+    settings = Settings()
+    ensure_zepto_schema(settings)
+    test_store = f"TEST_PICKER_STORE_{uuid.uuid4().hex[:8]}"
+
+    # Verify fractional day time conversion and formatting
+    assert parse_time_str(0.25) == "06:00:00"  # 1/4 day = 6:00 AM
+    assert parse_time_str(1.375) == "09:00:00" # 1 day + 9/24 = 9:00 AM
+    assert parse_time_str("07:30 PM") == "19:30:00"
+    assert parse_time_str("06:15 AM") == "06:15:00"
+
+    # Insert sample records for picker and supervisor across multiple days
+    zepto_db.save_attendance_batch({
+        "store_name": test_store,
+        "file_name": "test_picker_timing.xlsx",
+        "records": [
+            {
+                "employee_id": f"PICKER_001_{uuid.uuid4().hex[:4]}",
+                "employee_name": "Rohan Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-01",
+                "shift_name": "Morning Shift",
+                "punch_in": "06:00:00",
+                "punch_out": "15:00:00",
+                "work_duration_mins": 540,
+                "status": "PRESENT",
+                "designation": "Picker",
+            },
+            {
+                "employee_id": f"PACKER_002_{uuid.uuid4().hex[:4]}",
+                "employee_name": "Suresh Packer",
+                "store_name": test_store,
+                "shift_date": "2026-09-01",
+                "shift_name": "Morning Shift",
+                "punch_in": "06:30:00",
+                "punch_out": "14:30:00",
+                "work_duration_mins": 480,
+                "status": "PRESENT",
+                "designation": "Packer / Sorter",
+            },
+            {
+                "employee_id": f"SUP_001_{uuid.uuid4().hex[:4]}",
+                "employee_name": "Vikram Supervisor",
+                "store_name": test_store,
+                "shift_date": "2026-09-01",
+                "shift_name": "Morning Shift",
+                "punch_in": "06:00:00",
+                "punch_out": "16:00:00",
+                "work_duration_mins": 600,
+                "status": "PRESENT",
+                "designation": "Shift Incharge",
+            },
+            {
+                "employee_id": f"PICKER_001_{uuid.uuid4().hex[:4]}",
+                "employee_name": "Rohan Picker",
+                "store_name": test_store,
+                "shift_date": "2026-09-02",
+                "shift_name": "Morning Shift",
+                "punch_in": "06:00:00",
+                "punch_out": "14:00:00",
+                "work_duration_mins": 480,
+                "status": "PRESENT",
+                "designation": "Picker",
+            },
+            {
+                "employee_id": f"PACKER_002_{uuid.uuid4().hex[:4]}",
+                "employee_name": "Suresh Packer",
+                "store_name": test_store,
+                "shift_date": "2026-09-02",
+                "shift_name": "Morning Shift",
+                "punch_in": "",
+                "punch_out": "",
+                "work_duration_mins": 0,
+                "status": "ABSENT",
+                "designation": "Packer / Sorter",
+            },
+        ]
+    }, settings=settings)
+
+    summary = zepto_db.get_attendance_summary(year_month="2026-09", store_name=test_store, settings=settings)
+
+    # Validate MTD picker summary
+    p_summary = summary.get("picker_summary", {})
+    assert p_summary.get("headcount") >= 1
+    assert p_summary.get("total_shifts") == 4
+    assert p_summary.get("present_shifts") == 3
+    assert p_summary.get("absent_shifts") == 1
+    assert p_summary.get("operational_days") == 2
+    # Avg pickers per operational day: 3 present shifts / 2 days = 1.5
+    assert p_summary.get("avg_pickers_per_day") == 1.5
+    # Total picker minutes: 540 + 480 + 480 = 1500 mins = 25.0 hours / 3 shifts = 8.3 hours avg
+    assert p_summary.get("avg_picker_shift_hours") == 8.3
+    assert p_summary.get("total_picker_hours") == 25.0
+
+    # Validate daily trends contain picker breakdown
+    daily_trends = summary.get("daily_trend", [])
+    day1 = next((d for d in daily_trends if d["date"] == "2026-09-01"), None)
+    assert day1 is not None
+    assert day1["pickers_present"] == 2
+    assert day1["pickers_scheduled"] == 2
+    assert day1["pickers_absent"] == 0
+    assert day1["pickers_avg_shift_hours"] == 8.5  # (540 + 480) / 60 / 2 = 1020 / 120 = 8.5
+
+    day2 = next((d for d in daily_trends if d["date"] == "2026-09-02"), None)
+    assert day2 is not None
+    assert day2["pickers_present"] == 1
+    assert day2["pickers_scheduled"] == 2
+    assert day2["pickers_absent"] == 1
+    assert day2["pickers_avg_shift_hours"] == 8.0  # 480 / 60 / 1 = 8.0
 
