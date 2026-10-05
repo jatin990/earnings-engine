@@ -57,15 +57,16 @@
 
     <!-- Quick-Jump Navigation Ribbon -->
     <nav class="stock-drawer-nav" aria-label="Stock Drawer Sections">
-        <button type="button" class="drawer-nav-pill active" onclick="app.scrollDrawerTo('#drawerSecQuote')">📊 Quote &amp; 52W</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecChart')">📉 Chart Studio</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecStructure')">📐 Structure</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecEPS')">💵 Formula EPS</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecConsensus')">🧠 AI Consensus</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecInstitutional')">🏛️ Institutional</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecFactors')">⭐ Factors</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecNews')">📰 News</button>
-        <button type="button" class="drawer-nav-pill" onclick="app.scrollDrawerTo('#drawerSecNotes')">📝 Notes</button>
+        <button type="button" class="drawer-nav-pill active" data-tab="quote" onclick="app.switchDrawerTab('quote')">📊 Quote &amp; 52W</button>
+        <button type="button" class="drawer-nav-pill" data-tab="chart" onclick="app.switchDrawerTab('chart')">📉 Chart Studio</button>
+        <button type="button" class="drawer-nav-pill" data-tab="structure" onclick="app.switchDrawerTab('structure')">📐 Structure</button>
+        <button type="button" class="drawer-nav-pill" data-tab="eps" onclick="app.switchDrawerTab('eps')">💵 Formula EPS</button>
+        <button type="button" class="drawer-nav-pill" data-tab="consensus" onclick="app.switchDrawerTab('consensus')">🧠 AI Consensus</button>
+        <button type="button" class="drawer-nav-pill" data-tab="institutional" onclick="app.switchDrawerTab('institutional')">🏛️ Institutional</button>
+        <button type="button" class="drawer-nav-pill" data-tab="factors" onclick="app.switchDrawerTab('factors')">⭐ Factors</button>
+        <button type="button" class="drawer-nav-pill" data-tab="news" onclick="app.switchDrawerTab('news')">📰 News</button>
+        <button type="button" class="drawer-nav-pill" data-tab="notes" onclick="app.switchDrawerTab('notes')">📝 Notes</button>
+        <button type="button" class="drawer-nav-pill" data-tab="all" onclick="app.switchDrawerTab('all')">📑 All Sections</button>
     </nav>
 
     <!-- Scrollable Drawer Body -->
@@ -164,7 +165,7 @@
             </div>
 
             <!-- Chart Container / Embed -->
-            <div id="drawerChartFrameContainer" style="height:340px;background:#05070d;border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;position:relative;">
+            <div id="drawerChartFrameContainer" class="drawer-chart-frame-container" style="background:#05070d;border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;position:relative;">
                 <div id="drawerChartShimmer" class="drawer-shimmer drawer-shimmer-chart" style="position:absolute;inset:0;"></div>
                 <iframe id="drawerChartIframe" src="" style="width:100%;height:100%;border:none;background:transparent;display:block;" onload="document.getElementById('drawerChartShimmer').style.display='none';"></iframe>
             </div>
@@ -235,7 +236,15 @@
                     <span class="drawer-card-title-icon">💵</span>
                     <span>Formula EPS Derivation &amp; History</span>
                 </div>
-                <span class="drawer-timeframe-badge">Last 12 Quarters</span>
+                <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+                    <span class="drawer-timeframe-badge">Last 12 Quarters</span>
+                    <button type="button" id="btnDrawerRefreshEarnings" onclick="app.refreshEarningsFromSource()" class="btn-preset-chip" style="background:rgba(56,189,248,0.15);color:#38bdf8;border-color:rgba(56,189,248,0.3);" title="Fetch authoritative earnings filings from source">
+                        🔄 <span>Fetch Source</span>
+                    </button>
+                    <button type="button" id="btnDrawerRecalcEPS" onclick="app.recalculateStockEPS()" class="btn-preset-chip" style="background:rgba(52,211,153,0.15);color:#34d399;border-color:rgba(52,211,153,0.3);" title="Recalculate Formula EPS derivation">
+                        ⚡ <span>Recalculate EPS</span>
+                    </button>
+                </div>
             </div>
 
             <div id="drawerEPSShimmer">

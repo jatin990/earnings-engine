@@ -497,8 +497,19 @@
 }
 
 /* ========================================================
-   7. SKELETON SHIMMER PLACEHOLDERS
+   7. SKELETON SHIMMER PLACEHOLDERS & CHART CONTAINER
    ======================================================== */
+
+.drawer-chart-frame-container {
+    height: 380px;
+    transition: height 0.2s ease;
+}
+
+.drawer-card.drawer-tab-active-chart .drawer-chart-frame-container {
+    height: calc(100vh - 190px);
+    min-height: 520px;
+    max-height: 860px;
+}
 
 @keyframes drawerShimmer {
     0% { background-position: -200% 0; }

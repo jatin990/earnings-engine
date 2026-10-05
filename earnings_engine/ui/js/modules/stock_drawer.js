@@ -139,22 +139,9 @@
         app._hydrateTier2(sym, signal);
         app._hydrateTier3Consensus(sym, signal);
 
-        // Section Jump if requested
-        if (options.initialSection) {
-            const secMap = {
-                quote: '#drawerSecQuote',
-                chart: '#drawerSecChart',
-                structure: '#drawerSecStructure',
-                eps: '#drawerSecEPS',
-                consensus: '#drawerSecConsensus',
-                institutional: '#drawerSecInstitutional',
-                factors: '#drawerSecFactors',
-                news: '#drawerSecNews',
-                notes: '#drawerSecNotes',
-            };
-            const target = secMap[options.initialSection.toLowerCase()] || options.initialSection;
-            setTimeout(() => app.scrollDrawerTo(target), 80);
-        }
+        // Tab or Section Jump
+        const initialTab = options.initialTab || options.initialSection || app._currentDrawerTab || 'quote';
+        app.switchDrawerTab(initialTab);
     };
 
     app.closeStockDrawer = function () {
@@ -237,23 +224,73 @@
         });
     };
 
-    app.scrollDrawerTo = function (selector) {
-        const el = document.querySelector(selector);
-        const container = document.getElementById('stockDrawerBody');
-        if (el && container) {
-            const topOffset = el.offsetTop - 12;
-            container.scrollTo({ top: topOffset, behavior: 'smooth' });
+    const DRAWER_SECTIONS = [
+        { key: 'quote', id: 'drawerSecQuote' },
+        { key: 'chart', id: 'drawerSecChart' },
+        { key: 'structure', id: 'drawerSecStructure' },
+        { key: 'eps', id: 'drawerSecEPS' },
+        { key: 'consensus', id: 'drawerSecConsensus' },
+        { key: 'institutional', id: 'drawerSecInstitutional' },
+        { key: 'factors', id: 'drawerSecFactors' },
+        { key: 'news', id: 'drawerSecNews' },
+        { key: 'notes', id: 'drawerSecNotes' },
+    ];
 
-            // Highlight nav pill
-            document.querySelectorAll('.drawer-nav-pill').forEach(pill => {
-                const onclickAttr = pill.getAttribute('onclick') || '';
-                if (onclickAttr.includes(selector)) {
-                    pill.classList.add('active');
-                } else {
-                    pill.classList.remove('active');
+    app.switchDrawerTab = function (tabKey) {
+        if (!tabKey) tabKey = 'quote';
+        // Normalize selector like #drawerSecChart to key
+        if (tabKey.startsWith('#')) {
+            const found = DRAWER_SECTIONS.find(s => `#${s.id}` === tabKey);
+            if (found) tabKey = found.key;
+            else tabKey = tabKey.replace('#drawerSec', '').toLowerCase();
+        }
+        tabKey = tabKey.toLowerCase();
+        app._currentDrawerTab = tabKey;
+
+        // Update Nav Pills
+        document.querySelectorAll('.drawer-nav-pill').forEach(pill => {
+            const pTab = pill.getAttribute('data-tab');
+            if (pTab === tabKey) {
+                pill.classList.add('active');
+            } else {
+                pill.classList.remove('active');
+            }
+        });
+
+        // Show/Hide Sections
+        const chartSec = document.getElementById('drawerSecChart');
+        if (chartSec) {
+            if (tabKey === 'chart') {
+                chartSec.classList.add('drawer-tab-active-chart');
+            } else {
+                chartSec.classList.remove('drawer-tab-active-chart');
+            }
+        }
+
+        if (tabKey === 'all') {
+            DRAWER_SECTIONS.forEach(sec => {
+                const el = document.getElementById(sec.id);
+                if (el) el.style.display = 'block';
+            });
+        } else {
+            DRAWER_SECTIONS.forEach(sec => {
+                const el = document.getElementById(sec.id);
+                if (el) {
+                    if (sec.key === tabKey) {
+                        el.style.display = 'block';
+                    } else {
+                        el.style.display = 'none';
+                    }
                 }
             });
         }
+
+        const body = document.getElementById('stockDrawerBody');
+        if (body) body.scrollTop = 0;
+    };
+
+    app.scrollDrawerTo = function (selector) {
+        app.switchDrawerTab(selector);
     };
 
     // =========================================================================
@@ -588,6 +625,98 @@
         const content = document.getElementById('drawerEPSContent');
         if (shimmer) shimmer.style.display = 'none';
         if (content) content.style.display = 'block';
+    };
+
+    app.refreshEarningsFromSource = async function () {
+        if (!app._currentDrawerTicker) return;
+        const sym = app._currentDrawerTicker;
+        const btn = document.getElementById('btnDrawerRefreshEarnings');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `⏳ <span>Fetching...</span>`;
+        }
+
+        const shimmer = document.getElementById('drawerEPSShimmer');
+        const content = document.getElementById('drawerEPSContent');
+        if (shimmer) shimmer.style.display = 'block';
+        if (content) content.style.display = 'none';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/refresh-earnings-source`, { method: 'POST' });
+            if (res.ok) {
+                DRAWER_CACHE.delete(`eps_${sym}`);
+                const refreshed = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/earnings`);
+                if (refreshed.ok) {
+                    const data = await refreshed.json();
+                    setCached(`eps_${sym}`, data);
+                    app._renderEPSCard(data);
+                    if (typeof app.showToast === 'function') {
+                        app.showToast(`Fetched latest source filings for ${sym}`, 'success');
+                    }
+                }
+            } else {
+                throw new Error('Refresh endpoint returned error status');
+            }
+        } catch (e) {
+            console.error('[STOCK-DRAWER] Refresh earnings error:', e);
+            if (shimmer) shimmer.style.display = 'none';
+            if (content) content.style.display = 'block';
+            if (typeof app.showToast === 'function') {
+                app.showToast(`Earnings source refresh failed: ${e.message}`, 'error');
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+    };
+
+    app.recalculateStockEPS = async function () {
+        if (!app._currentDrawerTicker) return;
+        const sym = app._currentDrawerTicker;
+        const btn = document.getElementById('btnDrawerRecalcEPS');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `⏳ <span>Calculating...</span>`;
+        }
+
+        const shimmer = document.getElementById('drawerEPSShimmer');
+        const content = document.getElementById('drawerEPSContent');
+        if (shimmer) shimmer.style.display = 'block';
+        if (content) content.style.display = 'none';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/calculate-eps`, { method: 'POST' });
+            if (res.ok) {
+                DRAWER_CACHE.delete(`eps_${sym}`);
+                const refreshed = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/earnings`);
+                if (refreshed.ok) {
+                    const data = await refreshed.json();
+                    setCached(`eps_${sym}`, data);
+                    app._renderEPSCard(data);
+                    if (typeof app.showToast === 'function') {
+                        app.showToast(`Formula EPS recalculated for ${sym}`, 'success');
+                    }
+                }
+            } else {
+                throw new Error('Recalculate EPS endpoint returned error status');
+            }
+        } catch (e) {
+            console.error('[STOCK-DRAWER] Recalculate EPS error:', e);
+            if (shimmer) shimmer.style.display = 'none';
+            if (content) content.style.display = 'block';
+            if (typeof app.showToast === 'function') {
+                app.showToast(`Recalculate EPS failed: ${e.message}`, 'error');
+            }
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
     };
 
     // Institutional Forensics
