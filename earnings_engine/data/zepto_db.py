@@ -4532,6 +4532,7 @@ def get_loss_records(
     store_name: str | None = None,
     category: str | None = None,
     loss_type: str | None = None,
+    date: str | None = None,
     search: str | None = None,
     limit: int = 500,
     offset: int = 0,
@@ -4556,6 +4557,9 @@ def get_loss_records(
     if loss_type and loss_type != "ALL":
         where.append("loss_type = ?")
         params.append(loss_type)
+    if date and date != "ALL":
+        where.append("record_date = ?")
+        params.append(date)
     if search:
         s_pat = f"%{search.strip().lower()}%"
         where.append("(LOWER(notes) LIKE ? OR LOWER(sku_id) LIKE ? OR LOWER(item_name) LIKE ? OR LOWER(category) LIKE ? OR LOWER(loss_type) LIKE ? OR LOWER(store_name) LIKE ?)")

@@ -166,46 +166,108 @@
         </div>
     </section>
 
-    <!-- Visual Trend Graphs: Month-Wise & Day-Wise Loss Distribution -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <!-- 1. Month-Wise Loss Timeline Graph -->
+    <!-- Active Drilldown Filter Indicator Banner (Hidden by default) -->
+    <div id="lossDrilldownBanner" class="hidden glass-panel p-3 bg-amber-500/10 border-amber-500/30 flex items-center justify-between gap-3 animate-fadeIn">
+        <div class="flex items-center gap-2.5">
+            <span class="text-base text-amber-400">🎯</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Active Drilldown Filter</span>
+                    <span id="lossDrilldownTypeBadge" class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-mono">Category</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-0.5">
+                    Viewing details for <span id="lossDrilldownValueText" class="font-bold text-white font-mono">—</span>
+                    <span id="lossDrilldownMetricsText" class="text-slate-400 ml-1.5 font-mono"></span>
+                </div>
+            </div>
+        </div>
+        <button
+            type="button"
+            onclick="zeptoApp.clearLossDrilldown()"
+            class="px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+        >
+            <span>✕</span> Reset Filter
+        </button>
+    </div>
+
+    <!-- Visual Interactive Analytics: SVG Donut Charts & Velocity Timeline -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <!-- 1. Interactive Category Loss Breakdown SVG Donut -->
         <section class="glass-panel p-3.5 space-y-2.5">
             <div class="flex items-center justify-between pb-2 border-b border-white/5">
                 <div class="flex items-center gap-2">
-                    <span class="text-sm">📊</span>
+                    <span class="text-sm">🥧</span>
                     <div>
-                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Month-Wise Loss Trend</h4>
-                        <p class="text-[10px] text-slate-400">Monthly progression of DQ defects, shrinkage, and perishable spoilage.</p>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Category Loss Breakdown</h4>
+                        <p class="text-[10px] text-slate-400">Click any slice or label to drill down into SKU defects.</p>
                     </div>
                 </div>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossMonthlyGraphBadge">
-                    -- Months
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossCategoryPieBadge">
+                    -- Cats
                 </span>
             </div>
-            <div id="lossMonthlyGraphContainer" class="min-h-[140px] flex items-center justify-center">
-                <span class="text-xs text-slate-500 font-mono">Loading monthly trend chart...</span>
+            <div id="lossCategoryPieContainer" class="min-h-[190px] flex flex-col items-center justify-center">
+                <span class="text-xs text-slate-500 font-mono">Loading category distribution...</span>
             </div>
         </section>
 
-        <!-- 2. Day-Wise Loss Timeline Graph -->
+        <!-- 2. Interactive Loss Type Distribution SVG Donut -->
+        <section class="glass-panel p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">🍩</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Loss Type Distribution</h4>
+                        <p class="text-[10px] text-slate-400">DQ vs Shrinkage vs Spoilage vs Transit Damage.</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossTypePieBadge">
+                    -- Types
+                </span>
+            </div>
+            <div id="lossTypePieContainer" class="min-h-[190px] flex flex-col items-center justify-center">
+                <span class="text-xs text-slate-500 font-mono">Loading loss classification...</span>
+            </div>
+        </section>
+
+        <!-- 3. Day-Wise Defect Velocity Timeline Bar Chart -->
         <section class="glass-panel p-3.5 space-y-2.5">
             <div class="flex items-center justify-between pb-2 border-b border-white/5">
                 <div class="flex items-center gap-2">
                     <span class="text-sm">📈</span>
                     <div>
-                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Day-Wise Loss Distribution</h4>
-                        <p class="text-[10px] text-slate-400">Daily velocity of defect incidents across the selected timeframe.</p>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Day-Wise Defect Timeline</h4>
+                        <p class="text-[10px] text-slate-400">Click any day bar to inspect day-specific SKU defects.</p>
                     </div>
                 </div>
                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossDailyGraphBadge">
                     -- Days
                 </span>
             </div>
-            <div id="lossDailyGraphContainer" class="min-h-[140px] flex items-center justify-center overflow-x-auto custom-scrollbar">
+            <div id="lossDailyGraphContainer" class="min-h-[190px] flex items-center justify-center overflow-x-auto custom-scrollbar">
                 <span class="text-xs text-slate-500 font-mono">Loading daily timeline chart...</span>
             </div>
         </section>
     </div>
+
+    <!-- Month-Wise Historical Progression Bar -->
+    <section class="glass-panel p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="text-sm">📊</span>
+                <div>
+                    <h4 class="text-xs font-bold text-white uppercase tracking-wider">Month-Wise Historical Loss Trend</h4>
+                    <p class="text-[10px] text-slate-400">Monthly progression of DQ defects, shrinkage, and perishable spoilage.</p>
+                </div>
+            </div>
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="lossMonthlyGraphBadge">
+                -- Months
+            </span>
+        </div>
+        <div id="lossMonthlyGraphContainer" class="min-h-[100px] flex items-center justify-center">
+            <span class="text-xs text-slate-500 font-mono">Loading monthly trend chart...</span>
+        </div>
+    </section>
 
     <!-- Category-Wise Breakdown Matrix (Dual DQ vs Shrinkage vs Spoilage) -->
     <section class="glass-panel p-3.5 space-y-2.5">

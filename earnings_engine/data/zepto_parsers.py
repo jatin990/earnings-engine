@@ -809,7 +809,38 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
         except ValueError:
             pass
 
-    # 6. Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages: Rs. 1,200", "Shrinkage: 1450")
+    # 6. Loss / Shrinkage / DQ Metrics
+    # Parse explicit MTD and D-1 DQ losses
+    mtd_dq_match = re.search(r"mtd\s+dq[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
+    if mtd_dq_match:
+        try:
+            metrics["mtd_dq"] = float(mtd_dq_match.group(1))
+        except ValueError:
+            pass
+
+    d1_dq_match = re.search(r"d-?1\s+dq[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
+    if d1_dq_match:
+        try:
+            metrics["d1_dq"] = float(d1_dq_match.group(1))
+        except ValueError:
+            pass
+
+    # Parse explicit MTD and D-1 Shrinkage
+    mtd_shrink_match = re.search(r"mtd\s+shrinkage[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
+    if mtd_shrink_match:
+        try:
+            metrics["mtd_shrinkage"] = float(mtd_shrink_match.group(1))
+        except ValueError:
+            pass
+
+    d1_shrink_match = re.search(r"d-?1\s+shrinkage[:\s\-]+(?:rs\.?|inr|₹)?\s*([\-]?[\d\.]+)", clean_text, re.I)
+    if d1_shrink_match:
+        try:
+            metrics["d1_shrinkage"] = float(d1_shrink_match.group(1))
+        except ValueError:
+            pass
+
+    # Generic Loss / Shrinkage Amount (e.g. "DQ Loss: ₹4,500", "Damages: Rs. 1,200", "Shrinkage: 1450")
     # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture
     sanitized_text = re.sub(r"\b202\d[-/]\d{2}[-/]\d{2}\b", " ", clean_text)
     sanitized_text = re.sub(r"\b\d{2}[-/]\d{2}[-/]202\d\b", " ", sanitized_text)
@@ -826,6 +857,10 @@ def extract_metrics_from_email_body(text: str) -> Dict[str, Any]:
         has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
         if not (2020 <= amt <= 2035 and not has_curr):
             metrics["loss_amount"] = amt
+    elif "mtd_dq" in metrics:
+        metrics["loss_amount"] = metrics["mtd_dq"]
+    elif "mtd_shrinkage" in metrics:
+        metrics["loss_amount"] = metrics["mtd_shrinkage"]
 
     return metrics
 

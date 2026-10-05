@@ -5291,21 +5291,25 @@ const zeptoApp = {
     },
 
     // -----------------------------------------------------------------------
-    // Loss, Quality & Shrinkage Tab Logic (Redesigned)
+    // Loss, Quality & Shrinkage Tab Logic (Redesigned with Drilldowns & SVG Charts)
     // -----------------------------------------------------------------------
+
+    _activeLossDate: null,
 
     async loadLoss() {
         const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : (document.getElementById('lossMonthFilter')?.value || 'ALL');
         const lossType = document.getElementById('lossTypeFilter')?.value || 'ALL';
         const category = document.getElementById('lossCategoryFilter')?.value || 'ALL';
+        const date = this._activeLossDate || null;
 
         const params = new URLSearchParams();
         if (month && month !== 'ALL') params.append('month', month);
         if (lossType && lossType !== 'ALL') params.append('loss_type', lossType);
         if (category && category !== 'ALL') params.append('category', category);
+        if (date) params.append('date', date);
 
         const scopeBadge = document.getElementById('lossActiveScopeBadge');
-        if (scopeBadge) scopeBadge.textContent = month;
+        if (scopeBadge) scopeBadge.textContent = date ? `${date}` : month;
 
         try {
             const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
@@ -5542,11 +5546,61 @@ const zeptoApp = {
     },
 
     selectLossCategory(cat) {
+        this.drilldownCategory(cat);
+    },
+
+    drilldownCategory(cat) {
         const catSelect = document.getElementById('lossCategoryFilter');
-        if (catSelect) {
-            catSelect.value = cat;
-            this.loadLoss();
-        }
+        if (catSelect) catSelect.value = cat;
+
+        const banner = document.getElementById('lossDrilldownBanner');
+        const labelEl = document.getElementById('lossDrilldownFilterLabel');
+        const descEl = document.getElementById('lossDrilldownFilterDesc');
+        if (banner) banner.classList.remove('hidden');
+        if (labelEl) labelEl.textContent = `📁 Category: ${cat.replace(/_/g, ' ')}`;
+        if (descEl) descEl.textContent = `Filtered view for category "${cat.replace(/_/g, ' ')}" — click "Reset Drilldown" to clear.`;
+
+        this.loadLoss();
+    },
+
+    drilldownLossType(type) {
+        const typeSelect = document.getElementById('lossTypeFilter');
+        if (typeSelect) typeSelect.value = type;
+
+        const banner = document.getElementById('lossDrilldownBanner');
+        const labelEl = document.getElementById('lossDrilldownFilterLabel');
+        const descEl = document.getElementById('lossDrilldownFilterDesc');
+        if (banner) banner.classList.remove('hidden');
+        if (labelEl) labelEl.textContent = `⚠️ Loss Type: ${type}`;
+        if (descEl) descEl.textContent = `Filtered view for ${type} records across dark store operations.`;
+
+        this.loadLoss();
+    },
+
+    drilldownDate(dateStr) {
+        this._activeLossDate = dateStr;
+
+        const banner = document.getElementById('lossDrilldownBanner');
+        const labelEl = document.getElementById('lossDrilldownFilterLabel');
+        const descEl = document.getElementById('lossDrilldownFilterDesc');
+        if (banner) banner.classList.remove('hidden');
+        if (labelEl) labelEl.textContent = `📅 Date: ${dateStr}`;
+        if (descEl) descEl.textContent = `Filtered view for defect incidents recorded on ${dateStr}.`;
+
+        this.loadLoss();
+    },
+
+    clearLossDrilldown() {
+        this._activeLossDate = null;
+        const catSelect = document.getElementById('lossCategoryFilter');
+        if (catSelect) catSelect.value = 'ALL';
+        const typeSelect = document.getElementById('lossTypeFilter');
+        if (typeSelect) typeSelect.value = 'ALL';
+
+        const banner = document.getElementById('lossDrilldownBanner');
+        if (banner) banner.classList.add('hidden');
+
+        this.loadLoss();
     },
 
     filterLossRecords() {
@@ -5578,9 +5632,9 @@ const zeptoApp = {
 
         tbody.innerHTML = filtered.map(r => {
             let typeBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
-            if (r.loss_type === 'DQ_LOSS') typeBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-            else if (r.loss_type === 'SHRINKAGE') typeBadgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-            else if (r.loss_type === 'SPOILAGE') typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+            if (r.loss_type === 'DQ_LOSS') typeBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30 cursor-pointer hover:bg-amber-500/25';
+            else if (r.loss_type === 'SHRINKAGE') typeBadgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30 cursor-pointer hover:bg-purple-500/25';
+            else if (r.loss_type === 'SPOILAGE') typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 cursor-pointer hover:bg-emerald-500/25';
 
             const skuDisplay = r.sku_id
                 ? `<span class="font-mono text-sky-300 font-bold">${r.sku_id}</span>${r.item_name ? `<span class="text-slate-400 ml-1">· ${r.item_name}</span>` : ''}`
@@ -5588,14 +5642,22 @@ const zeptoApp = {
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
-                    <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">${r.record_date}</td>
+                    <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">
+                        <button type="button" onclick="zeptoApp.drilldownDate('${r.record_date}')" class="hover:text-sky-300 hover:underline transition text-left font-mono">
+                            ${r.record_date}
+                        </button>
+                    </td>
                     <td class="py-2 px-2.5 text-slate-400 font-mono text-[11px] whitespace-nowrap">${r.store_name}</td>
                     <td class="py-2 px-2.5">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border font-mono ${typeBadgeClass}">
+                        <button type="button" onclick="zeptoApp.drilldownLossType('${r.loss_type}')" class="px-1.5 py-0.5 rounded text-[10px] font-bold border font-mono ${typeBadgeClass}">
                             ${r.loss_type}
-                        </span>
+                        </button>
                     </td>
-                    <td class="py-2 px-2.5 text-slate-300 font-medium">${(r.category || 'GENERAL').replace(/_/g, ' ')}</td>
+                    <td class="py-2 px-2.5 text-slate-300 font-medium">
+                        <button type="button" onclick="zeptoApp.drilldownCategory('${r.category || 'GENERAL'}')" class="hover:text-amber-300 hover:underline transition text-left">
+                            ${(r.category || 'GENERAL').replace(/_/g, ' ')}
+                        </button>
+                    </td>
                     <td class="py-2 px-2.5 text-xs text-slate-200 max-w-[200px] truncate" title="${r.sku_id ? `SKU: ${r.sku_id}` : ''} ${r.item_name || ''}">${skuDisplay}</td>
                     <td class="py-2 px-2.5 text-right font-mono text-slate-300">${(r.sku_count || 0).toLocaleString('en-IN')}</td>
                     <td class="py-2 px-2.5 text-right font-mono font-bold ${r.amount < 0 ? 'text-emerald-400' : 'text-rose-400'}">${this.formatCurrency(r.amount || 0)}</td>
@@ -5643,128 +5705,338 @@ const zeptoApp = {
         this.showToast(`✅ Exported ${records.length} loss records to CSV`);
     },
 
+    polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+        const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+        return {
+            x: centerX + (radius * Math.cos(angleInRadians)),
+            y: centerY + (radius * Math.sin(angleInRadians)),
+        };
+    },
+
+    describeDonutArc(x, y, radius, innerRadius, startAngle, endAngle) {
+        if (endAngle - startAngle >= 359.9) {
+            endAngle = startAngle + 359.99;
+        }
+        const start = this.polarToCartesian(x, y, radius, endAngle);
+        const end = this.polarToCartesian(x, y, radius, startAngle);
+        const innerStart = this.polarToCartesian(x, y, innerRadius, endAngle);
+        const innerEnd = this.polarToCartesian(x, y, innerRadius, startAngle);
+        const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+
+        return [
+            "M", start.x, start.y,
+            "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y,
+            "L", innerEnd.x, innerEnd.y,
+            "A", innerRadius, innerRadius, 0, largeArcFlag, 1, innerStart.x, innerStart.y,
+            "Z"
+        ].join(" ");
+    },
+
     renderLossCharts(data) {
-        // 1. Month-Wise Loss Timeline Graph
-        const monthContainer = document.getElementById('lossMonthlyGraphContainer');
-        const monthBadge = document.getElementById('lossMonthlyGraphBadge');
-        const monthlyData = data.monthly_trends || [];
+        this.renderCategoryPieChart(data);
+        this.renderLossTypePieChart(data);
+        this.renderDayWiseTimelineChart(data);
+        this.renderMonthlyTrendChart(data);
+    },
 
-        if (monthBadge) monthBadge.textContent = `${monthlyData.length} Month${monthlyData.length === 1 ? '' : 's'}`;
+    renderCategoryPieChart(data) {
+        const container = document.getElementById('lossCategoryPieContainer');
+        const badge = document.getElementById('lossCategoryPieBadge');
+        const cats = data.category_breakdown || [];
+        const total = data.total_loss_amount || cats.reduce((sum, c) => sum + (c.total_amount || 0), 0);
 
-        if (monthContainer) {
-            if (monthlyData.length === 0) {
-                monthContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No monthly historical loss data available.</div>';
-            } else {
-                const maxLoss = Math.max(...monthlyData.map(m => m.total_loss || 0), 100);
-                monthContainer.innerHTML = `
-                    <div class="w-full space-y-2.5 py-1">
-                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-white/5">
-                            <span>Month & Composition</span>
-                            <span class="text-right">Total Net Loss</span>
-                        </div>
-                        <div class="space-y-2">
-                            ${monthlyData.map(m => {
-                                const tot = m.total_loss || 0;
-                                const dq = m.dq_loss || 0;
-                                const shrink = m.shrinkage || 0;
-                                const spoil = m.spoilage || 0;
-                                const widthPct = Math.max(4, Math.min(100, Math.round((tot / maxLoss) * 100)));
-                                const dqPct = tot > 0 ? (dq / tot) * 100 : 0;
-                                const shrinkPct = tot > 0 ? (shrink / tot) * 100 : 0;
-                                const spoilPct = tot > 0 ? (spoil / tot) * 100 : 0;
+        if (badge) badge.textContent = `${cats.length} Categories`;
+        if (!container) return;
 
-                                return `
-                                    <div class="space-y-1">
-                                        <div class="flex items-center justify-between text-xs">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="font-mono font-bold text-white">${m.month_ym}</span>
-                                                <span class="text-[10px] text-slate-400 font-mono">(${m.item_count} items)</span>
-                                            </div>
-                                            <span class="font-mono font-black text-rose-400">${this.formatCurrency(tot)}</span>
-                                        </div>
-                                        <div class="w-full bg-white/5 h-2.5 rounded-full overflow-hidden flex" title="DQ: ${this.formatCurrency(dq)} | Shrinkage: ${this.formatCurrency(shrink)} | Spoilage: ${this.formatCurrency(spoil)}">
-                                            <div style="width: ${widthPct}%;" class="h-full flex rounded-full overflow-hidden">
-                                                <div style="width: ${dqPct}%;" class="h-full bg-amber-400" title="DQ Loss: ${this.formatCurrency(dq)}"></div>
-                                                <div style="width: ${shrinkPct}%;" class="h-full bg-purple-400" title="Shrinkage: ${this.formatCurrency(shrink)}"></div>
-                                                <div style="width: ${spoilPct}%;" class="h-full bg-emerald-400" title="Spoilage: ${this.formatCurrency(spoil)}"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                        <div class="flex items-center justify-end gap-3 pt-2 text-[10px] font-mono text-slate-400 border-t border-white/5">
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> DQ Loss</span>
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Shrinkage</span>
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Spoilage</span>
-                        </div>
-                    </div>
-                `;
-            }
+        if (cats.length === 0 || total <= 0) {
+            container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No categorized loss data for chart.</div>';
+            return;
         }
 
-        // 2. Day-Wise Loss Timeline Graph
+        const colors = ['#f43f5e', '#fbbf24', '#a855f7', '#38bdf8', '#34d399', '#fb923c', '#e879f9', '#94a3b8', '#818cf8', '#f87171'];
+        let currentAngle = 0;
+
+        const slices = cats.slice(0, 6).map((c, idx) => {
+            const amt = c.total_amount || 0;
+            const pct = total > 0 ? (amt / total) : 0;
+            const angleDelta = pct * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleDelta;
+            currentAngle = endAngle;
+
+            const pathD = this.describeDonutArc(90, 90, 75, 48, startAngle, endAngle);
+            const color = colors[idx % colors.length];
+
+            return {
+                ...c,
+                color,
+                pathD,
+                pct: (pct * 100).toFixed(1),
+            };
+        });
+
+        const svgMarkup = `
+            <div class="flex flex-col sm:flex-row items-center gap-4 py-1">
+                <div class="relative w-44 h-44 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 180 180" class="w-full h-full transform -rotate-0 drop-shadow-md">
+                        ${slices.map(s => `
+                            <path
+                                d="${s.pathD}"
+                                fill="${s.color}"
+                                class="transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-[1.03] origin-center"
+                                onclick="zeptoApp.drilldownCategory('${s.category}')"
+                            >
+                                <title>${s.category}: ${this.formatCurrency(s.total_amount)} (${s.pct}%) - Click to filter</title>
+                            </path>
+                        `).join('')}
+                    </svg>
+                    <!-- Center Hole Summary -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-[10px] text-slate-400 font-mono">Total Loss</span>
+                        <span class="text-xs font-mono font-black text-rose-400">${this.formatCurrency(total)}</span>
+                    </div>
+                </div>
+
+                <!-- Legend & Drilldown Triggers -->
+                <div class="flex-1 w-full space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                    ${slices.map(s => `
+                        <div
+                            onclick="zeptoApp.drilldownCategory('${s.category}')"
+                            class="flex items-center justify-between p-1.5 rounded bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition text-[11px]"
+                            title="Click to drill down into ${s.category}"
+                        >
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${s.color};"></span>
+                                <span class="font-medium text-slate-200 truncate">${s.category.replace(/_/g, ' ')}</span>
+                            </div>
+                            <div class="flex items-center gap-2 font-mono flex-shrink-0">
+                                <span class="text-slate-400 text-[10px]">${s.pct}%</span>
+                                <span class="font-bold text-white">${this.formatCurrency(s.total_amount)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = svgMarkup;
+    },
+
+    renderLossTypePieChart(data) {
+        const container = document.getElementById('lossTypePieContainer');
+        const badge = document.getElementById('lossTypePieBadge');
+        const total = data.total_loss_amount || 0;
+        const dq = data.dq_loss_total || 0;
+        const shrink = data.shrinkage_total || 0;
+        const spoil = data.spoilage_total || 0;
+
+        const typeItems = [
+            { type: 'DQ_LOSS', label: 'DQ Loss (Defects)', amount: dq, color: '#fbbf24' },
+            { type: 'SHRINKAGE', label: 'Shrinkage & Variance', amount: shrink, color: '#c084fc' },
+            { type: 'SPOILAGE', label: 'Spoilage / Fresh Fruit', amount: spoil, color: '#34d399' },
+        ].filter(t => t.amount > 0);
+
+        if (badge) badge.textContent = `${typeItems.length} Types`;
+        if (!container) return;
+
+        if (typeItems.length === 0 || total <= 0) {
+            container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No loss type distribution data.</div>';
+            return;
+        }
+
+        let currentAngle = 0;
+        const slices = typeItems.map(t => {
+            const pct = total > 0 ? (t.amount / total) : 0;
+            const angleDelta = pct * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleDelta;
+            currentAngle = endAngle;
+
+            const pathD = this.describeDonutArc(90, 90, 75, 48, startAngle, endAngle);
+
+            return {
+                ...t,
+                pathD,
+                pct: (pct * 100).toFixed(1),
+            };
+        });
+
+        const svgMarkup = `
+            <div class="flex flex-col sm:flex-row items-center gap-4 py-1">
+                <div class="relative w-44 h-44 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 180 180" class="w-full h-full drop-shadow-md">
+                        ${slices.map(s => `
+                            <path
+                                d="${s.pathD}"
+                                fill="${s.color}"
+                                class="transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-[1.03] origin-center"
+                                onclick="zeptoApp.drilldownLossType('${s.type}')"
+                            >
+                                <title>${s.label}: ${this.formatCurrency(s.amount)} (${s.pct}%) - Click to filter</title>
+                            </path>
+                        `).join('')}
+                    </svg>
+                    <!-- Center Hole Summary -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-[10px] text-slate-400 font-mono">Net Defect</span>
+                        <span class="text-xs font-mono font-black text-rose-400">${this.formatCurrency(total)}</span>
+                    </div>
+                </div>
+
+                <!-- Legend & Drilldown Triggers -->
+                <div class="flex-1 w-full space-y-2">
+                    ${slices.map(s => `
+                        <div
+                            onclick="zeptoApp.drilldownLossType('${s.type}')"
+                            class="p-2 rounded bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition text-[11px]"
+                            title="Click to drill down into ${s.label}"
+                        >
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${s.color};"></span>
+                                    <span class="font-bold text-slate-200">${s.label}</span>
+                                </div>
+                                <span class="font-mono font-bold text-white">${this.formatCurrency(s.amount)}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                                <span>Share of Total</span>
+                                <span class="font-bold text-amber-300">${s.pct}%</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = svgMarkup;
+    },
+
+    renderDayWiseTimelineChart(data) {
         const dayContainer = document.getElementById('lossDailyGraphContainer');
         const dayBadge = document.getElementById('lossDailyGraphBadge');
         const dailyData = data.daily_trends || [];
 
         if (dayBadge) dayBadge.textContent = `${dailyData.length} Day${dailyData.length === 1 ? '' : 's'}`;
+        if (!dayContainer) return;
 
-        if (dayContainer) {
-            if (dailyData.length === 0) {
-                dayContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No daily timeline records for the selected filters.</div>';
-            } else {
-                const maxDayLoss = Math.max(...dailyData.map(d => d.total_loss || 0), 50);
-                dayContainer.innerHTML = `
-                    <div class="w-full flex flex-col justify-between py-1">
-                        <div class="flex items-end gap-1.5 h-28 pt-2 px-1 border-b border-white/10 overflow-x-auto custom-scrollbar">
-                            ${dailyData.map(d => {
-                                const tot = d.total_loss || 0;
-                                const barHeight = Math.max(6, Math.min(100, Math.round((tot / maxDayLoss) * 100)));
-                                const dateLabel = d.date.slice(8); // e.g. "14" from "2026-09-14"
-                                const isPeak = tot === maxDayLoss && tot > 0;
-
-                                return `
-                                    <div class="flex-1 min-w-[20px] max-w-[36px] flex flex-col items-center justify-end h-full group relative cursor-pointer" title="${d.date}: ${this.formatCurrency(tot)} (${d.item_count} records)">
-                                        <!-- Hover Tooltip -->
-                                        <div class="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
-                                            <div class="px-2 py-1 bg-slate-900 border border-white/20 rounded shadow-xl text-[10px] whitespace-nowrap font-mono text-center">
-                                                <div class="font-bold text-white">${d.date}</div>
-                                                <div class="text-rose-400 font-extrabold">${this.formatCurrency(tot)}</div>
-                                                <div class="text-slate-400 text-[9px]">${d.item_count} incidents</div>
-                                            </div>
-                                            <div class="w-1.5 h-1.5 bg-slate-900 border-r border-b border-white/20 rotate-45 -mt-1"></div>
-                                        </div>
-
-                                        <!-- Bar Element -->
-                                        <div
-                                            style="height: ${barHeight}%;"
-                                            class="w-full rounded-t transition-all duration-300 group-hover:brightness-125 ${
-                                                tot === 0
-                                                    ? 'bg-slate-700/40'
-                                                    : isPeak
-                                                        ? 'bg-gradient-to-t from-rose-600 to-amber-400 animate-pulse'
-                                                        : 'bg-gradient-to-t from-rose-500/80 to-amber-400/80'
-                                            }"
-                                        ></div>
-
-                                        <!-- Date Label -->
-                                        <span class="text-[9px] font-mono text-slate-400 mt-1 group-hover:text-white transition">
-                                            ${dateLabel}
-                                        </span>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1.5 px-1">
-                            <span>← ${dailyData[0]?.date || ''}</span>
-                            <span>Peak: ${this.formatCurrency(maxDayLoss)}</span>
-                            <span>${dailyData[dailyData.length - 1]?.date || ''} →</span>
-                        </div>
-                    </div>
-                `;
-            }
+        if (dailyData.length === 0) {
+            dayContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No daily timeline records for the selected filters.</div>';
+            return;
         }
+
+        const maxDayLoss = Math.max(...dailyData.map(d => d.total_loss || 0), 50);
+        dayContainer.innerHTML = `
+            <div class="w-full flex flex-col justify-between py-1">
+                <div class="flex items-end gap-1.5 h-28 pt-2 px-1 border-b border-white/10 overflow-x-auto custom-scrollbar">
+                    ${dailyData.map(d => {
+                        const tot = d.total_loss || 0;
+                        const barHeight = Math.max(6, Math.min(100, Math.round((tot / maxDayLoss) * 100)));
+                        const dateLabel = d.date.slice(8); // e.g. "14" from "2026-09-14"
+                        const isPeak = tot === maxDayLoss && tot > 0;
+
+                        return `
+                            <div
+                                class="flex-1 min-w-[20px] max-w-[36px] flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                                onclick="zeptoApp.drilldownDate('${d.date}')"
+                                title="${d.date}: ${this.formatCurrency(tot)} (${d.item_count} records) - Click to drill down"
+                            >
+                                <!-- Hover Tooltip -->
+                                <div class="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
+                                    <div class="px-2 py-1 bg-slate-900 border border-white/20 rounded shadow-xl text-[10px] whitespace-nowrap font-mono text-center">
+                                        <div class="font-bold text-white">${d.date}</div>
+                                        <div class="text-rose-400 font-extrabold">${this.formatCurrency(tot)}</div>
+                                        <div class="text-slate-400 text-[9px]">${d.item_count} incidents · Click to filter</div>
+                                    </div>
+                                    <div class="w-1.5 h-1.5 bg-slate-900 border-r border-b border-white/20 rotate-45 -mt-1"></div>
+                                </div>
+
+                                <!-- Bar Element -->
+                                <div
+                                    style="height: ${barHeight}%;"
+                                    class="w-full rounded-t transition-all duration-300 group-hover:brightness-125 ${
+                                        tot === 0
+                                            ? 'bg-slate-700/40'
+                                            : isPeak
+                                                ? 'bg-gradient-to-t from-rose-600 to-amber-400 animate-pulse'
+                                                : 'bg-gradient-to-t from-rose-500/80 to-amber-400/80'
+                                    }"
+                                ></div>
+
+                                <!-- Date Label -->
+                                <span class="text-[9px] font-mono text-slate-400 mt-1 group-hover:text-white transition">
+                                    ${dateLabel}
+                                </span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1.5 px-1">
+                    <span>← ${dailyData[0]?.date || ''}</span>
+                    <span class="text-slate-400">Peak: <strong class="text-rose-400">${this.formatCurrency(maxDayLoss)}</strong></span>
+                    <span>${dailyData[dailyData.length - 1]?.date || ''} →</span>
+                </div>
+            </div>
+        `;
+    },
+
+    renderMonthlyTrendChart(data) {
+        const monthContainer = document.getElementById('lossMonthlyGraphContainer');
+        const monthBadge = document.getElementById('lossMonthlyGraphBadge');
+        const monthlyData = data.monthly_trends || [];
+
+        if (monthBadge) monthBadge.textContent = `${monthlyData.length} Month${monthlyData.length === 1 ? '' : 's'}`;
+        if (!monthContainer) return;
+
+        if (monthlyData.length === 0) {
+            monthContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No monthly historical loss data available.</div>';
+            return;
+        }
+
+        const maxLoss = Math.max(...monthlyData.map(m => m.total_loss || 0), 100);
+        monthContainer.innerHTML = `
+            <div class="w-full space-y-2.5 py-1">
+                <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-white/5">
+                    <span>Month & Composition</span>
+                    <span class="text-right">Total Net Loss</span>
+                </div>
+                <div class="space-y-2">
+                    ${monthlyData.map(m => {
+                        const tot = m.total_loss || 0;
+                        const dq = m.dq_loss || 0;
+                        const shrink = m.shrinkage || 0;
+                        const spoil = m.spoilage || 0;
+                        const widthPct = Math.max(4, Math.min(100, Math.round((tot / maxLoss) * 100)));
+                        const dqPct = tot > 0 ? (dq / tot) * 100 : 0;
+                        const shrinkPct = tot > 0 ? (shrink / tot) * 100 : 0;
+                        const spoilPct = tot > 0 ? (spoil / tot) * 100 : 0;
+
+                        return `
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono font-bold text-white">${m.month_ym}</span>
+                                        <span class="text-[10px] text-slate-400 font-mono">(${m.item_count} items)</span>
+                                    </div>
+                                    <span class="font-mono font-black text-rose-400">${this.formatCurrency(tot)}</span>
+                                </div>
+                                <div class="w-full bg-white/5 h-2.5 rounded-full overflow-hidden flex" title="DQ: ${this.formatCurrency(dq)} | Shrinkage: ${this.formatCurrency(shrink)} | Spoilage: ${this.formatCurrency(spoil)}">
+                                    <div style="width: ${widthPct}%;" class="h-full flex rounded-full overflow-hidden">
+                                        <div style="width: ${dqPct}%;" class="h-full bg-amber-400" title="DQ Loss: ${this.formatCurrency(dq)}"></div>
+                                        <div style="width: ${shrinkPct}%;" class="h-full bg-purple-400" title="Shrinkage: ${this.formatCurrency(shrink)}"></div>
+                                        <div style="width: ${spoilPct}%;" class="h-full bg-emerald-400" title="Spoilage: ${this.formatCurrency(spoil)}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-2 text-[10px] font-mono text-slate-400 border-t border-white/5">
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> DQ Loss</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400"></span> Shrinkage</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Spoilage</span>
+                </div>
+            </div>
+        `;
     },
 
     async handleScorecardFileUpload(e) {

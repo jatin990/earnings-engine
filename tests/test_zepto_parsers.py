@@ -363,4 +363,73 @@ def test_safe_b64decode_padding():
     assert decoded_bytes.decode('utf-8') == original_text
 
 
+def test_extract_metrics_from_email_body_dq_and_shrinkage():
+    from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
+
+    email_text = """
+    Dark Store Daily Operations Pulse:
+    Store: JMU-Sainik Colony
+    Date: 2026-10-01
+    D-1 DQ: Rs. 145.50
+    MTD DQ: 2038
+    D-1 Shrinkage: ₹ 85.00
+    MTD Shrinkage: Rs. 1240.25
+    GMV: 4.85 L
+    Total Orders: 1,420
+    """
+
+    metrics = extract_metrics_from_email_body(email_text)
+    assert metrics["d1_dq"] == 145.50
+    assert metrics["mtd_dq"] == 2038.0
+    assert metrics["d1_shrinkage"] == 85.00
+    assert metrics["mtd_shrinkage"] == 1240.25
+    assert metrics["sales_gmv"] == pytest.approx(485000.0)
+    assert metrics["order_count"] == 1420
+
+
+def test_get_loss_records_date_drilldown_filter():
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    zepto_db.ensure_zepto_schema(settings=settings)
+
+    test_store = f"TEST_DRILLDOWN_STORE_{uuid.uuid4().hex[:6]}"
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": "2026-09-15",
+        "loss_type": "DQ_LOSS",
+        "category": "DAIRY",
+        "sku_id": "SKU_D1",
+        "item_name": "Milk Packet",
+        "amount": 100.0,
+        "sku_count": 2,
+    }, settings=settings)
+
+    zepto_db.save_loss_record({
+        "store_name": test_store,
+        "record_date": "2026-09-16",
+        "loss_type": "SHRINKAGE",
+        "category": "SNACKS",
+        "sku_id": "SKU_S1",
+        "item_name": "Chips Packet",
+        "amount": 50.0,
+        "sku_count": 1,
+    }, settings=settings)
+
+    # 1. Query with date filter for 2026-09-15
+    res1 = zepto_db.get_loss_records(store_name=test_store, date="2026-09-15", settings=settings)
+    assert len(res1["records"]) == 1
+    assert res1["records"][0]["sku_id"] == "SKU_D1"
+    assert res1["records"][0]["record_date"] == "2026-09-15"
+
+    # 2. Query with date filter for 2026-09-16
+    res2 = zepto_db.get_loss_records(store_name=test_store, date="2026-09-16", settings=settings)
+    assert len(res2["records"]) == 1
+    assert res2["records"][0]["sku_id"] == "SKU_S1"
+    assert res2["records"][0]["record_date"] == "2026-09-16"
+
+
+
 
