@@ -1308,12 +1308,17 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 pct_from_low = pct_from_52w_low
 
             technical_setup = classify_technical_setup(
-                closes=closes,
-                prices_df=prices,
-                sr_info=sr_levels,
-                pct_from_52w_high=pct_from_high,
-                pct_from_52w_low=pct_from_low,
+                current_price=current_price,
+                current_support=current_support,
+                next_resistance=next_resistance,
+                dist_to_support_pct=dist_to_support_pct,
+                dist_to_resistance_pct=dist_to_resistance_pct,
                 rel_vol_5d_vs_63d=rel_vol_5d_vs_63d,
+                seven_day_return_pct=seven_day_return_pct,
+                thirty_day_return_pct=thirty_day_return_pct,
+                three_day_return_pct=three_day_return_pct,
+                channel_position_pct=channel_position_pct,
+                pct_from_52w_high=pct_from_high,
             )
 
             metrics_payload = {
