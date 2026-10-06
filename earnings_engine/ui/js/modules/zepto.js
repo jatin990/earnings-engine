@@ -1156,47 +1156,6 @@ const zeptoApp = {
     // Staff & Payroll Slide-Out Inspector Drawer (sumi:desktop-app-design)
     // -----------------------------------------------------------------------
 
-    staffDrawerWidth: 'normal', // 'normal' (max-w-2xl), 'wide' (max-w-5xl), 'full' (max-w-[98vw])
-
-    toggleStaffDrawerExpand() {
-        const drawer = document.getElementById('staffEmployeeDrawer');
-        const icon = document.getElementById('staffDrawerExpandIcon');
-        const btn = document.getElementById('staffDrawerExpandBtn');
-        if (!drawer) return;
-
-        // Cycle through width states: normal -> wide -> full -> normal
-        const widths = ['normal', 'wide', 'full'];
-        const currentIndex = widths.indexOf(this.staffDrawerWidth);
-        const nextIndex = (currentIndex + 1) % widths.length;
-        this.staffDrawerWidth = widths[nextIndex];
-
-        // Remove existing width classes
-        drawer.classList.remove('max-w-2xl', 'max-w-5xl', 'max-w-[98vw]');
-
-        if (this.staffDrawerWidth === 'wide') {
-            drawer.classList.add('max-w-5xl');
-            drawer.setAttribute('data-drawer-width', 'wide');
-            if (btn) btn.title = 'Expanded: Wide (~1024px) - Click for Fullscreen';
-            if (icon) {
-                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6M4 4v6M4 4l7 7m9-7h-6m6 0v6m0-6l-7 7m-9 9h6m-6 0v-6m0 6l7-7m9 7h-6m6 0v-6m0 6l-7-7" />';
-            }
-        } else if (this.staffDrawerWidth === 'full') {
-            drawer.classList.add('max-w-[98vw]');
-            drawer.setAttribute('data-drawer-width', 'full');
-            if (btn) btn.title = 'Expanded: Fullscreen (~98vw) - Click for Standard';
-            if (icon) {
-                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0l5 5M4 4h5M4 4v5m11 5l5 5m0 0l-5-5m5 5v-5m0 5h-5M9 15l-5 5m0 0l5-5m-5 5h5m-5 0v-5m11-9l5-5m0 0l-5 5m5-5v5m0-5h-5" />';
-            }
-        } else {
-            drawer.classList.add('max-w-2xl');
-            drawer.setAttribute('data-drawer-width', 'normal');
-            if (btn) btn.title = 'Standard View (~672px) - Click to Expand Wide';
-            if (icon) {
-                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />';
-            }
-        }
-    },
-
     async openStaffDrawer(empId, yearMonth = null) {
         if (!empId) return;
         const targetMonth = yearMonth || (this.currentGlobalMonth && this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : null);
@@ -1579,7 +1538,7 @@ const zeptoApp = {
                 desc: 'Paid / Scheduled Holiday or Leave'
             };
         }
-        if (status === 'ABSENT' || (durMins <= 0 && status !== 'WEEK_OFF' && status !== 'HOLIDAY')) {
+        if (status === 'ABSENT' || status === 'A') {
             return {
                 type: 'absent',
                 label: 'Absent',
@@ -1589,7 +1548,23 @@ const zeptoApp = {
                 colorClass: 'bg-rose-600/70 border-rose-500/80 text-rose-100 hover:border-rose-400 hover:shadow-[0_0_10px_rgba(244,63,94,0.5)] hover:scale-110',
                 badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
                 badgeText: '🔴 Absent',
-                desc: 'Unplanned Absence / Zero Logged Work Hours'
+                desc: 'Unplanned Absence / Logged Absent'
+            };
+        }
+
+        // If employee is PRESENT (e.g. status === 'PRESENT' or 'P') but biometric punch duration is not yet recorded,
+        // treat as standard On-Time shift completed using scheduled duration rather than falsely marking absent.
+        if (durMins <= 0 && (status === 'PRESENT' || status === 'P' || !status)) {
+            return {
+                type: 'on_time',
+                label: 'On-Time (Present)',
+                category: 'ON_TIME',
+                deltaMins: 0,
+                schedMins,
+                colorClass: 'bg-emerald-500/85 border-emerald-400/90 text-white font-bold hover:border-emerald-300 hover:shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:scale-110',
+                badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+                badgeText: '🟢 On-Time / Present',
+                desc: `Roster Present (${(schedMins / 60).toFixed(1)}h scheduled shift)`
             };
         }
 

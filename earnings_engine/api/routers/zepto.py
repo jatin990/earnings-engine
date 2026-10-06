@@ -2059,12 +2059,20 @@ async def upload_store_metrics_excel_endpoint(file: UploadFile = File(...)) -> d
             zepto_db.save_store_metrics(rec, settings=_settings)
             saved_count += 1
 
+        # Also persist granular worker records and backfill attendance biometric punches
+        worker_records = parsed.get("worker_records", [])
+        saved_workers_count = 0
+        if worker_records:
+            zepto_db.save_manpower_utilization_batch(worker_records, settings=_settings)
+            saved_workers_count = len(worker_records)
+
         return {
             "success": True,
             "status": "success",
             "store_name": parsed.get("store_name"),
             "total_records": parsed.get("total_records", 0),
             "saved_count": saved_count,
+            "saved_workers_count": saved_workers_count,
         }
     except Exception as exc:
         logger.error("[ZEPTO-METRICS] Error parsing store metrics file: %s", exc, exc_info=True)
