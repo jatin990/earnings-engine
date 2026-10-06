@@ -19,6 +19,8 @@ from earnings_engine.data.morning_setups import (
     get_morning_deals_summary,
     get_upcoming_board_meetings,
     get_board_meetings_summary,
+    group_deals_by_symbol,
+    enrich_tickers_with_technicals,
 )
 from earnings_engine.api.server import create_app
 
@@ -248,3 +250,142 @@ def test_morning_setups_api_endpoints(test_settings):
         assert data["status"] == "success"
         assert data["count"] == 1
         assert data["meetings"][0]["ticker"] == "TRENT.NS"
+
+
+def test_group_deals_by_symbol():
+    """Verify deal aggregation by symbol, VWAP, net flow, and print breakdown."""
+    sample_deals = [
+        {
+            "deal_date": "2026-10-06",
+            "ticker": "TRENT.NS",
+            "security_name": "Trent Limited",
+            "client_name": "FUND A",
+            "deal_type": "BLOCK",
+            "transaction_type": "BUY",
+            "quantity": 1000,
+            "trade_price": 5000.0,
+            "value_cr": 0.5,
+        },
+        {
+            "deal_date": "2026-10-06",
+            "ticker": "TRENT.NS",
+            "security_name": "Trent Limited",
+            "client_name": "FUND B",
+            "deal_type": "BULK",
+            "transaction_type": "SELL",
+            "quantity": 500,
+            "trade_price": 5100.0,
+            "value_cr": 0.255,
+        },
+        {
+            "deal_date": "2026-10-06",
+            "ticker": "INFY.NS",
+            "security_name": "Infosys Limited",
+            "client_name": "FUND C",
+            "deal_type": "BLOCK",
+            "transaction_type": "BUY",
+            "quantity": 2000,
+            "trade_price": 1800.0,
+            "value_cr": 0.36,
+        },
+    ]
+
+    grouped = group_deals_by_symbol(sample_deals)
+    assert len(grouped) == 2
+
+    trent = next(g for g in grouped if g["ticker"] == "TRENT.NS")
+    assert trent["total_deals"] == 2
+    assert trent["block_count"] == 1
+    assert trent["bulk_count"] == 1
+    assert trent["total_quantity"] == 1500
+    assert trent["gross_buy_cr"] == 0.5
+    assert trent["gross_sell_cr"] == 0.26
+    assert trent["net_value_cr"] == 0.24
+    assert trent["total_value_cr"] == 0.76
+    # Total turnover = 1000 * 5000 + 500 * 5100 = 5,000,000 + 2,550,000 = 7,550,000. Total qty = 1500. VWAP = 7550000 / 1500 = 5033.33
+    assert trent["vwap"] == pytest.approx(5033.33, 0.01)
+    assert len(trent["prints"]) == 2
+
+    infy = next(g for g in grouped if g["ticker"] == "INFY.NS")
+    assert infy["total_deals"] == 1
+    assert infy["vwap"] == 1800.0
+    assert infy["net_value_cr"] == 0.36
+
+
+def test_deals_api_with_group_by_symbol(test_settings):
+    """Verify deals API returns grouped response when group_by_symbol=true."""
+    with patch("earnings_engine.api.routers.morning_setups._settings", test_settings):
+        app = create_app()
+        client = TestClient(app)
+
+        store_morning_block_deals(test_settings, [
+            {
+                "deal_date": "2026-10-06",
+                "ticker": "TRENT.NS",
+                "client_name": "BUYER 1",
+                "deal_type": "BLOCK",
+                "transaction_type": "BUY",
+                "quantity": 2000,
+                "trade_price": 7500.0,
+                "value_cr": 1.5,
+            },
+            {
+                "deal_date": "2026-10-06",
+                "ticker": "TRENT.NS",
+                "client_name": "SELLER 1",
+                "deal_type": "BLOCK",
+                "transaction_type": "SELL",
+                "quantity": 1000,
+                "trade_price": 7500.0,
+                "value_cr": 0.75,
+            },
+        ])
+
+        resp = client.get("/api/v1/morning-setups/deals?group_by_symbol=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["grouped"] is True
+        assert data["count"] == 1
+        assert data["deals"][0]["ticker"] == "TRENT.NS"
+        assert data["deals"][0]["total_deals"] == 2
+        assert data["deals"][0]["net_value_cr"] == 0.75
+        assert "technicals" in data
+
+
+def test_enrich_tickers_with_technicals():
+    """Verify technical indicator computation (1D/7D/30D returns, 20/50 DMA) and anti-fabrication."""
+    import pandas as pd
+    import numpy as np
+
+    # Generate 60 days of synthetic prices for testing
+    closes = [100.0 + i * 2.0 for i in range(60)]
+    df = pd.DataFrame({"close": closes}, index=pd.date_range("2026-08-01", periods=60, freq="D"))
+
+    with patch("earnings_engine.data.morning_setups.load_prices_batch") as mock_load:
+        mock_load.return_value = {"TRENT.NS": df, "MISSING.NS": pd.DataFrame()}
+
+        tech = enrich_tickers_with_technicals(["TRENT.NS", "MISSING.NS"])
+
+        assert "TRENT.NS" in tech
+        trent_tech = tech["TRENT.NS"]
+        assert trent_tech["latest_close"] == closes[-1]
+        assert trent_tech["return_1d"] is not None
+        assert trent_tech["return_7d"] is not None
+        assert trent_tech["return_30d"] is not None
+        assert trent_tech["dma_20"] is not None
+        assert trent_tech["dma_50"] is not None
+        assert trent_tech["price_vs_dma20_pct"] is not None
+        assert trent_tech["price_vs_dma50_pct"] is not None
+
+        # Anti-fabrication check: missing symbol must return None, not fake numbers
+        assert "MISSING.NS" in tech
+        missing_tech = tech["MISSING.NS"]
+        assert missing_tech["latest_close"] is None
+        assert missing_tech["return_1d"] is None
+        assert missing_tech["return_7d"] is None
+        assert missing_tech["return_30d"] is None
+        assert missing_tech["dma_20"] is None
+        assert missing_tech["dma_50"] is None
+
+

@@ -20,6 +20,7 @@ import requests
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.nse_api import _get_session, fetch_event_calendar
+from earnings_engine.data.prices import load_prices_batch
 
 logger = logging.getLogger("earnings_engine.data.morning_setups")
 
@@ -92,6 +93,85 @@ def clean_nse_deal_symbol(sym: str) -> str:
     if not s.endswith(".NS"):
         return f"{s}.NS"
     return s
+
+
+def enrich_tickers_with_technicals(
+    tickers: list[str],
+    settings: Settings | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Batch-calculate 1D, 7D, 30D returns and 20 / 50 DMA positioning from historical prices.
+
+    Follows Point-in-Time and strict anti-fabrication standards:
+    - If price history is unavailable or insufficient, returns None rather than synthetic defaults.
+    - Uses load_prices_batch to retrieve OHLCV frames efficiently.
+    """
+    settings = settings or Settings()
+    if not tickers:
+        return {}
+
+    clean_tickers = list(dict.fromkeys([clean_nse_deal_symbol(t) for t in tickers if t]))
+    if not clean_tickers:
+        return {}
+
+    try:
+        price_dfs = load_prices_batch(clean_tickers, settings)
+    except Exception as e:
+        logger.error("[MORNING-SETUPS] Failed to load batch prices for technical indicators: %s", e)
+        price_dfs = {}
+
+    results: dict[str, dict[str, Any]] = {}
+    for t in clean_tickers:
+        df = price_dfs.get(t)
+        base_record = {
+            "latest_close": None,
+            "return_1d": None,
+            "return_7d": None,
+            "return_30d": None,
+            "dma_20": None,
+            "dma_50": None,
+            "price_vs_dma20_pct": None,
+            "price_vs_dma50_pct": None,
+        }
+        if df is None or df.empty or "close" not in df.columns:
+            results[t] = base_record
+            continue
+
+        try:
+            closes = df["close"].dropna()
+            if closes.empty:
+                results[t] = base_record
+                continue
+
+            latest_c = float(closes.iloc[-1])
+            p1 = float(closes.iloc[-2]) if len(closes) >= 2 else None
+            p7 = float(closes.iloc[-8]) if len(closes) >= 8 else (float(closes.iloc[0]) if len(closes) >= 2 else None)
+            p30 = float(closes.iloc[-22]) if len(closes) >= 22 else (float(closes.iloc[0]) if len(closes) >= 2 else None)
+
+            dma20 = round(float(closes.tail(20).mean()), 2) if len(closes) >= 20 else None
+            dma50 = round(float(closes.tail(50).mean()), 2) if len(closes) >= 50 else None
+
+            r1 = round(((latest_c / p1) - 1.0) * 100.0, 2) if p1 and p1 > 0 else None
+            r7 = round(((latest_c / p7) - 1.0) * 100.0, 2) if p7 and p7 > 0 else None
+            r30 = round(((latest_c / p30) - 1.0) * 100.0, 2) if p30 and p30 > 0 else None
+
+            pct_dma20 = round(((latest_c / dma20) - 1.0) * 100.0, 2) if dma20 and dma20 > 0 else None
+            pct_dma50 = round(((latest_c / dma50) - 1.0) * 100.0, 2) if dma50 and dma50 > 0 else None
+
+            results[t] = {
+                "latest_close": round(latest_c, 2),
+                "return_1d": r1,
+                "return_7d": r7,
+                "return_30d": r30,
+                "dma_20": dma20,
+                "dma_50": dma50,
+                "price_vs_dma20_pct": pct_dma20,
+                "price_vs_dma50_pct": pct_dma50,
+            }
+        except Exception as err:
+            logger.debug("[MORNING-SETUPS] Error computing technicals for %s: %s", t, err)
+            results[t] = base_record
+
+    return results
 
 
 def parse_date_to_iso(dt_str: str | None) -> str:
@@ -658,6 +738,87 @@ def get_morning_block_deals(
         logger.error("[MORNING-SETUPS] Query deals error: %s", e)
 
     return deals
+
+
+def group_deals_by_symbol(deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate individual block and bulk deals prints by ticker symbol.
+
+    Calculates:
+    - total_deals: count of deals prints for this symbol
+    - gross_buy_cr, gross_sell_cr: total buys and sells in ₹ Cr
+    - net_value_cr: gross_buy_cr - gross_sell_cr
+    - total_quantity: sum of shares traded
+    - vwap: volume-weighted average price across all prints
+    - prints: list of original deal records
+    """
+    if not deals:
+        return []
+
+    grouped_dict: dict[str, dict[str, Any]] = {}
+
+    for d in deals:
+        sym = d.get("ticker") or "UNKNOWN.NS"
+        if sym not in grouped_dict:
+            grouped_dict[sym] = {
+                "ticker": sym,
+                "symbol": d.get("symbol") or sym.replace(".NS", ""),
+                "security_name": d.get("security_name") or sym,
+                "total_deals": 0,
+                "block_count": 0,
+                "bulk_count": 0,
+                "total_quantity": 0,
+                "gross_buy_cr": 0.0,
+                "gross_sell_cr": 0.0,
+                "net_value_cr": 0.0,
+                "total_turnover_rs": 0.0,
+                "vwap": 0.0,
+                "latest_deal_date": d.get("deal_date"),
+                "prints": [],
+            }
+
+        g = grouped_dict[sym]
+        g["total_deals"] += 1
+        dtype = (d.get("deal_type") or "").upper()
+        if dtype == "BLOCK":
+            g["block_count"] += 1
+        elif dtype == "BULK":
+            g["bulk_count"] += 1
+
+        qty = int(d.get("quantity") or 0)
+        price = float(d.get("trade_price") or 0.0)
+        val_cr = float(d.get("value_cr") or 0.0)
+        tx_type = (d.get("transaction_type") or "").upper()
+
+        g["total_quantity"] += qty
+        g["total_turnover_rs"] += (qty * price)
+
+        if tx_type == "BUY":
+            g["gross_buy_cr"] += val_cr
+        elif tx_type == "SELL":
+            g["gross_sell_cr"] += val_cr
+
+        d_date = d.get("deal_date") or ""
+        if d_date and (not g["latest_deal_date"] or d_date > g["latest_deal_date"]):
+            g["latest_deal_date"] = d_date
+
+        g["prints"].append(d)
+
+    result_list = []
+    for g in grouped_dict.values():
+        total_qty = g["total_quantity"]
+        turnover = g["total_turnover_rs"]
+        vwap = round(turnover / total_qty, 2) if total_qty > 0 else 0.0
+        g["vwap"] = vwap
+        g["gross_buy_cr"] = round(g["gross_buy_cr"], 2)
+        g["gross_sell_cr"] = round(g["gross_sell_cr"], 2)
+        g["net_value_cr"] = round(g["gross_buy_cr"] - g["gross_sell_cr"], 2)
+        g["total_value_cr"] = round(g["gross_buy_cr"] + g["gross_sell_cr"], 2)
+        del g["total_turnover_rs"]
+        result_list.append(g)
+
+    # Sort descending by cumulative total value in Cr
+    result_list.sort(key=lambda x: x["total_value_cr"], reverse=True)
+    return result_list
 
 
 def get_morning_deals_summary(settings: Settings | None = None) -> dict[str, Any]:

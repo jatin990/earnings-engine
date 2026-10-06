@@ -90,14 +90,14 @@ ZEPTO_SUBJECT_PATTERNS = [
             re.IGNORECASE,
         ),
     },
-    # 4. Daily Store Metrics & Performance Scorecard (e.g. "Store JMU-Sainik Colony Daily Update - 2026-09-30", "Store Metrics Summary - 2026-09-30")
+    # 4. Daily Store Metrics & Performance Scorecard (e.g. "Store JMU-Sainik Colony Daily Update - 2026-09-30", "Store Metrics Summary - 2026-09-30", "JMU-Sainik Colony | Store Metric Summary D-1 & MTD - 2026-10-06")
     {
         "category": "STORE_METRICS",
         "category_label": "Store Metric Summary",
         "badge_color": "emerald",
         "icon": "📊",
         "pattern": re.compile(
-            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+)?(?:Store\s+)?(?:Metrics?(?:\s+Summary)?|Update|Scorecard|Performance)\s*[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
+            r"^(?:Store\s+)?(?P<store>[A-Za-z0-9_\-\s]+?)\s*[-–:|]\s*(?:Daily\s+)?(?:Store\s+)?(?:Metrics?(?:\s+Summary)?|Update|Scorecard|Performance)\s*(?:D-1\s*&\s*MTD\s*)?[-–:|]\s*(?P<date>\d{4}-\d{2}-\d{2})",
             re.IGNORECASE,
         ),
     },
@@ -247,7 +247,7 @@ def build_targeted_gmail_query(month: str | None = None) -> tuple[str, str]:
     Avoids fetching random or noisy unrelated personal emails.
     Returns (clean_month_ym, gmail_q_str).
     """
-    pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
+    pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Metric" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
 
     if not month or month.upper() in ("CURRENT", "NOW"):
         clean_month = datetime.now().strftime("%Y-%m")

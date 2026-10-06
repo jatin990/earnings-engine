@@ -6,21 +6,35 @@
 
     const morningSetupsModule = {
         dealsData: [],
+        dealsTechnicals: {},
         dealsSummary: null,
         meetingsData: [],
+        meetingsTechnicals: {},
         meetingsSummary: null,
         activeSubtab: 'deals',
+        groupBySymbol: false,
         dealsLoading: false,
         meetingsLoading: false,
 
         init() {
-            // Check persisted or default subtab
             const savedSubtab = localStorage.getItem('morning_setups_subtab') || 'deals';
             this.switchSubtab(savedSubtab, false);
             this.loadDealsSummary();
             this.loadDeals();
             this.loadMeetingsSummary();
             this.loadMeetings();
+        },
+
+        openInspect(ticker) {
+            if (!ticker) return;
+            const sym = ticker.endsWith('.NS') ? ticker : `${ticker}.NS`;
+            if (window.app && typeof window.app.openStockDrawer === 'function') {
+                window.app.openStockDrawer(sym);
+            } else if (window.app && typeof window.app.openStockDetail === 'function') {
+                window.app.openStockDetail(sym);
+            } else {
+                window.location.assign(`/stock/${encodeURIComponent(sym)}`);
+            }
         },
 
         switchSubtab(subtab, reload = true) {
@@ -76,10 +90,65 @@
             }
         },
 
+        toggleGroupBySymbol(checked) {
+            this.groupBySymbol = Boolean(checked);
+            this.loadDeals(true);
+        },
+
+        togglePrintsAccordion(idx) {
+            const row = document.getElementById(`prints-accordion-${idx}`);
+            const icon = document.getElementById(`prints-icon-${idx}`);
+            if (!row) return;
+            const isHidden = row.style.display === 'none';
+            row.style.display = isHidden ? 'table-row' : 'none';
+            if (icon) icon.textContent = isHidden ? '▼' : '▶';
+        },
+
+        renderReturnsBadges(tech) {
+            if (!tech) return `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.7rem;">--</span>`;
+            const fmt = (v) => {
+                if (v === null || v === undefined) return `<span style="color:#64748b;">--</span>`;
+                const num = Number(v);
+                const col = num > 0 ? '#34d399' : (num < 0 ? '#f87171' : '#94a3b8');
+                const prefix = num > 0 ? '+' : '';
+                return `<span style="color:${col};font-weight:600;">${prefix}${num.toFixed(1)}%</span>`;
+            };
+            return `
+            <div style="display:flex;gap:0.35rem;align-items:center;font-family:var(--font-mono);font-size:0.68rem;white-space:nowrap;">
+                <span title="1-Day Return">1D: ${fmt(tech.return_1d)}</span>
+                <span style="color:rgba(255,255,255,0.18);">|</span>
+                <span title="7-Day Return">7D: ${fmt(tech.return_7d)}</span>
+                <span style="color:rgba(255,255,255,0.18);">|</span>
+                <span title="30-Day Return">30D: ${fmt(tech.return_30d)}</span>
+            </div>`;
+        },
+
+        renderTrendBadges(tech) {
+            if (!tech) return `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.7rem;">--</span>`;
+            const fmtDma = (pct) => {
+                if (pct === null || pct === undefined) return `<span style="color:#64748b;">--</span>`;
+                const num = Number(pct);
+                const col = num >= 0 ? '#34d399' : '#f87171';
+                const arrow = num >= 0 ? '▲ +' : '▼ ';
+                return `<span style="color:${col};font-weight:600;">${arrow}${num.toFixed(1)}%</span>`;
+            };
+            return `
+            <div style="display:flex;flex-direction:column;gap:0.12rem;font-family:var(--font-mono);font-size:0.67rem;white-space:nowrap;">
+                <div style="display:flex;align-items:center;gap:0.3rem;">
+                    <span style="color:#94a3b8;font-size:0.62rem;">20 DMA</span>
+                    ${fmtDma(tech.price_vs_dma20_pct)}
+                </div>
+                <div style="display:flex;align-items:center;gap:0.3rem;">
+                    <span style="color:#94a3b8;font-size:0.62rem;">50 DMA</span>
+                    ${fmtDma(tech.price_vs_dma50_pct)}
+                </div>
+            </div>`;
+        },
+
         // ---------------------------------------------------------------------
         // Block & Bulk Deals Handlers
         // ---------------------------------------------------------------------
-        onDealsDateChange(val) {
+        onDealsDateChange() {
             this.loadDeals(true);
         },
 
@@ -102,7 +171,7 @@
                 s.setDate(s.getDate() - 30);
                 return { start_date: format(s), end_date: format(today) };
             }
-            return {}; // 'all'
+            return {};
         },
 
         async loadDealsSummary() {
@@ -136,7 +205,7 @@
 
             const tbody = document.getElementById('morningDealsTableBody');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading executed block &amp; bulk deals...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading executed block &amp; bulk deals...</td></tr>`;
             }
 
             try {
@@ -161,29 +230,75 @@
                         params.append('client_name', search);
                     }
                 }
+                if (this.groupBySymbol) {
+                    params.append('group_by_symbol', 'true');
+                }
+                params.append('include_technicals', 'true');
                 params.append('limit', '300');
 
                 const res = await fetch(`${API_BASE}/api/v1/morning-setups/deals?${params.toString()}`);
                 if (!res.ok) throw new Error(`HTTP error ${res.status}`);
                 const data = await res.json();
                 this.dealsData = data.deals || [];
-                this.renderDealsTable(this.dealsData);
+                this.dealsTechnicals = data.technicals || {};
+
+                this.updateDealsHeaderRow();
+                if (this.groupBySymbol) {
+                    this.renderGroupedDealsTable(this.dealsData, this.dealsTechnicals);
+                } else {
+                    this.renderFlatDealsTable(this.dealsData, this.dealsTechnicals);
+                }
             } catch (err) {
                 console.error('Error loading morning deals:', err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load deals data. Error: ${this.escapeHtml(err.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load deals data: ${this.escapeHtml(err.message)}</td></tr>`;
                 }
             } finally {
                 this.dealsLoading = false;
             }
         },
 
-        renderDealsTable(deals) {
+        updateDealsHeaderRow() {
+            const headerRow = document.getElementById('morningDealsTableHeaderRow');
+            if (!headerRow) return;
+
+            if (this.groupBySymbol) {
+                headerRow.innerHTML = `
+                    <th style="padding: 0.65rem 0.5rem; color: #94a3b8; font-weight: 700; width: 34px; text-align: center;"></th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Symbol</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Deals Breakdown</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Net Flow (₹ Cr)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Gross Buy / Sell</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Total Qty</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">VWAP</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Total Turnover</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
+                `;
+            } else {
+                headerRow.innerHTML = `
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Date</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Symbol</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Client / Fund Name</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Type</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Side</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Quantity</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Trade Price</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Value (₹ Cr)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
+                `;
+            }
+        },
+
+        renderFlatDealsTable(deals, technicals) {
             const tbody = document.getElementById('morningDealsTableBody');
             if (!tbody) return;
 
             if (!deals || deals.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📦</div><div>No executed block or bulk deals found matching the selected filters.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try relaxing minimum deal value (₹ Cr) or expanding the date range.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📦</div><div>No executed block or bulk deals found matching the selected filters.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try relaxing minimum deal value (₹ Cr) or expanding the date range.</div></td></tr>`;
                 return;
             }
 
@@ -201,9 +316,11 @@
                 const priceFmt = Number(d.trade_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const valueCrFmt = Number(d.value_cr || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-                const rawSym = (d.ticker || '').toUpperCase().replace('.NS', '');
+                const ticker = d.ticker || '';
+                const rawSym = ticker.toUpperCase().replace('.NS', '');
                 const cleanSym = this.escapeHtml(rawSym);
                 const clientName = this.escapeHtml(d.client_name || '—');
+                const tech = technicals ? technicals[ticker] : null;
 
                 return `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background='transparent'">
@@ -211,11 +328,11 @@
                         ${this.escapeHtml(d.deal_date || '—')}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; font-family: var(--font-mono); font-weight: 700;">
-                        <a href="javascript:void(0)" onclick="app.openStockDetail ? app.openStockDetail('${cleanSym}.NS') : (window.stockDrawer ? window.stockDrawer.open('${cleanSym}.NS') : null)" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
                             <span>${cleanSym}</span>
                         </a>
                     </td>
-                    <td style="padding: 0.55rem 0.75rem; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0;" title="${clientName}">
+                    <td style="padding: 0.55rem 0.75rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0;" title="${clientName}">
                         ${clientName}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
@@ -237,10 +354,145 @@
                     <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${isBuy ? '#34d399' : '#f87171'};">
                         ₹${valueCrFmt} Cr
                     </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderReturnsBadges(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderTrendBadges(tech)}
+                    </td>
                     <td style="padding: 0.55rem 0.75rem; text-align: center;">
-                        <button type="button" onclick="app.openStockDetail ? app.openStockDetail('${cleanSym}.NS') : (window.stockDrawer ? window.stockDrawer.open('${cleanSym}.NS') : null)" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);" title="Open Stock Forensics">
+                        <button type="button" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);" title="Open Stock Forensics">
                             📊 Inspect
                         </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        },
+
+        renderGroupedDealsTable(groupedDeals, technicals) {
+            const tbody = document.getElementById('morningDealsTableBody');
+            if (!tbody) return;
+
+            if (!groupedDeals || groupedDeals.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🗂️</div><div>No grouped deal records found for the selected filters.</div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = groupedDeals.map((g, idx) => {
+                const ticker = g.ticker || '';
+                const rawSym = ticker.toUpperCase().replace('.NS', '');
+                const cleanSym = this.escapeHtml(rawSym);
+                const tech = technicals ? technicals[ticker] : null;
+
+                const netCr = Number(g.net_value_cr || 0);
+                const isNetBuy = netCr > 0;
+                const netColor = isNetBuy ? '#34d399' : (netCr < 0 ? '#f87171' : '#94a3b8');
+                const netPrefix = isNetBuy ? '+₹' : (netCr < 0 ? '-₹' : '₹');
+                const netFmt = `${netPrefix}${Math.abs(netCr).toFixed(2)} Cr`;
+
+                const grossBuyFmt = Number(g.gross_buy_cr || 0).toFixed(2);
+                const grossSellFmt = Number(g.gross_sell_cr || 0).toFixed(2);
+                const totalValFmt = Number(g.total_value_cr || 0).toFixed(2);
+                const vwapFmt = Number(g.vwap || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const totalQtyFmt = Number(g.total_quantity || 0).toLocaleString();
+
+                const prints = g.prints || [];
+                const blockCount = Number(g.block_count || 0);
+                const bulkCount = Number(g.bulk_count || 0);
+
+                // Nested sub-rows for prints
+                const printsSubRows = prints.map((p) => {
+                    const isPBuy = (p.transaction_type || '').toUpperCase() === 'BUY';
+                    const pSideColor = isPBuy ? '#34d399' : '#f87171';
+                    const isPBlock = (p.deal_type || '').toUpperCase() === 'BLOCK';
+                    const pTypeColor = isPBlock ? '#38bdf8' : '#fbbf24';
+
+                    return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.71rem;">
+                        <td style="padding: 0.35rem 0.6rem; color: #94a3b8; font-family: var(--font-mono);">${this.escapeHtml(p.deal_date || '—')}</td>
+                        <td style="padding: 0.35rem 0.6rem; color: #e2e8f0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(p.client_name || '—')}</td>
+                        <td style="padding: 0.35rem 0.6rem; color: ${pTypeColor}; font-weight: 700; font-family: var(--font-mono);">${this.escapeHtml(p.deal_type || 'DEAL')}</td>
+                        <td style="padding: 0.35rem 0.6rem; color: ${pSideColor}; font-weight: 800; font-family: var(--font-mono);">${this.escapeHtml(p.transaction_type || '—')}</td>
+                        <td style="padding: 0.35rem 0.6rem; text-align: right; color: #94a3b8; font-family: var(--font-mono);">${Number(p.quantity || 0).toLocaleString()}</td>
+                        <td style="padding: 0.35rem 0.6rem; text-align: right; color: #f8fafc; font-family: var(--font-mono);">₹${Number(p.trade_price || 0).toFixed(2)}</td>
+                        <td style="padding: 0.35rem 0.6rem; text-align: right; color: ${pSideColor}; font-weight: 700; font-family: var(--font-mono);">₹${Number(p.value_cr || 0).toFixed(2)} Cr</td>
+                    </tr>`;
+                }).join('');
+
+                return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='rgba(255,255,255,0.01)'">
+                    <td style="padding: 0.55rem 0.5rem; text-align: center;">
+                        <button type="button" onclick="morningSetupsModule.togglePrintsAccordion(${idx})" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.72rem; padding: 2px;" title="Toggle deal prints">
+                            <span id="prints-icon-${idx}">▶</span>
+                        </button>
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; font-family: var(--font-mono); font-weight: 700;">
+                        <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                            <span>${cleanSym}</span>
+                        </a>
+                        <div style="font-size: 0.65rem; color: #64748b; font-weight: 400; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${this.escapeHtml(g.security_name || cleanSym)}
+                        </div>
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        <div style="font-size: 0.72rem; font-weight: 600; color: #f8fafc;">
+                            ${g.total_deals} ${g.total_deals === 1 ? 'Deal' : 'Deals'}
+                        </div>
+                        <div style="font-size: 0.64rem; color: #94a3b8; font-family: var(--font-mono);">
+                            ${blockCount > 0 ? `<span style="color: #38bdf8;">${blockCount} Block</span>` : ''}
+                            ${blockCount > 0 && bulkCount > 0 ? ' · ' : ''}
+                            ${bulkCount > 0 ? `<span style="color: #fbbf24;">${bulkCount} Bulk</span>` : ''}
+                        </div>
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${netColor};">
+                        ${netFmt}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-size: 0.69rem;">
+                        <div style="color: #34d399;">+₹${grossBuyFmt} Cr</div>
+                        <div style="color: #f87171;">-₹${grossSellFmt} Cr</div>
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); color: #94a3b8;">
+                        ${totalQtyFmt}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); color: #f8fafc; font-weight: 600;">
+                        ₹${vwapFmt}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #e2e8f0;">
+                        ₹${totalValFmt} Cr
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderReturnsBadges(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderTrendBadges(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem; text-align: center;">
+                        <button type="button" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);" title="Open Stock Forensics">
+                            📊 Inspect
+                        </button>
+                    </td>
+                </tr>
+                <tr id="prints-accordion-${idx}" style="display: none; background: rgba(6, 6, 10, 0.7);">
+                    <td colspan="11" style="padding: 0.6rem 1rem 0.8rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size: 0.67rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.35rem; font-family: var(--font-mono);">
+                            Executed Prints for ${cleanSym} (${prints.length} Transactions)
+                        </div>
+                        <table style="width: 100%; max-width: 820px; border-collapse: collapse; background: #08080c; border: 1px solid rgba(255,255,255,0.06); border-radius: 4px;">
+                            <thead>
+                                <tr style="background: #0f1016; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.67rem; color: #94a3b8; font-family: var(--font-mono);">
+                                    <th style="padding: 0.3rem 0.6rem; text-align: left;">Date</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: left;">Client Name</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: left;">Type</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: left;">Side</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: right;">Quantity</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: right;">Price</th>
+                                    <th style="padding: 0.3rem 0.6rem; text-align: right;">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${printsSubRows}
+                            </tbody>
+                        </table>
                     </td>
                 </tr>`;
             }).join('');
@@ -312,7 +564,7 @@
 
             const tbody = document.getElementById('morningMeetingsTableBody');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading upcoming corporate board meetings...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading upcoming corporate board meetings...</td></tr>`;
             }
 
             try {
@@ -324,29 +576,31 @@
                 if (search) params.append('ticker', search);
                 if (impact) params.append('impact_tier', impact);
                 if (horizon) params.append('days_ahead', horizon);
+                params.append('include_technicals', 'true');
                 params.append('limit', '300');
 
                 const res = await fetch(`${API_BASE}/api/v1/morning-setups/board-meetings?${params.toString()}`);
                 if (!res.ok) throw new Error(`HTTP error ${res.status}`);
                 const data = await res.json();
                 this.meetingsData = data.meetings || [];
-                this.renderMeetingsTable(this.meetingsData);
+                this.meetingsTechnicals = data.technicals || {};
+                this.renderMeetingsTable(this.meetingsData, this.meetingsTechnicals);
             } catch (err) {
                 console.error('Error loading board meetings:', err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load board meetings. Error: ${this.escapeHtml(err.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load board meetings: ${this.escapeHtml(err.message)}</td></tr>`;
                 }
             } finally {
                 this.meetingsLoading = false;
             }
         },
 
-        renderMeetingsTable(meetings) {
+        renderMeetingsTable(meetings, technicals) {
             const tbody = document.getElementById('morningMeetingsTableBody');
             if (!tbody) return;
 
             if (!meetings || meetings.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📅</div><div>No scheduled board meetings found for the selected impact tier and horizon.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try selecting "All Impact Tiers" or expanding the horizon to 45D / 90D.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📅</div><div>No scheduled board meetings found for the selected impact tier and horizon.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try selecting "All Impact Tiers" or expanding the horizon to 45D / 90D.</div></td></tr>`;
                 return;
             }
 
@@ -370,12 +624,11 @@
                 }
 
                 let daysLeftStr = '—';
-                let daysLeftNum = null;
                 if (m.meeting_date) {
                     const mDate = new Date(m.meeting_date);
                     mDate.setHours(0, 0, 0, 0);
                     const diffTime = mDate.getTime() - today.getTime();
-                    daysLeftNum = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const daysLeftNum = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                     if (daysLeftNum === 0) {
                         daysLeftStr = `<span style="color:#fbbf24;font-weight:800;">TODAY</span>`;
                     } else if (daysLeftNum === 1) {
@@ -387,10 +640,12 @@
                     }
                 }
 
-                const rawSym = (m.ticker || '').toUpperCase().replace('.NS', '');
+                const ticker = m.ticker || '';
+                const rawSym = ticker.toUpperCase().replace('.NS', '');
                 const cleanSym = this.escapeHtml(rawSym);
                 const coName = this.escapeHtml(m.company_name || rawSym);
                 const purpose = this.escapeHtml(m.purpose || 'General / Other Business');
+                const tech = technicals ? technicals[ticker] : null;
 
                 return `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background='transparent'">
@@ -401,11 +656,11 @@
                         ${daysLeftStr}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; font-family: var(--font-mono); font-weight: 700;">
-                        <a href="javascript:void(0)" onclick="app.openStockDetail ? app.openStockDetail('${cleanSym}.NS') : (window.stockDrawer ? window.stockDrawer.open('${cleanSym}.NS') : null)" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
                             <span>${cleanSym}</span>
                         </a>
                     </td>
-                    <td style="padding: 0.55rem 0.75rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1;" title="${coName}">
+                    <td style="padding: 0.55rem 0.75rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1;" title="${coName}">
                         ${coName}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
@@ -413,13 +668,19 @@
                             ${impactLabel}
                         </span>
                     </td>
-                    <td style="padding: 0.55rem 0.75rem; max-width: 320px; color: #e2e8f0;" title="${purpose}">
+                    <td style="padding: 0.55rem 0.75rem; max-width: 280px; color: #e2e8f0;" title="${purpose}">
                         <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; font-size: 0.73rem;">
                             ${purpose}
                         </div>
                     </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderReturnsBadges(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderTrendBadges(tech)}
+                    </td>
                     <td style="padding: 0.55rem 0.75rem; text-align: center; white-space: nowrap;">
-                        <button type="button" onclick="app.openStockDetail ? app.openStockDetail('${cleanSym}.NS') : (window.stockDrawer ? window.stockDrawer.open('${cleanSym}.NS') : null)" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);" title="Open Stock Forensics">
+                        <button type="button" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);" title="Open Stock Forensics">
                             📊 Inspect
                         </button>
                     </td>

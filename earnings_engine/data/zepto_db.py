@@ -4213,11 +4213,18 @@ def get_loss_summary(
             active_items.append(it)
 
         # Core metric calculations (losses are positive financial defect magnitudes, shrinkage is algebraic net inventory delta)
-        total_loss = sum(abs(float(i.get("amount") or 0.0)) for i in active_items)
         dq_total = sum(abs(float(i.get("amount") or 0.0)) for i in active_items if i.get("loss_type") == "DQ_LOSS")
         shrinkage_net = sum(
             float(i.get("amount") or 0.0) for i in active_items
             if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK")
+        )
+        shrinkage_surplus = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK") and float(i.get("amount") or 0.0) > 0
+        )
+        shrinkage_deficit = sum(
+            float(i.get("amount") or 0.0) for i in active_items
+            if i.get("loss_type") in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK") and float(i.get("amount") or 0.0) < 0
         )
         shrinkage_gross = sum(
             abs(float(i.get("amount") or 0.0)) for i in active_items
@@ -4227,6 +4234,11 @@ def get_loss_summary(
             abs(float(i.get("amount") or 0.0)) for i in active_items
             if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
         )
+        # Financial loss strictly aggregates DQ defects + shrinkage loss (positive or negative deficit) + spoilage
+        # When shrinkage amount is recorded as positive (e.g. Inhouse loss = 500, cycle count missing = 50),
+        # total financial loss reflects the combined operational losses.
+        shrinkage_loss_component = shrinkage_net if shrinkage_net > 0 else abs(shrinkage_deficit)
+        total_loss = round(dq_total + shrinkage_loss_component + spoilage_total, 2)
         total_units_affected = sum(abs(int(i.get("sku_count") or 0)) for i in active_items)
 
         # Helper to normalize SKU identifier across incremental logs
@@ -4336,6 +4348,10 @@ def get_loss_summary(
         # 3. Email Body vs. Excel Verification / Reconciliation Ledger
         recon_where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
         recon_params: list[Any] = []
+        if loss_type == "DQ_LOSS":
+            recon_where.append("category = 'DQ_LOSS'")
+        elif loss_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
+            recon_where.append("category = 'SHRINKAGE'")
         if month and month != "ALL":
             recon_where.append("month_ym = ?")
             recon_params.append(month)
@@ -4439,9 +4455,8 @@ def get_loss_summary(
         month_trend_rows = conn.execute(
             """
             SELECT substr(record_date, 1, 7) AS ym,
-                   SUM(abs(amount)) AS monthly_total,
                    SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN abs(amount) ELSE 0 END) AS dq_total,
-                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN abs(amount) ELSE 0 END) AS shrink_total,
+                   SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END) AS shrink_net,
                    SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN abs(amount) ELSE 0 END) AS spoil_total,
                    COUNT(*) AS item_count,
                    SUM(abs(sku_count)) AS sku_count
@@ -4452,18 +4467,22 @@ def get_loss_summary(
             """
         ).fetchall()
 
-        monthly_trends = [
-            {
+        monthly_trends = []
+        for mtr in month_trend_rows:
+            dq_val = round(float(mtr["dq_total"] or 0.0), 2)
+            shrink_val = round(float(mtr["shrink_net"] or 0.0), 2)
+            spoil_val = round(float(mtr["spoil_total"] or 0.0), 2)
+            # Net financial loss: DQ defects + net shortage + spoilage
+            m_total = round(dq_val + abs(min(0.0, shrink_val)) + spoil_val, 2)
+            monthly_trends.append({
                 "month_ym": mtr["ym"],
-                "total_loss": round(float(mtr["monthly_total"] or 0.0), 2),
-                "dq_loss": round(float(mtr["dq_total"] or 0.0), 2),
-                "shrinkage": round(float(mtr["shrink_total"] or 0.0), 2),
-                "spoilage": round(float(mtr["spoil_total"] or 0.0), 2),
+                "total_loss": m_total,
+                "dq_loss": dq_val,
+                "shrinkage": shrink_val,
+                "spoilage": spoil_val,
                 "item_count": int(mtr["item_count"] or 0),
                 "sku_count": int(mtr["sku_count"] or 0),
-            }
-            for mtr in month_trend_rows
-        ]
+            })
 
         # 5. Day-wise Trend aggregation (for the active filtered records)
         daily_map: dict[str, dict[str, Any]] = {}
@@ -4517,6 +4536,9 @@ def get_loss_summary(
             "total_loss_amount": round(total_loss, 2),
             "dq_loss_total": round(dq_total, 2),
             "shrinkage_total": round(shrinkage_net, 2),
+            "shrinkage_net": round(shrinkage_net, 2),
+            "shrinkage_surplus": round(shrinkage_surplus, 2),
+            "shrinkage_deficit": round(shrinkage_deficit, 2),
             "shrinkage_gross": round(shrinkage_gross, 2),
             "spoilage_total": round(spoilage_total, 2),
             "total_skus_affected": unique_skus_count,
@@ -4969,12 +4991,15 @@ def get_manpower_utilization_summary(
         total_idle_hours = sum(i.get("idle_hours", 0.0) for i in items)
         total_flex_cost = sum(i.get("flex_labor_cost", 0.0) for i in items)
         avg_ipp = round(total_items / total_active_hours, 1) if total_active_hours > 0 else 0.0
+        distinct_pickers = len({i["employee_id"] for i in items if i.get("employee_id")} or {i["employee_name"] for i in items if i.get("employee_name")})
 
         return {
             "total_items_picked": total_items,
             "total_active_hours": round(total_active_hours, 1),
             "total_idle_hours": round(total_idle_hours, 1),
             "avg_ipp": avg_ipp,
+            "active_pickers_count": distinct_pickers,
+            "total_flex_labor_cost": round(total_flex_cost, 2),
             "total_flex_cost": round(total_flex_cost, 2),
             "records": items,
         }
@@ -5014,9 +5039,9 @@ def get_zepto_dashboard_analytics(
             l_row = conn.execute(
                 """
                 SELECT
-                    COALESCE(SUM(amount), 0.0) AS loss_amt,
-                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN abs(amount) ELSE 0 END), 0.0) AS dq_amt,
                     COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN abs(amount) ELSE 0 END), 0.0) AS spoil_amt,
                     COUNT(*) AS loss_incidents,
                     COALESCE(SUM(sku_count), 0) AS skus_affected
                 FROM zepto_loss_records
@@ -5077,11 +5102,16 @@ def get_zepto_dashboard_analytics(
             tot_gmv = round(met_row["total_gmv"] or 0.0, 2)
             aov = round(tot_gmv / tot_orders, 1) if tot_orders > 0 else 0.0
 
+            dq_amt_val = round(float(l_row["dq_amt"] or 0.0), 2)
+            shrink_amt_val = round(float(l_row["shrink_amt"] or 0.0), 2)
+            spoil_amt_val = round(float(l_row["spoil_amt"] or 0.0), 2)
+            net_loss_total = round(dq_amt_val + abs(min(0.0, shrink_amt_val)) + spoil_amt_val, 2)
+
             mom_trends.append({
                 "month_ym": ym,
-                "loss_total": round(l_row["loss_amt"] or 0.0, 2),
-                "dq_loss": round(l_row["dq_amt"] or 0.0, 2),
-                "shrinkage": round(l_row["shrink_amt"] or 0.0, 2),
+                "loss_total": net_loss_total,
+                "dq_loss": dq_amt_val,
+                "shrinkage": shrink_amt_val,
                 "loss_incidents": l_row["loss_incidents"] or 0,
                 "skus_affected": l_row["skus_affected"] or 0,
                 "scheduled_shifts": att_row["scheduled_shifts"] or 0,
@@ -5124,9 +5154,9 @@ def get_zepto_dashboard_analytics(
             l_d = conn.execute(
                 """
                 SELECT
-                    COALESCE(SUM(amount), 0.0) AS loss_amt,
-                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN amount ELSE 0 END), 0.0) AS dq_amt,
+                    COALESCE(SUM(CASE WHEN loss_type = 'DQ_LOSS' THEN abs(amount) ELSE 0 END), 0.0) AS dq_amt,
                     COALESCE(SUM(CASE WHEN loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK') THEN amount ELSE 0 END), 0.0) AS shrink_amt,
+                    COALESCE(SUM(CASE WHEN loss_type IN ('SPOILAGE', 'TRANSIT_DAMAGE', 'EXPIRY') THEN abs(amount) ELSE 0 END), 0.0) AS spoil_amt,
                     COUNT(*) AS loss_incidents,
                     COALESCE(SUM(sku_count), 0) AS skus_affected
                 FROM zepto_loss_records
@@ -5185,11 +5215,16 @@ def get_zepto_dashboard_analytics(
             d_ipp = met_d["packer_ipp"] if (met_d and met_d["packer_ipp"]) else (util_d["avg_ipp"] or 0.0)
             d_sla = met_d["sla_adherence_pct"] if (met_d and met_d["sla_adherence_pct"]) else 100.0
 
+            d_dq = round(float(l_d["dq_amt"] or 0.0), 2)
+            d_shrink = round(float(l_d["shrink_amt"] or 0.0), 2)
+            d_spoil = round(float(l_d["spoil_amt"] or 0.0), 2)
+            d_loss_total = round(d_dq + abs(min(0.0, d_shrink)) + d_spoil, 2)
+
             dod_metrics.append({
                 "date": dt,
-                "loss_total": round(l_d["loss_amt"] or 0.0, 2),
-                "dq_loss": round(l_d["dq_amt"] or 0.0, 2),
-                "shrinkage": round(l_d["shrink_amt"] or 0.0, 2),
+                "loss_total": d_loss_total,
+                "dq_loss": d_dq,
+                "shrinkage": d_shrink,
                 "loss_incidents": l_d["loss_incidents"] or 0,
                 "skus_affected": l_d["skus_affected"] or 0,
                 "shifts_scheduled": att_d["total_shifts"] or 0,

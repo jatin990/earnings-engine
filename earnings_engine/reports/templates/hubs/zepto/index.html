@@ -457,11 +457,18 @@
                                 <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Picker Throughput</div>
                             </div>
                         </button>
-                        <button type="button" class="nav-tab" id="tabBtn-loss" onclick="zeptoApp.switchTab('loss')">
+                        <button type="button" class="nav-tab" id="tabBtn-dq-loss" onclick="zeptoApp.switchTab('dq-loss')">
                             <span class="nav-icon text-sm">📉</span>
                             <div class="flex-1 truncate">
-                                <div class="text-xs font-bold leading-tight">DQ Loss & Spoilage</div>
-                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Defects & Shrinkage</div>
+                                <div class="text-xs font-bold leading-tight">DQ Loss & Defects</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Packaging & Spoilage</div>
+                            </div>
+                        </button>
+                        <button type="button" class="nav-tab" id="tabBtn-shrinkage" onclick="zeptoApp.switchTab('shrinkage')">
+                            <span class="nav-icon text-sm">⚖️</span>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs font-bold leading-tight">Inventory Shrinkage</div>
+                                <div class="text-[9px] text-slate-400 opacity-80 leading-tight">Audit & Cycle Counts</div>
                             </div>
                         </button>
                         <button type="button" class="nav-tab" id="tabBtn-scorecard" onclick="zeptoApp.switchTab('scorecard')">
@@ -560,9 +567,14 @@
                     {% include "hubs/zepto/_utilization.html" %}
                 </main>
 
-                <!-- ================= TAB: DQ LOSS & SHRINKAGE ================= -->
-                <main id="tabContent-loss" class="space-y-4" style="display: none;">
-                    {% include "hubs/zepto/_loss.html" %}
+                <!-- ================= TAB: DQ LOSS & DEFECTS ================= -->
+                <main id="tabContent-dq-loss" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_dq_loss.html" %}
+                </main>
+
+                <!-- ================= TAB: INVENTORY SHRINKAGE ================= -->
+                <main id="tabContent-shrinkage" class="space-y-4" style="display: none;">
+                    {% include "hubs/zepto/_shrinkage.html" %}
                 </main>
 
                 <!-- ================= TAB: STORE SCORECARD ================= -->

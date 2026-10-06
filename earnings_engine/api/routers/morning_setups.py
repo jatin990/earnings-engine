@@ -9,10 +9,12 @@ from pydantic import BaseModel
 
 from earnings_engine.config import Settings
 from earnings_engine.data.morning_setups import (
+    enrich_tickers_with_technicals,
     get_board_meetings_summary,
     get_morning_block_deals,
     get_morning_deals_summary,
     get_upcoming_board_meetings,
+    group_deals_by_symbol,
     sync_all_morning_deals,
     sync_upcoming_board_meetings,
 )
@@ -68,6 +70,8 @@ def list_morning_deals_endpoint(
     ticker: Optional[str] = Query(None, description="Ticker symbol filter, e.g., TRENT"),
     client_name: Optional[str] = Query(None, description="Client or fund name substring"),
     min_value_cr: Optional[float] = Query(None, ge=0.0, description="Minimum deal value in ₹ Crores (e.g., 5.0, 10.0, 50.0)"),
+    group_by_symbol: bool = Query(False, description="Group and aggregate deals by symbol"),
+    include_technicals: bool = Query(True, description="Enrich with 1D/7D/30D returns and 20/50 DMA"),
     limit: int = Query(200, ge=1, le=1000, description="Max records to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -86,10 +90,29 @@ def list_morning_deals_endpoint(
             limit=limit,
             offset=offset,
         )
+
+        # Technical indicators enrichment
+        technicals: dict[str, Any] = {}
+        if include_technicals and deals:
+            tickers = [d.get("ticker") for d in deals if d.get("ticker")]
+            technicals = enrich_tickers_with_technicals(tickers, settings=_settings)
+
+        if group_by_symbol:
+            grouped = group_deals_by_symbol(deals)
+            return {
+                "status": "success",
+                "count": len(grouped),
+                "deals": grouped,
+                "grouped": True,
+                "technicals": technicals,
+            }
+
         return {
             "status": "success",
             "count": len(deals),
             "deals": deals,
+            "grouped": False,
+            "technicals": technicals,
         }
     except Exception as e:
         logger.error("Failed to query morning deals: %s", e)
@@ -135,6 +158,7 @@ def list_board_meetings_endpoint(
     from_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
     to_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
     purpose_contains: Optional[str] = Query(None, description="Substring search on purpose (e.g., 'Dividend', 'Results')"),
+    include_technicals: bool = Query(True, description="Enrich with 1D/7D/30D returns and 20/50 DMA"),
     limit: int = Query(200, ge=1, le=1000, description="Max records to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -151,10 +175,17 @@ def list_board_meetings_endpoint(
             limit=limit,
             offset=offset,
         )
+
+        technicals: dict[str, Any] = {}
+        if include_technicals and meetings:
+            tickers = [m.get("ticker") for m in meetings if m.get("ticker")]
+            technicals = enrich_tickers_with_technicals(tickers, settings=_settings)
+
         return {
             "status": "success",
             "count": len(meetings),
             "meetings": meetings,
+            "technicals": technicals,
         }
     except Exception as e:
         logger.error("Failed to query board meetings: %s", e)

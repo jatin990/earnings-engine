@@ -96,6 +96,14 @@
                         <option value="100">&ge; ₹100 Cr (Institutional)</option>
                     </select>
                 </div>
+
+                <!-- Group by Symbol Toggle -->
+                <div style="display: flex; align-items: center; gap: 0.4rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.6rem; border-radius: 6px;">
+                    <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; margin: 0; font-size: 0.71rem; color: #e2e8f0; font-family: var(--font-mono); font-weight: 600;">
+                        <input type="checkbox" id="morningDealsGroupBySymbolCheckbox" onchange="morningSetupsModule.toggleGroupBySymbol(this.checked)" style="accent-color: #3b82f6; cursor: pointer;">
+                        <span>🗂️ Group by Symbol</span>
+                    </label>
+                </div>
             </div>
 
             <!-- Right Actions: Sync Now, Refresh -->
@@ -134,7 +142,7 @@
             <div style="overflow-x: auto; max-height: 620px;">
                 <table class="table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.76rem;">
                     <thead style="background: #040406; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.12);">
-                        <tr>
+                        <tr id="morningDealsTableHeaderRow">
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Date</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Symbol</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Client / Fund Name</th>
@@ -143,12 +151,14 @@
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Quantity</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Trade Price</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Value (₹ Cr)</th>
+                            <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                            <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="morningDealsTableBody">
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">
                                 Loading executed block &amp; bulk deals...
                             </td>
                         </tr>
@@ -248,12 +258,14 @@
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Company Name</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Impact Tier</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Agenda / Purpose</th>
+                            <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                            <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
                             <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="morningMeetingsTableBody">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
                                 Loading upcoming corporate board meetings...
                             </td>
                         </tr>

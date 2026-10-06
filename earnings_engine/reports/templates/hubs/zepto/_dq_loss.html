@@ -1,0 +1,351 @@
+<!-- DQ Loss & Defect Intelligence Subtab Partial -->
+<div class="space-y-3">
+    <!-- Header Banner & Filter Toolbar -->
+    <div class="glass-panel p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="text-lg">📉</span>
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider">DQ Loss & Defect Intelligence</h3>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
+                    Dispatch Quality & Spoilage
+                </span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+                Granular dispatch quality defects, packing and picking errors, transit damages, and spoilage waste tracking.
+            </p>
+        </div>
+
+        <!-- Filter Controls Toolbar -->
+        <div class="flex items-center gap-2 flex-wrap">
+            <!-- Active Scope Indicator -->
+            <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-md px-2.5 py-1.5" title="Synchronized with Global Header Month Filter">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Scope:</span>
+                <span id="dqLossActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
+            </div>
+
+            <!-- Defect Type Filter -->
+            <select
+                id="dqLossTypeFilter"
+                onchange="zeptoApp.loadDqLoss()"
+                class="bg-black/50 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-white/30"
+            >
+                <option value="ALL">All Defect Types</option>
+                <option value="DQ_LOSS">DQ Loss (Packing/Picking)</option>
+                <option value="SPOILAGE">Spoilage & Decay</option>
+                <option value="TRANSIT_DAMAGE">Transit Damage</option>
+            </select>
+
+            <!-- Category Filter -->
+            <select
+                id="dqCategoryFilter"
+                onchange="zeptoApp.loadDqLoss()"
+                class="bg-black/50 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-white/30"
+            >
+                <option value="ALL">All Categories</option>
+            </select>
+
+            <!-- Purge & Reprocess Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.reprocessGmailEmails()"
+                class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Purge operational database records and re-parse all email attachments month-wise"
+            >
+                <span>🧹</span> Purge & Reprocess
+            </button>
+
+            <!-- Upload Excel Action -->
+            <button
+                type="button"
+                onclick="document.getElementById('dqLossFileInput').click()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Upload DQ loss / spoilage report (.xlsx)"
+            >
+                <span>📤</span> Upload (.xlsx)
+            </button>
+            <input
+                type="file"
+                id="dqLossFileInput"
+                accept=".xlsx,.xlsm"
+                style="display: none;"
+                onchange="zeptoApp.handleDqLossFileUpload(event)"
+            />
+
+            <!-- Refresh Button -->
+            <button
+                type="button"
+                onclick="zeptoApp.loadDqLoss()"
+                class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+            >
+                <span>🔄</span> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Metric Cards Grid (5 High-Density Cards) -->
+    <section class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+        <!-- 1. Total DQ & Defect Loss -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Total Defect Loss</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono" id="dqLossTotalCountBadge">-- Incidents</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-rose-400 tracking-tight" id="dqLossTotalAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">DQ + Spoilage + Damage</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Impacted SKUs:</span>
+                <span class="font-mono font-bold text-slate-300" id="dqLossTotalSkuCount">--</span>
+            </div>
+        </div>
+
+        <!-- 2. Dispatch Quality (DQ) Packing/Picking Defects -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Packaging & Picking</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono" id="dqLossDqShareBadge">--%</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-amber-300 tracking-tight" id="dqLossDqAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Direct DQ Loss</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Loss Type:</span>
+                <span class="font-mono font-bold text-slate-300">DQ_LOSS</span>
+            </div>
+        </div>
+
+        <!-- 3. Perishables Spoilage & Decay -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Spoilage & Decay</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono" id="dqLossSpoilageShareBadge">--%</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-emerald-300 tracking-tight" id="dqLossSpoilageAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Fresh & Perishables</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Loss Type:</span>
+                <span class="font-mono font-bold text-slate-300">SPOILAGE</span>
+            </div>
+        </div>
+
+        <!-- 4. Transit Damage & Logistics -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400">Transit Damage</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/25 font-mono" id="dqLossTransitShareBadge">--%</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-sky-300 tracking-tight" id="dqLossTransitAmount">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Handling & En-Route Damage</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Loss Type:</span>
+                <span class="font-mono font-bold text-slate-300">TRANSIT_DAMAGE</span>
+            </div>
+        </div>
+
+        <!-- 5. Average Defect Severity -->
+        <div class="glass-panel p-3.5 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <div class="flex justify-between items-start">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Defect Severity</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">Avg/Incident</span>
+            </div>
+            <div class="my-1.5">
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="dqLossAvgIncidentValue">₹--</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Average Cost Per Defect</div>
+            </div>
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
+                <span>Defect Velocity:</span>
+                <span class="font-mono font-bold text-slate-300" id="dqLossDailyVelocity">--/day</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Drilldown Filter Indicator Banner (Hidden by default) -->
+    <div id="dqLossDrilldownBanner" class="hidden glass-panel p-3 bg-amber-500/10 border-amber-500/30 flex items-center justify-between gap-3 animate-fadeIn">
+        <div class="flex items-center gap-2.5">
+            <span class="text-base text-amber-400">🎯</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Active Drilldown Filter</span>
+                    <span id="dqLossDrilldownTypeBadge" class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-mono">Category</span>
+                </div>
+                <div class="text-[11px] text-slate-300 mt-0.5">
+                    Viewing details for <span id="dqLossDrilldownValueText" class="font-bold text-white font-mono">—</span>
+                    <span id="dqLossDrilldownMetricsText" class="text-slate-400 ml-1.5 font-mono"></span>
+                </div>
+            </div>
+        </div>
+        <button
+            type="button"
+            onclick="zeptoApp.clearDqLossDrilldown()"
+            class="px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+        >
+            <span>✕</span> Reset Filter
+        </button>
+    </div>
+
+    <!-- Visual Interactive Analytics: SVG Donut Charts & Velocity Timeline -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <!-- 1. Interactive Category Loss Breakdown SVG Donut -->
+        <section class="glass-panel p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">🥧</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Defect Category Breakdown</h4>
+                        <p class="text-[10px] text-slate-400">Click any slice or label to drill down into SKU defects.</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dqCategoryPieBadge">
+                    -- Cats
+                </span>
+            </div>
+            <div id="dqCategoryPieContainer" class="min-h-[190px] flex flex-col items-center justify-center">
+                <span class="text-xs text-slate-500 font-mono">Loading category distribution...</span>
+            </div>
+        </section>
+
+        <!-- 2. Interactive Defect Type Distribution SVG Donut -->
+        <section class="glass-panel p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">🍩</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Defect Classification</h4>
+                        <p class="text-[10px] text-slate-400">DQ Packaging vs Picking vs Spoilage vs Transit.</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dqTypePieBadge">
+                    -- Types
+                </span>
+            </div>
+            <div id="dqTypePieContainer" class="min-h-[190px] flex flex-col items-center justify-center">
+                <span class="text-xs text-slate-500 font-mono">Loading defect classification...</span>
+            </div>
+        </section>
+
+        <!-- 3. Day-Wise Defect Velocity Timeline Bar Chart -->
+        <section class="glass-panel p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between pb-2 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm">📈</span>
+                    <div>
+                        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Day-Wise Defect Timeline</h4>
+                        <p class="text-[10px] text-slate-400">Click any day bar to inspect day-specific SKU defects.</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dqDailyGraphBadge">
+                    -- Days
+                </span>
+            </div>
+            <div id="dqDailyGraphContainer" class="min-h-[190px] flex items-center justify-center overflow-x-auto custom-scrollbar">
+                <span class="text-xs text-slate-500 font-mono">Loading daily timeline chart...</span>
+            </div>
+        </section>
+    </div>
+
+    <!-- Category-Wise Defect Breakdown Matrix -->
+    <section class="glass-panel p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Department & Category Defect Matrix</h4>
+                <p class="text-[10px] text-slate-400">Breakdown of DQ packing/picking defects, spoilage waste, and impacted SKUs by store department.</p>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="dqCategoryTotalCountBadge">
+                0 Categories
+            </span>
+        </div>
+
+        <!-- Category Breakdown Table -->
+        <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-wider bg-white/[0.02]">
+                        <th class="py-2.5 px-3">Department / Category</th>
+                        <th class="py-2.5 px-3 text-right">DQ Loss (₹)</th>
+                        <th class="py-2.5 px-3 text-right">Spoilage / Transit (₹)</th>
+                        <th class="py-2.5 px-3 text-right text-rose-400 font-bold">Total Defect Loss (₹)</th>
+                        <th class="py-2.5 px-3 text-center" style="min-width: 140px;">% Share</th>
+                        <th class="py-2.5 px-3 text-right">SKUs / Units</th>
+                        <th class="py-2.5 px-3 text-right">Incidents</th>
+                        <th class="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dqCategoryMatrixTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500 text-xs">
+                            Loading category defect matrix...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Itemized Stored Defect SKU Ledger -->
+    <section class="glass-panel p-3.5 space-y-2.5">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+            <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider">Itemized Defect SKU Incident Ledger</h4>
+                <p class="text-[10px] text-slate-400">All granular SKU defect, damage, and spoilage records stored in the database.</p>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <!-- Search Input -->
+                <div class="relative w-full sm:w-64">
+                    <input
+                        type="text"
+                        id="dqLossSearchInput"
+                        placeholder="Search SKU, notes, category..."
+                        oninput="zeptoApp.filterDqLossRecords()"
+                        class="w-full bg-black/50 border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-white/30"
+                    />
+                </div>
+
+                <!-- Export CSV -->
+                <button
+                    type="button"
+                    onclick="zeptoApp.exportDqLossCsv()"
+                    class="px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-xs font-medium flex items-center gap-1 transition whitespace-nowrap"
+                    title="Export filtered records to CSV"
+                >
+                    <span>📥</span> CSV
+                </button>
+
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono whitespace-nowrap" id="dqLossRecordCountBadge">
+                    0 entries
+                </span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-96">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold text-[10px] uppercase tracking-wider bg-white/[0.02] sticky top-0 bg-slate-900/90 backdrop-blur z-10">
+                        <th class="py-2 px-2.5">Date</th>
+                        <th class="py-2 px-2.5">Store</th>
+                        <th class="py-2 px-2.5">Defect Type</th>
+                        <th class="py-2 px-2.5">Category</th>
+                        <th class="py-2 px-2.5">SKU / Item</th>
+                        <th class="py-2 px-2.5 text-right">Units</th>
+                        <th class="py-2 px-2.5 text-right">Amount (₹)</th>
+                        <th class="py-2 px-2.5">Notes / Reason</th>
+                        <th class="py-2 px-2.5">Source Email</th>
+                    </tr>
+                </thead>
+                <tbody id="dqLossTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="9" class="text-center py-6 text-slate-500 text-xs">
+                            Loading stored defect records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
