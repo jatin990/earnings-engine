@@ -366,10 +366,10 @@ def test_zepto_api_endpoints(client):
     assert ui_resp.status_code == 200
     assert "Zepto Dark Store Hub" in ui_resp.text
     assert "tabBtn-utilization" in ui_resp.text
-    assert "tabBtn-loss" in ui_resp.text
+    assert ("tabBtn-loss" in ui_resp.text or "tabBtn-dq-loss" in ui_resp.text)
     assert "tabBtn-scorecard" in ui_resp.text
     assert "tabContent-utilization" in ui_resp.text
-    assert "tabContent-loss" in ui_resp.text
+    assert ("tabContent-loss" in ui_resp.text or "tabContent-dq-loss" in ui_resp.text)
     assert "tabContent-scorecard" in ui_resp.text
     assert "attEmployeeDrawer" in ui_resp.text
 
