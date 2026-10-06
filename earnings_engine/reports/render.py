@@ -462,7 +462,7 @@ def _build_cap_section(title: str, badge_cls: str, rows: list[str] | dict[str, l
         ind_count = len(ind_rows)
         table_rows.append(
             f'<tr class="table-divider-row industry-subgroup industry-divider-row" data-ind="{html.escape(ind_name)}">'
-            f'<td colspan="16">'
+            f'<td colspan="8">'
             f'<div class="terminal-ind-divider">'
             f'<span class="ind-pill">🏭 Industry: {html.escape(ind_name)}</span>'
             f'<span class="ind-badge-count">{ind_count}</span>'
@@ -502,7 +502,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             count = len(data)
             table_rows.append(
                 f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-                f'<td colspan="18">'
+                f'<td colspan="8">'
                 f'<div class="terminal-cap-divider">'
                 f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
                 f'<span class="terminal-divider-meta">{count} stock{"s" if count != 1 else ""}</span>'
@@ -520,7 +520,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
         ind_count_total = len([k for k, v in data.items() if v])
         table_rows.append(
             f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-            f'<td colspan="18">'
+            f'<td colspan="8">'
             f'<div class="terminal-cap-divider">'
             f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
             f'<span class="terminal-divider-meta">{tier_count} stock{"s" if tier_count != 1 else ""} · {ind_count_total} industries</span>'
@@ -536,7 +536,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             icount = len(ind_rows)
             table_rows.append(
                 f'<tr class="table-divider-row industry-subgroup industry-divider-row" data-cap="{cap_tier}" data-ind="{html.escape(ind_name)}">'
-                f'<td colspan="18">'
+                f'<td colspan="8">'
                 f'<div class="terminal-ind-divider">'
                 f'<span class="ind-pill">🏭 Industry: {html.escape(ind_name)}</span>'
                 f'<span class="ind-badge-count">{icount}</span>'
