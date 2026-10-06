@@ -31,6 +31,7 @@ from earnings_engine.api.routers import (
     deals,
     institutional,
     kronos,
+    morning_setups,
     news,
     options,
     playground,
@@ -519,6 +520,7 @@ app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
 app.include_router(deals.router)
+app.include_router(morning_setups.router)
 app.include_router(routes_reg30.router)
 app.include_router(tri_confluence.router)
 app.include_router(options.router)

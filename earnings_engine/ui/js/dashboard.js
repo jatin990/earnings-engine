@@ -20,6 +20,7 @@ const API_BASE = window.location.origin;
                 'scanner': ['/static/js/modules/consensus.js', '/static/js/modules/scanner.js'],
                 'catalysts': ['/static/js/modules/schedules.js', '/static/js/modules/catalysts.js', '/static/js/modules/catalyst_consensus.js'],
                 'premarket': ['/static/js/modules/premarket.js'],
+                'morning-setups': ['/static/js/modules/morning_setups.js'],
                 'gainers': ['/static/js/modules/consensus.js', '/static/js/modules/gainers.js'],
                 'breakout': ['/static/js/modules/tier_pool.js', '/static/js/modules/consensus.js', '/static/js/modules/schedules.js', '/static/js/modules/swing_range.js', '/static/js/modules/breakout_audit.js', '/static/js/modules/tracked_breakouts.js', '/static/js/modules/stock_rating.js', '/static/js/modules/stock_note.js', '/static/js/modules/breakout_radar.js'],
                 'institutional': ['/static/js/modules/institutional.js'],
@@ -982,7 +983,7 @@ const API_BASE = window.location.origin;
 
             async switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'morning-setups', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -1041,6 +1042,7 @@ const API_BASE = window.location.origin;
                         'scanner': 'Scanner',
                         'catalysts': 'Catalysts & News',
                         'premarket': '🌅 Pre-Market Setups',
+                        'morning-setups': '🌅 Morning Setups (Deals & Meetings)',
                         'options': '⚡ Option Chain & Derivatives',
                         'commodities': '🥇 Commodities & Energy',
                         'gainers': 'Gainers & Breakouts',
@@ -1164,6 +1166,11 @@ const API_BASE = window.location.origin;
                         if (typeof this.loadPremarketSetups === 'function') {
                             this.loadPremarketSetups();
                         }
+                    }
+                }
+                if (name === 'morning-setups') {
+                    if (window.morningSetupsModule && typeof window.morningSetupsModule.init === 'function') {
+                        window.morningSetupsModule.init();
                     }
                 }
                 if (name === 'options') {

@@ -228,6 +228,28 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "params_json": '{"check_stuck": true, "auto_repair": false}',
         "description": "Comprehensive multi-tier audit verifying 100% mathematical sums, SHA-256 provenance hashes, statutory filing season deadlines, and zero synthetic records.",
     },
+    {
+        "job_id": "morning_deals_sync",
+        "job_name": "🌅 Morning & Post-Market Block/Bulk Deals Sync",
+        "category": "Morning Setups",
+        "interval_seconds": 3600,
+        "run_after_hours": 1,
+        "market_session": "always",
+        "is_enabled": 1,
+        "params_json": '{"include_live": true}',
+        "description": "Automated ingestion of NSE block and bulk deals synchronized with exchange publishing windows (~18:00-18:30 IST closing archives & morning block window).",
+    },
+    {
+        "job_id": "upcoming_board_meetings_sync",
+        "job_name": "📅 Upcoming Board Meetings Radar Sync",
+        "category": "Morning Setups",
+        "interval_seconds": 7200,
+        "run_after_hours": 1,
+        "market_session": "always",
+        "is_enabled": 1,
+        "params_json": '{"days_forward": 45}',
+        "description": "Scrapes official NSE event calendar for corporate board meetings scheduled over next 45 days, categorizing price-sensitive catalysts (Results, Bonus, Splits, Buybacks).",
+    },
 ]
 
 

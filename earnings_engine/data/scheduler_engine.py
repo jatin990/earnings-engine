@@ -75,6 +75,8 @@ class SchedulerEngine:
         self._job_handlers["kronos_cache_warmup"] = self._handle_kronos_warmup
         self._job_handlers["confluence_radar_sweep"] = self._handle_confluence_sweep
         self._job_handlers["institutional_integrity_audit"] = self._handle_institutional_integrity_audit
+        self._job_handlers["morning_deals_sync"] = self._handle_morning_deals_sync
+        self._job_handlers["upcoming_board_meetings_sync"] = self._handle_upcoming_board_meetings_sync
 
     def register_handler(self, job_id: str, handler: Callable[[Settings, dict[str, Any]], str]) -> None:
         """Register or override a custom job handler."""
@@ -309,6 +311,21 @@ class SchedulerEngine:
         setups = compute_and_save_confluence_radar(settings)
         count = len(setups)
         return f"Cross-Strategy Confluence Radar updated: {count} multi-module setups discovered and persisted."
+
+    def _handle_morning_deals_sync(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data.morning_setups import sync_all_morning_deals
+        res = sync_all_morning_deals(settings=settings)
+        inserted = res.get("inserted", 0)
+        scanned = res.get("total_scanned", 0)
+        return f"Morning Setups Deals sync completed: {inserted} new block/bulk deals inserted ({scanned} scanned)."
+
+    def _handle_upcoming_board_meetings_sync(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data.morning_setups import sync_upcoming_board_meetings
+        days_forward = int(params.get("days_forward", 45))
+        res = sync_upcoming_board_meetings(settings=settings, days_forward=days_forward)
+        inserted = res.get("inserted", 0)
+        updated = res.get("updated", 0)
+        return f"Upcoming Board Meetings Radar sync completed: {inserted} inserted, {updated} updated."
 
     # -------------------------------------------------------------------------
     # Engine Lifecycle

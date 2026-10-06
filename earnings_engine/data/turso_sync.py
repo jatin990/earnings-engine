@@ -129,6 +129,9 @@ SYNC_TABLES = [
     "zepto_manpower_utilization",
     "zepto_gmail_messages",
     "zepto_offer_letters",
+    # Morning Setups: Block Deals & Board Meetings Radar
+    "morning_block_deals",
+    "upcoming_board_meetings",
 ]
 
 
@@ -201,6 +204,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "metric_date",
     "record_date",
     "util_date",
+    "meeting_date",
     "synced_at",
     "iso_date",
     "date",
@@ -212,6 +216,7 @@ DATE_ONLY_COLUMNS = {
     "signal_date",
     "last_seen_date",
     "deal_date",
+    "meeting_date",
     "as_of_date",
     "asof_date",
     "fetch_date",

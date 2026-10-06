@@ -2350,6 +2350,57 @@ def _migration_045_market_pulse_and_pricing_indexes(conn: Any) -> None:
         pass
 
 
+def _migration_046_morning_setups_deals_and_board_meetings(conn: Any) -> None:
+    """Create morning_block_deals and upcoming_board_meetings tables for the Morning Setups radar."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS morning_block_deals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            deal_date TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            security_name TEXT,
+            client_name TEXT NOT NULL,
+            deal_type TEXT NOT NULL,
+            transaction_type TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            trade_price REAL NOT NULL DEFAULT 0.0,
+            value_cr REAL NOT NULL DEFAULT 0.0,
+            source TEXT NOT NULL DEFAULT 'NSE',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mbd_date ON morning_block_deals (deal_date DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mbd_ticker ON morning_block_deals (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mbd_client ON morning_block_deals (client_name)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mbd_type_val ON morning_block_deals (deal_type, value_cr DESC)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_mbd_uniq ON morning_block_deals (deal_date, ticker, client_name, deal_type, transaction_type, quantity, trade_price)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS upcoming_board_meetings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            company_name TEXT,
+            meeting_date TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            impact_tier TEXT NOT NULL DEFAULT 'MEDIUM',
+            details TEXT,
+            source TEXT NOT NULL DEFAULT 'NSE',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ubm_date ON upcoming_board_meetings (meeting_date ASC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ubm_ticker ON upcoming_board_meetings (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ubm_impact ON upcoming_board_meetings (impact_tier, meeting_date ASC)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ubm_uniq ON upcoming_board_meetings (ticker, meeting_date, purpose)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2397,6 +2448,7 @@ MIGRATIONS: list[Migration] = [
     Migration(43, "043_missing_query_indexes", _migration_043_missing_query_indexes),
     Migration(44, "044_shareholding_fetch_tracking", _migration_044_shareholding_fetch_tracking),
     Migration(45, "045_market_pulse_and_pricing_indexes", _migration_045_market_pulse_and_pricing_indexes),
+    Migration(46, "046_morning_setups_deals_and_board_meetings", _migration_046_morning_setups_deals_and_board_meetings),
 ]
 
 
