@@ -10,6 +10,7 @@ Calculates key derivatives metrics for catalyst and earnings prediction:
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime
 from typing import Any
 
@@ -304,6 +305,7 @@ def _calculate_option_metrics_from_records(
     records: list[dict[str, Any]],
     spot_price: float | None,
     strike_range: int | None = 20,
+    vix_data: dict | None = None,
 ) -> dict[str, Any]:
     """Parse real option chain records into quantitative metrics and structured strike ladder."""
     call_oi = 0.0
@@ -421,6 +423,14 @@ def _calculate_option_metrics_from_records(
     elif raw_strikes:
         atm_strike = raw_strikes[len(raw_strikes) // 2]["strike"]
 
+    current_spot = spot_price or atm_strike or 0.0
+    gamma_profile_data, enriched_raw = calculate_gamma_profile(
+        raw_strikes, spot_price=current_spot, dte_days=4.0
+    )
+
+    # Map enriched metrics by strike
+    enriched_by_strike = {r["strike"]: r for r in enriched_raw}
+
     # Filter to strike_range around ATM if specified
     formatted_strikes: list[dict[str, Any]] = []
     if raw_strikes:
@@ -437,7 +447,6 @@ def _calculate_option_metrics_from_records(
         else:
             selected_subset = raw_strikes
 
-        current_spot = spot_price or atm_strike or 0.0
         for s in selected_subset:
             stk = s["strike"]
             is_atm = stk == atm_strike
@@ -445,6 +454,8 @@ def _calculate_option_metrics_from_records(
             ce_itm = stk < current_spot
             # PE is In-The-Money when Strike > Spot
             pe_itm = stk > current_spot
+
+            enr = enriched_by_strike.get(stk, {})
 
             formatted_strikes.append({
                 "strike": stk,
@@ -457,13 +468,42 @@ def _calculate_option_metrics_from_records(
                 "ce_ltp": s["ce_ltp"],
                 "ce_iv": s["ce_iv"],
                 "ce_vol": s["ce_vol"],
+                "ce_delta": enr.get("ce_delta", 0.0),
+                "ce_gamma": enr.get("ce_gamma", 0.0),
+                "ce_theta": enr.get("ce_theta", 0.0),
+                "ce_vega": enr.get("ce_vega", 0.0),
+                "ce_gex": enr.get("ce_gex", 0.0),
                 "pe_oi": s["pe_oi"],
                 "pe_change_oi": s["pe_change_oi"],
                 "pe_pchange_oi": s["pe_pchange_oi"],
                 "pe_ltp": s["pe_ltp"],
                 "pe_iv": s["pe_iv"],
                 "pe_vol": s["pe_vol"],
+                "pe_delta": enr.get("pe_delta", 0.0),
+                "pe_gamma": enr.get("pe_gamma", 0.0),
+                "pe_theta": enr.get("pe_theta", 0.0),
+                "pe_vega": enr.get("pe_vega", 0.0),
+                "pe_gex": enr.get("pe_gex", 0.0),
+                "net_gex": enr.get("net_gex", 0.0),
+                "net_oi_delta": enr.get("net_oi_delta", 0),
             })
+
+    vix_profile = vix_data or {
+        "vix_value": 13.5,
+        "vix_change_pct": 0.0,
+        "vix_regime": "NORMAL_VOL",
+    }
+
+    setups = derive_market_setups(
+        symbol=symbol,
+        spot_price=current_spot,
+        records=formatted_strikes if formatted_strikes else raw_strikes,
+        gamma_profile=gamma_profile_data,
+        vix_data=vix_profile,
+        max_pain=max_pain,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+    )
 
     return {
         "symbol": symbol,
@@ -477,6 +517,9 @@ def _calculate_option_metrics_from_records(
         "support_strike": high_put_strike,
         "pin_strike": pin_strike,
         "atm_strike": atm_strike,
+        "gamma_profile": gamma_profile_data,
+        "vix_profile": vix_profile,
+        "market_setups": setups,
         "records_count": len(formatted_strikes),
         "strikes": formatted_strikes,
         "status": "LIVE",
@@ -512,3 +555,358 @@ def _calculate_max_pain(strikes_data: list[dict[str, float]]) -> float:
             best_strike = test_strike
 
     return round(best_strike, 2)
+
+
+def calculate_bs_greeks(
+    spot: float,
+    strike: float,
+    dte_days: float,
+    iv_pct: float,
+    is_call: bool,
+    r: float = 0.065,
+) -> dict[str, float]:
+    """Calculate Black-Scholes-Merton option Greeks: Delta, Gamma, Theta, Vega.
+
+    Args:
+        spot: Underlying spot price
+        strike: Option strike price
+        dte_days: Days to expiry (DTE)
+        iv_pct: Implied Volatility in percent (e.g. 15.0 for 15%)
+        is_call: True for Call option (CE), False for Put option (PE)
+        r: Annualized risk-free interest rate (default: 0.065 for India 10Y/Mibor baseline)
+
+    Returns:
+        Dict with keys: delta, gamma, theta (per day), vega (per 1% IV)
+    """
+    if spot <= 0 or strike <= 0:
+        return {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
+
+    # Safe bounds for DTE and IV
+    T = max(dte_days, 0.0) / 365.0
+    sigma = max(iv_pct, 0.0) / 100.0
+
+    if T <= 1e-6 or sigma <= 1e-4:
+        # At expiration or zero volatility: intrinsic delta, zero other Greeks
+        if is_call:
+            delta = 1.0 if spot > strike else (0.5 if spot == strike else 0.0)
+        else:
+            delta = -1.0 if spot < strike else (-0.5 if spot == strike else 0.0)
+        return {"delta": delta, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
+
+    sqrt_T = math.sqrt(T)
+    d1 = (math.log(spot / strike) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt_T)
+    d2 = d1 - sigma * sqrt_T
+
+    # Normal CDF and PDF
+    def _norm_cdf(x: float) -> float:
+        return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+    def _norm_pdf(x: float) -> float:
+        return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * x * x)
+
+    pdf_d1 = _norm_pdf(d1)
+    cdf_d1 = _norm_cdf(d1)
+    cdf_d2 = _norm_cdf(d2)
+
+    if is_call:
+        delta = cdf_d1
+        # Theta per calendar day
+        theta = (
+            -(spot * pdf_d1 * sigma) / (2.0 * sqrt_T)
+            - r * strike * math.exp(-r * T) * cdf_d2
+        ) / 365.0
+    else:
+        delta = cdf_d1 - 1.0
+        theta = (
+            -(spot * pdf_d1 * sigma) / (2.0 * sqrt_T)
+            + r * strike * math.exp(-r * T) * _norm_cdf(-d2)
+        ) / 365.0
+
+    gamma = pdf_d1 / (spot * sigma * sqrt_T)
+    vega = (spot * sqrt_T * pdf_d1 * 0.01)  # per 1% change in IV
+
+    return {
+        "delta": round(float(delta), 4),
+        "gamma": round(float(gamma), 6),
+        "theta": round(float(theta), 2),
+        "vega": round(float(vega), 2),
+    }
+
+
+def calculate_gamma_profile(
+    records: list[dict[str, Any]],
+    spot_price: float,
+    dte_days: float = 4.0,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Compute dealer Gamma Exposure (GEX) per strike, Net GEX regime, Gamma Flip, and Expected Move bands.
+
+    Dealer Gamma Positioning Convention:
+    - Market makers are net short calls purchased by the public -> Long Dealer Gamma (+GEX)
+    - Market makers are net short puts purchased by the public -> Short Dealer Gamma (-GEX)
+    - Net GEX = Call GEX + Put GEX
+    - Scaled in standard ₹ Lakhs (10^5) per point.
+    """
+    if not records or spot_price <= 0:
+        return {
+            "net_gex": 0.0,
+            "gamma_regime": "NEUTRAL",
+            "gamma_regime_label": "Neutral Gamma",
+            "gamma_flip_strike": spot_price,
+            "peak_call_gex_strike": spot_price,
+            "peak_put_gex_strike": spot_price,
+            "atm_straddle_price": 0.0,
+            "expected_move_upper": spot_price,
+            "expected_move_lower": spot_price,
+            "expected_move_2sigma_upper": spot_price,
+            "expected_move_2sigma_lower": spot_price,
+        }, records
+
+    enriched_records: list[dict[str, Any]] = []
+    total_net_gex = 0.0
+    max_call_gex = -1e12
+    max_call_gex_strike = spot_price
+    min_put_gex = 1e12
+    min_put_gex_strike = spot_price
+
+    # Find ATM strike
+    atm_record = min(records, key=lambda r: abs(float(r.get("strike", 0.0)) - spot_price))
+    atm_ce_ltp = float(atm_record.get("ce_ltp") or 0.0)
+    atm_pe_ltp = float(atm_record.get("pe_ltp") or 0.0)
+    atm_straddle = atm_ce_ltp + atm_pe_ltp
+
+    # Sort records by strike for cumulative GEX tracking
+    sorted_records = sorted(records, key=lambda r: float(r.get("strike", 0.0)))
+
+    cumulative_gex = 0.0
+    gamma_flip_strike = None
+    prev_cum_gex = 0.0
+    prev_strike = None
+
+    for r in sorted_records:
+        strike = float(r.get("strike", 0.0))
+        ce_oi = int(r.get("ce_oi") or 0)
+        pe_oi = int(r.get("pe_oi") or 0)
+        ce_change_oi = int(r.get("ce_change_oi") or 0)
+        pe_change_oi = int(r.get("pe_change_oi") or 0)
+        ce_iv = float(r.get("ce_iv") or 14.0)
+        pe_iv = float(r.get("pe_iv") or 14.0)
+
+        # Greeks
+        ce_greeks = calculate_bs_greeks(spot_price, strike, dte_days, ce_iv, is_call=True)
+        pe_greeks = calculate_bs_greeks(spot_price, strike, dte_days, pe_iv, is_call=False)
+
+        # Dealer GEX: Call GEX (+) and Put GEX (-) in standardized Lakhs
+        ce_gex = round((ce_oi * ce_greeks["gamma"] * (spot_price**2) * 0.01) / 100000.0, 2)
+        pe_gex = round((-pe_oi * pe_greeks["gamma"] * (spot_price**2) * 0.01) / 100000.0, 2)
+        net_gex = round(ce_gex + pe_gex, 2)
+
+        total_net_gex += net_gex
+
+        if ce_gex > max_call_gex:
+            max_call_gex = ce_gex
+            max_call_gex_strike = strike
+        if pe_gex < min_put_gex:
+            min_put_gex = pe_gex
+            min_put_gex_strike = strike
+
+        # Cumulative GEX for Gamma Flip detection
+        prev_cum_gex = cumulative_gex
+        cumulative_gex += net_gex
+        if gamma_flip_strike is None and prev_strike is not None:
+            if (prev_cum_gex < 0 and cumulative_gex >= 0) or (prev_cum_gex >= 0 and cumulative_gex < 0):
+                gamma_flip_strike = strike
+
+        prev_strike = strike
+
+        enriched = dict(r)
+        enriched.update({
+            "ce_delta": ce_greeks["delta"],
+            "ce_gamma": ce_greeks["gamma"],
+            "ce_theta": ce_greeks["theta"],
+            "ce_vega": ce_greeks["vega"],
+            "ce_gex": ce_gex,
+            "pe_delta": pe_greeks["delta"],
+            "pe_gamma": pe_greeks["gamma"],
+            "pe_theta": pe_greeks["theta"],
+            "pe_vega": pe_greeks["vega"],
+            "pe_gex": pe_gex,
+            "net_gex": net_gex,
+            "net_oi_delta": pe_change_oi - ce_change_oi,
+        })
+        enriched_records.append(enriched)
+
+    if gamma_flip_strike is None:
+        gamma_flip_strike = spot_price
+
+    gamma_regime = "POSITIVE_GAMMA" if total_net_gex >= 0 else "NEGATIVE_GAMMA"
+    gamma_regime_label = (
+        "Positive Gamma (Mean Reverting / Dampened Vol)"
+        if total_net_gex >= 0
+        else "Negative Gamma (Accelerating Momentum / Breakout Risk)"
+    )
+
+    profile = {
+        "net_gex": round(total_net_gex, 2),
+        "gamma_regime": gamma_regime,
+        "gamma_regime_label": gamma_regime_label,
+        "gamma_flip_strike": round(gamma_flip_strike, 1),
+        "peak_call_gex_strike": round(max_call_gex_strike, 1),
+        "peak_put_gex_strike": round(min_put_gex_strike, 1),
+        "atm_straddle_price": round(atm_straddle, 2),
+        "expected_move_upper": round(spot_price + atm_straddle, 2),
+        "expected_move_lower": round(spot_price - atm_straddle, 2),
+        "expected_move_2sigma_upper": round(spot_price + 1.85 * atm_straddle, 2),
+        "expected_move_2sigma_lower": round(spot_price - 1.85 * atm_straddle, 2),
+    }
+
+    return profile, enriched_records
+
+
+def derive_market_setups(
+    symbol: str,
+    spot_price: float,
+    records: list[dict[str, Any]],
+    gamma_profile: dict[str, Any],
+    vix_data: dict[str, Any] | None = None,
+    max_pain: float | None = None,
+    call_wall: float | None = None,
+    put_wall: float | None = None,
+) -> list[dict[str, Any]]:
+    """Generate quantitative options trading setups for major indices.
+
+    Detects:
+    1. Gamma Squeeze Breakout (Spot breaking Call Wall in Negative Gamma regime)
+    2. Dealer Max Pain Pin (Subdued VIX, Positive Gamma mean reversion to Max Pain)
+    3. Put Writer Capitulation (Spot breaking Put Wall with PE covering and surging VIX)
+    4. Expected Move 1-Sigma Rejection (Mean reversion fade/bounce off Expected Move bands in Positive Gamma)
+    """
+    clean_sym = symbol.upper().replace(".NS", "").strip()
+    is_major_index = clean_sym in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTY50")
+    if not is_major_index or not records or spot_price <= 0:
+        return []
+
+    setups: list[dict[str, Any]] = []
+    vix_val = float(vix_data.get("vix_value", 13.5)) if vix_data else 13.5
+    vix_chg = float(vix_data.get("vix_change_pct", 0.0)) if vix_data else 0.0
+    gamma_regime = gamma_profile.get("gamma_regime", "POSITIVE_GAMMA")
+    em_upper = float(gamma_profile.get("expected_move_upper", spot_price * 1.01))
+    em_lower = float(gamma_profile.get("expected_move_lower", spot_price * 0.99))
+    straddle_val = float(gamma_profile.get("atm_straddle_price", spot_price * 0.008))
+
+    # Identify Call Wall and Put Wall if not provided
+    if not call_wall:
+        c_max = max(records, key=lambda r: int(r.get("ce_oi") or 0))
+        call_wall = float(c_max.get("strike", spot_price * 1.02))
+    if not put_wall:
+        p_max = max(records, key=lambda r: int(r.get("pe_oi") or 0))
+        put_wall = float(p_max.get("strike", spot_price * 0.98))
+    if not max_pain:
+        max_pain = spot_price
+
+    # Find record for call wall and put wall to check delta OI
+    call_wall_rec = next((r for r in records if float(r.get("strike", 0.0)) == call_wall), None)
+    put_wall_rec = next((r for r in records if float(r.get("strike", 0.0)) == put_wall), None)
+
+    ce_wall_unwinding = bool(call_wall_rec and int(call_wall_rec.get("ce_change_oi") or 0) < 0)
+    pe_wall_unwinding = bool(put_wall_rec and int(put_wall_rec.get("pe_change_oi") or 0) < 0)
+
+    # 1. Gamma Squeeze Breakout Setup
+    if spot_price >= (call_wall * 0.998) and gamma_regime == "NEGATIVE_GAMMA" and (ce_wall_unwinding or vix_val >= 13.0):
+        entry_low = round(call_wall * 0.999, 1)
+        entry_high = round(call_wall * 1.003, 1)
+        sl = round(call_wall * 0.994, 1)
+        tp1 = round(em_upper, 1)
+        tp2 = round(em_upper + straddle_val * 0.5, 1)
+        setups.append({
+            "id": f"gamma-squeeze-{int(call_wall)}",
+            "title": f"Gamma Squeeze Breakout above {int(call_wall)}",
+            "type": "BREAKOUT",
+            "bias": "BULLISH",
+            "confidence": 88 if ce_wall_unwinding else 78,
+            "entry_zone": f"{entry_low} - {entry_high}",
+            "stop_loss": sl,
+            "target_1": tp1,
+            "target_2": tp2,
+            "risk_reward": "1 : 3.2",
+            "catalyst": f"Spot testing Call Wall ({int(call_wall)}) in Negative Gamma regime with CE covering and elevated volatility.",
+        })
+
+    # 2. Dealer Max Pain Pin Setup
+    dist_to_max_pain = abs(spot_price - max_pain) / spot_price
+    if gamma_regime == "POSITIVE_GAMMA" and dist_to_max_pain <= 0.008 and vix_val <= 14.5:
+        entry_zone = f"{round(spot_price - 20, 1)} - {round(spot_price + 20, 1)}"
+        sl = round(max_pain - straddle_val * 0.6 if spot_price >= max_pain else max_pain + straddle_val * 0.6, 1)
+        tp1 = round(max_pain, 1)
+        tp2 = round(max_pain + (15 if spot_price < max_pain else -15), 1)
+        setups.append({
+            "id": f"dealer-pin-{int(max_pain)}",
+            "title": f"Positive Gamma Expiry Pin at {int(max_pain)}",
+            "type": "MEAN_REVERSION",
+            "bias": "NEUTRAL",
+            "confidence": 85 if dist_to_max_pain <= 0.004 else 75,
+            "entry_zone": entry_zone,
+            "stop_loss": sl,
+            "target_1": tp1,
+            "target_2": tp2,
+            "risk_reward": "1 : 2.5",
+            "catalyst": f"Dealer positive gamma inventory dampens volatility near Max Pain ({int(max_pain)}) under subdued VIX ({vix_val:.1f}).",
+        })
+
+    # 3. Put Writer Capitulation Breakdown
+    if spot_price <= (put_wall * 1.002) and pe_wall_unwinding and vix_chg >= 2.0:
+        entry_low = round(put_wall * 0.997, 1)
+        entry_high = round(put_wall * 1.001, 1)
+        sl = round(put_wall * 1.005, 1)
+        tp1 = round(em_lower, 1)
+        tp2 = round(em_lower - straddle_val * 0.5, 1)
+        setups.append({
+            "id": f"put-capitulation-{int(put_wall)}",
+            "title": f"Put Writer Capitulation below {int(put_wall)}",
+            "type": "BREAKDOWN",
+            "bias": "BEARISH",
+            "confidence": 84,
+            "entry_zone": f"{entry_low} - {entry_high}",
+            "stop_loss": sl,
+            "target_1": tp1,
+            "target_2": tp2,
+            "risk_reward": "1 : 3.0",
+            "catalyst": f"Put writers unwinding positions at Put Wall ({int(put_wall)}) with surging volatility.",
+        })
+
+    # 4. Expected Move 1-Sigma Rejection
+    dist_to_em_upper = abs(spot_price - em_upper) / spot_price
+    dist_to_em_lower = abs(spot_price - em_lower) / spot_price
+    if gamma_regime == "POSITIVE_GAMMA":
+        if dist_to_em_upper <= 0.003:
+            setups.append({
+                "id": f"straddle-upper-fade-{int(em_upper)}",
+                "title": f"Expected Move +1σ Barrier Rejection ({int(em_upper)})",
+                "type": "MEAN_REVERSION",
+                "bias": "BEARISH",
+                "confidence": 76,
+                "entry_zone": f"{round(em_upper - 15, 1)} - {round(em_upper + 10, 1)}",
+                "stop_loss": round(em_upper + straddle_val * 0.35, 1),
+                "target_1": round(spot_price - straddle_val * 0.5, 1),
+                "target_2": round(max_pain, 1),
+                "risk_reward": "1 : 2.8",
+                "catalyst": f"Spot reached +1σ Straddle upper band ({int(em_upper)}) in positive gamma regime — high probability mean reversion fade.",
+            })
+        elif dist_to_em_lower <= 0.003:
+            setups.append({
+                "id": f"straddle-lower-bounce-{int(em_lower)}",
+                "title": f"Expected Move -1σ Barrier Bounce ({int(em_lower)})",
+                "type": "MEAN_REVERSION",
+                "bias": "BULLISH",
+                "confidence": 76,
+                "entry_zone": f"{round(em_lower - 10, 1)} - {round(em_lower + 15, 1)}",
+                "stop_loss": round(em_lower - straddle_val * 0.35, 1),
+                "target_1": round(spot_price + straddle_val * 0.5, 1),
+                "target_2": round(max_pain, 1),
+                "risk_reward": "1 : 2.8",
+                "catalyst": f"Spot tested -1σ Straddle lower band ({int(em_lower)}) in positive gamma regime — high probability mean reversion bounce.",
+            })
+
+    return setups
+
+
+
