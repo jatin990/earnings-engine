@@ -9,7 +9,8 @@ const ZEPTO_ALL_TABS = [
     'employees',
     'attendance',
     'utilization',
-    'loss',
+    'dq-loss',
+    'shrinkage',
     'scorecard',
     'income',
     'expenses',
@@ -160,7 +161,9 @@ const zeptoApp = {
         else if (tabId === 'employees') this.loadEmployees();
         else if (tabId === 'attendance') this.loadAttendanceData();
         else if (tabId === 'utilization') this.loadUtilization();
-        else if (tabId === 'loss') this.loadLoss();
+        else if (tabId === 'dq-loss') this.loadDqLoss();
+        else if (tabId === 'shrinkage') this.loadShrinkage();
+        else if (tabId === 'loss') this.loadDqLoss(); // legacy fallback
         else if (tabId === 'scorecard') this.loadScorecard();
         else if (tabId === 'income') this.loadIncome();
         else if (tabId === 'expenses') this.loadExpenses();
@@ -455,6 +458,12 @@ const zeptoApp = {
         const dashLabel = document.getElementById('dashSelectedMonthLabel');
         if (dashLabel) dashLabel.textContent = scopeText;
 
+        const dqLossScope = document.getElementById('dqLossActiveScopeBadge');
+        if (dqLossScope) dqLossScope.textContent = scopeText;
+
+        const shrinkageScope = document.getElementById('shrinkageActiveScopeBadge');
+        if (shrinkageScope) shrinkageScope.textContent = scopeText;
+
         const lossScope = document.getElementById('lossActiveScopeBadge');
         if (lossScope) lossScope.textContent = scopeText;
 
@@ -483,7 +492,9 @@ const zeptoApp = {
         // Reload data for currently active tab
         if (this.activeTab === 'dashboard') this.loadOperationsDashboard();
         else if (this.activeTab === 'attendance') this.loadAttendanceData();
-        else if (this.activeTab === 'loss') this.loadLoss();
+        else if (this.activeTab === 'dq-loss') this.loadDqLoss();
+        else if (this.activeTab === 'shrinkage') this.loadShrinkage();
+        else if (this.activeTab === 'loss') this.loadDqLoss();
         else if (this.activeTab === 'scorecard') this.loadScorecard();
         else if (this.activeTab === 'utilization') this.loadUtilization();
         else if (this.activeTab === 'income') this.loadIncome();
@@ -4959,7 +4970,12 @@ const zeptoApp = {
             await this.loadOverview();
             if (this.currentTab === 'attendance') await this.loadAttendanceData();
             if (this.currentTab === 'metrics') await this.loadMetrics();
-            if (this.currentTab === 'loss') await this.loadLoss();
+            if (this.currentTab === 'dq-loss') await this.loadDqLoss();
+            if (this.currentTab === 'shrinkage') await this.loadShrinkage();
+            if (this.currentTab === 'loss') {
+                await this.loadDqLoss();
+                await this.loadShrinkage();
+            }
         } catch (err) {
             this.showToast(`Error ingesting emails: ${err.message}`, true);
         } finally {
@@ -5008,7 +5024,12 @@ const zeptoApp = {
             await this.loadOverview();
             if (this.currentTab === 'attendance') await this.loadAttendanceData();
             if (this.currentTab === 'metrics') await this.loadMetrics();
-            if (this.currentTab === 'loss') await this.loadLoss();
+            if (this.currentTab === 'dq-loss') await this.loadDqLoss();
+            if (this.currentTab === 'shrinkage') await this.loadShrinkage();
+            if (this.currentTab === 'loss') {
+                await this.loadDqLoss();
+                await this.loadShrinkage();
+            }
         } catch (err) {
             this.showToast(`Error during purge & reprocess: ${err.message}`, true);
         } finally {
