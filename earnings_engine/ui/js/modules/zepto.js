@@ -59,6 +59,9 @@ const zeptoApp = {
     currentEmpId: null,
     currentStaffDrawerEmpId: null,
     currentStaffDrawerMonth: null,
+    _activeShrinkageDate: null,
+    _activeShrinkageCategory: null,
+    _currentShrinkageRecords: [],
 
     async init() {
         // Hydrate partner dropdowns immediately with defaults
@@ -5665,6 +5668,629 @@ const zeptoApp = {
     },
 
     // -----------------------------------------------------------------------
+    // Defect Quality (DQ) Loss & Spoilage Tab Logic (Dedicated)
+    // -----------------------------------------------------------------------
+
+    _activeDqLossDate: null,
+    _currentDqLossRecords: [],
+
+    async loadDqLoss() {
+        const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : 'ALL';
+        const lossType = document.getElementById('dqLossTypeFilter')?.value || 'ALL';
+        const category = document.getElementById('dqCategoryFilter')?.value || 'ALL';
+        const date = this._activeDqLossDate || null;
+
+        const params = new URLSearchParams();
+        if (month && month !== 'ALL') params.append('month', month);
+        if (lossType && lossType !== 'ALL') params.append('loss_type', lossType);
+        if (category && category !== 'ALL') params.append('category', category);
+        if (date) params.append('date', date);
+
+        const scopeBadge = document.getElementById('dqLossActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = date ? `${date}` : month;
+
+        try {
+            const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.available_months && Array.isArray(data.available_months)) {
+                this.updateAvailableMonths(data.available_months);
+            }
+            this.renderDqLoss(data);
+        } catch (err) {
+            console.error('[ZEPTO-DQ-LOSS] Error loading DQ loss summary:', err);
+        }
+    },
+
+    renderDqLoss(data) {
+        if (!data) return;
+
+        // 1. Synchronize Category Filter Options
+        const catSelect = document.getElementById('dqCategoryFilter');
+        if (catSelect && data.category_breakdown) {
+            const currentCat = catSelect.value || 'ALL';
+            const cats = data.category_breakdown.map(c => c.category);
+            const existingCats = Array.from(catSelect.options).map(o => o.value);
+            const needsCatUpdate = cats.some(c => !existingCats.includes(c)) || existingCats.length <= 1;
+
+            if (needsCatUpdate) {
+                let catHtml = '<option value="ALL">All Categories</option>';
+                cats.forEach(c => {
+                    catHtml += `<option value="${c}">${c.replace(/_/g, ' ')}</option>`;
+                });
+                catSelect.innerHTML = catHtml;
+                catSelect.value = currentCat;
+            }
+        }
+
+        // 2. Compute Defect Metrics for KPI Cards
+        const totalLoss = data.total_loss_amount || 0;
+        const dqLoss = data.dq_loss_total || 0;
+        const spoilLoss = data.spoilage_total || 0;
+
+        // Compute transit damage amount from records if present
+        const records = data.records || [];
+        const transitLoss = records
+            .filter(r => (r.loss_type || '').toUpperCase() === 'TRANSIT_DAMAGE')
+            .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount) || 0), 0);
+
+        const totalIncidents = data.total_loss_records || records.length || 0;
+        const uniqueSkus = data.unique_skus_count ?? data.total_skus_affected ?? 0;
+        const totalUnits = data.total_units_affected ?? data.total_sku_count ?? 0;
+
+        // Update 5 KPI Cards
+        const totAmtEl = document.getElementById('dqLossTotalAmount');
+        const countBadge = document.getElementById('dqLossTotalCountBadge');
+        const skuCountEl = document.getElementById('dqLossTotalSkuCount');
+        const dqAmtEl = document.getElementById('dqLossDqAmount');
+        const dqShareEl = document.getElementById('dqLossDqShareBadge');
+        const spoilAmtEl = document.getElementById('dqLossSpoilageAmount');
+        const spoilShareEl = document.getElementById('dqLossSpoilageShareBadge');
+        const transitAmtEl = document.getElementById('dqLossTransitAmount');
+        const transitShareEl = document.getElementById('dqLossTransitShareBadge');
+        const avgSevEl = document.getElementById('dqLossAvgIncidentValue');
+        const dailyVelEl = document.getElementById('dqLossDailyVelocity');
+
+        if (totAmtEl) totAmtEl.textContent = this.formatCurrency(totalLoss);
+        if (countBadge) countBadge.textContent = `${totalIncidents.toLocaleString('en-IN')} Incidents`;
+        if (skuCountEl) {
+            if (uniqueSkus === totalUnits || totalUnits === 0) {
+                skuCountEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} SKUs`;
+            } else {
+                skuCountEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} unique (${totalUnits.toLocaleString('en-IN')} units)`;
+            }
+        }
+
+        if (dqAmtEl) dqAmtEl.textContent = this.formatCurrency(dqLoss);
+        if (dqShareEl) dqShareEl.textContent = totalLoss > 0 ? `${((dqLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
+
+        if (spoilAmtEl) spoilAmtEl.textContent = this.formatCurrency(spoilLoss);
+        if (spoilShareEl) spoilShareEl.textContent = totalLoss > 0 ? `${((spoilLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
+
+        if (transitAmtEl) transitAmtEl.textContent = this.formatCurrency(transitLoss);
+        if (transitShareEl) transitShareEl.textContent = totalLoss > 0 ? `${((transitLoss / totalLoss) * 100).toFixed(1)}%` : '0.0%';
+
+        if (avgSevEl) {
+            const avgCost = totalIncidents > 0 ? totalLoss / totalIncidents : 0;
+            avgSevEl.textContent = this.formatCurrency(avgCost);
+        }
+
+        if (dailyVelEl) {
+            const dayCount = (data.daily_trends || []).length || 1;
+            const velocity = (totalIncidents / Math.max(1, dayCount)).toFixed(1);
+            dailyVelEl.textContent = `${velocity}/day`;
+        }
+
+        // 3. Render SVG Analytics Charts
+        this.renderDqCategoryPieChart(data);
+        this.renderDqTypePieChart(data);
+        this.renderDqDailyGraph(data);
+
+        // 4. Render Category Matrix Breakdown Table
+        const catTableBody = document.getElementById('dqCategoryMatrixTableBody');
+        const catTotalCountBadge = document.getElementById('dqCategoryTotalCountBadge');
+        const cats = data.category_breakdown || [];
+
+        if (catTotalCountBadge) catTotalCountBadge.textContent = `${cats.length} Categories`;
+
+        if (catTableBody) {
+            if (cats.length === 0) {
+                catTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No defect loss categorized for the selected criteria.</td></tr>`;
+            } else {
+                catTableBody.innerHTML = cats.map(c => {
+                    const pct = totalLoss > 0 ? ((c.total_amount || 0) / totalLoss * 100).toFixed(1) : '0.0';
+                    const isOthers = c.category === 'OTHERS' || c.is_composite;
+                    const dSkus = c.distinct_skus ?? c.total_skus ?? 0;
+                    const tUnits = c.total_units ?? c.total_skus ?? 0;
+                    const skuDisplay = dSkus === tUnits ? `${dSkus.toLocaleString('en-IN')}` : `${dSkus.toLocaleString('en-IN')} (${tUnits.toLocaleString('en-IN')}u)`;
+                    const dqAmt = c.dq_loss_amount || 0;
+                    const spoilTransitAmt = (c.spoilage_amount || 0) + (c.transit_amount || 0);
+
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition ${isOthers ? 'bg-white/[0.015] border-t border-white/10 font-medium' : ''}">
+                            <td class="py-2.5 px-3">
+                                <div class="font-bold ${isOthers ? 'text-slate-300 flex items-center gap-1.5' : 'text-white'}">
+                                    ${isOthers ? '<span class="text-slate-400">📦</span> Others (Below Top 10)' : c.category.replace(/_/g, ' ')}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">
+                                ${Math.abs(dqAmt) > 0 ? this.formatCurrency(dqAmt) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-300">
+                                ${Math.abs(spoilTransitAmt) > 0 ? this.formatCurrency(spoilTransitAmt) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-black text-rose-400">
+                                ${this.formatCurrency(c.total_amount || 0)}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 bg-black/40 rounded-full h-1.5 overflow-hidden">
+                                        <div class="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full" style="width: ${Math.min(100, Math.max(0, parseFloat(pct)))}%;"></div>
+                                    </div>
+                                    <span class="text-[10px] font-mono text-slate-400 w-10 text-right">${pct}%</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${skuDisplay}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-400">${(c.incident_count || 0).toLocaleString('en-IN')}</td>
+                            <td class="py-2.5 px-3 text-center">
+                                ${isOthers ? '<span class="text-slate-600 text-[10px]">—</span>' : `
+                                    <button
+                                        type="button"
+                                        onclick="zeptoApp.drilldownDqCategory('${c.category}')"
+                                        class="px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-bold transition"
+                                        title="Filter defect records by ${c.category}"
+                                    >
+                                        Filter
+                                    </button>
+                                `}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 5. Cache records & Filter/Render Itemized Table
+        this._currentDqLossRecords = records;
+        this.filterDqLossRecords();
+    },
+
+    filterDqLossRecords() {
+        const records = this._currentDqLossRecords || [];
+        const search = (document.getElementById('dqLossSearchInput')?.value || '').trim().toLowerCase();
+        const tbody = document.getElementById('dqLossTableBody');
+        const countBadge = document.getElementById('dqLossRecordCountBadge');
+
+        const filtered = search
+            ? records.filter(r => {
+                const notes = (r.notes || '').toLowerCase();
+                const sku = (r.sku_id || '').toLowerCase();
+                const item = (r.item_name || '').toLowerCase();
+                const cat = (r.category || '').toLowerCase();
+                const type = (r.loss_type || '').toLowerCase();
+                const store = (r.store_name || '').toLowerCase();
+                const date = (r.record_date || '').toLowerCase();
+                return notes.includes(search) || sku.includes(search) || item.includes(search) || cat.includes(search) || type.includes(search) || store.includes(search) || date.includes(search);
+            })
+            : records;
+
+        if (countBadge) countBadge.textContent = `${filtered.length.toLocaleString('en-IN')} entries`;
+        if (!tbody) return;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No matching stored defect records found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(r => {
+            let typeBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+            if (r.loss_type === 'DQ_LOSS') typeBadgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30 cursor-pointer hover:bg-amber-500/25';
+            else if (r.loss_type === 'SPOILAGE') typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 cursor-pointer hover:bg-emerald-500/25';
+            else if (r.loss_type === 'TRANSIT_DAMAGE') typeBadgeClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30 cursor-pointer hover:bg-sky-500/25';
+
+            const skuDisplay = r.sku_id
+                ? `<span class="font-mono text-sky-300 font-bold">${r.sku_id}</span>${r.item_name ? `<span class="text-slate-400 ml-1">· ${r.item_name}</span>` : ''}`
+                : (r.item_name || '<span class="text-slate-500 italic">Unspecified</span>');
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">
+                        <button type="button" onclick="zeptoApp.drilldownDqDate('${r.record_date}')" class="hover:text-sky-300 hover:underline transition text-left font-mono">
+                            ${r.record_date}
+                        </button>
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-400 font-mono text-[11px] whitespace-nowrap">${r.store_name || 'JMU-Sainik Colony'}</td>
+                    <td class="py-2 px-2.5">
+                        <button type="button" onclick="zeptoApp.drilldownDqType('${r.loss_type}')" class="px-1.5 py-0.5 rounded text-[10px] font-bold border font-mono ${typeBadgeClass}">
+                            ${r.loss_type}
+                        </button>
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-300 font-medium">
+                        <button type="button" onclick="zeptoApp.drilldownDqCategory('${r.category || 'GENERAL'}')" class="hover:text-amber-300 hover:underline transition text-left">
+                            ${(r.category || 'GENERAL').replace(/_/g, ' ')}
+                        </button>
+                    </td>
+                    <td class="py-2 px-2.5 text-xs text-slate-200 max-w-[200px] truncate" title="${r.sku_id ? `SKU: ${r.sku_id}` : ''} ${r.item_name || ''}">${skuDisplay}</td>
+                    <td class="py-2 px-2.5 text-right font-mono text-slate-300">${(r.sku_count || 0).toLocaleString('en-IN')}</td>
+                    <td class="py-2 px-2.5 text-right font-mono font-bold text-rose-400">${this.formatCurrency(Math.abs(r.amount || 0))}</td>
+                    <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-xs truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
+                    <td class="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">${r.source_email_id ? r.source_email_id.substring(0, 12) + '...' : 'Direct Upload'}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    exportDqLossCsv() {
+        const records = this._currentDqLossRecords || [];
+        if (records.length === 0) {
+            this.showToast('⚠️ No defect records available to export', true);
+            return;
+        }
+
+        const headers = ['Record Date', 'Store Name', 'Defect Type', 'Category', 'SKU ID', 'Item Name', 'Units', 'Loss Amount (INR)', 'Notes / Reason', 'Source Email ID'];
+        const csvRows = [headers.join(',')];
+
+        records.forEach(r => {
+            const row = [
+                `"${r.record_date || ''}"`,
+                `"${r.store_name || ''}"`,
+                `"${r.loss_type || ''}"`,
+                `"${(r.category || '').replace(/"/g, '""')}"`,
+                `"${(r.sku_id || '').replace(/"/g, '""')}"`,
+                `"${(r.item_name || '').replace(/"/g, '""')}"`,
+                r.sku_count || 0,
+                r.amount || 0,
+                `"${(r.notes || '').replace(/"/g, '""')}"`,
+                `"${r.source_email_id || ''}"`,
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `zepto_dq_defect_records_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showToast(`✅ Exported ${records.length} defect records to CSV`);
+    },
+
+    async handleDqLossFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            this.showToast('⏳ Uploading and parsing DQ loss & defect report...');
+            const res = await fetch('/api/v1/zepto/loss/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to parse DQ loss report');
+
+            this.showToast(`✅ Imported ${data.saved_count || data.total_records || 0} defect incident records for ${data.store_name || 'Dark Store'}`);
+            await this.loadDqLoss();
+        } catch (err) {
+            this.showToast('⚠️ DQ Loss report upload error: ' + err.message, true);
+        } finally {
+            e.target.value = '';
+        }
+    },
+
+    selectDqLossCategory(cat) {
+        this.drilldownDqCategory(cat);
+    },
+
+    drilldownDqDate(dateStr) {
+        this._activeDqLossDate = dateStr;
+
+        const banner = document.getElementById('dqLossDrilldownBanner');
+        const badgeEl = document.getElementById('dqLossDrilldownTypeBadge');
+        const valueEl = document.getElementById('dqLossDrilldownValueText');
+        const metricsEl = document.getElementById('dqLossDrilldownMetricsText');
+        if (banner) banner.classList.remove('hidden');
+        if (badgeEl) badgeEl.textContent = 'Date';
+        if (valueEl) valueEl.textContent = dateStr;
+        if (metricsEl) metricsEl.textContent = '(Filtered by incident date)';
+
+        this.loadDqLoss();
+    },
+
+    drilldownDqType(type) {
+        const typeSelect = document.getElementById('dqLossTypeFilter');
+        if (typeSelect) typeSelect.value = type;
+
+        const banner = document.getElementById('dqLossDrilldownBanner');
+        const badgeEl = document.getElementById('dqLossDrilldownTypeBadge');
+        const valueEl = document.getElementById('dqLossDrilldownValueText');
+        const metricsEl = document.getElementById('dqLossDrilldownMetricsText');
+        if (banner) banner.classList.remove('hidden');
+        if (badgeEl) badgeEl.textContent = 'Defect Type';
+        if (valueEl) valueEl.textContent = type;
+        if (metricsEl) metricsEl.textContent = '(Filtered by defect classification)';
+
+        this.loadDqLoss();
+    },
+
+    drilldownDqCategory(cat) {
+        const catSelect = document.getElementById('dqCategoryFilter');
+        if (catSelect) catSelect.value = cat;
+
+        const banner = document.getElementById('dqLossDrilldownBanner');
+        const badgeEl = document.getElementById('dqLossDrilldownTypeBadge');
+        const valueEl = document.getElementById('dqLossDrilldownValueText');
+        const metricsEl = document.getElementById('dqLossDrilldownMetricsText');
+        if (banner) banner.classList.remove('hidden');
+        if (badgeEl) badgeEl.textContent = 'Category';
+        if (valueEl) valueEl.textContent = cat.replace(/_/g, ' ');
+        if (metricsEl) metricsEl.textContent = '(Filtered by department)';
+
+        this.loadDqLoss();
+    },
+
+    clearDqLossDrilldown() {
+        this._activeDqLossDate = null;
+        const catSelect = document.getElementById('dqCategoryFilter');
+        if (catSelect) catSelect.value = 'ALL';
+        const typeSelect = document.getElementById('dqLossTypeFilter');
+        if (typeSelect) typeSelect.value = 'ALL';
+
+        const banner = document.getElementById('dqLossDrilldownBanner');
+        if (banner) banner.classList.add('hidden');
+
+        this.loadDqLoss();
+    },
+
+    renderDqCategoryPieChart(data) {
+        const container = document.getElementById('dqCategoryPieContainer');
+        const badge = document.getElementById('dqCategoryPieBadge');
+        const cats = data.category_breakdown || [];
+        const total = data.total_loss_amount || cats.reduce((sum, c) => sum + (c.total_amount || 0), 0);
+
+        if (badge) badge.textContent = `${cats.length} Categories`;
+        if (!container) return;
+
+        if (cats.length === 0 || total <= 0) {
+            container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No categorized defect data for chart.</div>';
+            return;
+        }
+
+        const colors = ['#f43f5e', '#fbbf24', '#a855f7', '#38bdf8', '#34d399', '#fb923c', '#e879f9', '#94a3b8', '#818cf8', '#f87171'];
+        let currentAngle = 0;
+
+        const slices = cats.slice(0, 6).map((c, idx) => {
+            const amt = c.total_amount || 0;
+            const pct = total > 0 ? (amt / total) : 0;
+            const angleDelta = pct * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleDelta;
+            currentAngle = endAngle;
+
+            const pathD = this.describeDonutArc(90, 90, 75, 48, startAngle, endAngle);
+            const color = colors[idx % colors.length];
+
+            return {
+                ...c,
+                color,
+                pathD,
+                pct: (pct * 100).toFixed(1),
+            };
+        });
+
+        const svgMarkup = `
+            <div class="flex flex-col sm:flex-row items-center gap-4 py-1">
+                <div class="relative w-44 h-44 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 180 180" class="w-full h-full transform -rotate-0 drop-shadow-md">
+                        ${slices.map(s => `
+                            <path
+                                d="${s.pathD}"
+                                fill="${s.color}"
+                                class="transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-[1.03] origin-center"
+                                onclick="zeptoApp.drilldownDqCategory('${s.category}')"
+                            >
+                                <title>${s.category}: ${this.formatCurrency(s.total_amount)} (${s.pct}%) - Click to filter</title>
+                            </path>
+                        `).join('')}
+                    </svg>
+                    <!-- Center Hole Summary -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-[10px] text-slate-400 font-mono">Defects</span>
+                        <span class="text-xs font-mono font-black text-rose-400">${this.formatCurrency(total)}</span>
+                    </div>
+                </div>
+
+                <!-- Legend & Drilldown Triggers -->
+                <div class="flex-1 w-full space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                    ${slices.map(s => `
+                        <div
+                            onclick="zeptoApp.drilldownDqCategory('${s.category}')"
+                            class="flex items-center justify-between p-1.5 rounded bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition text-[11px]"
+                            title="Click to drill down into ${s.category}"
+                        >
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${s.color};"></span>
+                                <span class="font-medium text-slate-200 truncate">${s.category.replace(/_/g, ' ')}</span>
+                            </div>
+                            <div class="flex items-center gap-2 font-mono flex-shrink-0">
+                                <span class="text-slate-400 text-[10px]">${s.pct}%</span>
+                                <span class="font-bold text-white">${this.formatCurrency(s.total_amount)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = svgMarkup;
+    },
+
+    renderDqTypePieChart(data) {
+        const container = document.getElementById('dqTypePieContainer');
+        const badge = document.getElementById('dqTypePieBadge');
+        const total = data.total_loss_amount || 0;
+        const dq = data.dq_loss_total || 0;
+        const spoil = data.spoilage_total || 0;
+
+        const records = data.records || [];
+        const transit = records
+            .filter(r => (r.loss_type || '').toUpperCase() === 'TRANSIT_DAMAGE')
+            .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount) || 0), 0);
+
+        const typeItems = [
+            { type: 'DQ_LOSS', label: 'DQ Loss (Packaging/Picking)', amount: dq, color: '#fbbf24' },
+            { type: 'SPOILAGE', label: 'Spoilage & Decay', amount: spoil, color: '#34d399' },
+            { type: 'TRANSIT_DAMAGE', label: 'Transit Damage', amount: transit, color: '#38bdf8' },
+        ].filter(t => t.amount > 0);
+
+        if (badge) badge.textContent = `${typeItems.length} Types`;
+        if (!container) return;
+
+        if (typeItems.length === 0 || total <= 0) {
+            container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No defect classification data.</div>';
+            return;
+        }
+
+        let currentAngle = 0;
+        const slices = typeItems.map(t => {
+            const pct = total > 0 ? (t.amount / total) : 0;
+            const angleDelta = pct * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleDelta;
+            currentAngle = endAngle;
+
+            const pathD = this.describeDonutArc(90, 90, 75, 48, startAngle, endAngle);
+
+            return {
+                ...t,
+                pathD,
+                pct: (pct * 100).toFixed(1),
+            };
+        });
+
+        const svgMarkup = `
+            <div class="flex flex-col sm:flex-row items-center gap-4 py-1">
+                <div class="relative w-44 h-44 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 180 180" class="w-full h-full drop-shadow-md">
+                        ${slices.map(s => `
+                            <path
+                                d="${s.pathD}"
+                                fill="${s.color}"
+                                class="transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-[1.03] origin-center"
+                                onclick="zeptoApp.drilldownDqType('${s.type}')"
+                            >
+                                <title>${s.label}: ${this.formatCurrency(s.amount)} (${s.pct}%) - Click to filter</title>
+                            </path>
+                        `).join('')}
+                    </svg>
+                    <!-- Center Hole Summary -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-[10px] text-slate-400 font-mono">Defects</span>
+                        <span class="text-xs font-mono font-black text-amber-300">${this.formatCurrency(total)}</span>
+                    </div>
+                </div>
+
+                <!-- Legend & Drilldown Triggers -->
+                <div class="flex-1 w-full space-y-2">
+                    ${slices.map(s => `
+                        <div
+                            onclick="zeptoApp.drilldownDqType('${s.type}')"
+                            class="p-2 rounded bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition text-[11px]"
+                            title="Click to drill down into ${s.label}"
+                        >
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${s.color};"></span>
+                                    <span class="font-bold text-slate-200">${s.label}</span>
+                                </div>
+                                <span class="font-mono font-bold text-white">${this.formatCurrency(s.amount)}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                                <span>Share of Defect Loss</span>
+                                <span class="font-bold text-amber-300">${s.pct}%</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = svgMarkup;
+    },
+
+    renderDqDailyGraph(data) {
+        const dayContainer = document.getElementById('dqDailyGraphContainer');
+        const dayBadge = document.getElementById('dqDailyGraphBadge');
+        const dailyData = data.daily_trends || [];
+
+        if (dayBadge) dayBadge.textContent = `${dailyData.length} Day${dailyData.length === 1 ? '' : 's'}`;
+        if (!dayContainer) return;
+
+        if (dailyData.length === 0) {
+            dayContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No daily timeline defect records for the selected filters.</div>';
+            return;
+        }
+
+        const maxDayLoss = Math.max(...dailyData.map(d => d.total_loss || 0), 50);
+        dayContainer.innerHTML = `
+            <div class="w-full flex flex-col justify-between py-1">
+                <div class="flex items-end gap-1.5 h-28 pt-2 px-1 border-b border-white/10 overflow-x-auto custom-scrollbar">
+                    ${dailyData.map(d => {
+                        const tot = d.total_loss || 0;
+                        const barHeight = Math.max(6, Math.min(100, Math.round((tot / maxDayLoss) * 100)));
+                        const dateLabel = d.date.slice(8);
+                        const isPeak = tot === maxDayLoss && tot > 0;
+
+                        return `
+                            <div
+                                class="flex-1 min-w-[20px] max-w-[36px] flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                                onclick="zeptoApp.drilldownDqDate('${d.date}')"
+                                title="${d.date}: ${this.formatCurrency(tot)} (${d.item_count} records) - Click to drill down"
+                            >
+                                <!-- Hover Tooltip -->
+                                <div class="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
+                                    <div class="px-2 py-1 bg-slate-900 border border-white/20 rounded shadow-xl text-[10px] whitespace-nowrap font-mono text-center">
+                                        <div class="font-bold text-white">${d.date}</div>
+                                        <div class="text-rose-400 font-extrabold">${this.formatCurrency(tot)}</div>
+                                        <div class="text-slate-400 text-[9px]">${d.item_count} incidents · Click to filter</div>
+                                    </div>
+                                    <div class="w-1.5 h-1.5 bg-slate-900 border-r border-b border-white/20 rotate-45 -mt-1"></div>
+                                </div>
+
+                                <!-- Bar Element -->
+                                <div
+                                    style="height: ${barHeight}%;"
+                                    class="w-full rounded-t transition-all duration-300 group-hover:brightness-125 ${
+                                        tot === 0
+                                            ? 'bg-slate-700/40'
+                                            : isPeak
+                                                ? 'bg-gradient-to-t from-rose-600 to-amber-400 animate-pulse'
+                                                : 'bg-gradient-to-t from-rose-500/80 to-amber-400/80'
+                                    }"
+                                ></div>
+
+                                <!-- Date Label -->
+                                <span class="text-[9px] font-mono text-slate-400 mt-1 group-hover:text-white transition">
+                                    ${dateLabel}
+                                </span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1.5 px-1">
+                    <span>← ${dailyData[0]?.date || ''}</span>
+                    <span class="text-slate-400">Peak: <strong class="text-rose-400">${this.formatCurrency(maxDayLoss)}</strong></span>
+                    <span>${dailyData[dailyData.length - 1]?.date || ''} →</span>
+                </div>
+            </div>
+        `;
+    },
+
+    // -----------------------------------------------------------------------
     // Loss, Quality & Shrinkage Tab Logic (Redesigned with Drilldowns & SVG Charts)
     // -----------------------------------------------------------------------
 
@@ -6461,6 +7087,596 @@ const zeptoApp = {
         } finally {
             e.target.value = '';
         }
+    },
+
+    // -----------------------------------------------------------------------
+    // Inventory Shrinkage & Cycle Count Audit Reconciliation Tab Logic
+    // -----------------------------------------------------------------------
+
+    async loadShrinkage() {
+        const month = this.currentGlobalMonth !== 'ALL' ? this.currentGlobalMonth : 'ALL';
+        const category = document.getElementById('shrinkageCategoryFilter')?.value || 'ALL';
+        const date = this._activeShrinkageDate || null;
+
+        const params = new URLSearchParams();
+        params.append('loss_type', 'SHRINKAGE');
+        if (month && month !== 'ALL') params.append('month', month);
+        if (category && category !== 'ALL') params.append('category', category);
+        if (date) {
+            params.append('start_date', date);
+            params.append('end_date', date);
+        }
+
+        const scopeBadge = document.getElementById('shrinkageActiveScopeBadge');
+        if (scopeBadge) scopeBadge.textContent = date ? `${date}` : month;
+
+        try {
+            const res = await fetch(`/api/v1/zepto/loss/summary?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.available_months && Array.isArray(data.available_months)) {
+                this.updateAvailableMonths(data.available_months);
+            }
+            this.renderShrinkage(data);
+        } catch (err) {
+            console.error('[ZEPTO-SHRINKAGE] Error loading shrinkage summary:', err);
+        }
+    },
+
+    renderShrinkage(data) {
+        if (!data) return;
+
+        // 1. Synchronize Category Filter Options
+        const catSelect = document.getElementById('shrinkageCategoryFilter');
+        if (catSelect && data.category_breakdown) {
+            const currentCat = catSelect.value || 'ALL';
+            const cats = data.category_breakdown.map(c => c.category);
+            const existingCats = Array.from(catSelect.options).map(o => o.value);
+            const needsCatUpdate = cats.some(c => !existingCats.includes(c)) || existingCats.length <= 1;
+
+            if (needsCatUpdate) {
+                let catHtml = '<option value="ALL">All Departments</option>';
+                cats.forEach(c => {
+                    catHtml += `<option value="${c}">${c.replace(/_/g, ' ')}</option>`;
+                });
+                catSelect.innerHTML = catHtml;
+                catSelect.value = currentCat;
+            }
+        }
+
+        // 2. Update 5 KPI Metric Cards
+        const netAmtEl = document.getElementById('shrinkageNetAmount');
+        const netBadge = document.getElementById('shrinkageNetBadge');
+        const totalRowsEl = document.getElementById('shrinkageTotalRecordsCount');
+        const netUnitsBadge = document.getElementById('shrinkageNetUnitsBadge');
+        const netSkuCountEl = document.getElementById('shrinkageNetSkuCount');
+
+        const surplusAmtEl = document.getElementById('shrinkageSurplusAmount');
+        const surplusUnitsEl = document.getElementById('shrinkageSurplusUnits');
+        const surplusUnitsBadge = document.getElementById('shrinkageSurplusUnitsBadge');
+
+        const deficitAmtEl = document.getElementById('shrinkageDeficitAmount');
+        const deficitUnitsEl = document.getElementById('shrinkageDeficitUnits');
+        const deficitUnitsBadge = document.getElementById('shrinkageDeficitUnitsBadge');
+
+        const grossAmtEl = document.getElementById('shrinkageGrossAmount');
+        const auditedSkusEl = document.getElementById('shrinkageAuditedSkusCount');
+        const grossUnitsBadge = document.getElementById('shrinkageGrossUnitsBadge');
+
+        const records = data.records || [];
+        const shrinkageNet = data.shrinkage_net ?? data.shrinkage_total ?? 0;
+        const shrinkageSurplus = data.shrinkage_surplus ?? records.filter(r => (r.amount || 0) > 0).reduce((sum, r) => sum + (r.amount || 0), 0);
+        const shrinkageDeficit = data.shrinkage_deficit ?? records.filter(r => (r.amount || 0) < 0).reduce((sum, r) => sum + (r.amount || 0), 0);
+        const shrinkageGross = data.shrinkage_gross ?? (shrinkageSurplus + Math.abs(shrinkageDeficit));
+
+        const surplusUnits = records.filter(r => (r.amount || 0) > 0).reduce((sum, r) => sum + Math.abs(r.sku_count || 0), 0);
+        const deficitUnits = records.filter(r => (r.amount || 0) < 0).reduce((sum, r) => sum + Math.abs(r.sku_count || 0), 0);
+        const totalUnits = data.total_units_affected ?? (surplusUnits + deficitUnits);
+        const uniqueSkus = data.unique_skus_count ?? data.total_skus_affected ?? 0;
+
+        // Card 1: Net Shrinkage
+        if (netAmtEl) {
+            netAmtEl.textContent = this.formatCurrency(shrinkageNet);
+            if (shrinkageNet > 0) {
+                netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400';
+            } else if (shrinkageNet < 0) {
+                netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-rose-400';
+            } else {
+                netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-200';
+            }
+        }
+        if (netBadge) {
+            if (shrinkageNet > 0) {
+                netBadge.textContent = 'Net Surplus (+)';
+                netBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono';
+            } else if (shrinkageNet < 0) {
+                netBadge.textContent = 'Net Deficit (-)';
+                netBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono';
+            } else {
+                netBadge.textContent = 'Balanced (₹0)';
+                netBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/25 font-mono';
+            }
+        }
+        if (totalRowsEl) totalRowsEl.textContent = `${(data.total_records || records.length || 0).toLocaleString('en-IN')}`;
+        if (netUnitsBadge) netUnitsBadge.textContent = `${(surplusUnits - deficitUnits >= 0 ? '+' : '')}${(surplusUnits - deficitUnits).toLocaleString('en-IN')} units`;
+        if (netSkuCountEl) netSkuCountEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} SKUs`;
+
+        // Card 2: Surplus Found
+        if (surplusAmtEl) surplusAmtEl.textContent = this.formatCurrency(shrinkageSurplus);
+        if (surplusUnitsEl) surplusUnitsEl.textContent = `${surplusUnits.toLocaleString('en-IN')} units`;
+        if (surplusUnitsBadge) surplusUnitsBadge.textContent = `+${surplusUnits.toLocaleString('en-IN')} units`;
+
+        // Card 3: Shortage Deficit
+        if (deficitAmtEl) deficitAmtEl.textContent = this.formatCurrency(Math.abs(shrinkageDeficit));
+        if (deficitUnitsEl) deficitUnitsEl.textContent = `${deficitUnits.toLocaleString('en-IN')} units`;
+        if (deficitUnitsBadge) deficitUnitsBadge.textContent = `-${deficitUnits.toLocaleString('en-IN')} units`;
+
+        // Card 4: Gross Turnover
+        if (grossAmtEl) grossAmtEl.textContent = this.formatCurrency(shrinkageGross);
+        if (auditedSkusEl) auditedSkusEl.textContent = `${uniqueSkus.toLocaleString('en-IN')} SKUs`;
+        if (grossUnitsBadge) grossUnitsBadge.textContent = `${totalUnits.toLocaleString('en-IN')} units`;
+
+        // Card 5: Email vs Excel Reconciliation
+        const recon = data.reconciliation || {};
+        const reconRateEl = document.getElementById('shrinkageReconMatchRate');
+        const reconStatusBadge = document.getElementById('shrinkageReconStatusBadge');
+        const reconVarCountEl = document.getElementById('shrinkageReconVarianceCount');
+        const reconMatchedBadge = document.getElementById('shrinkageReconMatchedBadge');
+        const reconMismatchBadge = document.getElementById('shrinkageReconMismatchBadge');
+
+        if (reconRateEl) reconRateEl.textContent = `${recon.match_rate_pct != null ? recon.match_rate_pct : 100}%`;
+        if (reconStatusBadge) reconStatusBadge.textContent = `${recon.matched_count || 0} / ${recon.total_audits || 0} Audits`;
+        if (reconVarCountEl) reconVarCountEl.textContent = `${recon.variance_count || 0} variances`;
+        if (reconMatchedBadge) reconMatchedBadge.textContent = `${recon.matched_count || 0} Matched`;
+        if (reconMismatchBadge) reconMismatchBadge.textContent = `${recon.variance_count || 0} Variance`;
+
+        // 3. Render Email vs Excel Reconciliation Ledger
+        const reconTableBody = document.getElementById('shrinkageReconciliationTableBody');
+        const reconItems = recon.items || [];
+
+        if (reconTableBody) {
+            if (reconItems.length === 0) {
+                reconTableBody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 text-xs">No cycle count reconciliation records logged for this period.</td></tr>`;
+            } else {
+                reconTableBody.innerHTML = reconItems.map(item => {
+                    let badgeClass = 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+                    let statusLabel = item.status;
+
+                    if (item.status === 'MATCHED') {
+                        badgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                        statusLabel = '✅ Matched';
+                    } else if (item.status === 'VARIANCE') {
+                        badgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                        statusLabel = `⚠️ Δ ${this.formatCurrency(Math.abs(item.variance))}`;
+                    } else if (item.status === 'EXCEL_ONLY') {
+                        badgeClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+                        statusLabel = '📊 Excel Only';
+                    } else if (item.status === 'EMAIL_ONLY') {
+                        badgeClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+                        statusLabel = '📧 Email Only';
+                    }
+
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2 px-3 font-mono text-slate-300 whitespace-nowrap">${item.date || '—'}</td>
+                            <td class="py-2 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">${item.store_name}</td>
+                            <td class="py-2 px-3 text-white max-w-xs truncate" title="${item.subject}">
+                                ${item.subject}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold text-slate-300">
+                                ${item.email_stated_amount != null && item.email_stated_amount !== '' ? this.formatCurrency(item.email_stated_amount) : '—'}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold text-emerald-300">
+                                ${item.excel_parsed_sum != null && item.excel_parsed_sum !== '' ? this.formatCurrency(item.excel_parsed_sum) : '—'}
+                                ${item.excel_item_count > 0 ? `<div class="text-[9px] text-slate-500 font-normal">(${item.excel_item_count} items)</div>` : ''}
+                            </td>
+                            <td class="py-2 px-3 text-right font-mono font-bold ${item.variance !== 0 ? 'text-rose-400' : 'text-slate-500'}">
+                                ${item.variance !== 0 ? (item.variance > 0 ? `+${this.formatCurrency(item.variance)}` : this.formatCurrency(item.variance)) : '₹0'}
+                            </td>
+                            <td class="py-2 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${badgeClass}">
+                                    ${statusLabel}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 text-slate-400 text-[11px] max-w-xs truncate" title="${item.attachment_filename || 'No attachment'}">
+                                ${item.attachment_filename ? `📎 ${item.attachment_filename}` : '<span class="text-slate-600">None</span>'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 4. Render Department Shrinkage Matrix
+        const catTableBody = document.getElementById('shrinkageCategoryMatrixTableBody');
+        const catTotalCountBadge = document.getElementById('shrinkageCategoryTotalCountBadge');
+        const cats = data.category_breakdown || [];
+
+        if (catTotalCountBadge) catTotalCountBadge.textContent = `${cats.length} Departments`;
+
+        if (catTableBody) {
+            if (cats.length === 0) {
+                catTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No department audit variances categorized for the selected criteria.</td></tr>`;
+            } else {
+                catTableBody.innerHTML = cats.map(c => {
+                    const isOthers = c.category === 'OTHERS' || c.is_composite;
+                    const dSkus = c.distinct_skus ?? c.total_skus ?? 0;
+                    const tUnits = c.total_units ?? c.total_skus ?? 0;
+                    const skuDisplay = dSkus === tUnits ? `${dSkus.toLocaleString('en-IN')}` : `${dSkus.toLocaleString('en-IN')} (${tUnits.toLocaleString('en-IN')}u)`;
+
+                    // Compute surplus vs deficit for this category from records
+                    const catRecs = records.filter(r => {
+                        const rCat = (r.category || 'GENERAL').toUpperCase();
+                        if (isOthers) {
+                            const topCats = cats.filter(x => x.category !== 'OTHERS' && !x.is_composite).map(x => x.category.toUpperCase());
+                            return !topCats.includes(rCat);
+                        }
+                        return rCat === c.category.toUpperCase();
+                    });
+
+                    const catSurplus = catRecs.filter(r => (r.amount || 0) > 0).reduce((sum, r) => sum + (r.amount || 0), 0);
+                    const catDeficit = catRecs.filter(r => (r.amount || 0) < 0).reduce((sum, r) => sum + (r.amount || 0), 0);
+                    const catNet = catSurplus + catDeficit;
+                    const catAuditRows = catRecs.length || c.incident_count || 0;
+
+                    return `
+                        <tr class="hover:bg-white/[0.02] transition ${isOthers ? 'bg-white/[0.015] border-t border-white/10 font-medium' : ''}">
+                            <td class="py-2.5 px-3">
+                                <div class="font-bold ${isOthers ? 'text-slate-300 flex items-center gap-1.5' : 'text-white'}">
+                                    ${isOthers ? '<span class="text-slate-400">📦</span> Others (Below Top 10)' : c.category.replace(/_/g, ' ')}
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
+                                ${catSurplus > 0 ? `+${this.formatCurrency(catSurplus)}` : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-400">
+                                ${catDeficit < 0 ? this.formatCurrency(catDeficit) : '—'}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono font-black ${catNet > 0 ? 'text-emerald-400' : (catNet < 0 ? 'text-rose-400' : 'text-slate-300')}">
+                                ${this.formatCurrency(catNet)}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-300" title="${dSkus} distinct SKUs, ${tUnits} total units">${skuDisplay}</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-slate-400">${catAuditRows.toLocaleString('en-IN')}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 5. Render Optional Donut / Trend Charts
+        this.renderShrinkageCategoryPieChart(data);
+        this.renderShrinkageMonthlyTrendChart(data);
+
+        // 6. Cache records and filter/render itemized Excel cycle count entries
+        this._currentShrinkageRecords = records;
+        this.filterShrinkageRecords();
+    },
+
+    filterShrinkageRecords() {
+        const records = this._currentShrinkageRecords || [];
+        const search = (document.getElementById('shrinkageSearchInput')?.value || '').trim().toLowerCase();
+        const varianceFilter = document.getElementById('shrinkageVarianceFilter')?.value || 'ALL';
+        const tbody = document.getElementById('shrinkageTableBody');
+        const countBadge = document.getElementById('shrinkageRecordCountBadge');
+
+        const filtered = records.filter(r => {
+            const amt = Number(r.amount || 0);
+            if (varianceFilter === 'DEFICIT' && amt >= 0) return false;
+            if (varianceFilter === 'SURPLUS' && amt <= 0) return false;
+
+            if (search) {
+                const notes = (r.notes || '').toLowerCase();
+                const sku = (r.sku_id || '').toLowerCase();
+                const item = (r.item_name || '').toLowerCase();
+                const cat = (r.category || '').toLowerCase();
+                const type = (r.loss_type || '').toLowerCase();
+                const store = (r.store_name || '').toLowerCase();
+                const date = (r.record_date || '').toLowerCase();
+                return notes.includes(search) || sku.includes(search) || item.includes(search) || cat.includes(search) || type.includes(search) || store.includes(search) || date.includes(search);
+            }
+            return true;
+        });
+
+        if (countBadge) countBadge.textContent = `${filtered.length.toLocaleString('en-IN')} entries`;
+        if (!tbody) return;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No matching stored cycle count audit records found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(r => {
+            const amt = Number(r.amount || 0);
+            const isSurplus = amt > 0;
+            const isDeficit = amt < 0;
+
+            let typeBadgeClass = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+            let typeLabel = r.loss_type || 'SHRINKAGE';
+            if (isSurplus) {
+                typeBadgeClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+                typeLabel = 'SURPLUS (+)';
+            } else if (isDeficit) {
+                typeBadgeClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                typeLabel = 'SHORTAGE (-)';
+            }
+
+            const skuDisplay = r.sku_id
+                ? `<span class="font-mono text-sky-300 font-bold">${r.sku_id}</span>${r.item_name ? `<span class="text-slate-400 ml-1">· ${r.item_name}</span>` : ''}`
+                : (r.item_name || '<span class="text-slate-500 italic">Unspecified SKU</span>');
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="py-2 px-2.5 font-mono text-slate-300 whitespace-nowrap">
+                        <button type="button" onclick="zeptoApp.drilldownShrinkageDate('${r.record_date}')" class="hover:text-sky-300 hover:underline transition text-left font-mono">
+                            ${r.record_date || '—'}
+                        </button>
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-400 font-mono text-[11px] whitespace-nowrap">${r.store_name || 'JMU-Sainik Colony'}</td>
+                    <td class="py-2 px-2.5">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border font-mono ${typeBadgeClass}">
+                            ${typeLabel}
+                        </span>
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-300 font-medium">
+                        <button type="button" onclick="zeptoApp.drilldownShrinkageCategory('${r.category || 'GENERAL'}')" class="hover:text-purple-300 hover:underline transition text-left">
+                            ${(r.category || 'GENERAL').replace(/_/g, ' ')}
+                        </button>
+                    </td>
+                    <td class="py-2 px-2.5 text-xs text-slate-200 max-w-[200px] truncate" title="${r.sku_id ? `SKU: ${r.sku_id}` : ''} ${r.item_name || ''}">${skuDisplay}</td>
+                    <td class="py-2 px-2.5 text-right font-mono font-bold ${isSurplus ? 'text-emerald-400' : (isDeficit ? 'text-rose-400' : 'text-slate-300')}">
+                        ${isSurplus ? `+${(r.sku_count || 0).toLocaleString('en-IN')}` : (r.sku_count || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td class="py-2 px-2.5 text-right font-mono font-black ${isSurplus ? 'text-emerald-400' : (isDeficit ? 'text-rose-400' : 'text-slate-300')}">
+                        ${isSurplus ? `+${this.formatCurrency(amt)}` : this.formatCurrency(amt)}
+                    </td>
+                    <td class="py-2 px-2.5 text-slate-400 text-[11px] max-w-xs truncate" title="${r.notes || ''}">${r.notes || '—'}</td>
+                    <td class="py-2 px-2.5 text-slate-500 font-mono text-[10px] whitespace-nowrap">${r.source_email_id ? r.source_email_id.substring(0, 12) + '...' : 'Direct Upload'}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    exportShrinkageCsv() {
+        const records = this._currentShrinkageRecords || [];
+        if (records.length === 0) {
+            this.showToast('⚠️ No shrinkage records available to export', true);
+            return;
+        }
+
+        const headers = ['Audit Date', 'Store Name', 'Classification', 'Department', 'SKU ID', 'Item Name', 'Variance Units', 'Variance Amount (INR)', 'Notes', 'Source Email ID'];
+        const csvRows = [headers.join(',')];
+
+        records.forEach(r => {
+            const row = [
+                `"${r.record_date || ''}"`,
+                `"${r.store_name || ''}"`,
+                `"${r.loss_type || 'SHRINKAGE'}"`,
+                `"${(r.category || '').replace(/"/g, '""')}"`,
+                `"${(r.sku_id || '').replace(/"/g, '""')}"`,
+                `"${(r.item_name || '').replace(/"/g, '""')}"`,
+                r.sku_count || 0,
+                r.amount || 0,
+                `"${(r.notes || '').replace(/"/g, '""')}"`,
+                `"${r.source_email_id || ''}"`,
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `zepto_inventory_shrinkage_records_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showToast(`✅ Exported ${records.length} shrinkage audit records to CSV`);
+    },
+
+    async handleShrinkageFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            this.showToast('⏳ Uploading and parsing Shrinkage cycle count report...');
+            const res = await fetch('/api/v1/zepto/loss/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to parse shrinkage report');
+
+            this.showToast(`✅ Imported ${data.saved_count || data.total_records || 0} cycle count records for ${data.store_name || 'Dark Store'}`);
+            await this.loadShrinkage();
+        } catch (err) {
+            this.showToast('⚠️ Shrinkage report upload error: ' + err.message, true);
+        } finally {
+            e.target.value = '';
+        }
+    },
+
+    selectShrinkageCategory(cat) {
+        this.drilldownShrinkageCategory(cat);
+    },
+
+    drilldownShrinkageDate(dateStr) {
+        this._activeShrinkageDate = dateStr;
+
+        const banner = document.getElementById('shrinkageDrilldownBanner');
+        const badgeEl = document.getElementById('shrinkageDrilldownTypeBadge');
+        const valEl = document.getElementById('shrinkageDrilldownValueText');
+        const metricsEl = document.getElementById('shrinkageDrilldownMetricsText');
+
+        if (banner) banner.classList.remove('hidden');
+        if (badgeEl) badgeEl.textContent = 'DATE AUDIT';
+        if (valEl) valEl.textContent = dateStr;
+        if (metricsEl) metricsEl.textContent = `Filtered view for physical cycle count audit on ${dateStr}.`;
+
+        this.loadShrinkage();
+    },
+
+    drilldownShrinkageCategory(cat) {
+        this._activeShrinkageCategory = cat;
+        const catSelect = document.getElementById('shrinkageCategoryFilter');
+        if (catSelect) catSelect.value = cat;
+
+        const banner = document.getElementById('shrinkageDrilldownBanner');
+        const badgeEl = document.getElementById('shrinkageDrilldownTypeBadge');
+        const valEl = document.getElementById('shrinkageDrilldownValueText');
+        const metricsEl = document.getElementById('shrinkageDrilldownMetricsText');
+
+        if (banner) banner.classList.remove('hidden');
+        if (badgeEl) badgeEl.textContent = 'DEPARTMENT';
+        if (valEl) valEl.textContent = cat.replace(/_/g, ' ');
+        if (metricsEl) metricsEl.textContent = `Filtered view for ${cat.replace(/_/g, ' ')} department audit records.`;
+
+        this.loadShrinkage();
+    },
+
+    clearShrinkageDrilldown() {
+        this._activeShrinkageDate = null;
+        this._activeShrinkageCategory = null;
+
+        const catSelect = document.getElementById('shrinkageCategoryFilter');
+        if (catSelect) catSelect.value = 'ALL';
+        const varianceSelect = document.getElementById('shrinkageVarianceFilter');
+        if (varianceSelect) varianceSelect.value = 'ALL';
+
+        const banner = document.getElementById('shrinkageDrilldownBanner');
+        if (banner) banner.classList.add('hidden');
+
+        this.loadShrinkage();
+    },
+
+    renderShrinkageCategoryPieChart(data) {
+        const container = document.getElementById('shrinkageCategoryPieContainer');
+        const badge = document.getElementById('shrinkageCategoryPieBadge');
+        if (!container) return;
+
+        const cats = data.category_breakdown || [];
+        const total = cats.reduce((sum, c) => sum + Math.abs(c.shrinkage_amount || c.total_amount || 0), 0);
+
+        if (badge) badge.textContent = `${cats.length} Departments`;
+        if (cats.length === 0 || total <= 0) {
+            container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No department shrinkage distribution data.</div>';
+            return;
+        }
+
+        const colors = ['#c084fc', '#38bdf8', '#34d399', '#fbbf24', '#f43f5e', '#fb923c', '#e879f9', '#94a3b8', '#818cf8', '#f87171'];
+        let currentAngle = 0;
+
+        const slices = cats.slice(0, 6).map((c, idx) => {
+            const amt = Math.abs(c.shrinkage_amount || c.total_amount || 0);
+            const pct = total > 0 ? (amt / total) : 0;
+            const angleDelta = pct * 360;
+            const startAngle = currentAngle;
+            const endAngle = currentAngle + angleDelta;
+            currentAngle = endAngle;
+
+            const pathD = this.describeDonutArc(90, 90, 75, 48, startAngle, endAngle);
+            const color = colors[idx % colors.length];
+
+            return {
+                ...c,
+                amt,
+                color,
+                pathD,
+                pct: (pct * 100).toFixed(1),
+            };
+        });
+
+        const svgMarkup = `
+            <div class="flex flex-col sm:flex-row items-center gap-4 py-1">
+                <div class="relative w-44 h-44 flex-shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 180 180" class="w-full h-full drop-shadow-md">
+                        ${slices.map(s => `
+                            <path
+                                d="${s.pathD}"
+                                fill="${s.color}"
+                                class="transition-all duration-200 cursor-pointer hover:opacity-80 hover:scale-[1.03] origin-center"
+                                onclick="zeptoApp.drilldownShrinkageCategory('${s.category}')"
+                            >
+                                <title>${s.category}: ${this.formatCurrency(s.amt)} (${s.pct}%) - Click to filter</title>
+                            </path>
+                        `).join('')}
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span class="text-[10px] text-slate-400 font-mono">Gross Variance</span>
+                        <span class="text-xs font-mono font-black text-purple-300">${this.formatCurrency(total)}</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 w-full space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                    ${slices.map(s => `
+                        <div
+                            onclick="zeptoApp.drilldownShrinkageCategory('${s.category}')"
+                            class="flex items-center justify-between p-1.5 rounded bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 cursor-pointer transition text-[11px]"
+                            title="Click to drill down into ${s.category}"
+                        >
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${s.color};"></span>
+                                <span class="font-medium text-slate-200 truncate">${s.category.replace(/_/g, ' ')}</span>
+                            </div>
+                            <div class="flex items-center gap-2 font-mono flex-shrink-0">
+                                <span class="text-slate-400 text-[10px]">${s.pct}%</span>
+                                <span class="font-bold text-white">${this.formatCurrency(s.amt)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = svgMarkup;
+    },
+
+    renderShrinkageMonthlyTrendChart(data) {
+        const monthContainer = document.getElementById('shrinkageMonthlyGraphContainer');
+        const monthBadge = document.getElementById('shrinkageMonthlyGraphBadge');
+        if (!monthContainer) return;
+
+        const monthlyData = data.monthly_trends || [];
+        if (monthBadge) monthBadge.textContent = `${monthlyData.length} Month${monthlyData.length === 1 ? '' : 's'}`;
+
+        if (monthlyData.length === 0) {
+            monthContainer.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">No monthly historical shrinkage data available.</div>';
+            return;
+        }
+
+        const maxShrink = Math.max(...monthlyData.map(m => Math.abs(m.shrinkage || 0)), 100);
+        monthContainer.innerHTML = `
+            <div class="w-full space-y-2.5 py-1">
+                <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-white/5">
+                    <span>Month</span>
+                    <span class="text-right">Net Shrinkage</span>
+                </div>
+                <div class="space-y-2">
+                    ${monthlyData.map(m => {
+                        const shrink = m.shrinkage || 0;
+                        const isSurplus = shrink > 0;
+                        const widthPct = Math.max(4, Math.min(100, Math.round((Math.abs(shrink) / maxShrink) * 100)));
+
+                        return `
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono font-bold text-white">${m.month_ym}</span>
+                                        <span class="text-[10px] text-slate-400 font-mono">(${m.item_count} items)</span>
+                                    </div>
+                                    <span class="font-mono font-black ${isSurplus ? 'text-emerald-400' : 'text-purple-300'}">${shrink > 0 ? '+' : ''}${this.formatCurrency(shrink)}</span>
+                                </div>
+                                <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden flex">
+                                    <div style="width: ${widthPct}%;" class="h-full rounded-full ${isSurplus ? 'bg-emerald-400' : 'bg-purple-400'}"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
     },
 
     // -----------------------------------------------------------------------
