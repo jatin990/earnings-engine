@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -116,6 +116,30 @@ def store_option_chain_snapshot(data: dict[str, Any], settings: Settings | None 
                 created_at,
             ),
         )
+
+        if data.get("market_setups") and data.get("spot_price"):
+            try:
+                save_tracked_option_setups(
+                    conn,
+                    data["market_setups"],
+                    sym,
+                    spot_price=float(data["spot_price"]),
+                    gamma_profile=data.get("gamma_profile"),
+                    vix_profile=data.get("vix_profile"),
+                )
+            except Exception as se:
+                logger.debug("[OPTION-CHAIN-DB] Could not save tracked setups for %s: %s", sym, se)
+
+        if data.get("spot_price"):
+            try:
+                evaluate_tracked_option_setups(
+                    conn,
+                    sym,
+                    current_spot=float(data["spot_price"]),
+                )
+            except Exception as ee:
+                logger.debug("[OPTION-CHAIN-DB] Could not evaluate tracked setups for %s: %s", sym, ee)
+
         conn.commit()
         return True
     except Exception as e:
@@ -907,6 +931,249 @@ def derive_market_setups(
             })
 
     return setups
+
+
+def save_tracked_option_setups(
+    conn: Any,
+    setups: list[dict[str, Any]],
+    symbol: str,
+    spot_price: float,
+    gamma_profile: dict[str, Any] | None = None,
+    vix_profile: dict[str, Any] | None = None,
+) -> int:
+    """Save newly identified algorithmic options setups to tracked history ledger with duplicate guard."""
+    if not setups or not conn:
+        return 0
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    gamma_regime = (gamma_profile or {}).get("gamma_regime", "NEUTRAL")
+    vix_val = (vix_profile or {}).get("vix_value", None)
+
+    saved_count = 0
+    clean_sym = symbol.replace(".NS", "").upper()
+
+    for s in setups:
+        setup_id = s.get("id")
+        if not setup_id:
+            continue
+
+        try:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO options_tracked_setups (
+                    symbol, setup_id, setup_title, setup_type, bias,
+                    confidence, signal_date, spot_at_signal, entry_zone,
+                    stop_loss, target_1, target_2, risk_reward, catalyst,
+                    gamma_regime, vix_value, current_spot, realized_pnl_pct,
+                    outcome, outcome_label, outcome_badge, scanned_at,
+                    created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?
+                )
+                """,
+                (
+                    clean_sym,
+                    setup_id,
+                    s.get("title", ""),
+                    s.get("type", "SETUP"),
+                    s.get("bias", "NEUTRAL"),
+                    float(s.get("confidence", 0.0)),
+                    today_str,
+                    float(spot_price),
+                    str(s.get("entry_zone", "")),
+                    float(s.get("stop_loss", 0.0)),
+                    float(s.get("target_1", 0.0)),
+                    float(s.get("target_2")) if s.get("target_2") is not None else None,
+                    s.get("risk_reward", ""),
+                    s.get("catalyst", ""),
+                    gamma_regime,
+                    float(vix_val) if vix_val is not None else None,
+                    float(spot_price),
+                    0.0,
+                    "ACTIVE",
+                    "Active Trade In-Flight",
+                    "indigo",
+                    now_iso,
+                    now_iso,
+                    now_iso,
+                ),
+            )
+            saved_count += 1
+        except Exception as e:
+            logger.warning(f"[save_tracked_option_setups] Error inserting setup {setup_id}: {e}")
+
+    try:
+        conn.commit()
+    except Exception:
+        pass
+
+    return saved_count
+
+
+def get_tracked_option_setups(
+    conn: Any,
+    symbol: str | None = None,
+    outcome: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Retrieve historical tracked option setups with optional filtering."""
+    if not conn:
+        return []
+
+    query = "SELECT * FROM options_tracked_setups WHERE 1=1"
+    params: list[Any] = []
+
+    if symbol:
+        query += " AND symbol = ?"
+        params.append(symbol.replace(".NS", "").upper())
+    if outcome:
+        query += " AND outcome = ?"
+        params.append(outcome.upper())
+
+    query += " ORDER BY signal_date DESC, id DESC LIMIT ?"
+    params.append(limit)
+
+    try:
+        cursor = conn.execute(query, params)
+        rows = cursor.fetchall()
+        cols = [c[0] for c in cursor.description] if cursor.description else []
+        results = []
+        for r in rows:
+            if hasattr(r, "keys"):
+                results.append({k: r[k] for k in r.keys()})
+            elif cols and isinstance(r, (tuple, list)):
+                results.append(dict(zip(cols, r)))
+            else:
+                results.append(dict(r))
+        return results
+    except Exception as e:
+        logger.warning(f"[get_tracked_option_setups] Failed to query tracked setups: {e}")
+        return []
+
+
+def evaluate_tracked_option_setups(
+    conn: Any,
+    symbol: str,
+    current_spot: float,
+) -> list[dict[str, Any]]:
+    """Evaluate active tracked setups against current spot price and update outcome state machine."""
+    if not conn or not current_spot or current_spot <= 0:
+        return []
+
+    clean_sym = symbol.replace(".NS", "").upper()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    try:
+        cursor = conn.execute(
+            "SELECT * FROM options_tracked_setups WHERE symbol = ? AND outcome = 'ACTIVE'",
+            (clean_sym,),
+        )
+        rows = cursor.fetchall()
+        cols = [c[0] for c in cursor.description] if cursor.description else []
+        active_setups = []
+        for r in rows:
+            if hasattr(r, "keys"):
+                active_setups.append({k: r[k] for k in r.keys()})
+            elif cols and isinstance(r, (tuple, list)):
+                active_setups.append(dict(zip(cols, r)))
+            else:
+                active_setups.append(dict(r))
+    except Exception as e:
+        logger.warning(f"[evaluate_tracked_option_setups] Error fetching active setups: {e}")
+        return []
+
+    updated = []
+    for row_dict in active_setups:
+        setup_id = row_dict["setup_id"]
+        bias = row_dict.get("bias", "BULLISH").upper()
+        spot_at_sig = float(row_dict.get("spot_at_signal") or current_spot)
+        target_1 = float(row_dict.get("target_1") or 0.0)
+        target_2 = float(row_dict.get("target_2") or 0.0) if row_dict.get("target_2") else None
+        stop_loss = float(row_dict.get("stop_loss") or 0.0)
+
+        # Calculate Spot PnL % based on trade direction bias
+        if bias == "BULLISH":
+            pnl_pct = round(((current_spot - spot_at_sig) / spot_at_sig) * 100, 2)
+            if target_2 and current_spot >= target_2:
+                new_outcome = "TARGET2_HIT"
+                label = f"Target 2 Hit (+{pnl_pct}%)"
+                badge = "emerald"
+            elif target_1 and current_spot >= target_1:
+                new_outcome = "TARGET1_HIT"
+                label = f"Target 1 Hit (+{pnl_pct}%)"
+                badge = "emerald"
+            elif stop_loss and current_spot <= stop_loss:
+                new_outcome = "STOPPED_OUT"
+                label = f"Stopped Out ({pnl_pct}%)"
+                badge = "rose"
+            else:
+                new_outcome = "ACTIVE"
+                label = f"In Flight ({pnl_pct:+}%)"
+                badge = "indigo"
+        elif bias == "BEARISH":
+            pnl_pct = round(((spot_at_sig - current_spot) / spot_at_sig) * 100, 2)
+            if target_2 and current_spot <= target_2:
+                new_outcome = "TARGET2_HIT"
+                label = f"Target 2 Hit (+{pnl_pct}%)"
+                badge = "emerald"
+            elif target_1 and current_spot <= target_1:
+                new_outcome = "TARGET1_HIT"
+                label = f"Target 1 Hit (+{pnl_pct}%)"
+                badge = "emerald"
+            elif stop_loss and current_spot >= stop_loss:
+                new_outcome = "STOPPED_OUT"
+                label = f"Stopped Out ({pnl_pct}%)"
+                badge = "rose"
+            else:
+                new_outcome = "ACTIVE"
+                label = f"In Flight ({pnl_pct:+}%)"
+                badge = "indigo"
+        else:
+            pnl_pct = 0.0
+            new_outcome = "ACTIVE"
+            label = "Active Neutral Pin"
+            badge = "indigo"
+
+        try:
+            conn.execute(
+                """
+                UPDATE options_tracked_setups
+                SET current_spot = ?, realized_pnl_pct = ?, outcome = ?,
+                    outcome_label = ?, outcome_badge = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    float(current_spot),
+                    float(pnl_pct),
+                    new_outcome,
+                    label,
+                    badge,
+                    now_iso,
+                    row_dict["id"],
+                ),
+            )
+            row_dict["outcome"] = new_outcome
+            row_dict["current_spot"] = current_spot
+            row_dict["realized_pnl_pct"] = pnl_pct
+            row_dict["outcome_label"] = label
+            row_dict["outcome_badge"] = badge
+            updated.append(row_dict)
+        except Exception as e:
+            logger.warning(f"[evaluate_tracked_option_setups] Failed to update setup {setup_id}: {e}")
+
+    try:
+        conn.commit()
+    except Exception:
+        pass
+
+    return updated
+
 
 
 

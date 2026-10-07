@@ -129,6 +129,28 @@ async def test_options_history_endpoint():
 
 
 @pytest.mark.anyio
+async def test_options_setups_history_and_evaluate_endpoints():
+    """Verify /api/v1/options/setups/history and evaluate endpoints."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # 1. Fetch history
+        res = await ac.get("/api/v1/options/setups/history?symbol=NIFTY")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert "setups" in data
+        assert isinstance(data["setups"], list)
+
+        # 2. Evaluate setups
+        eval_res = await ac.post("/api/v1/options/setups/evaluate?symbol=NIFTY&current_spot=25000.0")
+        assert eval_res.status_code == 200
+        eval_data = eval_res.json()
+        assert eval_data["success"] is True
+        assert eval_data["symbol"] == "NIFTY"
+        assert "updates" in eval_data
+
+
+
+@pytest.mark.anyio
 async def test_options_chart_intelligence_endpoint():
     """Verify /api/v1/options/chart-intelligence returns complete candlestick, SMC, and trade setups."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

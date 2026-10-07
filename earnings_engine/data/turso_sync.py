@@ -132,6 +132,8 @@ SYNC_TABLES = [
     # Morning Setups: Block Deals & Board Meetings Radar
     "morning_block_deals",
     "upcoming_board_meetings",
+    # Advanced Options Tracked Setups Ledger
+    "options_tracked_setups",
 ]
 
 

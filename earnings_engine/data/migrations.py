@@ -2401,6 +2401,46 @@ def _migration_046_morning_setups_deals_and_board_meetings(conn: Any) -> None:
         pass
 
 
+def _migration_047_options_tracked_setups(conn: Any) -> None:
+    """Create options_tracked_setups table for options setup history and outcome tracking."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS options_tracked_setups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            setup_id TEXT NOT NULL,
+            setup_title TEXT NOT NULL,
+            setup_type TEXT NOT NULL,
+            bias TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 0.0,
+            signal_date TEXT NOT NULL,
+            spot_at_signal REAL NOT NULL,
+            entry_zone TEXT NOT NULL,
+            stop_loss REAL NOT NULL,
+            target_1 REAL NOT NULL,
+            target_2 REAL,
+            risk_reward TEXT,
+            catalyst TEXT,
+            gamma_regime TEXT,
+            vix_value REAL,
+            current_spot REAL,
+            realized_pnl_pct REAL DEFAULT 0.0,
+            outcome TEXT NOT NULL DEFAULT 'ACTIVE',
+            outcome_label TEXT,
+            outcome_badge TEXT,
+            scanned_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(symbol, setup_id, signal_date)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ots_symbol ON options_tracked_setups (symbol)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ots_date ON options_tracked_setups (signal_date DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ots_outcome ON options_tracked_setups (outcome)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2449,6 +2489,7 @@ MIGRATIONS: list[Migration] = [
     Migration(44, "044_shareholding_fetch_tracking", _migration_044_shareholding_fetch_tracking),
     Migration(45, "045_market_pulse_and_pricing_indexes", _migration_045_market_pulse_and_pricing_indexes),
     Migration(46, "046_morning_setups_deals_and_board_meetings", _migration_046_morning_setups_deals_and_board_meetings),
+    Migration(47, "047_options_tracked_setups", _migration_047_options_tracked_setups),
 ]
 
 

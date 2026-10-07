@@ -15,6 +15,10 @@
     app._optionsExpiry = '';
     app._optionsStrikeRange = 20;
     app._optionsTimeframe = '5m';
+    app._optionsChartMode = 'gex'; // Default: Mode 1 - Dealer Gamma GEX Profile
+    app._optionsChainData = null;  // Cached latest option chain analysis
+    app._optionsSetupsHistory = [];
+    app._optionsSetupsFilter = 'ALL';
     app._optionsLayers = {
         vwap: true,
         ob: true,
@@ -23,7 +27,7 @@
         trendlines: true,
     };
 
-    app._optionsChart = null; // Chart.js instance for OI distribution
+    app._optionsChart = null; // Chart.js instance for multi-mode derivatives visualizer
     app._smartChart = null;   // TradingView Lightweight Charts instance
     app._candleSeries = null;
     app._volumeSeries = null;
@@ -294,17 +298,21 @@
             // Populate Expiries Dropdown if available
             app.populateOptionExpiries(data.expiries || [], data.selected_expiry || expiry);
 
-            // Render KPI cards
+            // Cache option chain data
+            app._optionsChainData = data;
+
+            // Render KPI cards & Radar HUD
             app.renderOptionKpiCards(data);
 
-            // Render Open Interest Distribution Chart
+            // Render Multi-Mode Open Interest / GEX / Delta / IV Chart
             app.renderOiDistributionChart(data);
 
-            // Render Strike Tree Table
+            // Render Strike Tree Table with Greek & GEX metrics
             app.renderStrikeTreeTable(data);
 
-            // Also load multi-day positioning history asynchronously
+            // Also load tracked setups and multi-day positioning history asynchronously
             app.fetchOptionHistory(symbol);
+            app.fetchOptionSetupsHistory(symbol);
 
         } catch (err) {
             console.error('Failed to load option chain:', err);
@@ -961,7 +969,56 @@
     };
 
     /**
-     * Render the 7 KPI Summary Cards
+     * Switch Option Chart Visualization Mode (GEX, OI, NET_DELTA, IV)
+     */
+    app.setOptionChartMode = function (mode) {
+        const cleanMode = (mode || 'gex').toLowerCase();
+        app._optionsChartMode = cleanMode;
+
+        const modeMap = {
+            'gex': 'btnOptModeGex',
+            'oi': 'btnOptModeOi',
+            'net_delta': 'btnOptModeNetDelta',
+            'iv': 'btnOptModeIv'
+        };
+
+        ['btnOptModeGex', 'btnOptModeOi', 'btnOptModeNetDelta', 'btnOptModeIv'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+                btn.style.color = '#94a3b8';
+            }
+        });
+
+        const activeBtnId = modeMap[cleanMode] || 'btnOptModeGex';
+        const activeBtn = document.getElementById(activeBtnId);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            activeBtn.style.background = cleanMode === 'gex' ? '#a855f7' : '#38bdf8';
+            activeBtn.style.color = cleanMode === 'gex' ? '#ffffff' : '#000000';
+        }
+
+        const descEl = document.getElementById('optionsChartModeDescription');
+        if (descEl) {
+            if (cleanMode === 'gex') {
+                descEl.textContent = 'Dealer Gamma Exposure (GEX) profile per strike in ₹ Lakhs. Green (Call GEX) = Positive Gamma (vol dampening), Red (Put GEX) = Negative Gamma (vol acceleration). Blue dashed line = Cumulative Net Gamma.';
+            } else if (cleanMode === 'oi') {
+                descEl.textContent = 'Total Open Interest & intraday OI change (solid = total OI, semi-transparent = change in OI) across Call and Put strikes.';
+            } else if (cleanMode === 'net_delta') {
+                descEl.textContent = 'Net OI Delta (PE ΔOI - CE ΔOI). Green bars indicate net Put writer accumulation (support building), Red bars indicate net Call writer accumulation (resistance building).';
+            } else if (cleanMode === 'iv') {
+                descEl.textContent = 'Implied Volatility (IV) Smile & Skew curve for CE and PE across the option ladder with ATM marker.';
+            }
+        }
+
+        if (app._optionsChainData) {
+            app.renderOiDistributionChart(app._optionsChainData);
+        }
+    };
+
+    /**
+     * Render the 7 KPI Summary Cards + Gamma Radar HUD
      */
     app.renderOptionKpiCards = function (data) {
         const formatNum = (num, decimals = 2) => {
@@ -1043,6 +1100,59 @@
             }
         }
 
+        // Gamma Regime Badge
+        const gammaRegimeEl = document.getElementById('optKpiGammaRegimeBadge');
+        if (gammaRegimeEl) {
+            const regime = data.gamma_regime || 'NEUTRAL';
+            if (regime === 'POSITIVE_GAMMA') {
+                gammaRegimeEl.textContent = '🛡️ POSITIVE GAMMA (Vol Dampening / Pin)';
+                gammaRegimeEl.style.background = 'rgba(16,185,129,0.15)';
+                gammaRegimeEl.style.color = '#34d399';
+                gammaRegimeEl.style.border = '1px solid rgba(16,185,129,0.3)';
+            } else if (regime === 'NEGATIVE_GAMMA') {
+                gammaRegimeEl.textContent = '⚡ NEGATIVE GAMMA (Vol Acceleration / Squeeze)';
+                gammaRegimeEl.style.background = 'rgba(239,68,68,0.15)';
+                gammaRegimeEl.style.color = '#f87171';
+                gammaRegimeEl.style.border = '1px solid rgba(239,68,68,0.3)';
+            } else {
+                gammaRegimeEl.textContent = '⚖️ NEUTRAL GAMMA';
+                gammaRegimeEl.style.background = 'rgba(245,158,11,0.15)';
+                gammaRegimeEl.style.color = '#fbbf24';
+                gammaRegimeEl.style.border = '1px solid rgba(245,158,11,0.3)';
+            }
+        }
+
+        // Gamma Flip & Net GEX
+        const gammaFlipEl = document.getElementById('optKpiGammaFlip');
+        if (gammaFlipEl) {
+            gammaFlipEl.textContent = data.gamma_flip_strike ? `Flip Strike: ${formatNum(data.gamma_flip_strike, 0)}` : 'Flip Strike: --';
+        }
+
+        const netGexEl = document.getElementById('optKpiNetGex');
+        if (netGexEl) {
+            const netGex = data.total_net_gex || 0;
+            const sign = netGex >= 0 ? '+' : '';
+            netGexEl.textContent = `Net GEX: ${sign}₹${netGex.toFixed(1)}L`;
+            netGexEl.style.color = netGex >= 0 ? '#34d399' : '#f87171';
+        }
+
+        // India VIX Badge
+        const vixBadge = document.getElementById('optKpiVixBadge');
+        if (vixBadge) {
+            vixBadge.textContent = data.vix != null ? `INDIA VIX: ${Number(data.vix).toFixed(2)}` : 'INDIA VIX: --';
+        }
+
+        // Expected Move (±1σ) Badge
+        const expMoveBadge = document.getElementById('optKpiExpectedMoveBadge');
+        const expMove = data.expected_move || {};
+        if (expMoveBadge) {
+            if (expMove.range_1sigma != null && expMove.upper_1sigma != null && expMove.lower_1sigma != null) {
+                expMoveBadge.textContent = `Exp Move (±1σ): ±${Number(expMove.range_1sigma).toFixed(1)} (${Number(expMove.lower_1sigma).toFixed(0)} - ${Number(expMove.upper_1sigma).toFixed(0)})`;
+            } else {
+                expMoveBadge.textContent = 'Exp Move: --';
+            }
+        }
+
         // Header Sentiment Badge
         const sentimentBadge = document.getElementById('optionsSentimentBadge');
         if (sentimentBadge) {
@@ -1066,10 +1176,69 @@
                 sentimentBadge.style.display = 'none';
             }
         }
+
+        // Render Algorithmic Setups
+        app.renderOptionMarketSetups(data);
     };
 
     /**
-     * Render Open Interest Distribution Bar Chart using Chart.js
+     * Render Algorithmic Derivatives Setups in Options Hub
+     */
+    app.renderOptionMarketSetups = function (data) {
+        const container = document.getElementById('optAlgorithmicSetupsContainer');
+        const countBadge = document.getElementById('optSetupsCountBadge');
+        if (!container) return;
+
+        const setups = data.setups || [];
+        if (countBadge) {
+            countBadge.textContent = `${setups.length} ACTIVE`;
+            countBadge.style.background = setups.length > 0 ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+            countBadge.style.color = setups.length > 0 ? '#38bdf8' : 'var(--text-secondary)';
+        }
+
+        if (setups.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 1.5rem; text-align: center; color: var(--text-secondary); background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.08);">
+                    No high-probability derivative trigger conditions detected for current strike matrix.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        setups.forEach(s => {
+            const isBullish = s.direction === 'BULLISH';
+            const isBearish = s.direction === 'BEARISH';
+            const dirColor = isBullish ? '#34d399' : (isBearish ? '#f87171' : '#fbbf24');
+            const dirBg = isBullish ? 'rgba(16, 185, 129, 0.15)' : (isBearish ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)');
+            const confBadge = s.confidence === 'HIGH' ? 'background:rgba(16,185,129,0.2);color:#34d399;' : 'background:rgba(245,158,11,0.2);color:#fbbf24;';
+
+            html += `
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 700; font-size: 0.85rem; color: #fff;">${s.title}</span>
+                        <div style="display: flex; gap: 0.35rem;">
+                            <span style="font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; ${confBadge}">${s.confidence} CONFIDENCE</span>
+                            <span style="font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px; background:${dirBg}; color:${dirColor};">${s.direction}</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                        ${s.description}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.35rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); font-family: var(--font-mono); font-size: 0.72rem;">
+                        <div><span style="color:var(--text-secondary);font-size:0.65rem;display:block;">ENTRY</span><span style="font-weight:700;color:#fff;">${s.trigger_spot != null ? s.trigger_spot.toFixed(1) : '--'}</span></div>
+                        <div><span style="color:var(--text-secondary);font-size:0.65rem;display:block;">TARGET 1</span><span style="font-weight:700;color:#34d399;">${s.target_1 != null ? s.target_1.toFixed(1) : '--'}</span></div>
+                        <div><span style="color:var(--text-secondary);font-size:0.65rem;display:block;">TARGET 2</span><span style="font-weight:700;color:#34d399;">${s.target_2 != null ? s.target_2.toFixed(1) : '--'}</span></div>
+                        <div><span style="color:var(--text-secondary);font-size:0.65rem;display:block;">STOP LOSS</span><span style="font-weight:700;color:#f87171;">${s.stop_loss != null ? s.stop_loss.toFixed(1) : '--'}</span></div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    };
+
+    /**
+     * Render Open Interest / Gamma / Net Delta / IV Distribution Chart using Chart.js
      */
     app.renderOiDistributionChart = function (data) {
         const ctx = document.getElementById('optionsOiChart');
@@ -1084,12 +1253,9 @@
             return;
         }
 
-        const labels = strikes.map(s => s.strike);
-        const callOiData = strikes.map(s => s.ce_oi || 0);
-        const putOiData = strikes.map(s => s.pe_oi || 0);
-
         if (app._optionsChart) {
             app._optionsChart.destroy();
+            app._optionsChart = null;
         }
 
         if (typeof Chart === 'undefined') {
@@ -1097,87 +1263,337 @@
             return;
         }
 
-        app._optionsChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Call OI (Resistance)',
-                        data: callOiData,
-                        backgroundColor: 'rgba(239, 68, 68, 0.75)',
-                        borderColor: '#ef4444',
-                        borderWidth: 1,
-                        borderRadius: 3,
-                    },
-                    {
-                        label: 'Put OI (Support)',
-                        data: putOiData,
-                        backgroundColor: 'rgba(16, 185, 129, 0.75)',
-                        borderColor: '#10b981',
-                        borderWidth: 1,
-                        borderRadius: 3,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
+        const mode = (app._optionsChartMode || 'gex').toLowerCase();
+        const labels = strikes.map(s => s.strike);
+
+        let chartConfig = null;
+
+        if (mode === 'gex') {
+            // Mode 1: Dealer Gamma Exposure (GEX) Profile (₹ Lakhs)
+            const callGexData = strikes.map(s => s.ce_gex || 0);
+            const putGexData = strikes.map(s => s.pe_gex || 0);
+            const cumGexData = strikes.map(s => s.cum_net_gex || 0);
+
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Cumulative Net GEX (₹ Lakhs)',
+                            data: cumGexData,
+                            borderColor: '#38bdf8',
+                            borderWidth: 2,
+                            borderDash: [4, 4],
+                            fill: false,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            yAxisID: 'yGex'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Call GEX (+Gamma / Vol Dampening)',
+                            data: callGexData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: '#10b981',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            yAxisID: 'yGex'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Put GEX (-Gamma / Vol Acceleration)',
+                            data: putGexData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            yAxisID: 'yGex'
+                        }
+                    ]
                 },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(10, 10, 10, 0.9)',
-                        titleColor: '#fbbf24',
-                        titleFont: { weight: 'bold' },
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
-                        borderWidth: 1,
-                        callbacks: {
-                            label: function (context) {
-                                const val = context.parsed.y || 0;
-                                const formatted = val >= 100000 ? (val / 100000).toFixed(2) + ' L' : val.toLocaleString();
-                                return `${context.dataset.label}: ${formatted} (${val.toLocaleString()} contracts)`;
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#e2e8f0', font: { size: 10 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(10, 10, 10, 0.9)',
+                            titleColor: '#fbbf24',
+                            titleFont: { weight: 'bold' },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.parsed.y || 0;
+                                    const formatted = '₹' + (Math.abs(val)).toFixed(2) + ' Lakhs';
+                                    const sign = val >= 0 ? '+' : '-';
+                                    return `${context.dataset.label}: ${sign}${formatted}`;
+                                }
                             }
                         }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
-                        },
-                        ticks: {
-                            color: '#a1a1aa',
-                            font: { size: 10, family: 'var(--font-mono)' }
-                        }
                     },
-                    y: {
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#a1a1aa', font: { size: 10, family: 'var(--font-mono)' } }
                         },
-                        ticks: {
-                            color: '#a1a1aa',
-                            font: { size: 10, family: 'var(--font-mono)' },
-                            callback: function (val) {
-                                if (val >= 10000000) return (val / 10000000) + ' Cr';
-                                if (val >= 100000) return (val / 100000) + ' L';
-                                if (val >= 1000) return (val / 1000) + 'k';
-                                return val;
+                        yGex: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#a1a1aa',
+                                font: { size: 10, family: 'var(--font-mono)' },
+                                callback: function (val) {
+                                    return '₹' + val.toFixed(0) + 'L';
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            };
+        } else if (mode === 'oi') {
+            // Mode 2: Total OI & ΔOI
+            const callOiData = strikes.map(s => s.ce_oi || 0);
+            const callOiChgData = strikes.map(s => s.ce_change_oi || 0);
+            const putOiData = strikes.map(s => s.pe_oi || 0);
+            const putOiChgData = strikes.map(s => s.pe_change_oi || 0);
+
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Call OI (Total)',
+                            data: callOiData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.75)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        },
+                        {
+                            label: 'Call ΔOI',
+                            data: callOiChgData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.35)',
+                            borderColor: '#f87171',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        },
+                        {
+                            label: 'Put OI (Total)',
+                            data: putOiData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                            borderColor: '#10b981',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        },
+                        {
+                            label: 'Put ΔOI',
+                            data: putOiChgData,
+                            backgroundColor: 'rgba(16, 185, 129, 0.35)',
+                            borderColor: '#34d399',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#e2e8f0', font: { size: 10 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(10, 10, 10, 0.9)',
+                            titleColor: '#fbbf24',
+                            titleFont: { weight: 'bold' },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.parsed.y || 0;
+                                    const formatted = val >= 100000 ? (val / 100000).toFixed(2) + ' L' : val.toLocaleString();
+                                    return `${context.dataset.label}: ${formatted} (${val.toLocaleString()} contracts)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#a1a1aa', font: { size: 10, family: 'var(--font-mono)' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#a1a1aa',
+                                font: { size: 10, family: 'var(--font-mono)' },
+                                callback: function (val) {
+                                    if (val >= 10000000) return (val / 10000000) + ' Cr';
+                                    if (val >= 100000) return (val / 100000) + ' L';
+                                    if (val >= 1000) return (val / 1000) + 'k';
+                                    return val;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        } else if (mode === 'net_delta') {
+            // Mode 3: Net OI Delta (PE ΔOI - CE ΔOI)
+            const netDeltaData = strikes.map(s => (s.pe_change_oi || 0) - (s.ce_change_oi || 0));
+            const bgColors = netDeltaData.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.75)' : 'rgba(239, 68, 68, 0.75)');
+            const borderColors = netDeltaData.map(v => v >= 0 ? '#10b981' : '#ef4444');
+
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Net OI Delta (PE ΔOI - CE ΔOI)',
+                            data: netDeltaData,
+                            backgroundColor: bgColors,
+                            borderColor: borderColors,
+                            borderWidth: 1,
+                            borderRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(10, 10, 10, 0.9)',
+                            titleColor: '#fbbf24',
+                            titleFont: { weight: 'bold' },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.parsed.y || 0;
+                                    const bias = val >= 0 ? 'Bullish (Net Put Writing)' : 'Bearish (Net Call Writing)';
+                                    const formatted = val >= 100000 ? (val / 100000).toFixed(2) + ' L' : val.toLocaleString();
+                                    return `Net ΔOI: ${formatted} contracts · ${bias}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#a1a1aa', font: { size: 10, family: 'var(--font-mono)' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#a1a1aa',
+                                font: { size: 10, family: 'var(--font-mono)' },
+                                callback: function (val) {
+                                    if (val >= 10000000) return (val / 10000000) + ' Cr';
+                                    if (val >= 100000) return (val / 100000) + ' L';
+                                    if (val >= 1000) return (val / 1000) + 'k';
+                                    return val;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        } else if (mode === 'iv') {
+            // Mode 4: IV Skew & Smile
+            const ceIvData = strikes.map(s => s.ce_iv || null);
+            const peIvData = strikes.map(s => s.pe_iv || null);
+
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Call IV (%)',
+                            data: ceIvData,
+                            borderColor: '#f87171',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Put IV (%)',
+                            data: peIvData,
+                            borderColor: '#34d399',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#e2e8f0', font: { size: 10 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(10, 10, 10, 0.9)',
+                            titleColor: '#fbbf24',
+                            titleFont: { weight: 'bold' },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    const val = context.parsed.y;
+                                    return val != null ? `${context.dataset.label}: ${val.toFixed(1)}%` : `${context.dataset.label}: N/A`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#a1a1aa', font: { size: 10, family: 'var(--font-mono)' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#a1a1aa',
+                                font: { size: 10, family: 'var(--font-mono)' },
+                                callback: function (val) {
+                                    return val.toFixed(1) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        if (chartConfig) {
+            app._optionsChart = new Chart(ctx, chartConfig);
+        }
     };
 
     /**
-     * Render the comprehensive Strike Tree Table
+     * Render the comprehensive Strike Tree Table (13 Columns including Greeks & GEX)
      */
     app.renderStrikeTreeTable = function (data) {
         const tbody = document.getElementById('optionsStrikeTreeBody');
@@ -1187,7 +1603,7 @@
         if (strikes.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" style="text-align:center;padding:2.5rem;color:var(--text-secondary);">
+                    <td colspan="13" style="text-align:center;padding:2.5rem;color:var(--text-secondary);">
                         No option strikes available for the selected parameters.
                     </td>
                 </tr>
@@ -1223,6 +1639,19 @@
             return Number(val).toFixed(1) + '%';
         };
 
+        const formatGreek = (val) => {
+            if (val === null || val === undefined || isNaN(val)) return '-';
+            return Number(val).toFixed(2);
+        };
+
+        const formatGex = (val) => {
+            if (val === null || val === undefined || isNaN(val)) return '-';
+            const num = Number(val);
+            if (num > 0) return `<span style="color:#34d399;">+${num.toFixed(1)}</span>`;
+            if (num < 0) return `<span style="color:#f87171;">${num.toFixed(1)}</span>`;
+            return `<span style="color:#71717a;">0.0</span>`;
+        };
+
         let html = '';
         strikes.forEach(s => {
             const isAtm = !!s.is_atm;
@@ -1241,14 +1670,21 @@
             const ceBg = ceItm ? 'background:rgba(239, 68, 68, 0.06);' : '';
             const peBg = peItm ? 'background:rgba(16, 185, 129, 0.06);' : '';
 
+            // Net GEX display
+            const netGex = s.net_gex_lakhs != null ? Number(s.net_gex_lakhs) : null;
+            const netGexBadge = netGex !== null ?
+                `<div style="font-size:0.65rem;font-weight:600;color:${netGex >= 0 ? '#38bdf8' : '#f87171'};margin-top:2px;">${netGex >= 0 ? '+' : ''}${netGex.toFixed(1)}L</div>` : '';
+
             html += `
                 <tr style="background:${rowBg}; border-bottom: 1px solid rgba(255,255,255,0.04);" ${isAtm ? 'id="optionsAtmRow"' : ''}>
+                    <!-- CE: Delta -->
+                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:#c084fc;${ceBg}">${formatGreek(s.ce_delta)}</td>
+                    <!-- CE: GEX -->
+                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${ceBg}">${formatGex(s.ce_gex_lakhs)}</td>
                     <!-- CE: OI -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${ceBg}">${formatQty(s.ce_oi)}</td>
                     <!-- CE: Chg OI -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${ceBg}">${formatDelta(s.ce_change_oi)}</td>
-                    <!-- CE: Volume -->
-                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:var(--text-secondary);${ceBg}">${formatQty(s.ce_vol)}</td>
                     <!-- CE: IV -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:var(--text-secondary);${ceBg}">${formatIv(s.ce_iv)}</td>
                     <!-- CE: LTP -->
@@ -1256,19 +1692,22 @@
 
                     <!-- STRIKE -->
                     <td style="padding:0.35rem 0.5rem;text-align:center;font-family:var(--font-mono);background:#121316;${strikeStyle}">
-                        ${s.strike} ${isAtm ? '<span style="font-size:0.65rem;background:#fbbf24;color:#000;padding:0.1rem 0.3rem;border-radius:4px;margin-left:0.2rem;font-weight:bold;">ATM</span>' : ''}
+                        <div>${s.strike} ${isAtm ? '<span style="font-size:0.65rem;background:#fbbf24;color:#000;padding:0.1rem 0.3rem;border-radius:4px;margin-left:0.2rem;font-weight:bold;">ATM</span>' : ''}</div>
+                        ${netGexBadge}
                     </td>
 
                     <!-- PE: LTP -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#34d399;border-left:1px solid rgba(255,255,255,0.08);${peBg}">${formatPrice(s.pe_ltp)}</td>
                     <!-- PE: IV -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:var(--text-secondary);${peBg}">${formatIv(s.pe_iv)}</td>
-                    <!-- PE: Volume -->
-                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:var(--text-secondary);${peBg}">${formatQty(s.pe_vol)}</td>
                     <!-- PE: Chg OI -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${peBg}">${formatDelta(s.pe_change_oi)}</td>
                     <!-- PE: OI -->
                     <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${peBg}">${formatQty(s.pe_oi)}</td>
+                    <!-- PE: GEX -->
+                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);${peBg}">${formatGex(s.pe_gex_lakhs)}</td>
+                    <!-- PE: Delta -->
+                    <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:#c084fc;${peBg}">${formatGreek(s.pe_delta)}</td>
                 </tr>
             `;
         });
@@ -1282,6 +1721,203 @@
                 atmRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }, 150);
+    };
+
+    /**
+     * Fetch tracked algorithmic option setups ledger
+     */
+    app.fetchOptionSetupsHistory = async function (symbol = null) {
+        const sym = (symbol || app._optionsSymbol || 'NIFTY').trim().toUpperCase().replace('.NS', '');
+        const tbody = document.getElementById('optionsSetupsHistoryBody');
+        const badge = document.getElementById('optSetupHistoryCountBadge');
+        if (!tbody) return;
+
+        try {
+            const res = await fetch(`/api/v1/options/setups/history?symbol=${encodeURIComponent(sym)}&limit=100`);
+            if (!res.ok) throw new Error('Failed to fetch setups history');
+
+            const payload = await res.json();
+            const setups = payload.setups || [];
+            app._optionsSetupsHistory = setups;
+
+            if (badge) {
+                badge.innerText = `${setups.length} Setups`;
+            }
+
+            app.renderOptionSetupsHistory(setups);
+
+        } catch (e) {
+            console.error('Error fetching options setups history:', e);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="13" style="text-align:center;padding:1.5rem;color:#f87171;">
+                        Could not load tracked setups: ${e.message}
+                    </td>
+                </tr>
+            `;
+        }
+    };
+
+    /**
+     * Filter tracked setups by outcome state
+     */
+    app.filterOptionsSetups = function (filter) {
+        app._optionsSetupsFilter = filter || 'ALL';
+
+        // Update active filter button styling
+        const buttons = document.querySelectorAll('.opt-setup-filter-btn');
+        buttons.forEach(btn => {
+            if (btn.getAttribute('data-filter') === filter) {
+                btn.style.background = '#38bdf8';
+                btn.style.color = '#000000';
+            } else {
+                btn.style.background = 'transparent';
+                btn.style.color = '#94a3b8';
+            }
+        });
+
+        const allSetups = app._optionsSetupsHistory || [];
+        let filtered = allSetups;
+        if (filter === 'ACTIVE') {
+            filtered = allSetups.filter(s => s.outcome === 'ACTIVE');
+        } else if (filter === 'TARGET1_HIT') {
+            filtered = allSetups.filter(s => s.outcome === 'TARGET1_HIT' || s.outcome === 'TARGET2_HIT');
+        } else if (filter === 'STOPPED_OUT') {
+            filtered = allSetups.filter(s => s.outcome === 'STOPPED_OUT');
+        }
+
+        app.renderOptionSetupsHistory(filtered);
+    };
+
+    /**
+     * Render tracked setups into table
+     */
+    app.renderOptionSetupsHistory = function (setups) {
+        const tbody = document.getElementById('optionsSetupsHistoryBody');
+        if (!tbody) return;
+
+        if (!setups || setups.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="13" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">
+                        No tracked setups found for this filter.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const formatPrice = (p) => (p != null ? Number(p).toFixed(1) : '--');
+
+        let html = '';
+        setups.forEach(s => {
+            const isBull = (s.direction || '').toUpperCase() === 'BULLISH';
+            const isBear = (s.direction || '').toUpperCase() === 'BEARISH';
+            const biasBg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
+            const biasColor = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+
+            // Outcome badge
+            let outcomeBg = 'rgba(56,189,248,0.15)';
+            let outcomeColor = '#38bdf8';
+            let outcomeLabel = s.outcome || 'ACTIVE';
+
+            if (s.outcome === 'TARGET2_HIT') {
+                outcomeBg = 'rgba(16,185,129,0.2)';
+                outcomeColor = '#34d399';
+                outcomeLabel = '🎯 Target 2 Hit';
+            } else if (s.outcome === 'TARGET1_HIT') {
+                outcomeBg = 'rgba(16,185,129,0.15)';
+                outcomeColor = '#34d399';
+                outcomeLabel = '🎯 Target 1 Hit';
+            } else if (s.outcome === 'STOPPED_OUT') {
+                outcomeBg = 'rgba(239,68,68,0.2)';
+                outcomeColor = '#f87171';
+                outcomeLabel = '🛑 Stopped Out';
+            } else if (s.outcome === 'ACTIVE') {
+                outcomeBg = 'rgba(56,189,248,0.15)';
+                outcomeColor = '#38bdf8';
+                outcomeLabel = '⚡ Active';
+            }
+
+            // Calculate Spot PnL %
+            const trigger = s.trigger_spot != null ? Number(s.trigger_spot) : null;
+            const currentSpot = app._optionsChainData?.spot_price || (s.outcome === 'STOPPED_OUT' ? s.stop_loss : trigger);
+            let pnlStr = '--';
+            let pnlColor = 'var(--text-secondary)';
+
+            if (trigger && currentSpot) {
+                let diffPct = 0;
+                if (isBull) {
+                    diffPct = ((currentSpot - trigger) / trigger) * 100;
+                } else if (isBear) {
+                    diffPct = ((trigger - currentSpot) / trigger) * 100;
+                }
+                const sign = diffPct >= 0 ? '+' : '';
+                pnlStr = `${sign}${diffPct.toFixed(2)}%`;
+                pnlColor = diffPct >= 0 ? '#34d399' : '#f87171';
+            }
+
+            // Entry timestamp formatting
+            const dateStr = s.entry_time || s.created_at || '--';
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);white-space:nowrap;">${dateStr}</td>
+                    <td style="font-family:var(--font-mono);font-weight:700;color:var(--text-primary);">${s.symbol || '--'}</td>
+                    <td style="font-weight:600;color:#f1f5f9;">${s.setup_type || '--'}</td>
+                    <td>
+                        <span style="background:${biasBg};color:${biasColor};padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;font-size:0.72rem;">
+                            ${s.direction || '--'}
+                        </span>
+                    </td>
+                    <td style="font-family:var(--font-mono);color:var(--text-primary);">${formatPrice(s.trigger_spot)}</td>
+                    <td style="font-family:var(--font-mono);color:#f87171;">${formatPrice(s.stop_loss)}</td>
+                    <td style="font-family:var(--font-mono);color:#34d399;">${formatPrice(s.target_1)}</td>
+                    <td style="font-family:var(--font-mono);color:#34d399;font-weight:700;">${formatPrice(s.target_2)}</td>
+                    <td style="font-family:var(--font-mono);color:#38bdf8;">1:2.0</td>
+                    <td style="font-family:var(--font-mono);color:var(--text-secondary);">${formatPrice(s.trigger_spot)}</td>
+                    <td style="font-family:var(--font-mono);">${formatPrice(currentSpot)}</td>
+                    <td style="font-family:var(--font-mono);font-weight:700;color:${pnlColor};">${pnlStr}</td>
+                    <td style="text-align:center;">
+                        <span style="background:${outcomeBg};color:${outcomeColor};padding:0.18rem 0.5rem;border-radius:4px;font-weight:700;font-size:0.72rem;display:inline-block;white-space:nowrap;">
+                            ${outcomeLabel}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    };
+
+    /**
+     * Trigger live evaluation of active setups against current spot price
+     */
+    app.evaluateOptionSetups = async function () {
+        const sym = (app._optionsSymbol || 'NIFTY').trim().toUpperCase().replace('.NS', '');
+        const currentSpot = app._optionsChainData?.spot_price;
+        try {
+            let url = `/api/v1/options/setups/evaluate?symbol=${encodeURIComponent(sym)}`;
+            if (currentSpot) url += `&current_spot=${currentSpot}`;
+
+            const res = await fetch(url, { method: 'POST' });
+            if (!res.ok) throw new Error('Evaluation request failed');
+
+            const payload = await res.json();
+            const count = payload.evaluated_count || 0;
+
+            // Refresh table
+            await app.fetchOptionSetupsHistory(sym);
+
+            if (typeof app.showToast === 'function') {
+                app.showToast(`Evaluated ${count} active setups for ${sym}`, 'success');
+            }
+        } catch (e) {
+            console.error('Error evaluating options setups:', e);
+            if (typeof app.showToast === 'function') {
+                app.showToast(`Evaluation failed: ${e.message}`, 'error');
+            }
+        }
     };
 
     /**

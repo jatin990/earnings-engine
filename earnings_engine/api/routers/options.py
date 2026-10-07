@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query
 from earnings_engine.api.dependencies import _settings
 from earnings_engine.data import option_chain as oc_mod
 from earnings_engine.data import options_chart_engine as oce_mod
+from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.universe import is_fno_eligible, _SEED_NSE_FNO
 from earnings_engine.logging_utils import get_logger
 
@@ -165,4 +166,71 @@ async def get_options_chart_intelligence(
     except Exception as e:
         logger.exception("Error in get_options_chart_intelligence for %s: %s", clean_symbol, e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/options/setups/history")
+async def get_options_setups_history(
+    symbol: str | None = Query(None, description="Optional symbol filter (e.g. NIFTY, BANKNIFTY)"),
+    outcome: str | None = Query(None, description="Optional outcome filter (ACTIVE, TARGET1_HIT, TARGET2_HIT, STOPPED_OUT)"),
+    limit: int = Query(50, ge=1, le=200, description="Max history records to return"),
+) -> dict[str, Any]:
+    """Retrieve historical tracked algorithmic option setups from SQLite ledger."""
+    def _fetch():
+        conn = get_db_connection(_get_settings())
+        return oc_mod.get_tracked_option_setups(
+            conn=conn,
+            symbol=symbol,
+            outcome=outcome,
+            limit=limit,
+        )
+
+    try:
+        records = await asyncio.to_thread(_fetch)
+        return {
+            "success": True,
+            "count": len(records),
+            "symbol": symbol.upper().replace(".NS", "") if symbol else None,
+            "outcome": outcome.upper() if outcome else None,
+            "setups": records,
+        }
+    except Exception as e:
+        logger.exception("Error in get_options_setups_history: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/options/setups/evaluate")
+async def evaluate_options_setups(
+    symbol: str = Query("NIFTY", description="Symbol to evaluate active setups for"),
+    current_spot: float | None = Query(None, description="Optional current spot price override"),
+) -> dict[str, Any]:
+    """Evaluate active tracked setups against current spot price and update outcome state machine."""
+    clean_symbol = symbol.strip().upper().replace(".NS", "")
+
+    def _eval():
+        settings = _get_settings()
+        spot = current_spot
+        if spot is None or spot <= 0:
+            spot = oc_mod._resolve_spot_price(clean_symbol, None, settings)
+        if not spot or spot <= 0:
+            return []
+
+        conn = get_db_connection(settings)
+        return oc_mod.evaluate_tracked_option_setups(
+            conn=conn,
+            symbol=clean_symbol,
+            current_spot=float(spot),
+        )
+
+    try:
+        updates = await asyncio.to_thread(_eval)
+        return {
+            "success": True,
+            "symbol": clean_symbol,
+            "evaluated_count": len(updates),
+            "updates": updates,
+        }
+    except Exception as e:
+        logger.exception("Error in evaluate_options_setups for %s: %s", clean_symbol, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
