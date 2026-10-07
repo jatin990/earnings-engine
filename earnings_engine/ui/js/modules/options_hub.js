@@ -35,6 +35,63 @@
     app._smartChartData = null;
     app._optionsPollTimer = null;
     app._hasInitialChartFitted = false;
+    app._avgVolume = 1;
+    app._crosshairBound = false;
+
+    /**
+     * Universal IST (Indian Standard Time / Asia/Kolkata) Timestamp Formatter
+     */
+    function formatIST(timeVal, opts = {}) {
+        if (timeVal === null || timeVal === undefined || timeVal === '') return '--';
+        let ms;
+        if (typeof timeVal === 'number') {
+            ms = timeVal < 1e11 ? timeVal * 1000 : timeVal;
+        } else if (typeof timeVal === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(timeVal)) {
+                const parts = timeVal.split('-').map(Number);
+                const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 10, 0, 0));
+                return new Intl.DateTimeFormat('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: opts.includeYear ? 'numeric' : (opts.hideYear ? undefined : 'numeric'),
+                }).format(dt);
+            }
+            ms = Date.parse(timeVal.includes('Z') || timeVal.includes('+') ? timeVal : timeVal + 'T00:00:00+05:30');
+        } else if (timeVal instanceof Date) {
+            ms = timeVal.getTime();
+        } else if (typeof timeVal === 'object' && timeVal.year) {
+            const dt = new Date(Date.UTC(timeVal.year, timeVal.month - 1, timeVal.day, 10, 0, 0));
+            return new Intl.DateTimeFormat('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                day: '2-digit',
+                month: 'short',
+                year: opts.includeYear ? 'numeric' : undefined,
+            }).format(dt);
+        } else {
+            ms = Date.now();
+        }
+
+        if (isNaN(ms)) return String(timeVal);
+
+        const d = new Date(ms);
+        const formatConfig = {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: 'short',
+            hour12: false,
+        };
+        if (opts.includeYear) formatConfig.year = 'numeric';
+        if (opts.includeTime !== false) {
+            formatConfig.hour = '2-digit';
+            formatConfig.minute = '2-digit';
+            if (opts.includeSeconds) formatConfig.second = '2-digit';
+        }
+
+        const formatted = new Intl.DateTimeFormat('en-IN', formatConfig).format(d);
+        return opts.suffix !== false ? `${formatted} IST` : formatted;
+    }
+    app.formatIST = formatIST;
 
     /**
      * Switch active symbol and refresh both option chain & chart intelligence
@@ -285,9 +342,9 @@
 
         const chart = window.LightweightCharts.createChart(container, {
             width: container.clientWidth || 800,
-            height: 460,
+            height: 560,
             layout: {
-                background: { type: 'solid', color: '#090a0f' },
+                background: { type: 'solid', color: '#050505' },
                 textColor: '#94a3b8',
                 fontSize: 11,
                 fontFamily: "var(--font-mono, monospace)",
@@ -298,15 +355,27 @@
             },
             crosshair: {
                 mode: window.LightweightCharts.CrosshairMode.Normal,
+                vertLine: { color: 'rgba(234, 179, 8, 0.4)', width: 1, style: 2 },
+                horzLine: { color: 'rgba(234, 179, 8, 0.4)', width: 1, style: 2 },
             },
             rightPriceScale: {
                 borderColor: 'rgba(255, 255, 255, 0.08)',
+                autoScale: true,
                 scaleMargins: { top: 0.08, bottom: 0.15 },
+            },
+            localization: {
+                locale: 'en-IN',
+                dateFormat: 'dd MMM yyyy',
+                timeFormatter: (time) => formatIST(time, { includeTime: true, suffix: false }),
+                dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: false }),
             },
             timeScale: {
                 borderColor: 'rgba(255, 255, 255, 0.08)',
                 timeVisible: true,
                 secondsVisible: false,
+                tickMarkFormatter: (time, tickMarkType) => {
+                    return formatIST(time, { includeTime: tickMarkType >= 3, includeYear: tickMarkType === 0, suffix: false });
+                },
             },
         });
 
@@ -356,6 +425,9 @@
         app._vwapUpperSeries = vwapUpperSeries;
         app._vwapLowerSeries = vwapLowerSeries;
 
+        // Subscribe to crosshair movement for Sticky Hover Inspector HUD
+        chart.subscribeCrosshairMove(app.handleOptionsCrosshairMove);
+
         // Responsive ResizeObserver
         const ro = new ResizeObserver(entries => {
             if (!entries || entries.length === 0 || !app._smartChart) return;
@@ -368,6 +440,170 @@
     };
 
     /**
+     * Crosshair move handler for Sticky Real-time Hover Inspector HUD bar
+     */
+    app.handleOptionsCrosshairMove = function (param) {
+        const inspectTime = document.getElementById('optInspectTime');
+        const inspectOpen = document.getElementById('optInspectOpen');
+        const inspectHigh = document.getElementById('optInspectHigh');
+        const inspectLow = document.getElementById('optInspectLow');
+        const inspectClose = document.getElementById('optInspectClose');
+        const inspectTr = document.getElementById('optInspectTr');
+        const inspectVol = document.getElementById('optInspectVol');
+        const inspectDelta = document.getElementById('optInspectDelta');
+        const inspectZoneDetails = document.getElementById('optInspectZoneDetails');
+        const inspectZone = document.getElementById('optInspectZone');
+
+        if (!inspectTime) return;
+
+        let candle = null;
+        let timeSec = null;
+
+        if (param && param.time && app._candleSeries && param.seriesData) {
+            candle = param.seriesData.get(app._candleSeries);
+            timeSec = typeof param.time === 'number' ? param.time : (param.time.year ? new Date(Date.UTC(param.time.year, param.time.month - 1, param.time.day)).getTime() / 1000 : null);
+        }
+
+        // Fallback to latest candle if cursor left canvas
+        if (!candle && app._smartChartData && app._smartChartData.candles && app._smartChartData.candles.length > 0) {
+            const candles = app._smartChartData.candles;
+            candle = candles[candles.length - 1];
+            timeSec = candle.time;
+        }
+
+        if (!candle) {
+            if (inspectTime) inspectTime.textContent = 'Cursor: --';
+            return;
+        }
+
+        const timeStr = formatIST(timeSec || param.time || Date.now() / 1000, { includeTime: true, suffix: true });
+
+        if (inspectTime) inspectTime.textContent = timeStr;
+        if (inspectOpen) inspectOpen.textContent = `₹${candle.open !== undefined ? Number(candle.open).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (inspectHigh) inspectHigh.textContent = `₹${candle.high !== undefined ? Number(candle.high).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (inspectLow) inspectLow.textContent = `₹${candle.low !== undefined ? Number(candle.low).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+        if (inspectClose) inspectClose.textContent = `₹${candle.close !== undefined ? Number(candle.close).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}`;
+
+        const tr = Math.max((candle.high || 0) - (candle.low || 0), 0);
+        if (inspectTr) inspectTr.textContent = `₹${tr.toFixed(2)}`;
+
+        // Volume surge multiple
+        const volItem = app._volumeSeries && param.seriesData ? param.seriesData.get(app._volumeSeries) : null;
+        const v = volItem ? Number(volItem.value || 0) : Number(candle.volume || 0);
+        const avgVol = app._avgVolume || 1;
+        const volRatio = (v / avgVol).toFixed(1);
+
+        if (inspectVol) {
+            const vFormatted = v >= 10000000 ? (v / 10000000).toFixed(2) + ' Cr' :
+                               v >= 100000 ? (v / 100000).toFixed(2) + ' L' :
+                               v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
+            inspectVol.textContent = `Vol: ${v ? vFormatted : '--'} (${volRatio}x avg)`;
+            if (Number(volRatio) >= 2.0) {
+                inspectVol.style.background = 'rgba(16, 185, 129, 0.25)';
+                inspectVol.style.color = '#10b981';
+            } else if (Number(volRatio) >= 1.2) {
+                inspectVol.style.background = 'rgba(56, 189, 248, 0.2)';
+                inspectVol.style.color = '#38bdf8';
+            } else {
+                inspectVol.style.background = 'rgba(255, 255, 255, 0.08)';
+                inspectVol.style.color = '#ededed';
+            }
+        }
+
+        // Wick Delta (Buyer Absorption vs Seller Rejection Pressure)
+        if (inspectDelta && candle.high !== undefined && candle.low !== undefined) {
+            const rng = Math.max(candle.high - candle.low, 0.001);
+            const buyRatio = Math.round(((candle.close - candle.low) / rng) * 100);
+            const sellRatio = 100 - buyRatio;
+            inspectDelta.textContent = `Delta: ${buyRatio}% B / ${sellRatio}% S`;
+            inspectDelta.style.color = buyRatio >= 50 ? '#10b981' : '#f43f5e';
+            inspectDelta.style.background = buyRatio >= 50 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)';
+        }
+
+        // Zone intersection check (Derivatives Max Pain, Call/Put Walls, ORB, Order Blocks, FVGs)
+        if (inspectZoneDetails && app._smartChartData) {
+            const data = app._smartChartData;
+            const deriv = data.derivatives_levels || {};
+            const smartMoney = data.smart_money || {};
+            const ind = data.indicators || {};
+            let matchedZone = null;
+            let zoneColor = '#eab308';
+
+            let hoverPrice = candle.close;
+            if (param.point && param.point.y !== undefined && app._candleSeries.coordinateToPrice) {
+                const p = app._candleSeries.coordinateToPrice(param.point.y);
+                if (p) hoverPrice = p;
+            }
+
+            // 1. Check Max Pain, Call Wall, Put Wall
+            if (deriv.call_wall && Math.abs(hoverPrice - deriv.call_wall) <= (deriv.call_wall * 0.003)) {
+                matchedZone = `Call Wall (Major Resistance) @ ₹${deriv.call_wall.toLocaleString()}`;
+                zoneColor = '#f87171';
+            } else if (deriv.put_wall && Math.abs(hoverPrice - deriv.put_wall) <= (deriv.put_wall * 0.003)) {
+                matchedZone = `Put Wall (Major Support) @ ₹${deriv.put_wall.toLocaleString()}`;
+                zoneColor = '#34d399';
+            } else if (deriv.max_pain && Math.abs(hoverPrice - deriv.max_pain) <= (deriv.max_pain * 0.003)) {
+                matchedZone = `Max Pain Strike @ ₹${deriv.max_pain.toLocaleString()}`;
+                zoneColor = '#fbbf24';
+            }
+
+            // 2. Check Order Blocks
+            if (!matchedZone && smartMoney.order_blocks) {
+                for (const ob of smartMoney.order_blocks) {
+                    const bMin = Math.min(ob.price_low || ob.bottom || 0, ob.price_high || ob.top || 0);
+                    const bMax = Math.max(ob.price_low || ob.bottom || 0, ob.price_high || ob.top || 0);
+                    if ((hoverPrice >= bMin && hoverPrice <= bMax) || param.time === ob.start_time) {
+                        const tag = ob.type === 'BULLISH_OB' ? 'Demand Order Block (D-OB)' : 'Supply Order Block (S-OB)';
+                        matchedZone = `${tag} @ ₹${bMin}–₹${bMax}`;
+                        zoneColor = ob.type === 'BULLISH_OB' ? '#10b981' : '#f87171';
+                        break;
+                    }
+                }
+            }
+
+            // 3. Check FVGs
+            if (!matchedZone && smartMoney.fvg_gaps) {
+                for (const fvg of smartMoney.fvg_gaps) {
+                    const fMin = Math.min(fvg.low || fvg.bottom || 0, fvg.high || fvg.top || 0);
+                    const fMax = Math.max(fvg.low || fvg.bottom || 0, fvg.high || fvg.top || 0);
+                    if ((hoverPrice >= fMin && hoverPrice <= fMax) || param.time === fvg.time) {
+                        matchedZone = `Fair Value Gap (${fvg.type || 'FVG'}) @ ₹${fMin}–₹${fMax}`;
+                        zoneColor = '#38bdf8';
+                        break;
+                    }
+                }
+            }
+
+            // 4. Check ORB-15 High / Low
+            if (!matchedZone && ind.orb && ind.orb.active) {
+                if (Math.abs(hoverPrice - ind.orb.high) <= (ind.orb.high * 0.002)) {
+                    matchedZone = `15m ORB High Resistance @ ₹${ind.orb.high.toLocaleString()}`;
+                    zoneColor = '#c084fc';
+                } else if (Math.abs(hoverPrice - ind.orb.low) <= (ind.orb.low * 0.002)) {
+                    matchedZone = `15m ORB Low Support @ ₹${ind.orb.low.toLocaleString()}`;
+                    zoneColor = '#c084fc';
+                }
+            }
+
+            if (matchedZone) {
+                inspectZoneDetails.textContent = matchedZone;
+                if (inspectZone) {
+                    inspectZone.style.background = `${zoneColor}22`;
+                    inspectZone.style.borderColor = `${zoneColor}55`;
+                    inspectZone.style.color = zoneColor;
+                }
+            } else {
+                inspectZoneDetails.textContent = `Hover over chart / SMC & Derivatives Key Levels`;
+                if (inspectZone) {
+                    inspectZone.style.background = 'rgba(234,179,8,0.12)';
+                    inspectZone.style.borderColor = 'rgba(234,179,8,0.25)';
+                    inspectZone.style.color = '#eab308';
+                }
+            }
+        }
+    };
+
+    /**
      * Load full candlestick & quant intelligence from backend API
      */
     app.loadOptionsChartIntelligence = async function (forceRefresh = false, isBackground = false) {
@@ -375,6 +611,7 @@
         const tf = app._optionsTimeframe || '5m';
         const loadingEl = document.getElementById('optionsSmartChartLoading');
         const dot = document.getElementById('optLivePulseDot');
+        const timeEl = document.getElementById('optChartTimestamp');
 
         if (loadingEl && !isBackground) {
             loadingEl.style.display = 'flex';
@@ -387,6 +624,20 @@
 
             const data = await res.json();
             app._smartChartData = data;
+
+            // Compute 20-period moving average volume for surge ratios
+            if (data.candles && data.candles.length > 0) {
+                const vols = data.candles.map(c => c.volume || 0);
+                const recent = vols.slice(-20);
+                const sum = recent.reduce((a, b) => a + b, 0);
+                app._avgVolume = Math.max(Math.round(sum / Math.max(recent.length, 1)), 1);
+            }
+
+            // Update timestamp badge in IST
+            if (timeEl) {
+                const ts = data.timestamp ? formatIST(data.timestamp, { includeTime: true, suffix: true }) : formatIST(Date.now() / 1000, { includeTime: true, suffix: true });
+                timeEl.textContent = `As of ${ts}`;
+            }
 
             // Render chart (preserving user zoom / pan if background update) & Tactical HUD
             app.renderSmartChart(data, isBackground);

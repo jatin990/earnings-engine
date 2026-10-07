@@ -165,6 +165,7 @@
                     <span id="optChartConfidenceBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-weight:700;">
                         85% Confluence
                     </span>
+                    <span id="optChartTimestamp" style="font-size:0.72rem;color:var(--text-secondary);font-family:var(--font-mono);margin-left:0.35rem;">--</span>
                 </div>
                 <p style="margin:0.25rem 0 0 0;font-size:0.78rem;color:var(--text-secondary);">
                     Live intraday candles, Session VWAP bands, 15m ORB, institutional Order Blocks (OB/FVG), and derivatives key level rays (Max Pain, Call/Put Walls).
@@ -214,10 +215,35 @@
             </div>
         </div>
 
+        <!-- Sticky Real-time Hover Inspector Bar -->
+        <div id="optHoverInspectorCard" style="background: rgba(15,15,18,0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem;">
+            <!-- Left: Cursor Time & OHLC & TR -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <span id="optInspectTime" style="color: #38bdf8; font-weight: 700;">Cursor: --</span>
+                <span style="color: var(--text-secondary);">O: <strong id="optInspectOpen" style="color: #fff;">--</strong></span>
+                <span style="color: var(--text-secondary);">H: <strong id="optInspectHigh" style="color: #10b981;">--</strong></span>
+                <span style="color: var(--text-secondary);">L: <strong id="optInspectLow" style="color: #f43f5e;">--</strong></span>
+                <span style="color: var(--text-secondary);">C: <strong id="optInspectClose" style="color: #fff;">--</strong></span>
+                <span style="color: var(--text-secondary);">TR: <strong id="optInspectTr" style="color: #fbbf24;">--</strong></span>
+            </div>
+
+            <!-- Middle: Volume Surge & Wick Pressure -->
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <span id="optInspectVol" class="badge" style="background: rgba(255,255,255,0.08); color: #ededed; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Vol: --</span>
+                <span id="optInspectDelta" class="badge" style="background: rgba(56,189,248,0.12); color: #38bdf8; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Delta: --</span>
+            </div>
+
+            <!-- Right: Active SMC & F&O Key Level Collision Forensics -->
+            <div id="optInspectZone" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.73rem; background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.25); color: #eab308; padding: 0.2rem 0.55rem; border-radius: 5px;">
+                <span>🎯</span>
+                <span id="optInspectZoneDetails">Hover over chart / SMC Order Blocks &amp; Key Levels</span>
+            </div>
+        </div>
+
         <!-- High-Resolution Interactive Lightweight Charts Canvas -->
-        <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:460px;background:#090a0f;border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
+        <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:560px;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
             <div id="optionsSmartChartCanvas" style="width:100%;height:100%;"></div>
-            <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(9,10,15,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
+            <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,5,5,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
                 <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
                     <div style="width:24px;height:24px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
                     <span>Streaming live candlestick bars &amp; computing Order Blocks...</span>

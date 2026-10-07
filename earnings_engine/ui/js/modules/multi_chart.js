@@ -6,6 +6,58 @@
     window.app = window.app || {};
     const app = window.app;
 
+    function formatIST(val, opts = {}) {
+        if (!val) return '—';
+        try {
+            let d;
+            if (typeof val === 'number') {
+                d = new Date(val > 1e11 ? val : val * 1000);
+            } else if (typeof val === 'string') {
+                if (val.includes('T')) {
+                    d = new Date(val);
+                } else if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                    const [y, m, day] = val.split('-').map(Number);
+                    d = new Date(Date.UTC(y, m - 1, day, 10, 0, 0));
+                } else {
+                    d = new Date(val);
+                }
+            } else if (val instanceof Date) {
+                d = val;
+            } else if (val && typeof val === 'object' && val.year) {
+                d = new Date(Date.UTC(val.year, (val.month || 1) - 1, val.day || 1, 10, 0, 0));
+            } else {
+                return String(val);
+            }
+
+            if (isNaN(d.getTime())) return String(val);
+
+            const timeParts = {
+                timeZone: 'Asia/Kolkata',
+                hour12: false,
+            };
+
+            if (opts.includeDate && opts.includeTime) {
+                const dateStr = d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                const timeStr = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+                return `${dateStr} ${timeStr}${opts.suffix ? ' IST' : ''}`;
+            } else if (opts.includeTime) {
+                const timeStr = d.toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: opts.includeSeconds ? '2-digit' : undefined,
+                    hour12: false
+                });
+                return `${timeStr}${opts.suffix ? ' IST' : ''}`;
+            } else {
+                return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+            }
+        } catch (e) {
+            return String(val);
+        }
+    }
+    app.formatIST = formatIST;
+
     app.multiChart = {
         layout: '1x1',
         syncCrosshair: true,
@@ -78,6 +130,21 @@
             },
             crosshair: {
                 mode: window.LightweightCharts.CrosshairMode.Normal,
+                vertLine: {
+                    color: 'rgba(234, 179, 8, 0.4)',
+                    width: 1,
+                    style: 1,
+                },
+                horzLine: {
+                    color: 'rgba(234, 179, 8, 0.4)',
+                    width: 1,
+                    style: 1,
+                },
+            },
+            localization: {
+                dateFormat: 'yyyy-MM-dd',
+                timeFormatter: (val) => formatIST(val, { includeDate: false, includeSeconds: true }),
+                dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false }),
             },
             rightPriceScale: {
                 borderColor: colors.border,
@@ -87,6 +154,9 @@
                 borderColor: colors.border,
                 timeVisible: true,
                 secondsVisible: false,
+                tickMarkFormatter: (time, tickMarkType, locale) => {
+                    return formatIST(time, { includeTime: false });
+                },
             },
         });
 

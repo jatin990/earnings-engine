@@ -2364,11 +2364,29 @@
                     },
                     crosshair: {
                         mode: window.LightweightCharts.CrosshairMode.Normal,
+                        vertLine: {
+                            color: 'rgba(234, 179, 8, 0.4)',
+                            width: 1,
+                            style: 1,
+                        },
+                        horzLine: {
+                            color: 'rgba(234, 179, 8, 0.4)',
+                            width: 1,
+                            style: 1,
+                        },
+                    },
+                    localization: {
+                        dateFormat: 'yyyy-MM-dd',
+                        timeFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: false, includeSeconds: true }) : val),
+                        dateFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: true, includeTime: false }) : val),
                     },
                     timeScale: {
                         borderColor: 'rgba(255, 255, 255, 0.08)',
                         timeVisible: true,
                         secondsVisible: false,
+                        tickMarkFormatter: (time, tickMarkType, locale) => {
+                            return (window.app && window.app.formatIST ? window.app.formatIST(time, { includeTime: false }) : time);
+                        },
                     },
                     rightPriceScale: {
                         borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -2549,7 +2567,9 @@
                         if (hudH) hudH.textContent = '₹' + Number(candle.high).toFixed(2);
                         if (hudL) hudL.textContent = '₹' + Number(candle.low).toFixed(2);
                         if (hudC) hudC.textContent = '₹' + Number(candle.close).toFixed(2);
-                        if (hudTime && timeVal) hudTime.textContent = timeVal;
+                        if (hudTime && timeVal) {
+                            hudTime.textContent = (window.app && window.app.formatIST ? window.app.formatIST(timeVal, { includeDate: true, includeTime: typeof timeVal === 'number', suffix: true }) : timeVal);
+                        }
                     }
                 });
 

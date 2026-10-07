@@ -49,6 +49,61 @@
     mod._crosshairBound = false;
 
     /**
+     * Universal IST (Indian Standard Time / Asia/Kolkata) Timestamp Formatter
+     */
+    function formatIST(timeVal, opts = {}) {
+        if (timeVal === null || timeVal === undefined || timeVal === '') return '--';
+        let ms;
+        if (typeof timeVal === 'number') {
+            ms = timeVal < 1e11 ? timeVal * 1000 : timeVal;
+        } else if (typeof timeVal === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(timeVal)) {
+                const parts = timeVal.split('-').map(Number);
+                const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 10, 0, 0));
+                return new Intl.DateTimeFormat('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: opts.includeYear ? 'numeric' : (opts.hideYear ? undefined : 'numeric'),
+                }).format(dt);
+            }
+            ms = Date.parse(timeVal.includes('Z') || timeVal.includes('+') ? timeVal : timeVal + 'T00:00:00+05:30');
+        } else if (timeVal instanceof Date) {
+            ms = timeVal.getTime();
+        } else if (typeof timeVal === 'object' && timeVal.year) {
+            const dt = new Date(Date.UTC(timeVal.year, timeVal.month - 1, timeVal.day, 10, 0, 0));
+            return new Intl.DateTimeFormat('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                day: '2-digit',
+                month: 'short',
+                year: opts.includeYear ? 'numeric' : undefined,
+            }).format(dt);
+        } else {
+            ms = Date.now();
+        }
+
+        if (isNaN(ms)) return String(timeVal);
+
+        const d = new Date(ms);
+        const formatConfig = {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: 'short',
+            hour12: false,
+        };
+        if (opts.includeYear) formatConfig.year = 'numeric';
+        if (opts.includeTime !== false) {
+            formatConfig.hour = '2-digit';
+            formatConfig.minute = '2-digit';
+            if (opts.includeSeconds) formatConfig.second = '2-digit';
+        }
+
+        const formatted = new Intl.DateTimeFormat('en-IN', formatConfig).format(d);
+        return opts.suffix !== false ? `${formatted} IST` : formatted;
+    }
+    mod.formatIST = formatIST;
+
+    /**
      * Check if commodities tab is active / visible in viewport
      */
     mod.isTabActive = function () {
@@ -269,7 +324,7 @@
                     spotChangeEl.style.color = chg >= 0 ? '#10b981' : '#f43f5e';
                 }
                 if (timeEl && data.timestamp) {
-                    timeEl.textContent = `As of ${data.timestamp}`;
+                    timeEl.textContent = `As of ${formatIST(data.timestamp, { includeTime: true, suffix: true })}`;
                 }
             }
         } catch (e) {
@@ -307,10 +362,19 @@
                     borderColor: 'rgba(255, 255, 255, 0.08)',
                     autoScale: true,
                 },
+                localization: {
+                    locale: 'en-IN',
+                    dateFormat: 'dd MMM yyyy',
+                    timeFormatter: (time) => formatIST(time, { includeTime: true, suffix: false }),
+                    dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: false }),
+                },
                 timeScale: {
                     borderColor: 'rgba(255, 255, 255, 0.08)',
                     timeVisible: true,
                     secondsVisible: false,
+                    tickMarkFormatter: (time, tickMarkType) => {
+                        return formatIST(time, { includeTime: tickMarkType >= 3, includeYear: tickMarkType === 0, suffix: false });
+                    },
                 },
             });
 
@@ -383,8 +447,7 @@
         if (!candle) return;
 
         const curr = mod._chartData?.currency_symbol || '$';
-        const d = new Date((timeSec || param.time || Date.now() / 1000) * 1000);
-        const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const timeStr = formatIST(timeSec || param.time || Date.now() / 1000, { includeTime: true, suffix: true });
 
         if (inspectTime) inspectTime.textContent = timeStr;
         if (inspectOpen) inspectOpen.textContent = `${curr}${candle.open !== undefined ? candle.open.toFixed(2) : '--'}`;

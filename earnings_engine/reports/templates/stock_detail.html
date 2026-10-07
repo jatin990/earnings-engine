@@ -1512,25 +1512,38 @@
             <!-- VIEW 2: NEXUS QUANT CANVAS & CUSTOM WALL OVERLAYS -->
             <div id="nexusQuantCanvasWrap" style="display: none; flex-direction: column; gap: 0.65rem;">
                 <!-- Interactive Crosshair HUD Info Bar -->
-                <div id="chartHudBar" style="display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.05); padding: 0.45rem 0.85rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.78rem;">
-                    <div style="color: #94a3b8;"><span style="color: #64748b;">DATE: </span><strong id="hudDate" style="color: #e2e8f0;">—</strong></div>
+                <div id="chartHudBar" style="display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; background: rgba(5,5,5,0.85); border: 1px solid rgba(255,255,255,0.08); padding: 0.45rem 0.85rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.76rem; backdrop-filter: blur(8px);">
+                    <div style="color: #94a3b8; display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="color: #64748b; font-size: 0.68rem; font-weight: 700;">DATE/TIME (IST):</span>
+                        <strong id="hudDate" style="color: #eab308; background: rgba(234,179,8,0.12); padding: 0.12rem 0.45rem; border-radius: 4px; font-weight: 700; border: 1px solid rgba(234,179,8,0.25);">—</strong>
+                    </div>
                     <div><span style="color: #64748b;">O: </span><strong id="hudOpen" style="color: #e2e8f0;">—</strong></div>
                     <div><span style="color: #64748b;">H: </span><strong id="hudHigh" style="color: #34d399;">—</strong></div>
                     <div><span style="color: #64748b;">L: </span><strong id="hudLow" style="color: #f87171;">—</strong></div>
                     <div><span style="color: #64748b;">C: </span><strong id="hudClose" style="color: #38bdf8;">—</strong></div>
-                    <div><span style="color: #64748b;">VOL: </span><strong id="hudVol" style="color: #e2e8f0;">—</strong></div>
+                    <div><span style="color: #64748b;">TR: </span><strong id="hudTR" style="color: #cbd5e1;">—</strong></div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="color: #64748b;">VOL: </span>
+                        <strong id="hudVol" style="color: #e2e8f0;">—</strong>
+                        <span id="hudVolSurge" style="color: #38bdf8; font-size: 0.70rem; font-weight: 700;"></span>
+                    </div>
+                    <div id="hudWickWrap" style="display: flex; align-items: center; gap: 0.35rem; color: #94a3b8;">
+                        <span style="color: #64748b;">WICK DELTA: </span>
+                        <strong id="hudWickDelta" style="color: #e2e8f0;">—</strong>
+                    </div>
+                    <div id="hudZoneTag" style="display: none; padding: 0.12rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.70rem; font-family: var(--font-mono);"></div>
                     <div id="hudChangePill" style="display: none; padding: 0.1rem 0.45rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem;">—</div>
                 </div>
 
                 <!-- Canvas Container with Loading Overlay & Draggable Depth Overlay -->
-                <div id="stockDetailCanvasRelativeWrap" style="position: relative; width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: #090a10; border: 1px solid rgba(255,255,255,0.04);">
+                <div id="stockDetailCanvasRelativeWrap" style="position: relative; width: 100%; height: 500px; border-radius: 8px; overflow: hidden; background: #050505; border: 1px solid rgba(255,255,255,0.06);">
                     <div id="stockDetailChartContainer" style="width: 100%; height: 100%;"></div>
 
                     <!-- 🧱 Floating Draggable Order Book Depth Overlay -->
                     <div id="stockDetailOrderBookDepthOverlay" style="position: absolute; top: 8px; right: 65px; width: 240px; max-height: calc(100% - 35px); pointer-events: none; z-index: 15; display: flex; flex-direction: column; gap: 2px; overflow: hidden; transition: width 0.25s ease, max-height 0.25s ease, opacity 0.2s ease;">
                     </div>
 
-                    <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(9, 10, 16, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 20;">
+                    <div id="chartLoadingOverlay" style="position: absolute; inset: 0; background: rgba(5, 5, 5, 0.85); display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem; font-family: var(--font-mono); z-index: 20;">
                         <span>Loading interactive candlestick series...</span>
                     </div>
                 </div>
@@ -2363,6 +2376,71 @@
     <script>
         const ACTIVE_SYM = {{ ticker | tojson }};
         let stockState = {};
+        let _stockAvgVolume = 1;
+
+        /**
+         * Universal Indian Standard Time (IST / Asia/Kolkata / UTC+5:30) Formatter
+         */
+        function formatIST(val, options = {}) {
+            if (!val) return '—';
+            try {
+                let dateObj;
+                if (typeof val === 'number') {
+                    dateObj = new Date(val > 1e11 ? val : val * 1000);
+                } else if (typeof val === 'string') {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                        const [y, m, d] = val.split('-').map(Number);
+                        dateObj = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+                    } else {
+                        dateObj = new Date(val);
+                    }
+                } else if (val instanceof Date) {
+                    dateObj = val;
+                } else if (val && typeof val === 'object' && val.year) {
+                    dateObj = new Date(Date.UTC(val.year, val.month - 1, val.day, 0, 0, 0));
+                } else {
+                    return String(val);
+                }
+
+                if (isNaN(dateObj.getTime())) return String(val);
+
+                if (options.includeDate === false) {
+                    return dateObj.toLocaleTimeString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: options.includeSeconds ? '2-digit' : undefined,
+                        hour12: false,
+                    }) + (options.suffix ? ' IST' : '');
+                }
+
+                if (options.includeTime === false) {
+                    return dateObj.toLocaleDateString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                    });
+                }
+
+                const dateStr = dateObj.toLocaleDateString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                });
+                const timeStr = dateObj.toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: options.includeSeconds ? '2-digit' : undefined,
+                    hour12: false
+                });
+                return `${dateStr}, ${timeStr}${options.suffix ? ' IST' : ''}`;
+            } catch (e) {
+                return String(val);
+            }
+        }
 
         function showStockToast(message, type = 'info', duration = 3500) {
             const container = document.getElementById('stockToastContainer');
@@ -2878,7 +2956,7 @@
                 if (q.is_live) {
                     badgeLive.style.display = 'inline-flex';
                     badgeLive.innerHTML = '<span class="pulse-dot"></span> LIVE MARKET';
-                    badgeLive.title = q.last_updated ? `Live data synced at ${new Date(q.last_updated).toLocaleTimeString()}` : 'Live data';
+                    badgeLive.title = q.last_updated ? `Live data synced at ${formatIST(q.last_updated, { includeDate: false, includeSeconds: true, suffix: true })}` : 'Live data';
                 } else {
                     badgeLive.innerHTML = '📊 CACHED FEED';
                     badgeLive.style.background = 'rgba(255, 255, 255, 0.06)';
@@ -2892,13 +2970,11 @@
             const asOfEl = document.getElementById('lblPriceAsOf');
             if (asOfEl) {
                 if (quoteDate) {
-                    const formattedDate = (typeof quoteDate === 'string' && quoteDate.includes('T')) 
-                        ? new Date(quoteDate).toLocaleString() 
-                        : quoteDate;
+                    const formattedDate = formatIST(quoteDate, { includeDate: true, includeTime: typeof quoteDate === 'string' && quoteDate.includes('T'), suffix: true });
                     asOfEl.textContent = `🕒 As of: ${formattedDate}`;
                     asOfEl.style.display = 'inline-block';
                 } else {
-                    asOfEl.textContent = `🕒 As of: Today (EOD)`;
+                    asOfEl.textContent = `🕒 As of: Today (EOD Snapshot)`;
                     asOfEl.style.display = 'inline-block';
                 }
             }
@@ -3624,9 +3700,7 @@
             const predDate = c.event_date || c.asof_date || c.created_at || c.run_at;
             if (cAsOfEl) {
                 if (predDate) {
-                    const formattedPred = (typeof predDate === 'string' && predDate.includes('T')) 
-                        ? new Date(predDate).toLocaleString() 
-                        : predDate;
+                    const formattedPred = formatIST(predDate, { includeDate: true, includeTime: typeof predDate === 'string' && predDate.includes('T'), suffix: true });
                     cAsOfEl.textContent = `🕒 Evaluated: ${formattedPred}`;
                     cAsOfEl.style.display = 'inline-block';
                 } else {
@@ -5554,19 +5628,34 @@
 
             const chart = window.LightweightCharts.createChart(container, {
                 width: container.clientWidth || 800,
-                height: 440,
+                height: 500,
                 layout: {
-                    background: { type: 'solid', color: '#090a10' },
+                    background: { type: 'solid', color: '#050505' },
                     textColor: '#cbd5e1',
                     fontSize: 11,
                     fontFamily: "var(--font-mono), monospace",
                 },
                 grid: {
-                    vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
-                    horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                    vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
                 },
                 crosshair: {
                     mode: window.LightweightCharts.CrosshairMode.Normal,
+                    vertLine: {
+                        color: 'rgba(234, 179, 8, 0.4)',
+                        width: 1,
+                        style: 1,
+                    },
+                    horzLine: {
+                        color: 'rgba(234, 179, 8, 0.4)',
+                        width: 1,
+                        style: 1,
+                    },
+                },
+                localization: {
+                    dateFormat: 'yyyy-MM-dd',
+                    timeFormatter: (val) => formatIST(val, { includeDate: false, includeSeconds: true }),
+                    dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false }),
                 },
                 rightPriceScale: {
                     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -5576,6 +5665,9 @@
                     borderColor: 'rgba(255, 255, 255, 0.08)',
                     timeVisible: true,
                     secondsVisible: false,
+                    tickMarkFormatter: (time, tickMarkType, locale) => {
+                        return formatIST(time, { includeTime: false });
+                    },
                 },
             });
 
@@ -5620,7 +5712,7 @@
                 if (!entries || entries.length === 0) return;
                 const { width, height } = entries[0].contentRect;
                 if (width > 0 && height > 0) {
-                    chart.applyOptions({ width, height: 440 });
+                    chart.applyOptions({ width, height: 500 });
                 }
             });
             ro.observe(container);
@@ -5655,15 +5747,84 @@
                     return;
                 }
                 if (candleData) {
-                    if (el('hudDate')) el('hudDate').textContent = timeVal || param.time;
+                    if (el('hudDate')) {
+                        el('hudDate').textContent = formatIST(timeVal || param.time, { includeDate: true, includeTime: typeof (timeVal || param.time) === 'number', suffix: true });
+                    }
                     if (el('hudOpen')) el('hudOpen').textContent = candleData.open != null ? '₹' + candleData.open.toFixed(2) : '—';
                     if (el('hudHigh')) el('hudHigh').textContent = candleData.high != null ? '₹' + candleData.high.toFixed(2) : '—';
                     if (el('hudLow')) el('hudLow').textContent = candleData.low != null ? '₹' + candleData.low.toFixed(2) : '—';
                     if (el('hudClose')) el('hudClose').textContent = candleData.close != null ? '₹' + candleData.close.toFixed(2) : '—';
-                    if (volData && el('hudVol')) {
-                        const v = volData.value;
+                    if (el('hudTR')) {
+                        const tr = (candleData.high != null && candleData.low != null) ? (candleData.high - candleData.low).toFixed(2) : '—';
+                        el('hudTR').textContent = tr !== '—' ? `₹${tr}` : '—';
+                    }
+                    const v = volData ? volData.value : (candleData.volume || 0);
+                    if (el('hudVol')) {
                         el('hudVol').textContent = v >= 1e7 ? (v / 1e7).toFixed(2) + ' Cr' : (v >= 1e5 ? (v / 1e5).toFixed(2) + ' L' : v.toLocaleString());
                     }
+                    const surgeRatio = _stockAvgVolume > 0 ? (v / _stockAvgVolume) : 1;
+                    if (el('hudVolSurge')) {
+                        el('hudVolSurge').textContent = surgeRatio >= 1.2 ? `(${surgeRatio.toFixed(1)}x avg)` : '';
+                        el('hudVolSurge').style.color = surgeRatio >= 2.0 ? '#34d399' : (surgeRatio >= 1.2 ? '#38bdf8' : '#94a3b8');
+                    }
+
+                    // Buyer vs Seller Wick Pressure
+                    if (el('hudWickDelta')) {
+                        const bodyTop = Math.max(candleData.open, candleData.close);
+                        const bodyBottom = Math.min(candleData.open, candleData.close);
+                        const upperWick = Math.max(0, candleData.high - bodyTop);
+                        const lowerWick = Math.max(0, bodyBottom - candleData.low);
+                        const totalWick = upperWick + lowerWick;
+                        if (totalWick > 0) {
+                            const buyWickPct = (lowerWick / totalWick) * 100;
+                            const sellWickPct = (upperWick / totalWick) * 100;
+                            if (buyWickPct >= sellWickPct) {
+                                el('hudWickDelta').innerHTML = `<span style="color:#34d399;">🟢 +${buyWickPct.toFixed(0)}% Buy Wick</span>`;
+                            } else {
+                                el('hudWickDelta').innerHTML = `<span style="color:#f87171;">🔴 -${sellWickPct.toFixed(0)}% Sell Wick</span>`;
+                            }
+                        } else {
+                            el('hudWickDelta').textContent = '—';
+                        }
+                    }
+
+                    // Collision / Zone proximity check
+                    const zTag = el('hudZoneTag');
+                    if (zTag) {
+                        let zoneHit = null;
+                        let zoneColor = '#94a3b8';
+                        let zoneBg = 'rgba(255,255,255,0.05)';
+                        let zoneBorder = 'rgba(255,255,255,0.1)';
+                        const cP = candleData.close;
+                        if (stockLiquidityData) {
+                            if (stockLiquidityData.support_strike && Math.abs(cP - stockLiquidityData.support_strike) / cP < 0.008) {
+                                zoneHit = `🛡️ Buy Wall Zone (₹${stockLiquidityData.support_strike})`;
+                                zoneColor = '#34d399';
+                                zoneBg = 'rgba(16,185,129,0.15)';
+                                zoneBorder = 'rgba(16,185,129,0.35)';
+                            } else if (stockLiquidityData.resistance_strike && Math.abs(cP - stockLiquidityData.resistance_strike) / cP < 0.008) {
+                                zoneHit = `🏰 Sell Wall Zone (₹${stockLiquidityData.resistance_strike})`;
+                                zoneColor = '#f87171';
+                                zoneBg = 'rgba(239,68,68,0.15)';
+                                zoneBorder = 'rgba(239,68,68,0.35)';
+                            } else if (stockLiquidityData.max_pain_strike && Math.abs(cP - stockLiquidityData.max_pain_strike) / cP < 0.008) {
+                                zoneHit = `🎯 Max Pain Level (₹${stockLiquidityData.max_pain_strike})`;
+                                zoneColor = '#fbbf24';
+                                zoneBg = 'rgba(251,191,36,0.15)';
+                                zoneBorder = 'rgba(251,191,36,0.35)';
+                            }
+                        }
+                        if (zoneHit) {
+                            zTag.style.display = 'inline-block';
+                            zTag.textContent = zoneHit;
+                            zTag.style.color = zoneColor;
+                            zTag.style.background = zoneBg;
+                            zTag.style.border = `1px solid ${zoneBorder}`;
+                        } else {
+                            zTag.style.display = 'none';
+                        }
+                    }
+
                     const diff = candleData.close - candleData.open;
                     const pct = candleData.open > 0 ? (diff / candleData.open) * 100 : 0;
                     const pill = el('hudChangePill');
@@ -5692,15 +5853,46 @@
             const last = stockChartRawRecords[stockChartRawRecords.length - 1];
             const prev = stockChartRawRecords.length > 1 ? stockChartRawRecords[stockChartRawRecords.length - 2] : last;
             if (!last) return;
-            if (el('hudDate')) el('hudDate').textContent = last.date || last.time;
+            if (el('hudDate')) {
+                el('hudDate').textContent = formatIST(last.date || last.time, { includeDate: true, includeTime: typeof (last.date || last.time) === 'number', suffix: true });
+            }
             if (el('hudOpen')) el('hudOpen').textContent = '₹' + Number(last.open).toFixed(2);
             if (el('hudHigh')) el('hudHigh').textContent = '₹' + Number(last.high).toFixed(2);
             if (el('hudLow')) el('hudLow').textContent = '₹' + Number(last.low).toFixed(2);
             if (el('hudClose')) el('hudClose').textContent = '₹' + Number(last.close).toFixed(2);
+            if (el('hudTR')) {
+                el('hudTR').textContent = '₹' + (Number(last.high) - Number(last.low)).toFixed(2);
+            }
+            const v = last.volume || 0;
             if (el('hudVol')) {
-                const v = last.volume || 0;
                 el('hudVol').textContent = v >= 1e7 ? (v / 1e7).toFixed(2) + ' Cr' : (v >= 1e5 ? (v / 1e5).toFixed(2) + ' L' : v.toLocaleString());
             }
+            const surgeRatio = _stockAvgVolume > 0 ? (v / _stockAvgVolume) : 1;
+            if (el('hudVolSurge')) {
+                el('hudVolSurge').textContent = surgeRatio >= 1.2 ? `(${surgeRatio.toFixed(1)}x avg)` : '';
+                el('hudVolSurge').style.color = surgeRatio >= 2.0 ? '#34d399' : (surgeRatio >= 1.2 ? '#38bdf8' : '#94a3b8');
+            }
+            if (el('hudWickDelta')) {
+                const bodyTop = Math.max(last.open, last.close);
+                const bodyBottom = Math.min(last.open, last.close);
+                const upperWick = Math.max(0, last.high - bodyTop);
+                const lowerWick = Math.max(0, bodyBottom - last.low);
+                const totalWick = upperWick + lowerWick;
+                if (totalWick > 0) {
+                    const buyWickPct = (lowerWick / totalWick) * 100;
+                    const sellWickPct = (upperWick / totalWick) * 100;
+                    if (buyWickPct >= sellWickPct) {
+                        el('hudWickDelta').innerHTML = `<span style="color:#34d399;">🟢 +${buyWickPct.toFixed(0)}% Buy Wick</span>`;
+                    } else {
+                        el('hudWickDelta').innerHTML = `<span style="color:#f87171;">🔴 -${sellWickPct.toFixed(0)}% Sell Wick</span>`;
+                    }
+                } else {
+                    el('hudWickDelta').textContent = '—';
+                }
+            }
+            const zTag = el('hudZoneTag');
+            if (zTag) zTag.style.display = 'none';
+
             const diff = last.close - prev.close;
             const pct = prev.close > 0 ? (diff / prev.close) * 100 : 0;
             const pill = el('hudChangePill');
@@ -5725,6 +5917,9 @@
                 }
 
                 stockChartRawRecords = records;
+                const recentVols = records.slice(-20).map(r => r.volume || 0);
+                _stockAvgVolume = recentVols.length > 0 ? (recentVols.reduce((a, b) => a + b, 0) / recentVols.length) : 1;
+
                 const candles = [];
                 const volumes = [];
 
