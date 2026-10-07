@@ -271,6 +271,21 @@
                     { name: 'Execution Latency (ms)', formula: 'Client Request Timestamp to Complete Server Response (ms)', desc: 'Roundtrip execution time for algorithmic trading integration.' }
                 ],
                 tips: 'Use the playground to test custom query parameters before deploying algorithmic integrations.'
+            },
+            'options': {
+                title: 'Option Chain, Dealer Gamma Exposure (GEX) & Algorithmic Setups',
+                icon: '⛓️',
+                dataSource: 'Live NSE F&O Option Chain feed, India VIX (^INDIAVIX), analytical Black-Scholes Greeks engine, and tracked setups database (options_tracked_setups).',
+                what: 'Real-time NSE strike tree, Dealer Gamma Exposure (GEX in ₹ Lakhs), Cumulative Net GEX curve, Gamma Flip Strike, ATM Straddle Expected Move (±1σ / ±2σ), Max Pain Theory, and automated trade setup lifecycle tracking.',
+                thought: 'Options market makers and institutional dealers maintain non-directional inventory by dynamically hedging underlying index delta. In Positive Gamma regimes, dealer hedging buys dips and sells rallies, pinning price and suppressing volatility. In Negative Gamma regimes, dealers are forced to sell falling markets and buy surging markets, triggering violent gamma squeezes and directional acceleration.',
+                calculations: [
+                    { name: 'Call GEX (₹ Lakhs)', formula: '(CE OI × Gamma × Spot² × 0.01) / 100,000', desc: 'Positive Gamma contribution. Dealers are long gamma; hedging dampens volatility and causes mean-reversion.' },
+                    { name: 'Put GEX (₹ Lakhs)', formula: '(-PE OI × Gamma × Spot² × 0.01) / 100,000', desc: 'Negative Gamma contribution. Dealers are short gamma; hedging accelerates market momentum.' },
+                    { name: 'Net GEX & Gamma Flip', formula: 'Net GEX = Call GEX + Put GEX; Flip = Cumulative Zero-Crossing', desc: 'Cumulative sum across strikes. Flip strike marks transition between mean-reverting and trending market regimes.' },
+                    { name: 'ATM Straddle Expected Move', formula: '1σ = Spot ± (CE ATM LTP + PE ATM LTP)', desc: 'Calculates the 68.2% probability cone pricing boundary for weekly expiry.' },
+                    { name: 'Max Pain Strike', formula: 'argmin(Sum of Option Buyer PnL across all strikes)', desc: 'Strike price where option buyers lose the most money, acting as an institutional expiry magnet.' }
+                ],
+                tips: 'Click "📖 Options Guide" or the interactive tutorial button to view the full 6-slide quantitative breakdown and visual formulas.'
             }
         };
 

@@ -509,6 +509,7 @@ def _calculate_option_metrics_from_records(
                 "pe_vega": enr.get("pe_vega", 0.0),
                 "pe_gex": enr.get("pe_gex", 0.0),
                 "net_gex": enr.get("net_gex", 0.0),
+                "cum_net_gex": enr.get("cum_net_gex", 0.0),
                 "net_oi_delta": enr.get("net_oi_delta", 0),
             })
 
@@ -542,6 +543,18 @@ def _calculate_option_metrics_from_records(
         "pin_strike": pin_strike,
         "atm_strike": atm_strike,
         "gamma_profile": gamma_profile_data,
+        "total_net_gex": gamma_profile_data.get("net_gex", 0.0),
+        "gamma_flip_strike": gamma_profile_data.get("gamma_flip_strike"),
+        "gamma_regime": gamma_profile_data.get("gamma_regime"),
+        "gamma_regime_label": gamma_profile_data.get("gamma_regime_label"),
+        "expected_move": {
+            "straddle_price": gamma_profile_data.get("atm_straddle_price"),
+            "range_1sigma": gamma_profile_data.get("atm_straddle_price"),
+            "upper_1sigma": gamma_profile_data.get("expected_move_upper"),
+            "lower_1sigma": gamma_profile_data.get("expected_move_lower"),
+            "upper_2sigma": gamma_profile_data.get("expected_move_2sigma_upper"),
+            "lower_2sigma": gamma_profile_data.get("expected_move_2sigma_lower"),
+        },
         "vix_profile": vix_profile,
         "market_setups": setups,
         "records_count": len(formatted_strikes),
@@ -755,6 +768,7 @@ def calculate_gamma_profile(
             "pe_vega": pe_greeks["vega"],
             "pe_gex": pe_gex,
             "net_gex": net_gex,
+            "cum_net_gex": round(cumulative_gex, 2),
             "net_oi_delta": pe_change_oi - ce_change_oi,
         })
         enriched_records.append(enriched)

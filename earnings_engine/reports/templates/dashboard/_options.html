@@ -66,6 +66,11 @@
             <button class="btn btn-primary btn-sm" onclick="app.loadOptionChain(true)" id="optionsRefreshBtn" style="display:flex;align-items:center;gap:0.35rem;">
                 <span>🔄</span> Refresh
             </button>
+
+            <!-- Interactive Options Guide Carousel Launcher -->
+            <button class="btn btn-secondary btn-sm" onclick="app.openOptionsGuideModal()" style="display:flex;align-items:center;gap:0.35rem;border-color:rgba(168,85,247,0.4);color:#c084fc;background:rgba(168,85,247,0.1);">
+                <span>📖</span> Options Guide
+            </button>
         </div>
     </div>
 
@@ -572,6 +577,200 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- 9. Interactive Options Guide Carousel Modal -->
+    <div id="optionsGuideModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1.5rem;">
+        <div style="background:#0e1017;border:1px solid rgba(255,255,255,0.12);border-radius:14px;width:100%;max-width:860px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);overflow:hidden;position:relative;">
+
+            <!-- Modal Header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(90deg, rgba(168,85,247,0.1) 0%, rgba(56,189,248,0.05) 100%);">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <span style="font-size:1.4rem;">📖</span>
+                    <div>
+                        <h2 style="margin:0;font-size:1.15rem;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">Options Intelligence &amp; Quantitative Guide</h2>
+                        <p style="margin:0.2rem 0 0 0;font-size:0.78rem;color:#94a3b8;">Interactive guide on Dealer Gamma Exposure (GEX), Greeks, Expected Moves, and Algorithmic Setups</p>
+                    </div>
+                </div>
+                <button onclick="app.closeOptionsGuideModal()" style="background:transparent;border:none;color:#94a3b8;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.5rem;border-radius:6px;line-height:1;" onmouseenter="this.style.color='#ffffff'" onmouseleave="this.style.color='#94a3b8'">&times;</button>
+            </div>
+
+            <!-- Slide Content Area (Scrollable) -->
+            <div id="optionsGuideSlideContainer" style="padding:1.5rem;overflow-y:auto;flex:1;min-height:360px;">
+
+                <!-- Slide 1: Core Derivatives Architecture & Option Chain -->
+                <div class="opt-guide-slide" data-slide="0" style="display:block;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 1 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">Core Derivatives Architecture &amp; Strike Matrix</h3>
+                    </div>
+                    <p style="font-size:0.86rem;color:#cbd5e1;line-height:1.6;margin-bottom:1rem;">
+                        The Options Hub aggregates live NSE F&amp;O tick-by-tick feeds, open interest distributions, and analytical Greeks across all active index and equity contracts.
+                    </p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.85rem;">
+                            <div style="font-size:0.78rem;font-weight:700;color:#38bdf8;margin-bottom:0.35rem;">📊 Put-Call Ratio (PCR OI &amp; Vol)</div>
+                            <div style="font-size:0.8rem;color:#94a3b8;line-height:1.4;">Ratio of total Put Open Interest to Call Open Interest. PCR &gt; 1.2 indicates bullish institutional put writing (support), while PCR &lt; 0.7 signals heavy call writing (resistance).</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.85rem;">
+                            <div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:0.35rem;">🎯 Max Pain Theory</div>
+                            <div style="font-size:0.8rem;color:#94a3b8;line-height:1.4;">The exact strike price where option buyers experience maximum cumulative financial loss at expiration, acting as an institutional pinning attractor.</div>
+                        </div>
+                    </div>
+                    <div style="background:rgba(56,189,248,0.08);border-left:3px solid #38bdf8;padding:0.75rem 1rem;border-radius:0 6px 6px 0;font-size:0.82rem;color:#e2e8f0;">
+                        💡 <strong>Anti-Fabrication Guarantee:</strong> If the market is closed or an underlying is not traded in F&amp;O, genuine empty/offline statuses are displayed without pseudo-random fallbacks.
+                    </div>
+                </div>
+
+                <!-- Slide 2: Dealer Gamma Exposure (GEX) Quantitative Architecture -->
+                <div class="opt-guide-slide" data-slide="1" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 2 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">Dealer Gamma Exposure (GEX) Formulation</h3>
+                    </div>
+                    <p style="font-size:0.86rem;color:#cbd5e1;line-height:1.6;margin-bottom:1rem;">
+                        Market makers (dealers) who sell options to retail participants maintain a delta-neutral book. Their dynamic hedging creates massive structural flows in the underlying index:
+                    </p>
+                    <div style="background:#06080d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.82rem;">
+                        <div style="color:#34d399;margin-bottom:0.4rem;">Call GEX (₹ Lakhs) = (CE_OI × Gamma × Spot² × 0.01) / 100,000</div>
+                        <div style="color:#f87171;margin-bottom:0.4rem;">Put GEX (₹ Lakhs) = (-PE_OI × Gamma × Spot² × 0.01) / 100,000</div>
+                        <div style="color:#c084fc;border-top:1px dashed rgba(255,255,255,0.1);padding-top:0.4rem;">Net GEX (₹ Lakhs) = Call GEX + Put GEX</div>
+                    </div>
+                    <div style="font-size:0.82rem;color:#94a3b8;line-height:1.5;">
+                        • <strong>Call GEX</strong> represents positive gamma. As price rises, dealers must sell futures/equities to hedge, suppressing rallies.<br>
+                        • <strong>Put GEX</strong> represents negative gamma. As price falls, dealers must sell into dropping markets, accelerating selloffs.
+                    </div>
+                </div>
+
+                <!-- Slide 3: Positive vs Negative Gamma & The Gamma Flip Strike -->
+                <div class="opt-guide-slide" data-slide="2" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 3 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">Market Regimes: Positive vs. Negative Gamma</h3>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:0.9rem;">
+                            <div style="font-size:0.85rem;font-weight:800;color:#34d399;margin-bottom:0.35rem;">🟢 POSITIVE GAMMA REGIME</div>
+                            <p style="font-size:0.78rem;color:#cbd5e1;line-height:1.45;margin:0;">
+                                Dealers are long gamma. Hedging requires <strong>buying dips and selling rallies</strong>. Market exhibits low realized volatility, tight trading ranges, and strong mean-reversion around key strikes.
+                            </p>
+                        </div>
+                        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:0.9rem;">
+                            <div style="font-size:0.85rem;font-weight:800;color:#f87171;margin-bottom:0.35rem;">🔴 NEGATIVE GAMMA REGIME</div>
+                            <p style="font-size:0.78rem;color:#cbd5e1;line-height:1.45;margin:0;">
+                                Dealers are short gamma. Hedging forces <strong>selling into declines and buying into breakouts</strong>. This triggers volatility expansion, gamma squeezes, and explosive directional trends.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="background:#06080d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;font-size:0.82rem;color:#e2e8f0;">
+                        🔄 <strong>Gamma Flip Strike:</strong> The cumulative zero-crossing strike where dealer gamma transitions from positive to negative. Crossing below the Flip level signals an immediate regime change into high-volatility momentum.
+                    </div>
+                </div>
+
+                <!-- Slide 4: Analytical Black-Scholes Greeks Engine -->
+                <div class="opt-guide-slide" data-slide="3" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 4 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">Analytical Black-Scholes Greeks &amp; 0-DTE Guards</h3>
+                    </div>
+                    <p style="font-size:0.86rem;color:#cbd5e1;line-height:1.6;margin-bottom:1rem;">
+                        Our quantitative engine computes closed-form Black-Scholes Greeks for every individual strike, with numerical boundary guards for zero IV and 0-DTE expiry sessions:
+                    </p>
+                    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:0.75rem;font-size:0.8rem;margin-bottom:1rem;">
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <strong style="color:#38bdf8;">Delta (Δ):</strong> Sensitivity of option price to underlying move ($\partial V / \partial S$). Call Δ ∈ [0, 1], Put Δ ∈ [-1, 0].
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <strong style="color:#c084fc;">Gamma (Γ):</strong> Rate of change in delta per unit move in underlying ($\partial^2 V / \partial S^2$). Peaks at ATM strikes.
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <strong style="color:#f87171;">Theta (Θ):</strong> Time decay loss per day. Accelerates exponentially in the final 72 hours before expiry.
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <strong style="color:#34d399;">Vega (ν):</strong> Sensitivity of contract price to 1% change in Implied Volatility (IV).
+                        </div>
+                    </div>
+                    <div style="font-size:0.8rem;color:#94a3b8;">
+                        🛡️ <strong>Boundary Protection:</strong> Enforces $\max(DTE/365, 10^{-6})$ and $\max(IV/100, 10^{-4})$ to prevent division by zero during intraday expiry hours.
+                    </div>
+                </div>
+
+                <!-- Slide 5: Expected Move Bands & Smart Money Pinning -->
+                <div class="opt-guide-slide" data-slide="4" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 5 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">ATM Straddle Expected Move Bands (±1σ / ±2σ)</h3>
+                    </div>
+                    <p style="font-size:0.86rem;color:#cbd5e1;line-height:1.6;margin-bottom:1rem;">
+                        The market-implied pricing cone represents where institutional market makers price terminal index settlement based on ATM Straddle premiums:
+                    </p>
+                    <div style="background:#06080d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.82rem;">
+                        <div style="color:#fbbf24;margin-bottom:0.35rem;">ATM Straddle Price = CE_ATM_LTP + PE_ATM_LTP</div>
+                        <div style="color:#38bdf8;margin-bottom:0.35rem;">1σ Expected Range (68.2% Conf) = Spot ± ATM_Straddle</div>
+                        <div style="color:#a855f7;">2σ Tail Range (95.0% Conf) = Spot ± (1.85 × ATM_Straddle)</div>
+                    </div>
+                    <p style="font-size:0.82rem;color:#94a3b8;line-height:1.5;margin:0;">
+                        • Prices trading outside the 1σ band indicate aggressive institutional tail-hedging or high-conviction breakout momentum.<br>
+                        • Rejections at the 1σ/2σ bands frequently offer asymmetric mean-reversion counter-trend entries.
+                    </p>
+                </div>
+
+                <!-- Slide 6: Algorithmic Setups Engine & Tracked Lifecycle Ledger -->
+                <div class="opt-guide-slide" data-slide="5" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                        <span class="badge" style="background:rgba(234,179,8,0.15);color:#eab308;font-weight:700;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:4px;">SLIDE 6 OF 6</span>
+                        <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f1f5f9;">Algorithmic Setups Engine &amp; Tracked Lifecycle</h3>
+                    </div>
+                    <p style="font-size:0.86rem;color:#cbd5e1;line-height:1.6;margin-bottom:1rem;">
+                        The Derivatives Engine automatically identifies four high-probability quantitative trade setups and maintains an immutable audit ledger:
+                    </p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;font-size:0.8rem;">
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <span style="color:#38bdf8;font-weight:700;display:block;">⚡ Gamma Squeeze Breakout</span>
+                            Spot cross above Call Wall / Gamma Flip in Negative Gamma regime triggering fast momentum.
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <span style="color:#fbbf24;font-weight:700;display:block;">🎯 Dealer Pinning Expiry</span>
+                            Heavy Call &amp; Put open interest converging on Max Pain with positive gamma dampening.
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <span style="color:#f87171;font-weight:700;display:block;">💥 Put Writer Capitulation</span>
+                            Violent unwinding of Put OI near Put Wall forcing aggressive dealer sell orders.
+                        </div>
+                        <div style="background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                            <span style="color:#34d399;font-weight:700;display:block;">🛡️ Barrier Rejection</span>
+                            Mean-reversion bounce after testing the outer 1σ / 2σ Expected Move boundary.
+                        </div>
+                    </div>
+                    <div style="background:rgba(234,179,8,0.08);border-left:3px solid #eab308;padding:0.75rem 1rem;border-radius:0 6px 6px 0;font-size:0.82rem;color:#e2e8f0;">
+                        📋 <strong>Lifecycle State Machine:</strong> Every active setup transitions automatically through <code>ACTIVE</code> &rarr; <code>TARGET1_HIT</code> | <code>TARGET2_HIT</code> | <code>STOPPED_OUT</code> with real-time PnL attribution in the Tracked Derivatives History table.
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer Controls & Carousel Dots -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,0.08);background:#07090e;">
+                <button id="optGuidePrevBtn" class="btn btn-secondary btn-sm" onclick="app.prevOptionsGuideSlide()" style="padding:0.4rem 0.85rem;">
+                    &larr; Previous
+                </button>
+
+                <!-- Dot Indicators -->
+                <div style="display:flex;align-items:center;gap:0.45rem;">
+                    <span class="opt-guide-dot active" onclick="app.goToOptionsGuideSlide(0)" style="width:10px;height:10px;border-radius:50%;background:#c084fc;cursor:pointer;transition:all 0.2s;"></span>
+                    <span class="opt-guide-dot" onclick="app.goToOptionsGuideSlide(1)" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;transition:all 0.2s;"></span>
+                    <span class="opt-guide-dot" onclick="app.goToOptionsGuideSlide(2)" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;transition:all 0.2s;"></span>
+                    <span class="opt-guide-dot" onclick="app.goToOptionsGuideSlide(3)" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;transition:all 0.2s;"></span>
+                    <span class="opt-guide-dot" onclick="app.goToOptionsGuideSlide(4)" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;transition:all 0.2s;"></span>
+                    <span class="opt-guide-dot" onclick="app.goToOptionsGuideSlide(5)" style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;transition:all 0.2s;"></span>
+                </div>
+
+                <button id="optGuideNextBtn" class="btn btn-primary btn-sm" onclick="app.nextOptionsGuideSlide()" style="padding:0.4rem 0.85rem;background:#c084fc;border-color:#c084fc;color:#000000;font-weight:700;">
+                    Next &rarr;
+                </button>
+            </div>
+
         </div>
     </div>
 </div>

@@ -5688,16 +5688,22 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = records.map((r, idx) => `
-            <tr class="hover:bg-white/[0.02] transition">
+        tbody.innerHTML = records.map((r, idx) => {
+            const empId = r.employee_id || (this.employees ? (this.employees.find(e => e.name && e.name.toLowerCase() === (r.employee_name || '').toLowerCase())?.id) : '') || '';
+            const drillTarget = empId || r.employee_name || '';
+
+            return `
+            <tr class="hover:bg-white/[0.04] transition">
                 <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                 <td class="py-2.5 px-3 font-mono text-slate-300 font-medium">${r.util_date}</td>
                 <td class="py-2.5 px-3">
-                    <div class="font-bold text-white">${r.employee_name || '—'}</div>
+                    <div class="font-bold text-white ${drillTarget ? 'cursor-pointer hover:text-emerald-400 transition inline-flex items-center gap-1' : ''}" ${drillTarget ? `onclick="zeptoApp.openStaffDrawer('${drillTarget}')" title="View staff profile & forensics"` : ''}>
+                        ${r.employee_name || '—'}
+                    </div>
                     <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
                 </td>
                 <td class="py-2.5 px-3 text-slate-300">${r.role}</td>
@@ -5706,8 +5712,18 @@ const zeptoApp = {
                 <td class="py-2.5 px-3 text-right font-mono text-rose-400">${r.idle_hours} hrs</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${r.ipp > 0 ? `${r.ipp} IPP` : '—'}</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${this.formatCurrency(r.flex_labor_cost || 0)}</td>
+                <td class="py-2.5 px-3 text-center">
+                    ${drillTarget ? `
+                        <button type="button" onclick="zeptoApp.openStaffDrawer('${drillTarget}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition shadow-sm" title="Open comprehensive staff profile & analytics">
+                            📊 Drilldown
+                        </button>
+                    ` : `
+                        <span class="text-slate-600 font-mono text-[10px]">—</span>
+                    `}
+                </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     },
 
     // -----------------------------------------------------------------------
