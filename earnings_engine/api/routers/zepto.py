@@ -2109,6 +2109,25 @@ async def get_loss_records_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/api/v1/zepto/loss/reconciliation/rerun", summary="Rerun Email Body vs Excel Audit Reconciliation")
+async def rerun_loss_reconciliation_endpoint(
+    payload: dict[str, Any] = Body(default={}),
+) -> dict[str, Any]:
+    """Rerun email body metrics extraction and Excel audit attachment reconciliation ledger."""
+    try:
+        month = payload.get("month")
+        store_name = payload.get("store_name")
+        summary = zepto_db.rerun_loss_audit_reconciliation(
+            month=month,
+            store_name=store_name,
+            settings=_settings,
+        )
+        return {"success": True, "message": "Email body vs Excel reconciliation rerun successfully", **summary}
+    except Exception as exc:
+        logger.error("[ZEPTO-LOSS-RECON] Error rerunning loss reconciliation: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/api/v1/zepto/loss", summary="Record Damage, DQ Loss or Shrinkage")
 async def create_loss_record_endpoint(record: dict[str, Any] = Body(...)) -> dict[str, Any]:
     """Insert a new loss or shrinkage record."""

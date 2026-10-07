@@ -1035,6 +1035,28 @@ def test_zepto_hub_available_months_and_dashboard_analytics(client):
     assert "summary_kpis" in data
 
 
+def test_zepto_rerun_loss_audit_reconciliation(client):
+    """Test rerun email body vs Excel attachment reconciliation endpoint and DB method."""
+    settings = Settings()
+    # 1. Test database method
+    summary = zepto_db.rerun_loss_audit_reconciliation(month="ALL", store_name="ALL", settings=settings)
+    assert isinstance(summary, dict)
+    assert "total_records" in summary
+    assert "records" in summary
+    assert "category_breakdown" in summary
+    assert "reconciliation" in summary
+    assert "match_rate_pct" in summary["reconciliation"]
+
+    # 2. Test POST API endpoint
+    res = client.post("/api/v1/zepto/loss/reconciliation/rerun", json={"month": "ALL", "store_name": "ALL"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "reconciliation" in data
+    assert "message" in data
+
+
+
 
 
 

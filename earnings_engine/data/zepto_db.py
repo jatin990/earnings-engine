@@ -4599,6 +4599,90 @@ def get_loss_summary(
         }
 
 
+def rerun_loss_audit_reconciliation(
+    month: str | None = None,
+    store_name: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """
+    Rerun email body metrics extraction and Excel audit attachment reconciliation ledger.
+    Re-evaluates message body metrics, auto-associates unlinked zepto_loss_records with their
+    corresponding zepto_gmail_messages, updates reconciliation status, and returns the updated loss summary.
+    """
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
+
+    where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
+    params: list[Any] = []
+    if month and month != "ALL":
+        where.append("month_ym = ?")
+        params.append(month)
+    if store_name and store_name != "ALL":
+        where.append("(store_name = ? OR store_name = '')")
+        params.append(store_name)
+
+    where_sql = " AND ".join(where)
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        msg_rows = conn.execute(
+            f"""
+            SELECT id, subject, snippet, body_text, body_html, iso_date, month_ym, store_name, extracted_metrics, attachments
+            FROM zepto_gmail_messages
+            WHERE {where_sql}
+            """,
+            params,
+        ).fetchall()
+
+        for mr in msg_rows:
+            m_dict = dict(mr)
+            msg_id = m_dict["id"]
+            msg_date = m_dict["iso_date"]
+            msg_store = m_dict["store_name"] or "JMU-Sainik Colony"
+            b_text = m_dict.get("body_text") or m_dict.get("snippet") or ""
+            b_html = m_dict.get("body_html") or ""
+
+            # Re-extract metrics if text/html available
+            if b_text or b_html:
+                extracted = extract_metrics_from_email_body(b_text, b_html)
+                if extracted:
+                    conn.execute(
+                        "UPDATE zepto_gmail_messages SET extracted_metrics = ?, updated_at = ? WHERE id = ?",
+                        (json.dumps(extracted), datetime.now(timezone.utc).isoformat(), msg_id),
+                    )
+
+            # Associate unlinked zepto_loss_records matching record_date and store_name
+            if msg_date:
+                conn.execute(
+                    """
+                    UPDATE zepto_loss_records
+                    SET source_email_id = ?, updated_at = ?
+                    WHERE (source_email_id IS NULL OR source_email_id = '')
+                      AND record_date = ?
+                      AND (store_name = ? OR store_name IS NULL OR store_name = '')
+                      AND category != 'EMAIL_INGESTED'
+                    """,
+                    (msg_id, datetime.now(timezone.utc).isoformat(), msg_date, msg_store),
+                )
+
+            # Update parsed count & status on message
+            linked_cnt = conn.execute(
+                "SELECT COUNT(*) FROM zepto_loss_records WHERE source_email_id = ? AND category != 'EMAIL_INGESTED'",
+                (msg_id,),
+            ).fetchone()[0]
+
+            p_status = "SUCCESS" if linked_cnt > 0 else "PENDING"
+            conn.execute(
+                "UPDATE zepto_gmail_messages SET parsed_records_count = ?, parsed_status = ?, updated_at = ? WHERE id = ?",
+                (linked_cnt, p_status, datetime.now(timezone.utc).isoformat(), msg_id),
+            )
+
+        conn.commit()
+
+    return get_loss_summary(month=month, store_name=store_name, loss_type="SHRINKAGE", settings=settings)
+
+
 def get_loss_records(
     month: str | None = None,
     store_name: str | None = None,

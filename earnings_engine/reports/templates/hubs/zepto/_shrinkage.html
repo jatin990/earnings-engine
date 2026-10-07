@@ -101,7 +101,7 @@
             </div>
             <div class="my-1.5">
                 <div class="text-xl sm:text-2xl font-black font-mono tracking-tight" id="shrinkageNetAmount">₹--</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">Surplus (+) - Shortage (-)</div>
+                <div class="text-[10px] text-slate-400 mt-0.5" id="shrinkageNetSubtext">Negative (-) = Surplus Gain · Positive (+) = Stock Loss</div>
             </div>
             <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Total Audit Rows:</span>
@@ -184,7 +184,16 @@
                 </div>
                 <p class="text-[10px] text-slate-400">Automated audit verification matching the daily inventory shrinkage declared in Gmail body text with the itemized Excel row total.</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+                <button
+                    type="button"
+                    id="shrinkageRerunReconBtn"
+                    onclick="zeptoApp.rerunShrinkageReconciliation()"
+                    class="px-2.5 py-1 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white border border-purple-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                    title="Rerun email body metrics extraction and Excel audit attachment reconciliation ledger"
+                >
+                    <span>🔄</span> Rerun Verification
+                </button>
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="shrinkageReconMatchedBadge">
                     0 Matched
                 </span>

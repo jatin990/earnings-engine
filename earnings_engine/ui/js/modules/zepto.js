@@ -7166,6 +7166,39 @@ const zeptoApp = {
         }
     },
 
+    async rerunShrinkageReconciliation() {
+        const queryMonth = this.currentGlobalMonth !== 'ALL' ? (this.currentGlobalMonth || new Date().toISOString().slice(0, 7)) : 'ALL';
+        const btn = document.getElementById('shrinkageRerunReconBtn');
+        const originalContent = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Reconciling...';
+        }
+
+        try {
+            this.showToast(`🔄 Re-running email body vs Excel verification for ${queryMonth}...`);
+            const res = await fetch('/api/v1/zepto/loss/reconciliation/rerun', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: queryMonth }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to rerun shrinkage reconciliation');
+
+            this.showToast(`✅ ${data.message || 'Shrinkage audit reconciliation rerun complete'}`);
+            this.renderShrinkage(data);
+            await this.loadOverview();
+        } catch (err) {
+            console.error('[ZEPTO-SHRINKAGE] Error rerunning audit reconciliation:', err);
+            this.showToast(`⚠️ Verification rerun error: ${err.message}`, true);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+    },
+
     renderShrinkage(data) {
         if (!data) return;
 
@@ -7218,22 +7251,24 @@ const zeptoApp = {
         const uniqueSkus = data.unique_skus_count ?? data.total_skus_affected ?? 0;
 
         // Card 1: Net Shrinkage
+        // Business Logic: Positive (+) shrinkage = stock deficit / shortage loss (Rose).
+        // Negative (-) shrinkage = stock surplus / inventory store gain (Emerald).
         if (netAmtEl) {
             netAmtEl.textContent = this.formatCurrency(shrinkageNet);
-            if (shrinkageNet > 0) {
+            if (shrinkageNet < 0) {
                 netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-400';
-            } else if (shrinkageNet < 0) {
+            } else if (shrinkageNet > 0) {
                 netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-rose-400';
             } else {
                 netAmtEl.className = 'text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-200';
             }
         }
         if (netBadge) {
-            if (shrinkageNet > 0) {
-                netBadge.textContent = 'Net Surplus (+)';
+            if (shrinkageNet < 0) {
+                netBadge.textContent = 'Store Gain (Surplus)';
                 netBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono';
-            } else if (shrinkageNet < 0) {
-                netBadge.textContent = 'Net Deficit (-)';
+            } else if (shrinkageNet > 0) {
+                netBadge.textContent = 'Stock Loss (Deficit)';
                 netBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/25 font-mono';
             } else {
                 netBadge.textContent = 'Balanced (₹0)';
@@ -7375,7 +7410,7 @@ const zeptoApp = {
                             <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-400">
                                 ${catDeficit < 0 ? this.formatCurrency(catDeficit) : '—'}
                             </td>
-                            <td class="py-2.5 px-3 text-right font-mono font-black ${catNet > 0 ? 'text-emerald-400' : (catNet < 0 ? 'text-rose-400' : 'text-slate-300')}">
+                            <td class="py-2.5 px-3 text-right font-mono font-black ${catNet < 0 ? 'text-emerald-400' : (catNet > 0 ? 'text-rose-400' : 'text-slate-300')}">
                                 ${this.formatCurrency(catNet)}
                             </td>
                             <td class="py-2.5 px-3 text-right font-mono text-slate-300" title="${dSkus} distinct SKUs, ${tUnits} total units">${skuDisplay}</td>
@@ -7699,7 +7734,8 @@ const zeptoApp = {
                 <div class="space-y-2">
                     ${monthlyData.map(m => {
                         const shrink = m.shrinkage || 0;
-                        const isSurplus = shrink > 0;
+                        const isGain = shrink < 0;
+                        const isLoss = shrink > 0;
                         const widthPct = Math.max(4, Math.min(100, Math.round((Math.abs(shrink) / maxShrink) * 100)));
 
                         return `
@@ -7709,10 +7745,10 @@ const zeptoApp = {
                                         <span class="font-mono font-bold text-white">${m.month_ym}</span>
                                         <span class="text-[10px] text-slate-400 font-mono">(${m.item_count} items)</span>
                                     </div>
-                                    <span class="font-mono font-black ${isSurplus ? 'text-emerald-400' : 'text-purple-300'}">${shrink > 0 ? '+' : ''}${this.formatCurrency(shrink)}</span>
+                                    <span class="font-mono font-black ${isGain ? 'text-emerald-400' : (isLoss ? 'text-rose-400' : 'text-slate-300')}">${shrink > 0 ? '+' : ''}${this.formatCurrency(shrink)}</span>
                                 </div>
                                 <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden flex">
-                                    <div style="width: ${widthPct}%;" class="h-full rounded-full ${isSurplus ? 'bg-emerald-400' : 'bg-purple-400'}"></div>
+                                    <div style="width: ${widthPct}%;" class="h-full rounded-full ${isGain ? 'bg-emerald-400' : (isLoss ? 'bg-rose-400' : 'bg-purple-400')}"></div>
                                 </div>
                             </div>
                         `;
