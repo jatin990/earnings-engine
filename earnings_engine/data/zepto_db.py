@@ -511,6 +511,37 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                     except Exception:
                         pass
 
+            # Prune duplicate cumulative records from historic syncs keeping the latest canonical record per SKU/item
+            try:
+                conn.execute("""
+                    DELETE FROM zepto_loss_records
+                    WHERE id NOT IN (
+                        SELECT id FROM (
+                            SELECT id, ROW_NUMBER() OVER (
+                                PARTITION BY store_name, record_date, loss_type, category,
+                                             CASE
+                                                 WHEN sku_id IS NOT NULL AND sku_id != '' THEN 'SKU:' || sku_id
+                                                 WHEN item_name IS NOT NULL AND item_name != '' THEN 'NAME:' || item_name
+                                                 ELSE 'REC:' || COALESCE(notes, '') || ':' || CAST(ROUND(amount, 2) AS TEXT) || ':' || CAST(sku_count AS TEXT)
+                                             END
+                                ORDER BY updated_at DESC, created_at DESC, rowid DESC
+                            ) as rn
+                            FROM zepto_loss_records
+                        ) WHERE rn = 1
+                    )
+                """)
+                # Prune generic EMAIL_INGESTED summaries if itemized line items exist for the source email
+                conn.execute("""
+                    DELETE FROM zepto_loss_records
+                    WHERE category = 'EMAIL_INGESTED'
+                      AND source_email_id IN (
+                          SELECT DISTINCT source_email_id FROM zepto_loss_records
+                          WHERE category != 'EMAIL_INGESTED' AND source_email_id IS NOT NULL AND source_email_id != ''
+                      )
+                """)
+            except Exception:
+                pass
+
         met_cols = _get_table_columns(conn, "zepto_store_metrics")
         if met_cols and "source_email_id" not in met_cols:
             try:
@@ -4178,8 +4209,14 @@ def get_loss_summary(
         where.append("record_date <= ?")
         params.append(end_date)
     if loss_type and loss_type != "ALL":
-        where.append("loss_type = ?")
-        params.append(loss_type)
+        l_upper = loss_type.upper()
+        if l_upper == "SHRINKAGE":
+            where.append("loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK')")
+        elif l_upper == "DQ_LOSS":
+            where.append("loss_type IN ('DQ_LOSS', 'PACKAGING_DEFECT', 'PICKING_DEFECT')")
+        else:
+            where.append("loss_type = ?")
+            params.append(loss_type)
     if category and category != "ALL":
         where.append("category = ?")
         params.append(category)
@@ -4590,8 +4627,14 @@ def get_loss_records(
         where.append("category = ?")
         params.append(category)
     if loss_type and loss_type != "ALL":
-        where.append("loss_type = ?")
-        params.append(loss_type)
+        l_upper = loss_type.upper()
+        if l_upper == "SHRINKAGE":
+            where.append("loss_type IN ('SHRINKAGE', 'CYCLE_COUNT_VARIANCE', 'SHORT_PICK')")
+        elif l_upper == "DQ_LOSS":
+            where.append("loss_type IN ('DQ_LOSS', 'PACKAGING_DEFECT', 'PICKING_DEFECT')")
+        else:
+            where.append("loss_type = ?")
+            params.append(loss_type)
     if date and date != "ALL":
         where.append("record_date = ?")
         params.append(date)
@@ -4657,8 +4700,8 @@ def save_loss_records_batch(
             rec_id = str(r["id"])
         else:
             sku_identifier = sku_id or item_name or notes or "general"
-            email_part = str(source_email_id or "")
-            raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{amount}|{email_part}".encode("utf-8")
+            rounded_amount = round(amount, 2)
+            raw_key = f"{store}|{date_str}|{loss_type}|{category}|{sku_identifier}|{rounded_amount}|{sku_count}".encode("utf-8")
             rec_id = f"loss_{hashlib.md5(raw_key).hexdigest()[:16]}"
 
         rows.append((

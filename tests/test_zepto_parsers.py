@@ -431,5 +431,96 @@ def test_get_loss_records_date_drilldown_filter():
     assert res2["records"][0]["record_date"] == "2026-09-16"
 
 
+def test_cumulative_attachment_batch_deduplication_and_net_shrinkage():
+    import uuid
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    zepto_db.ensure_zepto_schema(settings=settings)
+
+    test_store = f"TEST_CUMULATIVE_STORE_{uuid.uuid4().hex[:6]}"
+    email_day1 = f"email_d1_{uuid.uuid4().hex[:6]}"
+    email_day2 = f"email_d2_{uuid.uuid4().hex[:6]}"
+
+    # Day 1 Excel batch contains item 1 and item 2
+    batch_day1 = [
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-01",
+            "loss_type": "DQ_LOSS",
+            "category": "BEVERAGES",
+            "sku_id": "SKU_BEV_1",
+            "item_name": "Juice 1L",
+            "amount": 200.0,
+            "sku_count": 2,
+            "source_email_id": email_day1,
+        },
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-01",
+            "loss_type": "SHRINKAGE",
+            "category": "DAIRY",
+            "sku_id": "SKU_CHEESE_1",
+            "item_name": "Cheese Block",
+            "amount": -500.0,  # Shortage deficit
+            "sku_count": 1,
+            "source_email_id": email_day1,
+        },
+    ]
+    zepto_db.save_loss_records_batch(batch_day1, settings=settings)
+
+    # Day 2 cumulative MTD Excel batch contains Day 1 items again PLUS net-new Day 2 items (with different source_email_id)
+    batch_day2 = [
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-01",
+            "loss_type": "DQ_LOSS",
+            "category": "BEVERAGES",
+            "sku_id": "SKU_BEV_1",
+            "item_name": "Juice 1L",
+            "amount": 200.0,
+            "sku_count": 2,
+            "source_email_id": email_day2,  # Different email ID from cumulative export
+        },
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-01",
+            "loss_type": "SHRINKAGE",
+            "category": "DAIRY",
+            "sku_id": "SKU_CHEESE_1",
+            "item_name": "Cheese Block",
+            "amount": -500.0,
+            "sku_count": 1,
+            "source_email_id": email_day2,
+        },
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-02",
+            "loss_type": "SHRINKAGE",
+            "category": "SNACKS",
+            "sku_id": "SKU_CHIPS_2",
+            "item_name": "Surplus Chips",
+            "amount": 300.0,  # Surplus found (+300)
+            "sku_count": 3,
+            "source_email_id": email_day2,
+        },
+    ]
+    zepto_db.save_loss_records_batch(batch_day2, settings=settings)
+
+    # Check that day 1 items were NOT duplicated
+    summary = zepto_db.get_loss_summary(store_name=test_store, settings=settings)
+    assert summary["dq_loss_total"] == 200.0
+    # Net Shrinkage: -500 (deficit) + 300 (surplus) = -200.0
+    assert summary["shrinkage_net"] == -200.0
+    assert summary["shrinkage_surplus"] == 300.0
+    assert summary["shrinkage_deficit"] == -500.0
+    # Gross turnover: |-500| + |300| = 800.0
+    assert summary["shrinkage_gross"] == 800.0
+    # Total Store Financial Loss = DQ Loss (200) + Net Shrinkage Deficit (200) = 400.0 (NOT conflated with 800)
+    assert summary["total_loss_amount"] == 400.0
+
+
+
 
 
