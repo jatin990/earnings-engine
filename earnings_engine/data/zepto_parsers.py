@@ -280,8 +280,8 @@ def build_targeted_gmail_query(month: str | None = None, metric_type: str | None
             next_y, next_m = y + 1, 1
         else:
             next_y, next_m = y, m + 1
-        # Include through day 2 of next month to capture closing MTD emails sent on 1st/2nd
-        end_date = f"{next_y:04d}/{next_m:02d}/03"
+        # Include through end of month (e.g., 2026/10/01 for September)
+        end_date = f"{next_y:04d}/{next_m:02d}/01"
         return (clean_month, f"{pattern_clause} after:{start_date} before:{end_date}")
     except Exception:
         return (clean_month, pattern_clause)
@@ -769,6 +769,22 @@ def extract_metrics_from_email_body(text: str, html: str = "") -> Dict[str, Any]
         return metrics
 
     # 1. Structured HTML Key-Value parsing (metric-row, tables, etc.)
+    def _parse_signed_amount(raw_txt: str) -> Optional[float]:
+        if not raw_txt:
+            return None
+        raw_s = str(raw_txt).strip()
+        is_neg = False
+        if (raw_s.startswith("(") and raw_s.endswith(")")) or raw_s.startswith("-") or "-" in raw_s:
+            is_neg = True
+        clean_digits = re.sub(r"[^\d\.]", "", raw_s)
+        if clean_digits:
+            try:
+                num = float(clean_digits)
+                return -num if is_neg else num
+            except ValueError:
+                pass
+        return None
+
     if "<" in combined_raw and ">" in combined_raw:
         try:
             from bs4 import BeautifulSoup
@@ -779,48 +795,32 @@ def extract_metrics_from_email_body(text: str, html: str = "") -> Dict[str, Any]
                 if left and right:
                     l_txt = left.get_text(strip=True).lower()
                     r_txt = right.get_text(strip=True)
-                    clean_r = re.sub(r"[^\d\.\-+]", "", r_txt)
-                    if clean_r:
-                        try:
-                            val = float(clean_r)
-                            if "mtd shrinkage" in l_txt:
-                                metrics["mtd_shrinkage"] = val
-                                metrics["loss_amount"] = val
-                            elif "d-1 shrinkage" in l_txt:
-                                metrics["d1_shrinkage"] = val
-                                if "loss_amount" not in metrics:
-                                    metrics["loss_amount"] = val
-                            elif "mtd dq" in l_txt or "mtd defect" in l_txt:
-                                metrics["mtd_dq"] = val
-                                metrics["loss_amount"] = val
-                            elif "d-1 dq" in l_txt or "d-1 defect" in l_txt:
-                                metrics["d1_dq"] = val
-                                if "loss_amount" not in metrics:
-                                    metrics["loss_amount"] = val
-                        except ValueError:
-                            pass
+                    val = _parse_signed_amount(r_txt)
+                    if val is not None:
+                        if "mtd shrinkage" in l_txt:
+                            metrics["mtd_shrinkage"] = val
+                        elif "d-1 shrinkage" in l_txt:
+                            metrics["d1_shrinkage"] = val
+                        elif "mtd dq" in l_txt or "mtd defect" in l_txt:
+                            metrics["mtd_dq"] = val
+                        elif "d-1 dq" in l_txt or "d-1 defect" in l_txt:
+                            metrics["d1_dq"] = val
 
             for tr in soup.find_all("tr"):
                 cells = tr.find_all(["td", "th"])
                 if len(cells) == 2:
                     k = cells[0].get_text(strip=True).lower()
                     v = cells[1].get_text(strip=True)
-                    clean_v = re.sub(r"[^\d\.\-+]", "", v)
-                    if clean_v:
-                        try:
-                            val = float(clean_v)
-                            if "mtd shrinkage" in k:
-                                metrics["mtd_shrinkage"] = val
-                                metrics["loss_amount"] = val
-                            elif "d-1 shrinkage" in k:
-                                metrics["d1_shrinkage"] = val
-                            elif "mtd dq" in k:
-                                metrics["mtd_dq"] = val
-                                metrics["loss_amount"] = val
-                            elif "d-1 dq" in k:
-                                metrics["d1_dq"] = val
-                        except ValueError:
-                            pass
+                    val = _parse_signed_amount(v)
+                    if val is not None:
+                        if "mtd shrinkage" in k:
+                            metrics["mtd_shrinkage"] = val
+                        elif "d-1 shrinkage" in k:
+                            metrics["d1_shrinkage"] = val
+                        elif "mtd dq" in k:
+                            metrics["mtd_dq"] = val
+                        elif "d-1 dq" in k:
+                            metrics["d1_dq"] = val
         except Exception:
             pass
 
@@ -889,62 +889,57 @@ def extract_metrics_from_email_body(text: str, html: str = "") -> Dict[str, Any]
 
     # 6. Loss / Shrinkage / DQ Metrics
     def _extract_amount_by_pattern(pat: str, src: str) -> Optional[float]:
-        # Match pattern followed by optional separator/currency and signed numeric value
-        m = re.search(pat + r"[:\s\-=]*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)", src, re.I)
-        if not m:
-            m = re.search(pat + r"[:\s\-=]*(-?\s*(?:rs\.?|inr|₹)?\s*\d+(?:\.\d+)?)", src, re.I)
+        # Match pattern followed by colon/equals separator or whitespace, optional currency and signed numeric value
+        m = re.search(pat + r"(?:\s*[:=]\s*|\s+)\s*(?:rs\.?|inr|₹)?\s*(\(?-?\s*(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\)?|\(?-?\s*[\d,]+(?:\.\d+)?\)?)(?!\s*%)", src, re.I)
         if m:
-            clean_val = re.sub(r"[^\d\.\-+]", "", m.group(1))
-            try:
-                return float(clean_val)
-            except ValueError:
-                pass
+            return _parse_signed_amount(m.group(1))
         return None
 
+    # Check MTD & D-1 Shrinkage / DQ patterns independently
+    mtd_s_val = _extract_amount_by_pattern(r"\bmtd\s+shrinkage\b", clean_text)
+    if mtd_s_val is not None:
+        metrics["mtd_shrinkage"] = mtd_s_val
+
+    d1_s_val = _extract_amount_by_pattern(r"\bd-?1\s+shrinkage\b", clean_text)
+    if d1_s_val is not None:
+        metrics["d1_shrinkage"] = d1_s_val
+
+    mtd_dq_val = _extract_amount_by_pattern(r"\bmtd\s+(?:dq\s*loss|dq|defect)\b", clean_text)
+    if mtd_dq_val is not None:
+        metrics["mtd_dq"] = mtd_dq_val
+
+    d1_dq_val = _extract_amount_by_pattern(r"\bd-?1\s+(?:dq\s*loss|dq|defect)\b", clean_text)
+    if d1_dq_val is not None:
+        metrics["d1_dq"] = d1_dq_val
+
+    # Prioritize daily variance for single-day loss_amount target (for reconciling daily cycle count attachments)
     if "loss_amount" not in metrics:
-        # Check MTD & D-1 Shrinkage / DQ patterns
-        mtd_s_val = _extract_amount_by_pattern(r"\bmtd\s+shrinkage\b", clean_text)
-        if mtd_s_val is not None:
-            metrics["mtd_shrinkage"] = mtd_s_val
-            metrics["loss_amount"] = mtd_s_val
-
-        d1_s_val = _extract_amount_by_pattern(r"\bd-?1\s+shrinkage\b", clean_text)
-        if d1_s_val is not None:
-            metrics["d1_shrinkage"] = d1_s_val
-            if "loss_amount" not in metrics:
-                metrics["loss_amount"] = d1_s_val
-
-        mtd_dq_val = _extract_amount_by_pattern(r"\bmtd\s+(?:dq\s*loss|dq|defect)\b", clean_text)
-        if mtd_dq_val is not None:
-            metrics["mtd_dq"] = mtd_dq_val
-            if "loss_amount" not in metrics:
-                metrics["loss_amount"] = mtd_dq_val
-
-        d1_dq_val = _extract_amount_by_pattern(r"\bd-?1\s+(?:dq\s*loss|dq|defect)\b", clean_text)
-        if d1_dq_val is not None:
-            metrics["d1_dq"] = d1_dq_val
-            if "loss_amount" not in metrics:
-                metrics["loss_amount"] = d1_dq_val
-    elif "mtd_dq" in metrics:
-        metrics["loss_amount"] = metrics["mtd_dq"]
-    elif "mtd_shrinkage" in metrics:
-        metrics["loss_amount"] = metrics["mtd_shrinkage"]
+        if "d1_shrinkage" in metrics:
+            metrics["loss_amount"] = metrics["d1_shrinkage"]
+        elif "d1_dq" in metrics:
+            metrics["loss_amount"] = metrics["d1_dq"]
+        elif "mtd_shrinkage" in metrics:
+            metrics["loss_amount"] = metrics["mtd_shrinkage"]
+        elif "mtd_dq" in metrics:
+            metrics["loss_amount"] = metrics["mtd_dq"]
 
     if "loss_amount" not in metrics:
         # First, strip date stamps like '2026-09-30' or '2026/09/30' from text to avoid false year capture
         sanitized_text = re.sub(r"\b202\d[-/]\d{2}[-/]\d{2}\b", " ", clean_text)
         sanitized_text = re.sub(r"\b\d{2}[-/]\d{2}[-/]202\d\b", " ", sanitized_text)
-        loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*[:=]\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)", sanitized_text, re.I)
+        loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*[:=]\s*(?:rs\.?|inr|₹)?\s*(\(?-?\s*(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\)?|\(?-?\s*[\d,]+(?:\.\d+)?\)?)", sanitized_text, re.I)
         if not loss_match:
-            loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*(?:of)?\s*(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)", sanitized_text, re.I)
+            loss_match = re.search(r"\b(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b\s*(?:of)?\s*(?:rs\.?|inr|₹)\s*(\(?-?\s*(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\)?|\(?-?\s*[\d,]+(?:\.\d+)?\)?)", sanitized_text, re.I)
         if not loss_match:
-            loss_match = re.search(r"(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)\s*(?:in\s+|of\s+)?(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b", sanitized_text, re.I)
+            loss_match = re.search(r"(?:rs\.?|inr|₹)\s*(\(?-?\s*(?:rs\.?|inr|₹)?\s*[\d,]+(?:\.\d+)?\)?|\(?-?\s*[\d,]+(?:\.\d+)?\)?)\s*(?:in\s+|of\s+)?(?:dq\s*loss|shrinkage|spoilage|damage|defect\s*loss)\b", sanitized_text, re.I)
         if loss_match:
-            amt = float(loss_match.group(1))
-            matched_str = loss_match.group(0).lower()
-            has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
-            if not (2020 <= amt <= 2035 and not has_curr):
-                metrics["loss_amount"] = amt
+            parsed_amt = _parse_signed_amount(loss_match.group(1))
+            if parsed_amt is not None:
+                amt = parsed_amt
+                matched_str = loss_match.group(0).lower()
+                has_curr = "₹" in matched_str or "rs" in matched_str or "inr" in matched_str
+                if not (2020 <= amt <= 2035 and not has_curr):
+                    metrics["loss_amount"] = amt
 
     return metrics
 

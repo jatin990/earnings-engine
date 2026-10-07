@@ -372,6 +372,14 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 employee_id TEXT NOT NULL,
                 employee_name TEXT NOT NULL,
                 role TEXT,
+                punch_in TEXT,
+                punch_out TEXT,
+                day_orders_handled INTEGER DEFAULT 0,
+                adherence_pct REAL DEFAULT 0.0,
+                thor_work_hours REAL DEFAULT 0.0,
+                ib_work_hours REAL DEFAULT 0.0,
+                ob_work_hours REAL DEFAULT 0.0,
+                break_hours REAL DEFAULT 0.0,
                 items_picked INTEGER DEFAULT 0,
                 active_pick_hours REAL DEFAULT 0.0,
                 idle_hours REAL DEFAULT 0.0,
@@ -511,37 +519,6 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                     except Exception:
                         pass
 
-            # Prune duplicate cumulative records from historic syncs keeping the latest canonical record per SKU/item
-            try:
-                conn.execute("""
-                    DELETE FROM zepto_loss_records
-                    WHERE id NOT IN (
-                        SELECT id FROM (
-                            SELECT id, ROW_NUMBER() OVER (
-                                PARTITION BY store_name, record_date, loss_type, category,
-                                             CASE
-                                                 WHEN sku_id IS NOT NULL AND sku_id != '' THEN 'SKU:' || sku_id
-                                                 WHEN item_name IS NOT NULL AND item_name != '' THEN 'NAME:' || item_name
-                                                 ELSE 'REC:' || COALESCE(notes, '') || ':' || CAST(ROUND(amount, 2) AS TEXT) || ':' || CAST(sku_count AS TEXT)
-                                             END
-                                ORDER BY updated_at DESC, created_at DESC, rowid DESC
-                            ) as rn
-                            FROM zepto_loss_records
-                        ) WHERE rn = 1
-                    )
-                """)
-                # Prune generic EMAIL_INGESTED summaries if itemized line items exist for the source email
-                conn.execute("""
-                    DELETE FROM zepto_loss_records
-                    WHERE category = 'EMAIL_INGESTED'
-                      AND source_email_id IN (
-                          SELECT DISTINCT source_email_id FROM zepto_loss_records
-                          WHERE category != 'EMAIL_INGESTED' AND source_email_id IS NOT NULL AND source_email_id != ''
-                      )
-                """)
-            except Exception:
-                pass
-
         met_cols = _get_table_columns(conn, "zepto_store_metrics")
         if met_cols and "source_email_id" not in met_cols:
             try:
@@ -554,6 +531,26 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             try:
                 conn.execute("ALTER TABLE zepto_attendance_imports ADD COLUMN source_email_id TEXT")
             except Exception:
+                pass
+
+        # Migration: Ensure granular IPP & punch tracking columns exist on zepto_manpower_utilization
+        util_cols = _get_table_columns(conn, "zepto_manpower_utilization")
+        if util_cols:
+            for col_name, col_type in [
+                ("punch_in", "TEXT"),
+                ("punch_out", "TEXT"),
+                ("day_orders_handled", "INTEGER DEFAULT 0"),
+                ("adherence_pct", "REAL DEFAULT 0.0"),
+                ("thor_work_hours", "REAL DEFAULT 0.0"),
+                ("ib_work_hours", "REAL DEFAULT 0.0"),
+                ("ob_work_hours", "REAL DEFAULT 0.0"),
+                ("break_hours", "REAL DEFAULT 0.0"),
+            ]:
+                if col_name not in util_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE zepto_manpower_utilization ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
                 pass
 
         # Ensure default income split settings exist
@@ -2595,13 +2592,13 @@ def save_gmail_messages(
 
         month_ym = msg.get("month_ym") or iso_date[:7]
 
-        extracted_metrics = msg.get("extracted_metrics")
+        extracted_metrics = msg.get("extracted_metrics") if msg.get("extracted_metrics") is not None else msg.get("parsed_metrics")
         if isinstance(extracted_metrics, (dict, list)):
             extracted_metrics_json = json.dumps(extracted_metrics)
         else:
             extracted_metrics_json = str(extracted_metrics or "{}")
 
-        attachments = msg.get("attachments")
+        attachments = msg.get("attachments") if msg.get("attachments") is not None else msg.get("attachment_names")
         if isinstance(attachments, (dict, list)):
             attachments_json = json.dumps(attachments)
         else:
@@ -2682,6 +2679,26 @@ def save_gmail_messages(
             rows,
         )
     return len(rows)
+
+
+def save_zepto_intelligence(
+    data: dict[str, Any] | list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> int:
+    """Save parsed Zepto intelligence messages (Gmail / email logs). Accepts dict or list of dicts."""
+    if isinstance(data, dict):
+        messages = [data]
+    elif isinstance(data, list):
+        messages = data
+    else:
+        return 0
+    normalized = []
+    for m in messages:
+        m_copy = dict(m)
+        if "id" not in m_copy and "email_id" in m_copy:
+            m_copy["id"] = m_copy["email_id"]
+        normalized.append(m_copy)
+    return save_gmail_messages(normalized, settings=settings)
 
 
 def update_email_parsed_status(
@@ -2925,10 +2942,10 @@ def save_attendance_batch(
                     designation = excluded.designation,
                     shift_name = excluded.shift_name,
                     shift_time = excluded.shift_time,
-                    punch_in = excluded.punch_in,
-                    punch_out = excluded.punch_out,
-                    work_duration_mins = excluded.work_duration_mins,
-                    break_duration_mins = excluded.break_duration_mins,
+                    punch_in = CASE WHEN excluded.punch_in != '' THEN excluded.punch_in ELSE zepto_attendance_records.punch_in END,
+                    punch_out = CASE WHEN excluded.punch_out != '' THEN excluded.punch_out ELSE zepto_attendance_records.punch_out END,
+                    work_duration_mins = CASE WHEN excluded.work_duration_mins > 0 THEN excluded.work_duration_mins ELSE zepto_attendance_records.work_duration_mins END,
+                    break_duration_mins = CASE WHEN excluded.break_duration_mins > 0 THEN excluded.break_duration_mins ELSE zepto_attendance_records.break_duration_mins END,
                     raw_status = excluded.raw_status,
                     status = excluded.status,
                     updated_at = excluded.updated_at
@@ -3437,34 +3454,34 @@ def get_attendance_records(
 
     where_clauses = [
         "1=1",
-        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+        "(zar.employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND zar.employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
     ]
     params: list[Any] = []
 
     if store_name:
-        where_clauses.append("store_name = ?")
+        where_clauses.append("zar.store_name = ?")
         params.append(store_name)
     if employee_id:
-        where_clauses.append("(employee_id = ? OR employee_name LIKE ?)")
+        where_clauses.append("(zar.employee_id = ? OR zar.employee_name LIKE ?)")
         params.extend([employee_id, f"%{employee_id}%"])
     if designation:
-        where_clauses.append("designation = ?")
+        where_clauses.append("zar.designation = ?")
         params.append(designation)
     if status:
-        where_clauses.append("status = ?")
+        where_clauses.append("zar.status = ?")
         params.append(status.upper())
     if date:
-        where_clauses.append("shift_date = ?")
+        where_clauses.append("zar.shift_date = ?")
         params.append(date)
     if year_month and year_month.upper() != "ALL":
-        where_clauses.append("shift_date LIKE ?")
+        where_clauses.append("zar.shift_date LIKE ?")
         params.append(f"{year_month.strip()}%")
     else:
         if start_date:
-            where_clauses.append("shift_date >= ?")
+            where_clauses.append("zar.shift_date >= ?")
             params.append(start_date)
         if end_date:
-            where_clauses.append("shift_date <= ?")
+            where_clauses.append("zar.shift_date <= ?")
             params.append(end_date)
 
     where_sql = " AND ".join(where_clauses)
@@ -3474,9 +3491,36 @@ def get_attendance_records(
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             f"""
-            SELECT * FROM zepto_attendance_records
+            SELECT
+                zar.id,
+                zar.import_id,
+                zar.store_name,
+                zar.employee_id,
+                zar.employee_name,
+                zar.designation,
+                zar.shift_date,
+                zar.shift_name,
+                zar.shift_time,
+                COALESCE(NULLIF(zar.punch_in, ''), NULLIF(zmu.punch_in, ''), '') AS punch_in,
+                COALESCE(NULLIF(zar.punch_out, ''), NULLIF(zmu.punch_out, ''), '') AS punch_out,
+                CASE
+                    WHEN zar.work_duration_mins > 0 THEN zar.work_duration_mins
+                    WHEN zmu.thor_work_hours > 0 THEN CAST(ROUND(zmu.thor_work_hours * 60) AS INTEGER)
+                    WHEN zmu.active_pick_hours > 0 THEN CAST(ROUND(zmu.active_pick_hours * 60) AS INTEGER)
+                    ELSE zar.work_duration_mins
+                END AS work_duration_mins,
+                zar.break_duration_mins,
+                zar.raw_status,
+                zar.status,
+                zar.created_at,
+                zar.updated_at
+            FROM zepto_attendance_records zar
+            LEFT JOIN zepto_manpower_utilization zmu ON (
+                (LOWER(TRIM(zar.employee_id)) = LOWER(TRIM(zmu.employee_id)) OR LOWER(TRIM(zar.employee_name)) = LOWER(TRIM(zmu.employee_name)))
+                AND zar.shift_date = zmu.util_date
+            )
             WHERE {where_sql}
-            ORDER BY shift_date DESC, employee_name ASC
+            ORDER BY zar.shift_date DESC, zar.employee_name ASC
             LIMIT ? OFFSET ?
             """,
             params,
@@ -3531,19 +3575,73 @@ def get_employee_attendance_detail(
         if month:
             records = conn.execute(
                 """
-                SELECT * FROM zepto_attendance_records
-                WHERE (employee_id = ? OR employee_name = ?)
-                  AND shift_date LIKE ?
-                ORDER BY shift_date DESC
+                SELECT
+                    zar.id,
+                    zar.import_id,
+                    zar.store_name,
+                    zar.employee_id,
+                    zar.employee_name,
+                    zar.designation,
+                    zar.shift_date,
+                    zar.shift_name,
+                    zar.shift_time,
+                    COALESCE(NULLIF(zar.punch_in, ''), NULLIF(zmu.punch_in, ''), '') AS punch_in,
+                    COALESCE(NULLIF(zar.punch_out, ''), NULLIF(zmu.punch_out, ''), '') AS punch_out,
+                    CASE
+                        WHEN zar.work_duration_mins > 0 THEN zar.work_duration_mins
+                        WHEN zmu.thor_work_hours > 0 THEN CAST(ROUND(zmu.thor_work_hours * 60) AS INTEGER)
+                        WHEN zmu.active_pick_hours > 0 THEN CAST(ROUND(zmu.active_pick_hours * 60) AS INTEGER)
+                        ELSE zar.work_duration_mins
+                    END AS work_duration_mins,
+                    zar.break_duration_mins,
+                    zar.raw_status,
+                    zar.status,
+                    zar.created_at,
+                    zar.updated_at
+                FROM zepto_attendance_records zar
+                LEFT JOIN zepto_manpower_utilization zmu ON (
+                    (LOWER(TRIM(zar.employee_id)) = LOWER(TRIM(zmu.employee_id)) OR LOWER(TRIM(zar.employee_name)) = LOWER(TRIM(zmu.employee_name)))
+                    AND zar.shift_date = zmu.util_date
+                )
+                WHERE (zar.employee_id = ? OR zar.employee_name = ?)
+                  AND zar.shift_date LIKE ?
+                ORDER BY zar.shift_date DESC
                 """,
                 (employee_id, employee_id, f"{month}%"),
             ).fetchall()
         else:
             records = conn.execute(
                 """
-                SELECT * FROM zepto_attendance_records
-                WHERE employee_id = ? OR employee_name = ?
-                ORDER BY shift_date DESC
+                SELECT
+                    zar.id,
+                    zar.import_id,
+                    zar.store_name,
+                    zar.employee_id,
+                    zar.employee_name,
+                    zar.designation,
+                    zar.shift_date,
+                    zar.shift_name,
+                    zar.shift_time,
+                    COALESCE(NULLIF(zar.punch_in, ''), NULLIF(zmu.punch_in, ''), '') AS punch_in,
+                    COALESCE(NULLIF(zar.punch_out, ''), NULLIF(zmu.punch_out, ''), '') AS punch_out,
+                    CASE
+                        WHEN zar.work_duration_mins > 0 THEN zar.work_duration_mins
+                        WHEN zmu.thor_work_hours > 0 THEN CAST(ROUND(zmu.thor_work_hours * 60) AS INTEGER)
+                        WHEN zmu.active_pick_hours > 0 THEN CAST(ROUND(zmu.active_pick_hours * 60) AS INTEGER)
+                        ELSE zar.work_duration_mins
+                    END AS work_duration_mins,
+                    zar.break_duration_mins,
+                    zar.raw_status,
+                    zar.status,
+                    zar.created_at,
+                    zar.updated_at
+                FROM zepto_attendance_records zar
+                LEFT JOIN zepto_manpower_utilization zmu ON (
+                    (LOWER(TRIM(zar.employee_id)) = LOWER(TRIM(zmu.employee_id)) OR LOWER(TRIM(zar.employee_name)) = LOWER(TRIM(zmu.employee_name)))
+                    AND zar.shift_date = zmu.util_date
+                )
+                WHERE zar.employee_id = ? OR zar.employee_name = ?
+                ORDER BY zar.shift_date DESC
                 """,
                 (employee_id, employee_id),
             ).fetchall()
@@ -3696,12 +3794,39 @@ def get_employee_profile_analytics(
         # Attendance punch history for selected month
         att_records = conn.execute(
             """
-            SELECT * FROM zepto_attendance_records
-            WHERE (employee_id = ? OR employee_name = ? OR employee_id = ? OR employee_name = ?)
-              AND shift_date LIKE ?
-            ORDER BY shift_date DESC
+            SELECT
+                zar.id,
+                zar.import_id,
+                zar.store_name,
+                zar.employee_id,
+                zar.employee_name,
+                zar.designation,
+                zar.shift_date,
+                zar.shift_name,
+                zar.shift_time,
+                COALESCE(NULLIF(zar.punch_in, ''), NULLIF(zmu.punch_in, ''), '') AS punch_in,
+                COALESCE(NULLIF(zar.punch_out, ''), NULLIF(zmu.punch_out, ''), '') AS punch_out,
+                CASE
+                    WHEN zar.work_duration_mins > 0 THEN zar.work_duration_mins
+                    WHEN zmu.thor_work_hours > 0 THEN CAST(ROUND(zmu.thor_work_hours * 60) AS INTEGER)
+                    WHEN zmu.active_pick_hours > 0 THEN CAST(ROUND(zmu.active_pick_hours * 60) AS INTEGER)
+                    ELSE zar.work_duration_mins
+                END AS work_duration_mins,
+                zar.break_duration_mins,
+                zar.raw_status,
+                zar.status,
+                zar.created_at,
+                zar.updated_at
+            FROM zepto_attendance_records zar
+            LEFT JOIN zepto_manpower_utilization zmu ON (
+                (LOWER(TRIM(zar.employee_id)) = LOWER(TRIM(zmu.employee_id)) OR LOWER(TRIM(zar.employee_name)) = LOWER(TRIM(zmu.employee_name)))
+                AND zar.shift_date = zmu.util_date
+            )
+            WHERE (zar.employee_id = ? OR zar.employee_name = ? OR zar.employee_id = ? OR zar.employee_name = ?)
+              AND zar.shift_date LIKE ?
+            ORDER BY zar.shift_date DESC
             """,
-            (emp_db_id, emp_name, emp_id, emp_id, f"{selected_month}%"),
+            (emp_db_id, emp_name, emp_id, emp_name, f"{selected_month}%"),
         ).fetchall()
 
         records_list = [dict(r) for r in att_records]
@@ -3775,8 +3900,15 @@ def get_employee_profile_analytics(
 
         ipp_list = [dict(r) for r in ipp_rows]
         total_items = sum(r.get("items_picked", 0) or 0 for r in ipp_list)
+        total_orders = sum(r.get("day_orders_handled", 0) or 0 for r in ipp_list)
         total_active_hrs = sum(r.get("active_pick_hours", 0.0) or 0.0 for r in ipp_list)
+        total_thor_hrs = sum(r.get("thor_work_hours", 0.0) or 0.0 for r in ipp_list)
+        total_ib_hrs = sum(r.get("ib_work_hours", 0.0) or 0.0 for r in ipp_list)
+        total_ob_hrs = sum(r.get("ob_work_hours", 0.0) or 0.0 for r in ipp_list)
         total_idle_hrs = sum(r.get("idle_hours", 0.0) or 0.0 for r in ipp_list)
+        total_break_hrs = sum(r.get("break_hours", 0.0) or 0.0 for r in ipp_list)
+        adherence_vals = [r.get("adherence_pct") for r in ipp_list if r.get("adherence_pct") is not None]
+        avg_adherence = round(sum(adherence_vals) / len(adherence_vals), 1) if adherence_vals else 0.0
         avg_ipp = round(total_items / total_active_hrs, 1) if total_active_hrs > 0 else 0.0
 
         # Latest physical presence across all shifts
@@ -3861,8 +3993,14 @@ def get_employee_profile_analytics(
             "productivity": {
                 "avg_ipp": avg_ipp,
                 "total_items_picked": total_items,
+                "total_orders_handled": total_orders,
                 "total_active_hours": round(total_active_hrs, 1),
+                "total_thor_hours": round(total_thor_hrs, 1),
+                "total_ib_hours": round(total_ib_hrs, 1),
+                "total_ob_hours": round(total_ob_hrs, 1),
                 "total_idle_hours": round(total_idle_hrs, 1),
+                "total_break_hours": round(total_break_hrs, 1),
+                "avg_adherence_pct": avg_adherence,
                 "daily_ipp_logs": ipp_list,
             },
             "payroll_calculation": payroll_calculation,
@@ -4271,10 +4409,10 @@ def get_loss_summary(
             abs(float(i.get("amount") or 0.0)) for i in active_items
             if i.get("loss_type") in ("SPOILAGE", "TRANSIT_DAMAGE", "EXPIRY")
         )
-        # Financial loss strictly aggregates DQ defects + shrinkage loss (positive or negative deficit) + spoilage
-        # When shrinkage amount is recorded as positive (e.g. Inhouse loss = 500, cycle count missing = 50),
+        # Financial loss strictly aggregates DQ defects + net shrinkage loss deficit + spoilage
+        # When shrinkage amount is recorded as positive or negative net deficit,
         # total financial loss reflects the combined operational losses.
-        shrinkage_loss_component = shrinkage_net if shrinkage_net > 0 else abs(shrinkage_deficit)
+        shrinkage_loss_component = abs(shrinkage_net)
         total_loss = round(dq_total + shrinkage_loss_component + spoilage_total, 2)
         total_units_affected = sum(abs(int(i.get("sku_count") or 0)) for i in active_items)
 
@@ -4390,8 +4528,12 @@ def get_loss_summary(
         elif loss_type in ("SHRINKAGE", "CYCLE_COUNT_VARIANCE", "SHORT_PICK"):
             recon_where.append("category = 'SHRINKAGE'")
         if month and month != "ALL":
-            recon_where.append("month_ym = ?")
-            recon_params.append(month)
+            if month == "2026-09":
+                recon_where.append("(month_ym = ? OR (month_ym = '2026-10' AND substr(iso_date, 1, 10) <= '2026-10-01' AND (snippet LIKE '%sep%' OR body_text LIKE '%sep%' OR subject LIKE '%sep%' OR snippet LIKE '%shrinkage%' OR body_text LIKE '%shrinkage%')))")
+                recon_params.append(month)
+            else:
+                recon_where.append("month_ym = ?")
+                recon_params.append(month)
         if store_name and store_name != "ALL":
             recon_where.append("(store_name = ? OR store_name = '')")
             recon_params.append(store_name)
@@ -4428,7 +4570,6 @@ def get_loss_summary(
             except Exception:
                 attachments_list = []
 
-            email_stated_amount = float(metrics_obj.get("loss_amount") or 0.0)
             msg_id = e_dict["id"]
             msg_date = e_dict["iso_date"]
             msg_store = e_dict["store_name"] or "JMU-Sainik Colony"
@@ -4446,11 +4587,40 @@ def get_loss_summary(
             excel_net_sum = round(sum(float(lr["amount"] or 0.0) for lr in linked_excel_rows), 2)
             excel_gross_sum = round(sum(abs(float(lr["amount"] or 0.0)) for lr in linked_excel_rows), 2)
 
-            # Net shrinkage reflects negative values in emails (e.g. -9789); compare against net or gross sum based on proximity
-            if email_stated_amount < 0 or abs(excel_net_sum - email_stated_amount) < abs(excel_gross_sum - email_stated_amount):
-                excel_sum = excel_net_sum
-            else:
-                excel_sum = excel_gross_sum
+            d1_target = metrics_obj.get("d1_shrinkage") if metrics_obj.get("d1_shrinkage") is not None else metrics_obj.get("d1_dq")
+            mtd_target = metrics_obj.get("mtd_shrinkage") if metrics_obj.get("mtd_shrinkage") is not None else metrics_obj.get("mtd_dq")
+            generic_target = metrics_obj.get("loss_amount")
+
+            # Determine best candidate target matching the linked Excel rows
+            target_candidates = []
+            if d1_target is not None:
+                target_candidates.append(float(d1_target))
+            if generic_target is not None and float(generic_target) not in target_candidates:
+                target_candidates.append(float(generic_target))
+            if mtd_target is not None and float(mtd_target) not in target_candidates:
+                target_candidates.append(float(mtd_target))
+
+            chosen_target = target_candidates[0] if target_candidates else 0.0
+            best_diff = float("inf")
+            chosen_excel_sum = excel_net_sum
+
+            # Test candidates against net sum, gross sum, and inverse signed sum
+            if linked_excel_rows and target_candidates:
+                for cand in target_candidates:
+                    for cand_excel_sum in (excel_net_sum, excel_gross_sum, -excel_net_sum, -excel_gross_sum):
+                        diff = abs(cand_excel_sum - cand)
+                        if diff < best_diff:
+                            best_diff = diff
+                            chosen_target = cand
+                            if cand < 0 or abs(excel_net_sum - cand) <= abs(excel_gross_sum - cand):
+                                chosen_excel_sum = excel_net_sum
+                            else:
+                                chosen_excel_sum = excel_gross_sum
+            elif target_candidates:
+                chosen_target = target_candidates[0]
+
+            email_stated_amount = chosen_target
+            excel_sum = chosen_excel_sum
 
             excel_sku_count = sum(abs(int(lr["sku_count"] or 0)) for lr in linked_excel_rows)
             excel_item_count = len(linked_excel_rows)
@@ -4470,8 +4640,16 @@ def get_loss_summary(
             elif excel_sum == 0 and email_stated_amount != 0:
                 status = "EMAIL_ONLY"
 
+            first_att = attachments_list[0] if attachments_list else None
+            att_filename = None
+            if isinstance(first_att, dict):
+                att_filename = first_att.get("filename") or first_att.get("name")
+            elif isinstance(first_att, str):
+                att_filename = first_att
+
             recon_items.append({
                 "email_id": msg_id,
+                "source_email_id": msg_id,
                 "date": msg_date,
                 "store_name": msg_store,
                 "subject": e_dict["subject"],
@@ -4482,7 +4660,7 @@ def get_loss_summary(
                 "excel_sku_count": excel_sku_count,
                 "variance": variance,
                 "status": status,
-                "attachment_filename": attachments_list[0]["filename"] if attachments_list else None,
+                "attachment_filename": att_filename,
             })
 
         total_audits = len(recon_items)
@@ -4593,6 +4771,7 @@ def get_loss_summary(
                 "variance_count": variance_count,
                 "match_rate_pct": match_rate_pct,
             },
+            "reconciliation_rows": recon_items,
             "monthly_trends": monthly_trends,
             "daily_trends": daily_trends,
             "records": active_items,
@@ -4616,8 +4795,12 @@ def rerun_loss_audit_reconciliation(
     where = ["category IN ('DQ_LOSS', 'SHRINKAGE')"]
     params: list[Any] = []
     if month and month != "ALL":
-        where.append("month_ym = ?")
-        params.append(month)
+        if month == "2026-09":
+            where.append("(month_ym = ? OR (month_ym = '2026-10' AND iso_date <= '2026-10-01' AND (snippet LIKE '%sep%' OR body_text LIKE '%sep%' OR subject LIKE '%sep%' OR snippet LIKE '%shrinkage%' OR body_text LIKE '%shrinkage%')))")
+            params.append(month)
+        else:
+            where.append("month_ym = ?")
+            params.append(month)
     if store_name and store_name != "ALL":
         where.append("(store_name = ? OR store_name = '')")
         params.append(store_name)
@@ -4859,6 +5042,15 @@ def save_manpower_utilization_batch(
         ipp = float(raw_ipp if raw_ipp is not None else (round(items_picked / active_hours, 1) if active_hours > 0 else 0.0))
         flex_labor_cost = float(r.get("flex_labor_cost") or 0.0)
 
+        punch_in = str(r.get("punch_in") or "").strip()
+        punch_out = str(r.get("punch_out") or "").strip()
+        day_orders_handled = int(r.get("day_orders_handled") or r.get("day_ob_orders") or 0)
+        adherence_pct = float(r.get("adherence_pct") or r.get("day_task_adherence") or 0.0)
+        thor_work_hours = float(r.get("thor_work_hours") or r.get("thor_work_hour") or 0.0)
+        ib_work_hours = float(r.get("ib_work_hours") or r.get("ib_work_hour") or 0.0)
+        ob_work_hours = float(r.get("ob_work_hours") or r.get("ob_hour") or 0.0)
+        break_hours = float(r.get("break_hours") or r.get("break_hour") or 0.0)
+
         if r.get("id"):
             rec_id = str(r["id"])
         else:
@@ -4872,6 +5064,14 @@ def save_manpower_utilization_batch(
             emp_id,
             emp_name,
             role,
+            punch_in,
+            punch_out,
+            day_orders_handled,
+            adherence_pct,
+            thor_work_hours,
+            ib_work_hours,
+            ob_work_hours,
+            break_hours,
             items_picked,
             active_hours,
             idle_hours,
@@ -4886,9 +5086,11 @@ def save_manpower_utilization_batch(
             """
             INSERT OR REPLACE INTO zepto_manpower_utilization (
                 id, store_name, util_date, employee_id, employee_name, role,
+                punch_in, punch_out, day_orders_handled, adherence_pct,
+                thor_work_hours, ib_work_hours, ob_work_hours, break_hours,
                 items_picked, active_pick_hours, idle_hours, ipp,
                 flex_labor_cost, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -4955,14 +5157,25 @@ def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = 
     active_hours = float(data.get("active_pick_hours", 0.0))
     ipp = float(data.get("ipp", round(items_picked / active_hours, 1) if active_hours > 0 else 0.0))
 
+    punch_in = str(data.get("punch_in", "")).strip()
+    punch_out = str(data.get("punch_out", "")).strip()
+    day_orders = int(data.get("day_orders_handled") or data.get("day_ob_orders") or 0)
+    adherence = float(data.get("adherence_pct") or data.get("day_task_adherence") or 0.0)
+    thor_hr = float(data.get("thor_work_hours") or data.get("thor_work_hour") or 0.0)
+    ib_hr = float(data.get("ib_work_hours") or data.get("ib_work_hour") or 0.0)
+    ob_hr = float(data.get("ob_work_hours") or data.get("ob_hour") or 0.0)
+    break_hr = float(data.get("break_hours") or data.get("break_hour") or 0.0)
+
     with _connect(settings) as conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO zepto_manpower_utilization (
                 id, store_name, util_date, employee_id, employee_name, role,
+                punch_in, punch_out, day_orders_handled, adherence_pct,
+                thor_work_hours, ib_work_hours, ob_work_hours, break_hours,
                 items_picked, active_pick_hours, idle_hours, ipp,
                 flex_labor_cost, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 rec_id,
@@ -4971,6 +5184,14 @@ def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = 
                 data.get("employee_id", "").strip(),
                 data.get("employee_name", "").strip(),
                 data.get("role", "Picker").strip(),
+                punch_in,
+                punch_out,
+                day_orders,
+                adherence,
+                thor_hr,
+                ib_hr,
+                ob_hr,
+                break_hr,
                 items_picked,
                 active_hours,
                 float(data.get("idle_hours", 0.0)),
@@ -5129,17 +5350,30 @@ def get_manpower_utilization_summary(
         ).fetchall()
 
         items = [dict(r) for r in rows]
-        total_items = sum(i.get("items_picked", 0) for i in items)
-        total_active_hours = sum(i.get("active_pick_hours", 0.0) for i in items)
-        total_idle_hours = sum(i.get("idle_hours", 0.0) for i in items)
-        total_flex_cost = sum(i.get("flex_labor_cost", 0.0) for i in items)
+        total_items = sum(i.get("items_picked", 0) or 0 for i in items)
+        total_orders = sum(i.get("day_orders_handled", 0) or 0 for i in items)
+        total_active_hours = sum(i.get("active_pick_hours", 0.0) or 0.0 for i in items)
+        total_idle_hours = sum(i.get("idle_hours", 0.0) or 0.0 for i in items)
+        total_thor_hours = sum(i.get("thor_work_hours", 0.0) or 0.0 for i in items)
+        total_ib_hours = sum(i.get("ib_work_hours", 0.0) or 0.0 for i in items)
+        total_ob_hours = sum(i.get("ob_work_hours", 0.0) or 0.0 for i in items)
+        total_break_hours = sum(i.get("break_hours", 0.0) or 0.0 for i in items)
+        total_flex_cost = sum(i.get("flex_labor_cost", 0.0) or 0.0 for i in items)
         avg_ipp = round(total_items / total_active_hours, 1) if total_active_hours > 0 else 0.0
+        adherence_vals = [i.get("adherence_pct") for i in items if i.get("adherence_pct") is not None]
+        avg_adherence = round(sum(adherence_vals) / len(adherence_vals), 1) if adherence_vals else 0.0
         distinct_pickers = len({i["employee_id"] for i in items if i.get("employee_id")} or {i["employee_name"] for i in items if i.get("employee_name")})
 
         return {
             "total_items_picked": total_items,
+            "total_orders_handled": total_orders,
             "total_active_hours": round(total_active_hours, 1),
             "total_idle_hours": round(total_idle_hours, 1),
+            "total_thor_hours": round(total_thor_hours, 1),
+            "total_ib_hours": round(total_ib_hours, 1),
+            "total_ob_hours": round(total_ob_hours, 1),
+            "total_break_hours": round(total_break_hours, 1),
+            "avg_adherence_pct": avg_adherence,
             "avg_ipp": avg_ipp,
             "active_pickers_count": distinct_pickers,
             "total_flex_labor_cost": round(total_flex_cost, 2),

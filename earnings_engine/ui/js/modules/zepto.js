@@ -1386,7 +1386,7 @@ const zeptoApp = {
 
             if (punchTbody) {
                 if (punches.length === 0) {
-                    punchTbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-500 text-xs">No shift records found for ${selMonth}.</td></tr>`;
+                    punchTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-500 text-xs">No shift records found for ${selMonth}.</td></tr>`;
                 } else {
                     punchTbody.innerHTML = punches.map(p => {
                         let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">PRESENT</span>';
@@ -1397,14 +1397,68 @@ const zeptoApp = {
 
                         const durMins = p.work_duration_mins || 0;
                         const durHours = (durMins / 60).toFixed(1);
+                        const pIn = p.punch_in || p.in_time;
+                        const pOut = p.punch_out || p.out_time;
 
                         return `
                             <tr class="hover:bg-white/[0.04] transition" data-shift-date="${p.shift_date}">
                                 <td class="py-2 px-2.5 font-bold text-white font-mono">${p.shift_date}</td>
                                 <td class="py-2 px-2.5 text-slate-300 text-[10px]">${p.shift_name || 'General Shift'}</td>
                                 <td class="py-2 px-2.5 text-sky-300 font-mono text-[10px]">${p.shift_time || '09:00 - 18:00'}</td>
+                                <td class="py-2 px-2.5 text-center font-mono ${pIn ? 'text-emerald-400 font-bold' : 'text-slate-500'} text-[10px]">${pIn || '—'}</td>
+                                <td class="py-2 px-2.5 text-center font-mono ${pOut ? 'text-rose-300 font-bold' : 'text-slate-500'} text-[10px]">${pOut || '—'}</td>
                                 <td class="py-2 px-2.5 text-right font-mono text-purple-300 font-bold">${durMins > 0 ? `${durHours}h (${durMins}m)` : '—'}</td>
                                 <td class="py-2 px-2.5 text-center">${stBadge}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 8b. Granular IPP & Picking Productivity Forensics (Selected Month)
+            const ippCountEl = document.getElementById('staffDrawerIppLogCount');
+            const ippOrdersEl = document.getElementById('staffDrawerProdOrders');
+            const ippItemsEl = document.getElementById('staffDrawerProdItems');
+            const ippHoursSplitEl = document.getElementById('staffDrawerProdHoursSplit');
+            const ippAdherenceEl = document.getElementById('staffDrawerProdAdherence');
+            const ippTbody = document.getElementById('staffDrawerIppTableBody');
+
+            const ippLogs = prod.daily_ipp_logs || [];
+            if (ippCountEl) ippCountEl.textContent = `${ippLogs.length} Records`;
+            if (ippOrdersEl) ippOrdersEl.textContent = (prod.total_orders_handled || 0).toLocaleString('en-IN');
+            if (ippItemsEl) ippItemsEl.textContent = (prod.total_items_picked || 0).toLocaleString('en-IN');
+            if (ippHoursSplitEl) {
+                const obH = (prod.total_ob_hours || prod.total_active_hours || 0).toFixed(1);
+                const ibH = ((prod.total_ib_hours || 0) + (prod.total_break_hours || 0)).toFixed(1);
+                ippHoursSplitEl.textContent = `${obH}h OB / ${ibH}h IB`;
+            }
+            if (ippAdherenceEl) {
+                ippAdherenceEl.textContent = prod.avg_adherence_pct ? `${prod.avg_adherence_pct}%` : '—';
+            }
+
+            if (ippTbody) {
+                if (ippLogs.length === 0) {
+                    ippTbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-slate-500 text-xs">No granular IPP logs recorded for ${selMonth}.</td></tr>`;
+                } else {
+                    ippTbody.innerHTML = ippLogs.map(l => {
+                        const pIn = l.punch_in || '';
+                        const pOut = l.punch_out || '';
+                        const punchDisplay = (pIn || pOut) ? `${pIn || '—'} / ${pOut || '—'}` : '—';
+                        const obHrs = parseFloat(l.active_pick_hours || l.ob_work_hours || 0).toFixed(1);
+                        const ibBreakHrs = (parseFloat(l.ib_work_hours || 0) + parseFloat(l.break_hours || 0)).toFixed(1);
+                        const idleHrs = parseFloat(l.idle_hours || 0).toFixed(1);
+
+                        return `
+                            <tr class="hover:bg-white/[0.04] transition">
+                                <td class="py-2 px-2.5 font-bold text-white font-mono">${l.util_date}</td>
+                                <td class="py-2 px-2.5 text-center font-mono text-[10px] text-slate-300">${punchDisplay}</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-purple-300 font-bold">${l.day_orders_handled ? Number(l.day_orders_handled).toLocaleString('en-IN') : '—'}</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-white font-bold">${(l.items_picked || 0).toLocaleString('en-IN')}</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-emerald-400 font-bold">${obHrs}h</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-sky-300">${ibBreakHrs}h</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-rose-300">${idleHrs}h</td>
+                                <td class="py-2 px-2.5 text-right font-mono text-amber-300 font-bold">${l.ipp > 0 ? `${l.ipp} IPP` : '—'}</td>
+                                <td class="py-2 px-2.5 text-center font-mono font-bold ${l.adherence_pct >= 90 ? 'text-emerald-400' : (l.adherence_pct ? 'text-amber-300' : 'text-slate-500')}">${l.adherence_pct != null ? `${l.adherence_pct}%` : '—'}</td>
                             </tr>
                         `;
                     }).join('');
@@ -4319,6 +4373,9 @@ const zeptoApp = {
                         ? Number(r.work_duration_hours).toFixed(1)
                         : (r.duration_minutes ? (r.duration_minutes / 60).toFixed(1) : '0.0'));
 
+                const punchIn = r.punch_in || r.in_time || '';
+                const punchOut = r.punch_out || r.out_time || '';
+
                 return `
                     <tr class="hover:bg-white/[0.04] transition cursor-pointer" onclick="zeptoApp.openEmployeeDrawer('${r.employee_id}')" title="Click to view full 30-day shift history for ${r.employee_name}">
                         <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
@@ -4339,11 +4396,11 @@ const zeptoApp = {
                         <td class="py-2.5 px-3 text-center font-mono text-slate-300 text-[11px]">
                             ${r.shift_start && r.shift_end ? `${r.shift_start} - ${r.shift_end}` : (r.shift_name || r.shift || 'Standard')}
                         </td>
-                        <td class="py-2.5 px-3 text-center font-mono ${r.in_time ? 'text-emerald-300 font-bold' : 'text-slate-500'}">
-                            ${r.in_time || '—'}
+                        <td class="py-2.5 px-3 text-center font-mono ${punchIn ? 'text-emerald-300 font-bold' : 'text-slate-500'}">
+                            ${punchIn || '—'}
                         </td>
-                        <td class="py-2.5 px-3 text-center font-mono ${r.out_time ? 'text-slate-200' : 'text-slate-500'}">
-                            ${r.out_time || '—'}
+                        <td class="py-2.5 px-3 text-center font-mono ${punchOut ? 'text-slate-200' : 'text-slate-500'}">
+                            ${punchOut || '—'}
                         </td>
                         <td class="py-2.5 px-3 text-right font-mono font-bold ${Number(durationHours) > 0 ? 'text-purple-300' : 'text-slate-500'}">
                             ${Number(durationHours) > 0 ? `${durationHours} hrs` : '—'}
@@ -5655,9 +5712,12 @@ const zeptoApp = {
         if (!data) return;
 
         const totItemsEl = document.getElementById('utilTotalItems');
+        const totOrdersEl = document.getElementById('utilTotalOrders');
         const activePickersEl = document.getElementById('utilActivePickers');
         const avgIppEl = document.getElementById('utilAvgIpp');
+        const avgAdherenceEl = document.getElementById('utilAvgAdherence');
         const activeHoursEl = document.getElementById('utilActiveHours');
+        const ibHoursEl = document.getElementById('utilIbHours');
         const idleHoursEl = document.getElementById('utilIdleHours');
         const floorEffEl = document.getElementById('utilFloorEfficiency');
         const flexCostEl = document.getElementById('utilFlexLaborCost');
@@ -5667,12 +5727,18 @@ const zeptoApp = {
 
         const records = data.records || [];
         if (totItemsEl) totItemsEl.textContent = (data.total_items_picked || 0).toLocaleString('en-IN');
+        if (totOrdersEl) totOrdersEl.textContent = `${(data.total_orders_handled || 0).toLocaleString('en-IN')} orders`;
         if (activePickersEl) activePickersEl.textContent = `${data.active_pickers_count || 0} Pickers`;
         if (avgIppEl) avgIppEl.textContent = data.avg_ipp ? `${data.avg_ipp} IPP` : '—';
+        if (avgAdherenceEl) avgAdherenceEl.textContent = data.avg_adherence_pct ? `${data.avg_adherence_pct}%` : '—%';
         if (activeHoursEl) activeHoursEl.textContent = `${data.total_active_hours || 0} hrs`;
-        if (idleHoursEl) idleHoursEl.textContent = `${data.total_idle_hours || 0} hrs`;
+        if (ibHoursEl) ibHoursEl.textContent = `${data.total_ib_hours || 0}h`;
+        if (idleHoursEl) {
+            const combinedIdle = ((data.total_idle_hours || 0) + (data.total_break_hours || 0)).toFixed(1);
+            idleHoursEl.textContent = `${combinedIdle}h`;
+        }
 
-        const totalHours = (data.total_active_hours || 0) + (data.total_idle_hours || 0);
+        const totalHours = (data.total_active_hours || 0) + (data.total_ib_hours || 0) + (data.total_idle_hours || 0) + (data.total_break_hours || 0);
         if (floorEffEl) {
             const eff = totalHours > 0 ? Math.round(((data.total_active_hours || 0) / totalHours) * 100) : 100;
             floorEffEl.textContent = `${eff}% Active`;
@@ -5688,13 +5754,16 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="15" class="text-center py-8 text-slate-500 text-xs">No manpower utilization records logged for this timeframe.</td></tr>`;
             return;
         }
 
         tbody.innerHTML = records.map((r, idx) => {
             const empId = r.employee_id || (this.employees ? (this.employees.find(e => e.name && e.name.toLowerCase() === (r.employee_name || '').toLowerCase())?.id) : '') || '';
             const drillTarget = empId || r.employee_name || '';
+            const pIn = r.punch_in || '';
+            const pOut = r.punch_out || '';
+            const ibBreakHrs = (parseFloat(r.ib_work_hours || 0) + parseFloat(r.break_hours || 0)).toFixed(1);
 
             return `
             <tr class="hover:bg-white/[0.04] transition">
@@ -5706,12 +5775,17 @@ const zeptoApp = {
                     </div>
                     <div class="text-[10px] font-mono text-slate-500">${r.employee_id || ''}</div>
                 </td>
-                <td class="py-2.5 px-3 text-slate-300">${r.role}</td>
+                <td class="py-2.5 px-3 text-center font-mono ${pIn ? 'text-emerald-400 font-bold' : 'text-slate-500'} text-[11px]">${pIn || '—'}</td>
+                <td class="py-2.5 px-3 text-center font-mono ${pOut ? 'text-rose-300 font-bold' : 'text-slate-500'} text-[11px]">${pOut || '—'}</td>
+                <td class="py-2.5 px-3 text-slate-300 text-xs">${r.role || 'Picker'}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${r.day_orders_handled ? Number(r.day_orders_handled).toLocaleString('en-IN') : '—'}</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${(r.items_picked || 0).toLocaleString('en-IN')}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${r.active_pick_hours} hrs</td>
-                <td class="py-2.5 px-3 text-right font-mono text-rose-400">${r.idle_hours} hrs</td>
+                <td class="py-2.5 px-3 text-right font-mono text-emerald-400 font-bold">${r.active_pick_hours} hrs</td>
+                <td class="py-2.5 px-3 text-right font-mono text-sky-300">${ibBreakHrs} hrs</td>
+                <td class="py-2.5 px-3 text-right font-mono text-rose-300">${r.idle_hours} hrs</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${r.ipp > 0 ? `${r.ipp} IPP` : '—'}</td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${this.formatCurrency(r.flex_labor_cost || 0)}</td>
+                <td class="py-2.5 px-3 text-center font-mono font-bold ${r.adherence_pct >= 90 ? 'text-emerald-400' : (r.adherence_pct ? 'text-amber-300' : 'text-slate-500')}">${r.adherence_pct != null ? `${r.adherence_pct}%` : '—'}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-200">${this.formatCurrency(r.flex_labor_cost || 0)}</td>
                 <td class="py-2.5 px-3 text-center">
                     ${drillTarget ? `
                         <button type="button" onclick="zeptoApp.openStaffDrawer('${drillTarget}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition shadow-sm" title="Open comprehensive staff profile & analytics">
@@ -7858,7 +7932,7 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (activeStaff.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500 text-xs">No active roster staff members found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" class="text-center py-6 text-slate-500 text-xs">No active roster staff members found.</td></tr>`;
             return;
         }
 
@@ -7872,23 +7946,32 @@ const zeptoApp = {
                 if (!targetKey) return;
 
                 const items = parseFloat(r.items_picked || r.day_ob_packed_qty || r.items_count || 0);
-                const hours = parseFloat(r.active_pick_hours || r.ob_hour || r.thor_work_hour || r.hours_worked || 0);
+                const orders = parseFloat(r.day_orders_handled || 0);
+                const hours = parseFloat(r.active_pick_hours || r.ob_work_hours || r.ob_hour || r.thor_work_hours || r.hours_worked || 0);
 
                 if (!utilMap[targetKey]) {
                     utilMap[targetKey] = {
                         items: 0,
+                        orders: 0,
                         hours: 0,
                         shifts: 0,
                         raw_ipp_sum: 0,
-                        record_count: 0
+                        record_count: 0,
+                        adherence_sum: 0,
+                        adherence_count: 0
                     };
                 }
                 utilMap[targetKey].items += items;
+                utilMap[targetKey].orders += orders;
                 utilMap[targetKey].hours += hours;
                 utilMap[targetKey].shifts += 1;
                 if (r.packer_ipp || r.day_ob_ipp || r.ipp) {
                     utilMap[targetKey].raw_ipp_sum += parseFloat(r.packer_ipp || r.day_ob_ipp || r.ipp || 0);
                     utilMap[targetKey].record_count += 1;
+                }
+                if (r.adherence_pct !== undefined && r.adherence_pct !== null && r.adherence_pct !== '') {
+                    utilMap[targetKey].adherence_sum += parseFloat(r.adherence_pct);
+                    utilMap[targetKey].adherence_count += 1;
                 }
 
                 // Also map alias keys for fuzzy matching
@@ -7906,12 +7989,15 @@ const zeptoApp = {
             const realUtil = (idKey && utilMap[idKey]) ? utilMap[idKey] : (nameKey && utilMap[nameKey] ? utilMap[nameKey] : null);
 
             let itemsDisplay = '—';
+            let ordersDisplay = '—';
             let hoursDisplay = '—';
             let ippDisplay = '—';
+            let adherenceDisplay = '<span class="text-slate-500 font-mono text-[10px]">—</span>';
             let tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/15 text-slate-400 border border-slate-500/30">PENDING DATA</span>';
 
-            if (realUtil && (realUtil.items > 0 || realUtil.hours > 0 || realUtil.record_count > 0)) {
+            if (realUtil && (realUtil.items > 0 || realUtil.hours > 0 || realUtil.record_count > 0 || realUtil.orders > 0)) {
                 const items = realUtil.items;
+                const orders = realUtil.orders;
                 const hours = realUtil.hours;
 
                 // Calculate weighted IPP: Total Items / Total Active Pick Hours
@@ -7922,9 +8008,16 @@ const zeptoApp = {
                     ipp = Math.round(realUtil.raw_ipp_sum / realUtil.record_count);
                 }
 
+                ordersDisplay = orders > 0 ? Math.round(orders).toLocaleString('en-IN') : '—';
                 itemsDisplay = items > 0 ? Math.round(items).toLocaleString('en-IN') : '0';
                 hoursDisplay = hours > 0 ? `${hours.toFixed(1)}h` : '0.0h';
                 ippDisplay = ipp > 0 ? `${ipp} IPP` : '—';
+
+                if (realUtil.adherence_count > 0) {
+                    const avgAdh = Math.round(realUtil.adherence_sum / realUtil.adherence_count);
+                    const adhColor = avgAdh >= 90 ? 'text-emerald-400' : 'text-amber-300';
+                    adherenceDisplay = `<span class="font-mono font-bold ${adhColor}">${avgAdh}%</span>`;
+                }
 
                 if (ipp >= 140) {
                     tierBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">⚡ ELITE (≥140)</span>';
@@ -7939,14 +8032,18 @@ const zeptoApp = {
                 <tr class="hover:bg-white/[0.02] transition">
                     <td class="py-2.5 px-3 text-center font-mono text-slate-500 font-bold">${idx + 1}</td>
                     <td class="py-2.5 px-3">
-                        <div class="font-bold text-white">${emp.name}</div>
+                        <div class="font-bold text-white cursor-pointer hover:text-emerald-400 transition inline-flex items-center gap-1" onclick="zeptoApp.openStaffDrawer('${emp.id}')" title="View staff profile & forensics">
+                            ${emp.name}
+                        </div>
                         <div class="text-[10px] font-mono text-slate-500">${emp.phone || emp.id}</div>
                     </td>
                     <td class="py-2.5 px-3">${roleBadge}</td>
                     <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+                    <td class="py-2.5 px-3 text-right font-mono font-bold text-purple-300">${ordersDisplay}</td>
                     <td class="py-2.5 px-3 text-right font-mono font-bold text-white">${itemsDisplay}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-emerald-300">${hoursDisplay}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-emerald-400 font-bold">${hoursDisplay}</td>
                     <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">${ippDisplay}</td>
+                    <td class="py-2.5 px-3 text-center">${adherenceDisplay}</td>
                     <td class="py-2.5 px-3 text-center">${tierBadge}</td>
                     <td class="py-2.5 px-3 text-center">
                         <button type="button" onclick="zeptoApp.openStaffDrawer('${emp.id}')" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 transition shadow-sm" title="Open comprehensive staff profile, IPP analytics, and rating ledger">

@@ -521,6 +521,124 @@ def test_cumulative_attachment_batch_deduplication_and_net_shrinkage():
     assert summary["total_loss_amount"] == 400.0
 
 
+def test_extract_metrics_comma_and_parentheses_signed_numbers():
+    from earnings_engine.data.zepto_parsers import extract_metrics_from_email_body
+
+    email_text = """
+    Zepto Dark Store Loss Report - September Finalized
+    Store: JMU-Sainik Colony
+    Date: 2026-10-01
+    D-1 Shrinkage: ₹ 422.49
+    MTD Shrinkage: -9,789.00
+    D-1 DQ: 120.50
+    MTD DQ: (2,450.75)
+    GMV: 12,45,000.00
+    Orders: 15,200
+    """
+
+    metrics = extract_metrics_from_email_body(email_text)
+    assert metrics["d1_shrinkage"] == 422.49
+    assert metrics["mtd_shrinkage"] == -9789.00
+    assert metrics["d1_dq"] == 120.50
+    assert metrics["mtd_dq"] == -2450.75
+    # Single-day loss_amount priority should prefer d1_shrinkage
+    assert metrics["loss_amount"] == 422.49
+    assert metrics["sales_gmv"] == 1245000.0
+    assert metrics["order_count"] == 15200
+
+
+def test_reconciliation_dual_target_candidate_matching_and_september_closing():
+    import uuid
+    import json
+    from earnings_engine.config import Settings
+    from earnings_engine.data import zepto_db
+
+    settings = Settings()
+    zepto_db.ensure_zepto_schema(settings=settings)
+
+    test_store = f"TEST_RECON_STORE_{uuid.uuid4().hex[:6]}"
+    email_id_d1 = f"recon_email_d1_{uuid.uuid4().hex[:6]}"
+    email_id_oct1 = f"recon_email_oct1_{uuid.uuid4().hex[:6]}"
+
+    # 1. Insert an email for 2026-09-15 where D-1 shrinkage is 422.49 and MTD shrinkage is -8,500.00
+    # The Excel attachment only contains the single-day cycle count audits summing to 422.49
+    d1_metrics = {
+        "store_name": test_store,
+        "date": "2026-09-15",
+        "d1_shrinkage": 422.49,
+        "mtd_shrinkage": -8500.00,
+        "loss_amount": 422.49,
+    }
+    zepto_db.save_zepto_intelligence({
+        "email_id": email_id_d1,
+        "source_type": "GMAIL",
+        "category": "DQ_LOSS",
+        "subject": "Daily Inventory Shrinkage & DQ Audit 2026-09-15",
+        "sender": "inventory@zeptonow.com",
+        "recipient": "store@zeptonow.com",
+        "iso_date": "2026-09-15T08:00:00Z",
+        "month_ym": "2026-09",
+        "snippet": "D-1 Shrinkage: 422.49, MTD Shrinkage: -8,500.00",
+        "body_text": "D-1 Shrinkage: 422.49, MTD Shrinkage: -8,500.00",
+        "attachment_names": json.dumps(["Inhouse_DOD_15Sep.xlsx"]),
+        "parsed_metrics": json.dumps(d1_metrics),
+    }, settings=settings)
+
+    # Insert corresponding Excel row-level items summing to 422.49
+    zepto_db.save_loss_records_batch([
+        {
+            "store_name": test_store,
+            "record_date": "2026-09-15",
+            "loss_type": "SHRINKAGE",
+            "category": "STATIONERY",
+            "sku_id": "SKU_PEN",
+            "item_name": "Gel Pen Pack",
+            "amount": 422.49,
+            "sku_count": 5,
+            "source_email_id": email_id_d1,
+        }
+    ], settings=settings)
+
+    # 2. Insert the Oct 1st morning email reporting finalized Sep MTD shrinkage (-9,789.00)
+    oct1_metrics = {
+        "store_name": test_store,
+        "date": "2026-09-30",
+        "mtd_shrinkage": -9789.00,
+        "loss_amount": -9789.00,
+    }
+    zepto_db.save_zepto_intelligence({
+        "email_id": email_id_oct1,
+        "source_type": "GMAIL",
+        "category": "DQ_LOSS",
+        "subject": "Monthly Finalized Inventory Shrinkage - September 2026",
+        "sender": "audit@zeptonow.com",
+        "recipient": "store@zeptonow.com",
+        "iso_date": "2026-10-01T04:30:00Z",
+        "month_ym": "2026-10",
+        "snippet": "Finalized Sep Shrinkage: -9,789.00",
+        "body_text": "September 2026 Total Shrinkage: -9,789.00",
+        "attachment_names": json.dumps([]),
+        "parsed_metrics": json.dumps(oct1_metrics),
+    }, settings=settings)
+
+    # 3. Query loss summary for September 2026 ("2026-09")
+    summary = zepto_db.get_loss_summary(store_name=test_store, month="2026-09", settings=settings)
+    recon_rows = summary.get("reconciliation_rows", [])
+
+    # Should include both the Sep 15th email and the Oct 1st closing email
+    recon_ids = [r["source_email_id"] for r in recon_rows]
+    assert email_id_d1 in recon_ids
+    assert email_id_oct1 in recon_ids
+
+    # Sep 15th email should match D-1 shrinkage target (422.49) with 0 variance!
+    d1_recon = next(r for r in recon_rows if r["source_email_id"] == email_id_d1)
+    assert d1_recon["email_stated_amount"] == 422.49
+    assert d1_recon["excel_parsed_sum"] == 422.49
+    assert d1_recon["variance"] == 0.0
+    assert d1_recon["status"] == "MATCHED"
+
+
+
 
 
 
