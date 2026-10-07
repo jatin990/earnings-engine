@@ -2420,7 +2420,7 @@
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric'
-                    });
+                    }) + (options.suffix ? ' IST' : '');
                 }
 
                 const dateStr = dateObj.toLocaleDateString('en-IN', {
@@ -5654,8 +5654,8 @@
                 },
                 localization: {
                     dateFormat: 'yyyy-MM-dd',
-                    timeFormatter: (val) => formatIST(val, { includeDate: false, includeSeconds: true }),
-                    dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false }),
+                    timeFormatter: (val) => formatIST(val, { includeDate: true, includeTime: true, suffix: true }),
+                    dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false, suffix: true }),
                 },
                 rightPriceScale: {
                     borderColor: 'rgba(255, 255, 255, 0.08)',

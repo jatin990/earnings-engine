@@ -2377,8 +2377,8 @@
                     },
                     localization: {
                         dateFormat: 'yyyy-MM-dd',
-                        timeFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: false, includeSeconds: true }) : val),
-                        dateFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: true, includeTime: false }) : val),
+                        timeFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: true, includeTime: true, suffix: true }) : val),
+                        dateFormatter: (val) => (window.app && window.app.formatIST ? window.app.formatIST(val, { includeDate: true, includeTime: false, suffix: true }) : val),
                     },
                     timeScale: {
                         borderColor: 'rgba(255, 255, 255, 0.08)',

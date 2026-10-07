@@ -50,7 +50,7 @@
                 });
                 return `${timeStr}${opts.suffix ? ' IST' : ''}`;
             } else {
-                return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+                return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) + (opts.suffix ? ' IST' : '');
             }
         } catch (e) {
             return String(val);
@@ -143,8 +143,8 @@
             },
             localization: {
                 dateFormat: 'yyyy-MM-dd',
-                timeFormatter: (val) => formatIST(val, { includeDate: false, includeSeconds: true }),
-                dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false }),
+                timeFormatter: (val) => formatIST(val, { includeDate: true, includeTime: true, suffix: true }),
+                dateFormatter: (val) => formatIST(val, { includeDate: true, includeTime: false, suffix: true }),
             },
             rightPriceScale: {
                 borderColor: colors.border,

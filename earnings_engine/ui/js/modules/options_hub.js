@@ -366,15 +366,15 @@
             localization: {
                 locale: 'en-IN',
                 dateFormat: 'dd MMM yyyy',
-                timeFormatter: (time) => formatIST(time, { includeTime: true, suffix: false }),
-                dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: false }),
+                timeFormatter: (time) => formatIST(time, { includeTime: true, includeYear: true, suffix: true }),
+                dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: true }),
             },
             timeScale: {
                 borderColor: 'rgba(255, 255, 255, 0.08)',
                 timeVisible: true,
                 secondsVisible: false,
                 tickMarkFormatter: (time, tickMarkType) => {
-                    return formatIST(time, { includeTime: tickMarkType >= 3, includeYear: tickMarkType === 0, suffix: false });
+                    return formatIST(time, { includeTime: true, includeYear: false, suffix: true });
                 },
             },
         });
@@ -615,6 +615,7 @@
 
         if (loadingEl && !isBackground) {
             loadingEl.style.display = 'flex';
+            loadingEl.style.pointerEvents = 'auto';
         }
 
         try {
@@ -653,6 +654,7 @@
         } finally {
             if (loadingEl && !isBackground) {
                 loadingEl.style.display = 'none';
+                loadingEl.style.pointerEvents = 'none';
             }
         }
     };
@@ -1349,10 +1351,29 @@
         }
     };
 
-    // Auto-initialize when loaded
-    if (document.getElementById('tab-options')) {
+    /**
+     * Entry point for tab activation from dashboard.js
+     */
+    app.initOptionsHub = function () {
         app.loadOptionChain(false);
         app.loadOptionsChartIntelligence(false);
+        setTimeout(() => {
+            if (app._smartChart) {
+                const container = document.getElementById('optionsSmartChartCanvas');
+                if (container && container.clientWidth > 0) {
+                    app._smartChart.applyOptions({
+                        width: container.clientWidth,
+                        height: 560
+                    });
+                    app._smartChart.timeScale().fitContent();
+                }
+            }
+        }, 100);
+    };
+
+    // Auto-initialize when loaded
+    if (document.getElementById('tab-options')) {
+        app.initOptionsHub();
 
         // Auto-refresh timer every 15 seconds during active usage
         if (app._optionsPollTimer) clearInterval(app._optionsPollTimer);

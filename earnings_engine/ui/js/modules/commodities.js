@@ -365,8 +365,8 @@
                 localization: {
                     locale: 'en-IN',
                     dateFormat: 'dd MMM yyyy',
-                    timeFormatter: (time) => formatIST(time, { includeTime: true, suffix: false }),
-                    dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: false }),
+                    timeFormatter: (time) => formatIST(time, { includeTime: true, suffix: true }),
+                    dateFormatter: (time) => formatIST(time, { includeTime: false, includeYear: true, suffix: true }),
                 },
                 timeScale: {
                     borderColor: 'rgba(255, 255, 255, 0.08)',
