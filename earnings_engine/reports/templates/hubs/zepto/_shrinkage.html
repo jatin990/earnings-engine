@@ -43,14 +43,24 @@
                 <option value="ALL">All Departments</option>
             </select>
 
+            <!-- Force Ingest Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('SHRINKAGE')"
+                class="px-2.5 py-1.5 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-white border border-purple-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Force re-fetch and re-parse Inventory Shrinkage emails and attachments for current scope"
+            >
+                <span>⚡</span> Force Ingest
+            </button>
+
             <!-- Purge & Reprocess Action -->
             <button
                 type="button"
-                onclick="zeptoApp.reprocessGmailEmails()"
+                onclick="zeptoApp.forceIngestMetric('SHRINKAGE', { purge: true })"
                 class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
-                title="Purge operational database records and re-parse all email attachments month-wise"
+                title="Purge Inventory Shrinkage records and re-parse email attachments"
             >
-                <span>🧹</span> Purge & Reprocess
+                <span>🧹</span> Purge & Re-ingest
             </button>
 
             <!-- Upload Excel Action -->

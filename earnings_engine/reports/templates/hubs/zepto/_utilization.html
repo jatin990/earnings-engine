@@ -23,6 +23,26 @@
                 <span id="utilActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
             </div>
 
+            <!-- Force Ingest Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('IPP')"
+                class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Force re-fetch and re-parse IPP & Manpower Utilization emails and attachments"
+            >
+                <span>⚡</span> Force Ingest
+            </button>
+
+            <!-- Purge & Reprocess Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('IPP', { purge: true })"
+                class="px-2.5 py-1.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white border border-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Purge IPP records and re-parse email attachments"
+            >
+                <span>🧹</span> Purge & Re-ingest
+            </button>
+
             <button
                 type="button"
                 onclick="zeptoApp.loadUtilization()"

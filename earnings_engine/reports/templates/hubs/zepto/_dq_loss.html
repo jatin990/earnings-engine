@@ -44,14 +44,24 @@
                 <option value="ALL">All Categories</option>
             </select>
 
+            <!-- Force Ingest Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('DQ_LOSS')"
+                class="px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-white border border-emerald-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Force re-fetch and re-parse DQ Loss emails and attachments for current scope"
+            >
+                <span>⚡</span> Force Ingest
+            </button>
+
             <!-- Purge & Reprocess Action -->
             <button
                 type="button"
-                onclick="zeptoApp.reprocessGmailEmails()"
+                onclick="zeptoApp.forceIngestMetric('DQ_LOSS', { purge: true })"
                 class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
-                title="Purge operational database records and re-parse all email attachments month-wise"
+                title="Purge DQ Loss records and re-parse email attachments"
             >
-                <span>🧹</span> Purge & Reprocess
+                <span>🧹</span> Purge & Re-ingest
             </button>
 
             <!-- Upload Excel Action -->

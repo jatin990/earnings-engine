@@ -4902,6 +4902,7 @@ def save_manpower_utilization(data: dict[str, Any], settings: Settings | None = 
 def purge_zepto_operational_data(
     store_name: str | None = None,
     month: str | None = None,
+    metric_type: str | None = None,
     include_emails: bool = False,
     include_employees: bool = False,
     include_salaries: bool = False,
@@ -4909,6 +4910,7 @@ def purge_zepto_operational_data(
 ) -> dict[str, int]:
     """
     Purge historical Zepto operational data to allow clean re-ingestion with updated parsers.
+    Supports granular metric purging (e.g. 'ATTENDANCE', 'DQ_LOSS', 'SHRINKAGE', 'IPP', 'STORE_METRICS', or 'ALL').
     Cleans zepto_manpower_utilization, zepto_loss_records, zepto_store_metrics,
     zepto_attendance_records, and zepto_attendance_imports.
     Optionally purges zepto_gmail_messages, zepto_employees, zepto_salaries, zepto_monthly_ratings.
@@ -4928,6 +4930,8 @@ def purge_zepto_operational_data(
         "monthly_ratings": 0,
     }
 
+    norm_metric = (metric_type or "ALL").upper().strip()
+
     with _connect(settings) as conn:
         # Build filter clauses
         def build_filter(date_col: str, store_col: str = "store_name") -> tuple[str, list[Any]]:
@@ -4942,28 +4946,40 @@ def purge_zepto_operational_data(
             return " AND ".join(clauses), params
 
         # 1. Manpower Utilization
-        w, p = build_filter("util_date")
-        cur = conn.execute(f"DELETE FROM zepto_manpower_utilization WHERE {w}", p)
-        purged_counts["manpower_utilization"] = cur.rowcount
+        if norm_metric in ("ALL", "IPP", "MANPOWER_UTILIZATION", "UTILIZATION", "MANPOWER"):
+            w, p = build_filter("util_date")
+            cur = conn.execute(f"DELETE FROM zepto_manpower_utilization WHERE {w}", p)
+            purged_counts["manpower_utilization"] = cur.rowcount
 
-        # 2. Loss Records
-        w, p = build_filter("record_date")
-        cur = conn.execute(f"DELETE FROM zepto_loss_records WHERE {w}", p)
-        purged_counts["loss_records"] = cur.rowcount
+        # 2. Loss Records (DQ Loss vs. Shrinkage vs. All Loss)
+        if norm_metric in ("ALL", "LOSS", "LOSSES", "DQ_LOSS_AND_SHRINKAGE"):
+            w, p = build_filter("record_date")
+            cur = conn.execute(f"DELETE FROM zepto_loss_records WHERE {w}", p)
+            purged_counts["loss_records"] = cur.rowcount
+        elif norm_metric in ("DQ_LOSS", "DQ", "DEFECT"):
+            w, p = build_filter("record_date")
+            cur = conn.execute(f"DELETE FROM zepto_loss_records WHERE {w} AND loss_type != 'SHRINKAGE'", p)
+            purged_counts["loss_records"] = cur.rowcount
+        elif norm_metric in ("SHRINKAGE", "AUDIT", "CYCLE_COUNT"):
+            w, p = build_filter("record_date")
+            cur = conn.execute(f"DELETE FROM zepto_loss_records WHERE {w} AND loss_type = 'SHRINKAGE'", p)
+            purged_counts["loss_records"] = cur.rowcount
 
         # 3. Store Metrics
-        w, p = build_filter("metric_date")
-        cur = conn.execute(f"DELETE FROM zepto_store_metrics WHERE {w}", p)
-        purged_counts["store_metrics"] = cur.rowcount
+        if norm_metric in ("ALL", "STORE_METRICS", "SCORECARD", "METRICS", "GMV", "SLA"):
+            w, p = build_filter("metric_date")
+            cur = conn.execute(f"DELETE FROM zepto_store_metrics WHERE {w}", p)
+            purged_counts["store_metrics"] = cur.rowcount
 
         # 4. Attendance Records & Imports
-        w, p = build_filter("shift_date")
-        cur = conn.execute(f"DELETE FROM zepto_attendance_records WHERE {w}", p)
-        purged_counts["attendance_records"] = cur.rowcount
+        if norm_metric in ("ALL", "ATTENDANCE", "EMPLOYEES", "ROSTER"):
+            w, p = build_filter("shift_date")
+            cur = conn.execute(f"DELETE FROM zepto_attendance_records WHERE {w}", p)
+            purged_counts["attendance_records"] = cur.rowcount
 
-        w_imp, p_imp = build_filter("created_at")
-        cur = conn.execute(f"DELETE FROM zepto_attendance_imports WHERE {w_imp}", p_imp)
-        purged_counts["attendance_imports"] = cur.rowcount
+            w_imp, p_imp = build_filter("created_at")
+            cur = conn.execute(f"DELETE FROM zepto_attendance_imports WHERE {w_imp}", p_imp)
+            purged_counts["attendance_imports"] = cur.rowcount
 
         # 5. Salaries & Ratings (optional)
         if include_salaries:

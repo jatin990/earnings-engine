@@ -5042,6 +5042,49 @@ const zeptoApp = {
         }
     },
 
+    async forceIngestMetric(metricType, options = {}) {
+        const queryMonth = this.currentGlobalMonth !== 'ALL' ? (this.currentGlobalMonth || new Date().toISOString().slice(0, 7)) : 'ALL';
+        const purgeExisting = options.purge || false;
+
+        const metricMap = {
+            'EMPLOYEES': { slug: 'employees', label: 'Staff Roster', reload: () => this.loadEmployees() },
+            'ATTENDANCE': { slug: 'attendance', label: 'Attendance Muster', reload: () => this.loadAttendanceData() },
+            'DQ_LOSS': { slug: 'dq-loss', label: 'DQ Loss & Defects', reload: () => this.loadDqLoss() },
+            'SHRINKAGE': { slug: 'shrinkage', label: 'Inventory Shrinkage', reload: () => this.loadShrinkage() },
+            'IPP': { slug: 'ipp', label: 'Manpower Utilization & IPP', reload: () => this.loadUtilization() },
+            'STORE_METRICS': { slug: 'store-metrics', label: 'Daily Store Scorecard', reload: () => this.loadScorecard() },
+        };
+
+        const config = metricMap[metricType] || { slug: 'store-metrics', label: metricType, reload: () => this.loadOverview() };
+
+        try {
+            this.showToast(`⚡ Force ingesting ${config.label} for ${queryMonth}...`);
+            const params = new URLSearchParams({
+                month: queryMonth,
+                force: 'true',
+                purge_existing: String(purgeExisting),
+            });
+            const res = await fetch(`/api/v1/zepto/ingest/${config.slug}?${params.toString()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || `Failed to force ingest ${config.label}`);
+
+            this.showToast(`✅ ${data.message || `Successfully ingested ${config.label}`}`);
+
+            // Reload relevant views
+            await config.reload();
+            await this.loadOverview();
+            if (this.activeTab === 'gmail') {
+                await this.loadRecentEmails();
+            }
+        } catch (err) {
+            console.error(`[ZEPTO-INGEST] Error force ingesting ${metricType}:`, err);
+            this.showToast(`⚠️ Force ingest error: ${err.message}`, true);
+        }
+    },
+
     filterGmailEmails() {
         const query = (document.getElementById('gmailSearchInput')?.value || '').toLowerCase().trim();
         const catFilter = document.getElementById('gmailCategoryFilter')?.value || 'ALL';

@@ -866,15 +866,15 @@ def _classify_zepto_email(subject: str, sender: str, snippet: str = "") -> dict[
     return match_zepto_subject_pattern(subject=subject, sender=sender, snippet=snippet)
 
 
-def _build_gmail_month_query(month: str | None) -> tuple[str, str]:
+def _build_gmail_month_query(month: str | None, metric_type: str | None = None) -> tuple[str, str]:
     """
-    Given a month string (e.g. '2026-08' or 'ALL' or None),
+    Given a month string (e.g. '2026-08' or 'ALL' or None) and optional metric_type filter,
     returns (clean_month_ym, gmail_q_str).
     Defaults to current month if None or empty.
     Uses targeted operational keywords to avoid fetching unrelated emails.
     """
     from earnings_engine.data.zepto_parsers import build_targeted_gmail_query
-    return build_targeted_gmail_query(month)
+    return build_targeted_gmail_query(month, metric_type=metric_type)
 
 
 @router.get("/api/v1/zepto/gmail/recent-emails", summary="Get Categorized Dark Store Emails by Month")
@@ -1094,33 +1094,36 @@ async def get_recent_emails_endpoint(
 async def purge_zepto_data_endpoint(
     store_name: str | None = Query(None, description="Store name, or defaults to all stores"),
     month: str | None = Query(None, description="Month YYYY-MM, or defaults to all months"),
+    metric_type: str | None = Query(None, description="Specific metric domain to purge: ATTENDANCE, DQ_LOSS, SHRINKAGE, IPP, STORE_METRICS, EMPLOYEES, or ALL"),
     include_emails: bool = Query(False, description="Whether to also purge ingested raw Gmail messages"),
 ) -> dict[str, Any]:
     """Purge historical operational records to enable clean re-ingestion with latest multi-sheet parsers."""
     purged = zepto_db.purge_zepto_operational_data(
         store_name=store_name,
         month=month,
+        metric_type=metric_type,
         include_emails=include_emails,
         settings=_settings,
     )
     return {
         "status": "success",
-        "message": f"Successfully purged operational records for store={store_name or 'ALL'}, month={month or 'ALL'}",
+        "message": f"Successfully purged operational records for store={store_name or 'ALL'}, month={month or 'ALL'}, metric={metric_type or 'ALL'}",
         "purged_counts": purged,
     }
 
 
-@router.post("/api/v1/zepto/gmail/ingest-all-emails", summary="Ingest All Operational Emails & Parse Metrics into Database")
+@router.post("/api/v1/zepto/gmail/ingest-all-emails", summary="Ingest Operational Emails & Parse Metrics into Database")
 async def ingest_all_emails_endpoint(
     month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    metric_type: str | None = Query(None, description="Granular metric filter: EMPLOYEES, ATTENDANCE, DQ_LOSS, SHRINKAGE, IPP, MANPOWER_UTILIZATION, STORE_METRICS, or ALL"),
     force: bool = Query(False, description="Force re-processing of already saved emails and attachments"),
     purge_existing: bool = Query(False, description="Purge operational database tables prior to re-ingestion"),
 ) -> dict[str, Any]:
     """
-    Ingest all operational emails from linked Gmail inbox for the specified month (or all):
-    1. Optionally purges old operational data if purge_existing is True.
-    2. Fetches all messages for the month across operational categories and saves them into zepto_gmail_messages.
-    3. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, Manpower, and DQ Loss.
+    Ingest operational emails from linked Gmail inbox for the specified month (or all):
+    1. Optionally purges old operational data if purge_existing is True (can be scoped by metric_type).
+    2. Fetches messages for the month across operational categories (or scoped to metric_type).
+    3. Downloads and parses attached spreadsheets (.xlsx) for Attendance, Store Metrics, Manpower, and DQ Loss / Shrinkage.
     4. Extracts structured body metrics (GMV, Orders, AOV, SLA, IPP, Loss) and updates persistent tables.
     5. Returns updated category counters and ingested payload details.
     """
@@ -1141,11 +1144,12 @@ async def ingest_all_emails_endpoint(
             detail="No active Gmail account connected. Please link Gmail in the #gmail tab.",
         )
 
-    clean_month, gmail_q = _build_gmail_month_query(month)
+    clean_month, gmail_q = _build_gmail_month_query(month, metric_type=metric_type)
 
     if purge_existing:
         zepto_db.purge_zepto_operational_data(
             month=clean_month if clean_month != "ALL" else None,
+            metric_type=metric_type,
             include_emails=False,
             settings=_settings,
         )
@@ -1169,7 +1173,15 @@ async def ingest_all_emails_endpoint(
         "loss_records": 0,
         "emails_scanned": 0,
         "month": clean_month,
+        "metric_type": metric_type or "ALL",
     }
+
+    norm_metric = (metric_type or "ALL").upper().strip()
+    should_parse_attendance = norm_metric in ("ALL", "ATTENDANCE", "EMPLOYEES", "ROSTER")
+    should_parse_dq_loss = norm_metric in ("ALL", "DQ_LOSS", "DQ", "DEFECT", "LOSS", "LOSSES")
+    should_parse_shrinkage = norm_metric in ("ALL", "SHRINKAGE", "AUDIT", "CYCLE_COUNT", "LOSS", "LOSSES")
+    should_parse_manpower = norm_metric in ("ALL", "IPP", "MANPOWER_UTILIZATION", "UTILIZATION", "MANPOWER")
+    should_parse_store_metrics = norm_metric in ("ALL", "STORE_METRICS", "SCORECARD", "METRICS", "GMV", "SLA")
 
     try:
         # Step 1: Detect existing IDs to only process net-new delta emails unless force=True
@@ -1317,7 +1329,7 @@ async def ingest_all_emails_endpoint(
                 )
 
                 # If email contains store metrics text numbers, persist them
-                if category == "STORE_METRICS" and (body_metrics.get("sales_gmv") or body_metrics.get("order_count") or body_metrics.get("packer_ipp")):
+                if category == "STORE_METRICS" and should_parse_store_metrics and (body_metrics.get("sales_gmv") or body_metrics.get("order_count") or body_metrics.get("packer_ipp")):
                     zepto_db.save_store_metrics({
                         "store_name": store_name,
                         "metric_date": iso_date,
@@ -1334,7 +1346,7 @@ async def ingest_all_emails_endpoint(
                     email_parsed_count += 1
 
                 # If email contains Manpower Utilization numbers, record in metrics and utilization
-                if category == "MANPOWER_UTILIZATION" and (body_metrics.get("packer_d1_hc") or body_metrics.get("packer_ipp") or body_metrics.get("d1_ipp")):
+                if category == "MANPOWER_UTILIZATION" and should_parse_manpower and (body_metrics.get("packer_d1_hc") or body_metrics.get("packer_ipp") or body_metrics.get("d1_ipp")):
                     packer_hc = float(body_metrics.get("packer_d1_hc") or body_metrics.get("packer_headcount") or 0.0)
                     packer_ipp = float(body_metrics.get("packer_ipp") or body_metrics.get("d1_ipp") or 0.0)
                     flex_deduction = float(body_metrics.get("total_flex_deduction_d1") or body_metrics.get("flex_deductions") or 0.0)
@@ -1351,7 +1363,8 @@ async def ingest_all_emails_endpoint(
                         email_parsed_count += 1
 
                 # If email contains DQ loss / shrinkage text numbers, persist only if no Excel attachment exists (prevents double-counting)
-                if category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount") and not has_loss_attachment:
+                allow_loss_body = (category == "DQ_LOSS" and should_parse_dq_loss) or (category == "SHRINKAGE" and should_parse_shrinkage) or (category not in ("DQ_LOSS", "SHRINKAGE") and (should_parse_dq_loss or should_parse_shrinkage))
+                if allow_loss_body and category in ("DQ_LOSS", "SHRINKAGE") and body_metrics.get("loss_amount") and not has_loss_attachment:
                     zepto_db.save_loss_record({
                         "store_name": store_name,
                         "record_date": iso_date,
@@ -1383,7 +1396,7 @@ async def ingest_all_emails_endpoint(
                             file_bytes = _safe_b64decode(raw_data)
 
                             # Route attachment parser by category or filename
-                            if "attendance" in fname.lower() or category == "ATTENDANCE":
+                            if ("attendance" in fname.lower() or category == "ATTENDANCE") and should_parse_attendance:
                                 try:
                                     parsed_att = parse_zepto_attendance_excel(file_bytes, file_name=fname)
                                     saved_att = zepto_db.save_attendance_batch(
@@ -1401,21 +1414,23 @@ async def ingest_all_emails_endpoint(
                                     if email_parsed_status != "PARSED":
                                         email_parsed_status = "FAILED"
 
-                            elif "metric" in fname.lower() or "manpower" in fname.lower() or "utilization" in fname.lower() or category in ("STORE_METRICS", "MANPOWER_UTILIZATION"):
+                            elif ("metric" in fname.lower() or "manpower" in fname.lower() or "utilization" in fname.lower() or category in ("STORE_METRICS", "MANPOWER_UTILIZATION")) and (should_parse_store_metrics or should_parse_manpower):
                                 try:
                                     parsed_met = parse_zepto_store_metrics_excel(file_bytes, file_name=fname)
-                                    for r in parsed_met.get("records", []):
-                                        r["source_email_id"] = msg_id
-                                        zepto_db.save_store_metrics(r, settings=_settings)
-                                        processed_details["store_metrics_records"] += 1
-                                        email_parsed_count += 1
+                                    if should_parse_store_metrics:
+                                        for r in parsed_met.get("records", []):
+                                            r["source_email_id"] = msg_id
+                                            zepto_db.save_store_metrics(r, settings=_settings)
+                                            processed_details["store_metrics_records"] += 1
+                                            email_parsed_count += 1
 
                                     # Persist granular worker records into zepto_manpower_utilization
-                                    w_records = parsed_met.get("worker_records", [])
-                                    if w_records:
-                                        zepto_db.save_manpower_utilization_batch(w_records, settings=_settings)
-                                        processed_details["manpower_records"] += len(w_records)
-                                        email_parsed_count += len(w_records)
+                                    if should_parse_manpower:
+                                        w_records = parsed_met.get("worker_records", [])
+                                        if w_records:
+                                            zepto_db.save_manpower_utilization_batch(w_records, settings=_settings)
+                                            processed_details["manpower_records"] += len(w_records)
+                                            email_parsed_count += len(w_records)
 
                                     email_parsed_status = "PARSED"
                                 except Exception as e:
@@ -1423,10 +1438,15 @@ async def ingest_all_emails_endpoint(
                                     if email_parsed_status != "PARSED":
                                         email_parsed_status = "FAILED"
 
-                            elif "loss" in fname.lower() or "shrinkage" in fname.lower() or category in ("DQ_LOSS", "SHRINKAGE"):
+                            elif ("loss" in fname.lower() or "shrinkage" in fname.lower() or category in ("DQ_LOSS", "SHRINKAGE")) and (should_parse_dq_loss or should_parse_shrinkage):
                                 try:
                                     parsed_loss = parse_zepto_loss_shrinkage_excel(file_bytes, file_name=fname)
                                     for r in parsed_loss.get("records", []):
+                                        l_type = (r.get("loss_type") or "").upper()
+                                        if l_type == "SHRINKAGE" and not should_parse_shrinkage:
+                                            continue
+                                        if l_type != "SHRINKAGE" and not should_parse_dq_loss:
+                                            continue
                                         r["source_email_id"] = msg_id
                                         zepto_db.save_loss_record(r, settings=_settings)
                                         processed_details["loss_records"] += 1
@@ -1482,6 +1502,100 @@ async def ingest_all_emails_endpoint(
     except Exception as exc:
         logger.error("[GMAIL-INGEST] Error during bulk email ingestion: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Email ingestion failed: {str(exc)}")
+
+
+# ---------------------------------------------------------------------------
+# Granular Per-Metric Force Ingestion Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v1/zepto/ingest/employees", summary="Force Ingest Staff & Attendance Records")
+async def ingest_employees_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge attendance tables prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest and reconcile Employee Roster and Shift Muster records."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="EMPLOYEES",
+        force=force,
+        purge_existing=purge_existing,
+    )
+
+
+@router.post("/api/v1/zepto/ingest/attendance", summary="Force Ingest Attendance Records")
+async def ingest_attendance_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge attendance tables prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest Attendance Excel workbooks and muster reports."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="ATTENDANCE",
+        force=force,
+        purge_existing=purge_existing,
+    )
+
+
+@router.post("/api/v1/zepto/ingest/dq-loss", summary="Force Ingest DQ Loss Records")
+async def ingest_dq_loss_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge DQ loss tables prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest Dispatch Quality, Packaging/Picking defects, Spoilage, and Transit Damage."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="DQ_LOSS",
+        force=force,
+        purge_existing=purge_existing,
+    )
+
+
+@router.post("/api/v1/zepto/ingest/shrinkage", summary="Force Ingest Inventory Shrinkage Records")
+async def ingest_shrinkage_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge Shrinkage records prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest Cycle Count Audits, Physical Inventory Variances, and Net Shrinkage."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="SHRINKAGE",
+        force=force,
+        purge_existing=purge_existing,
+    )
+
+
+@router.post("/api/v1/zepto/ingest/ipp", summary="Force Ingest IPP & Manpower Utilization")
+async def ingest_ipp_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge Manpower records prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest Picker IPP throughput, Manpower Utilization, and Hourly Roster matrices."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="IPP",
+        force=force,
+        purge_existing=purge_existing,
+    )
+
+
+@router.post("/api/v1/zepto/ingest/store-metrics", summary="Force Ingest Daily Store Metrics & Scorecard")
+async def ingest_store_metrics_endpoint(
+    month: str | None = Query(None, description="Month in YYYY-MM format, 'ALL', or defaults to current month"),
+    force: bool = Query(True, description="Force re-processing of already saved emails and attachments"),
+    purge_existing: bool = Query(False, description="Purge Store Metrics prior to re-ingestion"),
+) -> dict[str, Any]:
+    """Dedicated endpoint to force-ingest Daily Store GMV, Order Throughput, AOV, and 10-min SLA Scorecards."""
+    return await ingest_all_emails_endpoint(
+        month=month,
+        metric_type="STORE_METRICS",
+        force=force,
+        purge_existing=purge_existing,
+    )
 
 
 @router.get("/api/v1/zepto/gmail/status", summary="Gmail Integration Status")

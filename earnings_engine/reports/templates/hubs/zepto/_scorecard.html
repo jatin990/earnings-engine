@@ -23,6 +23,26 @@
                 <span id="scorecardActiveScopeBadge" class="text-xs text-white font-mono font-bold">ALL</span>
             </div>
 
+            <!-- Force Ingest Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('STORE_METRICS')"
+                class="px-2.5 py-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Force re-fetch and re-parse daily store scorecard metrics (GMV, Orders, SLA, IPP)"
+            >
+                <span>⚡</span> Force Ingest
+            </button>
+
+            <!-- Purge & Reprocess Action -->
+            <button
+                type="button"
+                onclick="zeptoApp.forceIngestMetric('STORE_METRICS', { purge: true })"
+                class="px-2.5 py-1.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-white border border-amber-500/25 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+                title="Purge daily store metrics and re-parse email attachments"
+            >
+                <span>🧹</span> Purge & Re-ingest
+            </button>
+
             <button
                 type="button"
                 onclick="document.getElementById('scorecardFileInput').click()"

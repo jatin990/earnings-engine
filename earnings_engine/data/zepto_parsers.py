@@ -241,13 +241,28 @@ def match_zepto_subject_pattern(
     }
 
 
-def build_targeted_gmail_query(month: str | None = None) -> tuple[str, str]:
+def build_targeted_gmail_query(month: str | None = None, metric_type: str | None = None) -> tuple[str, str]:
     """
-    Build targeted Gmail API query string focusing strictly on Zepto operational pattern keywords.
+    Build targeted Gmail API query string focusing strictly on Zepto operational pattern keywords,
+    with optional granular filtering by specific metric domain (e.g. ATTENDANCE, DQ_LOSS, SHRINKAGE, IPP, STORE_METRICS).
     Avoids fetching random or noisy unrelated personal emails.
     Returns (clean_month_ym, gmail_q_str).
     """
-    pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Metric" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
+    normalized_metric = (metric_type or "").upper().strip()
+    if normalized_metric in ("ATTENDANCE", "EMPLOYEES", "ROSTER"):
+        pattern_clause = 'subject:("Attendance-report" OR "Attendance" OR "Shift Summary" OR "Muster")'
+    elif normalized_metric in ("DQ_LOSS", "DQ", "DEFECT"):
+        pattern_clause = 'subject:("DQ Loss" OR "DQ" OR "Dispatch Quality" OR "Defect")'
+    elif normalized_metric in ("SHRINKAGE", "AUDIT", "CYCLE_COUNT"):
+        pattern_clause = 'subject:("Shrinkage" OR "Cycle Count" OR "Inventory Audit")'
+    elif normalized_metric in ("LOSS", "LOSSES"):
+        pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Dispatch Quality" OR "Cycle Count")'
+    elif normalized_metric in ("IPP", "MANPOWER_UTILIZATION", "UTILIZATION", "MANPOWER"):
+        pattern_clause = 'subject:("Manpower" OR "Utilization" OR "IPP" OR "Flex" OR "Manpower Plan")'
+    elif normalized_metric in ("STORE_METRICS", "SCORECARD", "METRICS", "GMV", "SLA"):
+        pattern_clause = 'subject:("Metrics" OR "Metric" OR "Daily Update" OR "Scorecard")'
+    else:
+        pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Metric" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
 
     if not month or month.upper() in ("CURRENT", "NOW"):
         clean_month = datetime.now().strftime("%Y-%m")
@@ -265,7 +280,8 @@ def build_targeted_gmail_query(month: str | None = None) -> tuple[str, str]:
             next_y, next_m = y + 1, 1
         else:
             next_y, next_m = y, m + 1
-        end_date = f"{next_y:04d}/{next_m:02d}/01"
+        # Include through day 2 of next month to capture closing MTD emails sent on 1st/2nd
+        end_date = f"{next_y:04d}/{next_m:02d}/03"
         return (clean_month, f"{pattern_clause} after:{start_date} before:{end_date}")
     except Exception:
         return (clean_month, pattern_clause)
