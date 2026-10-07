@@ -171,16 +171,65 @@ Both files will be updated identically:
 
 ---
 
-## 6. Verification & Test Plan
+## 6. Options Setup Tracking Ledger & Outcome Engine
+
+To maintain parity with Breakout Radar's audit tracking (`breakout_tracked_signals`), the options engine includes a dedicated persistence and outcome-tracking ledger: `options_tracked_setups`.
+
+### 6.1 Database Schema (`options_tracked_setups`)
+```sql
+CREATE TABLE IF NOT EXISTS options_tracked_setups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    setup_id TEXT NOT NULL,
+    setup_title TEXT NOT NULL,
+    setup_type TEXT NOT NULL,
+    bias TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 0.0,
+    signal_date TEXT NOT NULL,
+    spot_at_signal REAL NOT NULL,
+    entry_zone TEXT NOT NULL,
+    stop_loss REAL NOT NULL,
+    target_1 REAL NOT NULL,
+    target_2 REAL,
+    risk_reward TEXT,
+    catalyst TEXT,
+    gamma_regime TEXT,
+    vix_value REAL,
+    current_spot REAL,
+    realized_pnl_pct REAL DEFAULT 0.0,
+    outcome TEXT NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE, TARGET1_HIT, TARGET2_HIT, STOPPED_OUT, EXPIRED_PINNED
+    outcome_label TEXT,
+    outcome_badge TEXT,
+    scanned_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(symbol, setup_id, signal_date)
+);
+```
+
+### 6.2 Setup Tracking Lifecycle & Endpoints
+1. When options chain is fetched/analyzed, generated `market_setups` are upserted into `options_tracked_setups`.
+2. REST Endpoints in `earnings_engine/api/routers/options.py`:
+   - `GET /api/v1/options/setups/history`: Returns list of historical tracked options setups with filter by `symbol` and `outcome`.
+   - `POST /api/v1/options/setups/evaluate`: Evaluates current spot price against active setups to advance outcome state machine (`ACTIVE` $\rightarrow$ `TARGET1_HIT`, `TARGET2_HIT`, `STOPPED_OUT`).
+
+---
+
+## 7. Verification & Test Plan
 
 1. **Unit Tests (`tests/test_option_chain.py`)**:
    - Verify Black-Scholes Greeks calculation ($\Delta, \Gamma, \Theta, \nu$) against benchmark values.
    - Verify GEX calculation, Net GEX summation, and Gamma Flip detection.
    - Verify Expected Move ($1\sigma$) interval arithmetic.
    - Verify algorithmic market setup derivation logic for major indices (`NIFTY`, `BANKNIFTY`).
-2. **API Tests (`tests/test_api_options.py`)**:
+2. **Setup Tracking Tests (`tests/test_options_tracked.py`)**:
+   - Verify table creation and Turso sync registration for `options_tracked_setups`.
+   - Verify setup recording, state evaluation, and history query filtering.
+3. **API Tests (`tests/test_api_options.py`)**:
    - Verify `/api/v1/options/chain` returns `gamma_profile`, `vix_profile`, `market_setups`, and enriched strike Greeks.
-3. **Frontend Syntax Validation**:
+   - Verify `/api/v1/options/setups/history` returns setup ledger.
+4. **Frontend Syntax Validation**:
    - Verify JavaScript modules syntax using `node -c earnings_engine/ui/js/modules/options_hub.js`.
-4. **Git Delivery**:
+5. **Git Delivery**:
    - Commit all changes directly to `origin/new_report`.
+
