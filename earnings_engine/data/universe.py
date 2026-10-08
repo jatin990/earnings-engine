@@ -98,7 +98,7 @@ _SEED_US_TOP = [
 
 _SEED_NSE_FNO = [
     # Major Indices
-    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI",
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI", "SENSEX",
     # Official Underlying Equities
     "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS",
     "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP",
@@ -154,6 +154,13 @@ FNO_INDEX_ALIASES: dict[str, str] = {
     "NIFTYNXT50": "NIFTYNXT50",
     "NIFTY NEXT 50": "NIFTYNXT50",
     "NIFTY_NEXT_50": "NIFTYNXT50",
+    "^BSESN": "SENSEX",
+    "SENSEX": "SENSEX",
+    "BSESENSEX": "SENSEX",
+    "BSE:SENSEX": "SENSEX",
+    "SENSEX.BO": "SENSEX",
+    "BSE SENSEX": "SENSEX",
+    "BSE_SENSEX": "SENSEX",
 }
 
 
@@ -458,7 +465,7 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
     elif clean_name in ("nifty_500", "nifty500", "nse_500"):
         return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
     elif clean_name in ("nse_fno", "fno", "nifty_fno"):
-        indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+        indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI", "SENSEX"}
         return [f"{s}.NS" if s not in indices else s for s in _SEED_NSE_FNO]
     elif clean_name in ("us_top", "us", "us_50"):
         return list(_SEED_US_TOP)
@@ -808,6 +815,9 @@ def load_nse_fno(force_refresh: bool = False, settings: Settings | None = None) 
             if not _FNO_NORMALIZED_SET:
                 _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
             _FNO_NORMALIZED_SET.update(t.upper().replace(".NS", "").strip() for t in tickers)
+            _FNO_NORMALIZED_SET.add("SENSEX")
+            if "SENSEX" not in tickers:
+                tickers.append("SENSEX")
             return tickers
 
     logger.info("refreshing NSE_FNO derivatives universe")
@@ -820,7 +830,11 @@ def load_nse_fno(force_refresh: bool = False, settings: Settings | None = None) 
                 if not _FNO_NORMALIZED_SET:
                     _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
                 _FNO_NORMALIZED_SET.update(raw_syms)
-                indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+                _FNO_NORMALIZED_SET.add("SENSEX")
+                indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI", "SENSEX"}
+                for idx in indices:
+                    if idx not in raw_syms:
+                        raw_syms.append(idx)
                 fno_tickers = [f"{s}.NS" if s not in indices else s for s in raw_syms]
                 store_universe("NSE_FNO", fno_tickers, settings)
                 logger.info("NSE_FNO refreshed with %d symbols", len(fno_tickers))
@@ -828,7 +842,7 @@ def load_nse_fno(force_refresh: bool = False, settings: Settings | None = None) 
     except Exception as e:
         logger.warning("Dynamic NSE F&O underlying fetch failed: %s; falling back to seed universe", e)
 
-    indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+    indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI", "SENSEX"}
     seed_formatted = [f"{s}.NS" if s not in indices else s for s in _SEED_NSE_FNO]
     store_universe("NSE_FNO", seed_formatted, settings)
     return seed_formatted

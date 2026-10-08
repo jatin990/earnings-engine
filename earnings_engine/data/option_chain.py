@@ -37,8 +37,9 @@ def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: S
     try:
         from earnings_engine.data.prices import load_prices
         settings = settings or Settings()
-        pdf = load_prices(clean_symbol, settings)
-        if (pdf is None or pdf.empty) and not clean_symbol.endswith(".NS"):
+        lookup_sym = "^BSESN" if clean_symbol in ("SENSEX", "BSESENSEX", "^BSESN") else clean_symbol
+        pdf = load_prices(lookup_sym, settings)
+        if (pdf is None or pdf.empty) and not clean_symbol.endswith(".NS") and lookup_sym == clean_symbol:
             pdf = load_prices(f"{clean_symbol}.NS", settings)
         if pdf is not None and not pdf.empty and "close" in pdf.columns:
             last_close = float(pdf["close"].dropna().iloc[-1])
@@ -50,7 +51,8 @@ def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: S
     # 2. Fallback to live quote
     try:
         mgr = get_data_manager(settings)
-        q = mgr.fetch_quote(clean_symbol)
+        lookup_sym = "^BSESN" if clean_symbol in ("SENSEX", "BSESENSEX", "^BSESN") else clean_symbol
+        q = mgr.fetch_quote(lookup_sym)
         p = float(q.get("price") or 0)
         if p > 0:
             return p

@@ -48,6 +48,12 @@ INDEX_MAP = {
     "NIFTY NEXT 50": "^NSEMDCP50",
     "NIFTYIT": "^CNXIT",
     "NIFTY IT": "^CNXIT",
+    "SENSEX": "^BSESN",
+    "BSESENSEX": "^BSESN",
+    "BSE:SENSEX": "^BSESN",
+    "SENSEX.BO": "^BSESN",
+    "BSE SENSEX": "^BSESN",
+    "BSE_SENSEX": "^BSESN",
 }
 
 

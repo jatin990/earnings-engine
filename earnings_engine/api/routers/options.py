@@ -39,6 +39,7 @@ async def get_options_symbols(
         {"symbol": "BANKNIFTY", "name": "NIFTY BANK", "type": "INDEX", "is_index": True},
         {"symbol": "FINNIFTY", "name": "NIFTY FINANCIAL SERVICES", "type": "INDEX", "is_index": True},
         {"symbol": "MIDCPNIFTY", "name": "NIFTY MIDCAP SELECT", "type": "INDEX", "is_index": True},
+        {"symbol": "SENSEX", "name": "BSE SENSEX", "type": "INDEX", "is_index": True, "exchange": "BSE"},
     ]
 
     popular_equities = [

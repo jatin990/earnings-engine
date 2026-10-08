@@ -104,8 +104,122 @@ class DataProviderManager:
         logger.warning("[PROVIDER-BHAVCOPY] NSE Direct provider not available for bhavcopy on %s", date_str)
         return pd.DataFrame(columns=["ticker", "open", "high", "low", "close", "volume"])
 
+    def fetch_bse_option_chain(self, symbol: str = "SENSEX", expiry_date: str | None = None) -> dict[str, Any]:
+        """Fetch Option Chain data for BSE SENSEX derivatives from official BSE Bhavcopy."""
+        import io
+        import urllib.request
+        from datetime import datetime, timedelta
+
+        clean_sym = symbol.upper().replace(".NS", "").replace(".BO", "").replace("BSE:", "").replace("^BSESN", "SENSEX").strip()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        now = datetime.now()
+        df = None
+
+        # Look back up to 7 calendar days to find the latest published BSE FO Bhavcopy
+        for days_back in range(0, 7):
+            target_dt = now - timedelta(days=days_back)
+            if target_dt.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
+                continue
+            d_str = target_dt.strftime("%Y%m%d")
+            url = f"https://www.bseindia.com/download/BhavCopy/Derivative/BhavCopy_BSE_FO_0_0_0_{d_str}_F_0000.CSV"
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    raw_csv = resp.read().decode("utf-8", errors="ignore")
+                    if raw_csv and len(raw_csv) > 200:
+                        parsed_df = pd.read_csv(io.StringIO(raw_csv))
+                        if not parsed_df.empty:
+                            df = parsed_df
+                            logger.info("[PROVIDER-OPTIONS] [BSE-Direct] Successfully downloaded BhavCopy for %s (%d rows)", d_str, len(df))
+                            break
+            except Exception as e:
+                logger.debug("[PROVIDER-OPTIONS] [BSE-Direct] BhavCopy fetch attempt for %s failed: %s", d_str, e)
+                continue
+
+        if df is None or df.empty:
+            logger.warning("[PROVIDER-OPTIONS] [BSE-Direct] No BSE FO Bhavcopy available for symbol %s in last 7 days", clean_sym)
+            return {"symbol": clean_sym, "records_count": 0, "data": [], "expiries": [], "selected_expiry": None}
+
+        # Filter for SENSEX index options (IDO)
+        sub = df[(df["TckrSymb"].astype(str).str.upper() == clean_sym) & (df["FinInstrmTp"].astype(str).str.upper() == "IDO")]
+        if sub.empty:
+            logger.warning("[PROVIDER-OPTIONS] [BSE-Direct] No IDO options found for symbol %s in BSE Bhavcopy", clean_sym)
+            return {"symbol": clean_sym, "records_count": 0, "data": [], "expiries": [], "selected_expiry": None}
+
+        expiries = sorted(sub["XpryDt"].dropna().astype(str).unique().tolist())
+        selected_expiry = expiry_date if (expiry_date and expiry_date in expiries) else (expiries[0] if expiries else None)
+
+        active_df = sub[sub["XpryDt"] == selected_expiry] if selected_expiry else sub
+        underlying_val = None
+        if not active_df["UndrlygPric"].dropna().empty:
+            try:
+                underlying_val = float(active_df["UndrlygPric"].dropna().iloc[0])
+            except Exception:
+                underlying_val = None
+
+        strikes_map: dict[float, dict[str, Any]] = {}
+        for _, row in active_df.iterrows():
+            try:
+                strike = float(row.get("StrkPric") or 0)
+            except Exception:
+                continue
+            if strike <= 0:
+                continue
+
+            if strike not in strikes_map:
+                strikes_map[strike] = {
+                    "strikePrice": strike,
+                    "expiryDate": selected_expiry,
+                    "CE": {},
+                    "PE": {},
+                }
+
+            opt_type = str(row.get("OptnTp") or "").upper().strip()
+            close_p = float(row.get("ClsPric") or 0.0)
+            prev_p = float(row.get("PrvsClsgPric") or 0.0)
+            change = close_p - prev_p
+            p_change = ((change / prev_p) * 100.0) if prev_p > 0 else 0.0
+
+            opt_data = {
+                "strikePrice": strike,
+                "expiryDate": selected_expiry,
+                "underlying": clean_sym,
+                "openInterest": int(row.get("OpnIntrst") or 0),
+                "changeinOpenInterest": int(row.get("ChngInOpnIntrst") or 0),
+                "totalTradedVolume": int(row.get("TtlTradgVol") or 0),
+                "lastPrice": float(row.get("LastPric") or close_p),
+                "change": round(change, 2),
+                "pChange": round(p_change, 2),
+                "totalTradedValue": float(row.get("TtlTrfVal") or 0.0),
+                "underlyingValue": underlying_val,
+            }
+            if opt_type == "CE":
+                strikes_map[strike]["CE"] = opt_data
+            elif opt_type == "PE":
+                strikes_map[strike]["PE"] = opt_data
+
+        sorted_strikes = [strikes_map[k] for k in sorted(strikes_map.keys())]
+        return {
+            "symbol": clean_sym,
+            "records_count": len(sorted_strikes),
+            "data": sorted_strikes,
+            "expiries": expiries,
+            "selected_expiry": selected_expiry,
+            "underlying_value": underlying_val,
+            "timestamp": datetime.now().isoformat(),
+            "provider": "bse_derivatives_bhavcopy",
+        }
+
     def fetch_option_chain(self, symbol: str, expiry_date: str | None = None) -> dict[str, Any]:
-        """Fetch Option Chain data for an NSE symbol or index."""
+        """Fetch Option Chain data for an NSE or BSE symbol/index."""
+        clean_symbol = symbol.strip().upper().replace(".NS", "").replace(".BO", "")
+        if clean_symbol in ("SENSEX", "BSESENSEX", "^BSESN", "BSE:SENSEX"):
+            logger.info("[PROVIDER-OPTIONS] [BSE-Direct] Querying Option Chain for %s (expiry=%s)...", clean_symbol, expiry_date)
+            return self.fetch_bse_option_chain("SENSEX", expiry_date=expiry_date)
+
         nse_prov = self._providers["nse_direct"]
         if nse_prov.is_available:
             logger.info("[PROVIDER-OPTIONS] [NSE-Direct] Querying live Option Chain for %s (expiry=%s)...", symbol, expiry_date)
