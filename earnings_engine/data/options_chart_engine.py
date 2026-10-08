@@ -514,7 +514,7 @@ def get_options_chart_intelligence(
             "success": True,
             "status": "NOT_FNO",
             "symbol": clean_sym,
-            "message": f"{clean_sym} is not eligible for NSE Equity Derivatives (F&O).",
+            "message": f"{clean_sym} is not eligible for NSE/BSE Equity Derivatives (F&O).",
             "candles": [],
             "indicators": {},
             "smart_money": {},

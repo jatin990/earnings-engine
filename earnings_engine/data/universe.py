@@ -177,11 +177,15 @@ def resolve_fno_symbol(ticker: str) -> str:
     return clean_no_ns
 
 
+_FNO_MAJOR_INDICES: set[str] = {
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI", "SENSEX",
+}
+
 _FNO_NORMALIZED_SET: set[str] = set()
 
 
 def is_fno_eligible(ticker: str) -> bool:
-    """Check if a ticker or symbol is eligible for NSE Derivatives (F&O).
+    """Check if a ticker or symbol is eligible for NSE/BSE Derivatives (F&O).
 
     Fast in-memory lookup (<0.01ms). Normalizes ticker symbol (removes .NS suffix,
     resolves index aliases, converts to uppercase, trims whitespace).
@@ -189,6 +193,8 @@ def is_fno_eligible(ticker: str) -> bool:
     if not ticker:
         return False
     clean = resolve_fno_symbol(ticker)
+    if clean in _FNO_MAJOR_INDICES:
+        return True
     global _FNO_NORMALIZED_SET
     if not _FNO_NORMALIZED_SET:
         _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}

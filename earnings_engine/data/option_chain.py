@@ -219,7 +219,7 @@ def analyze_option_chain(
         res = {
             "symbol": clean_symbol,
             "status": "NOT_FNO",
-            "message": f"{clean_symbol} is not eligible for NSE Equity Derivatives (F&O). Cash market only.",
+            "message": f"{clean_symbol} is not eligible for NSE/BSE Equity Derivatives (F&O). Cash market only.",
             "pcr_oi": None,
             "pcr_volume": None,
             "max_pain_strike": None,

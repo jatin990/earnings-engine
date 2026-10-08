@@ -277,7 +277,7 @@
                     statusBanner.style.background = 'rgba(239, 68, 68, 0.15)';
                     statusBanner.style.border = '1px solid rgba(239, 68, 68, 0.35)';
                     statusBanner.style.color = '#f87171';
-                    statusBanner.innerHTML = `⚠️ <strong>${symbol} is not eligible for NSE Derivatives (F&amp;O)</strong>. Only official NSE index &amp; stock derivatives are supported.`;
+                    statusBanner.innerHTML = `⚠️ <strong>${symbol} is not eligible for NSE/BSE Derivatives (F&amp;O)</strong>. Only official NSE and BSE index &amp; stock derivatives are supported.`;
                 } else if (data.status === 'ARCHIVED') {
                     statusBanner.style.display = 'block';
                     statusBanner.style.background = 'rgba(245, 158, 11, 0.15)';
