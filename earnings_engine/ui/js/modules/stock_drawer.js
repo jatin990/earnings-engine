@@ -664,9 +664,11 @@
                 epsBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#8e97a8;padding:1.2rem;">No consensus estimate track record on record</td></tr>`;
             } else {
                 epsBody.innerHTML = history.slice(0, 12).map(q => {
-                    const qName = q.quarter || q.period || q.date || '--';
-                    const rep = q.reported_eps != null ? Number(q.reported_eps).toFixed(2) : '--';
-                    const est = q.estimate_eps != null ? Number(q.estimate_eps).toFixed(2) : '--';
+                    const qName = q.earnings_date || q.quarter || q.period || q.date || '--';
+                    const repVal = q.eps_reported != null ? q.eps_reported : q.reported_eps;
+                    const rep = repVal != null ? Number(repVal).toFixed(2) : '--';
+                    const estVal = q.eps_estimate != null ? q.eps_estimate : q.estimate_eps;
+                    const est = estVal != null ? Number(estVal).toFixed(2) : '--';
                     const surp = q.surprise_pct != null ? formatPct(q.surprise_pct) : '--';
                     const surpClass = q.surprise_pct > 0 ? '#34d399' : (q.surprise_pct < 0 ? '#fb7185' : '#cbd5e1');
                     const src = q.source || 'Filing';
