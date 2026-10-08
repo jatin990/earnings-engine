@@ -765,7 +765,7 @@ def fetch_all_broadband_news_with_feed_telemetry(
         def _fetch_gnews(u=feed_url, n=name, fid=fid):
             g_items = _fetch_rss_feed(u, n, timeout=timeout, feed_id=fid)
             for it in g_items:
-                t = it.get("title", "")
+                t = str(it.get("title") or "")
                 if " - " in t:
                     parts = t.rsplit(" - ", 1)
                     it["title"] = parts[0].strip()
@@ -832,7 +832,7 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
     seen_titles: set[str] = set()
 
     for it in all_items:
-        t_clean = re.sub(r"[^a-z0-9]", "", it.get("title", "").lower())
+        t_clean = re.sub(r"[^a-z0-9]", "", str(it.get("title") or "").lower())
         if not t_clean or len(t_clean) < 10:
             continue
         if t_clean in seen_titles:

@@ -847,9 +847,9 @@ class NewsVerifier:
 
     def verify_news_item(self, item: dict[str, Any]) -> dict[str, Any]:
         """Execute the end-to-end 6-stage verification funnel for an incoming news item."""
-        title = _clean_text(item.get("title", ""))
-        summary = _clean_text(item.get("summary", ""))
-        ticker = item.get("ticker", "").strip().upper()
+        title = _clean_text(str(item.get("title") or ""))
+        summary = _clean_text(str(item.get("summary") or ""))
+        ticker = str(item.get("ticker") or "").strip().upper()
         raw_pub = item.get("published_at")
 
         all_flags: list[str] = []

@@ -335,7 +335,7 @@ def get_ticker_news_and_sentiment(
     seen_titles: set[str] = set()
 
     def _add_article(art: dict[str, Any]) -> None:
-        title = art.get("title", "").strip().lower()
+        title = str(art.get("title") or "").strip().lower()
         if not title or title in seen_titles:
             return
         seen_titles.add(title)

@@ -163,7 +163,7 @@ def process_and_verify_news_items(
             continue
 
         c_hash = v_res.get("canonical_hash")
-        title = item.get("title", "").strip()
+        title = str(item.get("title") or "").strip()
         ticker = v_res["resolved_ticker"]
         t_key = (ticker, title.lower())
 
@@ -176,7 +176,7 @@ def process_and_verify_news_items(
             seen_hashes.add(c_hash)
         seen_titles.add(t_key)
 
-        summary = item.get("summary", "").strip()
+        summary = str(item.get("summary") or "").strip()
         scored = score_catalyst_headline(title, summary)
         pub_d = (v_res.get("published_at_utc") or "")[:10]
 
@@ -559,8 +559,8 @@ def analyze_news_batch_ondemand(
     results: list[dict[str, Any]] = []
 
     for it in items:
-        ticker = it.get("ticker", "").strip().upper()
-        title = it.get("title", "").strip()
+        ticker = str(it.get("ticker") or "").strip().upper()
+        title = str(it.get("title") or "").strip()
         if not ticker or not title:
             continue
         try:

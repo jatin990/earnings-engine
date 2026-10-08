@@ -148,6 +148,26 @@ def test_news_verifier_full_pipeline():
     }
     res_noise = verifier.verify_news_item(item_noise)
     assert res_noise["verification_status"] == "REJECTED"
+
+    # 3. Item with None ticker, title, summary (must not raise AttributeError on strip)
+    item_none_ticker = {
+        "ticker": None,
+        "title": "Tata Power bags 500MW solar order win - Moneycontrol",
+        "summary": None,
+        "published_at": recent_utc,
+    }
+    res_none = verifier.verify_news_item(item_none_ticker)
+    assert res_none["verification_status"] == "VERIFIED"
+    assert res_none["resolved_ticker"] == "TATAPOWER.NS"
+
+    item_all_none = {
+        "ticker": None,
+        "title": None,
+        "summary": None,
+        "published_at": None,
+    }
+    res_all_none = verifier.verify_news_item(item_all_none)
+    assert res_all_none["verification_status"] == "REJECTED"
     assert "noise" in res_noise["rejection_reason"].lower()
 
     # 3. Foreign exchange ticker collision (SFL NYSE:SFL misattributed to Indian SFL.NS)

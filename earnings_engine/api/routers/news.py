@@ -524,8 +524,8 @@ async def extract_structured_news_endpoint(payload: dict, model: str | None = No
 @router.post("/api/v1/news/analyze-ondemand")
 async def analyze_news_ondemand_endpoint(payload: dict):
     """Execute on-demand AI analysis for a single news item and persist structured output atomically."""
-    ticker = payload.get("ticker", "").strip().upper()
-    title = payload.get("title", "").strip()
+    ticker = str(payload.get("ticker") or "").strip().upper()
+    title = str(payload.get("title") or "").strip()
     model = payload.get("model")
     raw_item = payload.get("item")
     if not ticker or not title:
