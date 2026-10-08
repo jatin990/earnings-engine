@@ -1088,14 +1088,14 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
         if is_future:
             # Future earnings cannot be declared yet; badge depends on whether official board meeting notice exists
-            if src == "nse":
-                status_badge = '<span class="signal-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="NSE Corporate Board Meeting Notice">🏛️ Board Meeting</span>'
+            if "nse" in src or "bse" in src:
+                status_badge = '<span class="signal-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Official Corporate Board Meeting Notice (NSE/BSE)">🏛️ Board Meeting</span>'
             else:
                 status_badge = '<span class="signal-badge" style="background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Tentative / Estimated Date - Official Results Not Yet Filed">⏳ Unconfirmed</span>'
         elif eps_rep is not None and not pd.isna(eps_rep):
             status_badge = '<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Official Financial Results Declared">✅ Declared</span>'
-        elif src == "nse":
-            status_badge = '<span class="signal-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="NSE Corporate Board Meeting Notice">🏛️ Board Meeting</span>'
+        elif "nse" in src or "bse" in src:
+            status_badge = '<span class="signal-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Official Corporate Board Meeting Notice (NSE/BSE)">🏛️ Board Meeting</span>'
         elif pd.notna(ed_val) and pd.Timestamp(ed_val) < pd.Timestamp.today().normalize() and (eps_rep is None or pd.isna(eps_rep)) and (surp is None or pd.isna(surp)):
             status_badge = '<span class="signal-badge" style="background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Tentative / Estimated Date - Official Results Not Yet Filed">⏳ Unconfirmed</span>'
 

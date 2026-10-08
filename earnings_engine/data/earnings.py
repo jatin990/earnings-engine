@@ -108,6 +108,7 @@ def _connect(settings: Settings) -> Any:
         """
         CREATE TABLE IF NOT EXISTS tickers (
             ticker TEXT PRIMARY KEY,
+            name TEXT,
             company_name TEXT,
             industry TEXT,
             sector TEXT,
@@ -539,6 +540,260 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
     return {"total": len(rows), "inserted": inserted, "errors": 0}
 
 
+def fetch_bse_result_calendar(
+    start_date: str | Any = None,
+    end_date: str | Any = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Fetch multi-exchange (BSE/NSE) corporate earnings board meetings calendar from MoneyControl.
+
+    Captures official board meeting announcements filed under BSE and NSE corporate actions,
+    including BSE-exclusive listings and newly listed companies (e.g., Onix Solar Energy,
+    Grand Oak Canyons Distillery, K&R Rail Engineering, Lotus Chocolate).
+    """
+    import json
+    import urllib.request
+    from datetime import datetime
+    from concurrent.futures import ThreadPoolExecutor
+
+    if start_date is None:
+        start_date = pd.Timestamp.today().strftime("%Y-%m-%d")
+    elif hasattr(start_date, "strftime"):
+        start_date = start_date.strftime("%Y-%m-%d")
+    else:
+        start_date = str(start_date)
+
+    if end_date is None:
+        end_date = (pd.Timestamp(start_date) + pd.Timedelta(days=60)).strftime("%Y-%m-%d")
+    elif hasattr(end_date, "strftime"):
+        end_date = end_date.strftime("%Y-%m-%d")
+    else:
+        end_date = str(end_date)
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.moneycontrol.com/",
+    }
+
+    all_raw_items = []
+    page = 1
+    max_pages = 25
+
+    while page <= max_pages:
+        url = f"https://api.moneycontrol.com/mcapi/v1/earnings/get-earnings-data?indexId=All&startDate={start_date}&endDate={end_date}&limit={limit}&page={page}"
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if not data or data.get("success") != 1:
+                    break
+                raw_data = data.get("data")
+                items = raw_data.get("list", []) if isinstance(raw_data, dict) else (raw_data if isinstance(raw_data, list) else [])
+                if not items:
+                    break
+                all_raw_items.extend(items)
+                total_records = int(data.get("totalRecords") or (raw_data.get("pagination", {}).get("totalRecords") if isinstance(raw_data, dict) else 0) or 0)
+                if (total_records > 0 and len(all_raw_items) >= total_records) or len(items) < limit:
+                    break
+        except Exception as e:
+            logger.warning("BSE/Moneycontrol earnings calendar fetch failed page=%s error=%s", page, e)
+            break
+        page += 1
+
+    if not all_raw_items:
+        return []
+
+    # Filter out non-result board meetings if purpose is explicitly specified
+    filtered_items = []
+    for item in all_raw_items:
+        if not isinstance(item, dict):
+            continue
+        purpose = str(item.get("purpose", "")).lower()
+        if purpose:
+            is_excluded = any(kw in purpose for kw in [
+                "agm", "annual general meeting", "egm", "extraordinary general meeting",
+                "postal ballot", "dividend only", "fund raising only", "warrants allotment", "employee stock"
+            ]) and not ("result" in purpose or "financial" in purpose)
+            if is_excluded:
+                continue
+        filtered_items.append(item)
+
+    if not filtered_items:
+        return []
+
+    def _resolve_item(item: dict[str, Any]) -> dict[str, Any] | None:
+        sc_id = item.get("scId")
+        ex = item.get("exchange", "N")
+        date_val = item.get("date")
+        company_name = item.get("stockName") or item.get("shortName") or item.get("companyName")
+        purpose_str = item.get("resultType") or item.get("purpose", "Financial Results")
+        market_cap = item.get("marketCap")
+
+        if not sc_id or not date_val:
+            return None
+
+        # Parse date value (handles '8 Oct', '17 Oct', or 'YYYY-MM-DD')
+        edate = None
+        date_str = str(date_val).strip()
+        try:
+            if "-" in date_str and len(date_str) == 10:
+                edate = pd.Timestamp(date_str).strftime("%Y-%m-%d")
+            else:
+                start_year = pd.Timestamp(start_date).year
+                parsed_dt = datetime.strptime(f"{date_str} {start_year}", "%d %b %Y")
+                if parsed_dt < pd.Timestamp(start_date) - pd.Timedelta(days=30):
+                    parsed_dt = datetime.strptime(f"{date_str} {start_year + 1}", "%d %b %Y")
+                edate = parsed_dt.strftime("%Y-%m-%d")
+        except Exception:
+            try:
+                edate = pd.Timestamp(date_val).strftime("%Y-%m-%d")
+            except Exception:
+                return None
+
+        ticker = None
+        ex_code = "bse" if str(ex).upper() == "B" else "nse"
+        try:
+            feed_url = f"https://priceapi.moneycontrol.com/pricefeed/{ex_code}/equitycash/{sc_id}"
+            feed_req = urllib.request.Request(feed_url, headers=headers)
+            with urllib.request.urlopen(feed_req, timeout=5) as resp:
+                fdata = json.loads(resp.read().decode("utf-8"))
+                if fdata.get("code") == "200" and "data" in fdata and isinstance(fdata["data"], dict):
+                    finfo = fdata["data"]
+                    nse_id = finfo.get("NSEID")
+                    bse_id = finfo.get("BSEID")
+                    disp_id = finfo.get("DISPID")
+                    c_name = finfo.get("company") or company_name
+                    if c_name:
+                        company_name = c_name
+                    mcap_val = finfo.get("MktCap")
+                    if mcap_val:
+                        try:
+                            market_cap = float(str(mcap_val).replace(",", ""))
+                        except Exception:
+                            pass
+
+                    if nse_id:
+                        ticker = f"{nse_id}.NS"
+                    elif bse_id:
+                        ticker = f"{bse_id}.BO"
+                    elif disp_id:
+                        ticker = f"{disp_id}.BO"
+        except Exception:
+            pass
+
+        if not ticker:
+            if ex_code == "nse" and str(sc_id).isalpha():
+                ticker = f"{sc_id}.NS"
+            else:
+                ticker = f"{sc_id}.BO"
+
+        return {
+            "ticker": ticker.upper(),
+            "earnings_date": edate,
+            "company_name": company_name,
+            "market_cap": market_cap,
+            "source": "bse" if (ex_code == "bse" or ticker.endswith(".BO")) else "nse",
+            "purpose": purpose_str,
+        }
+
+    resolved_events = []
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = [executor.submit(_resolve_item, item) for item in filtered_items]
+        for f in futures:
+            try:
+                res = f.result()
+                if res:
+                    resolved_events.append(res)
+            except Exception:
+                pass
+
+    return resolved_events
+
+
+def ingest_bse_result_calendar(settings: Settings, days: int = 60) -> dict[str, int]:
+    """Ingest upcoming result dates from BSE / Multi-exchange corporate filing calendar.
+
+    Covers both BSE-exclusive and NSE-listed equities. Writes result dates to SQLite
+    earnings_history and records newly discovered company metadata into tickers table.
+    """
+    from datetime import date, timedelta
+
+    today = date.today()
+    events = fetch_bse_result_calendar(
+        start_date=today,
+        end_date=today + timedelta(days=days),
+    )
+
+    if not events:
+        logger.info("bse/multi-exchange result-calendar returned no events")
+        return {"total": 0, "inserted": 0, "errors": 0}
+
+    eh_rows = []
+    ticker_rows = []
+    now_str = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for ev in events:
+        ticker = ev["ticker"]
+        edate = ev["earnings_date"]
+        source = ev.get("source", "bse")
+        cname = ev.get("company_name")
+        mcap = ev.get("market_cap")
+
+        eh_rows.append((ticker, edate, source))
+        if cname:
+            ticker_rows.append((ticker, cname, mcap, now_str))
+
+    with _connect(settings) as connection:
+        inserted = connection.executemany(
+            """
+            INSERT INTO earnings_history (ticker, earnings_date, source)
+            VALUES (?, ?, ?)
+            ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                source = CASE
+                    WHEN earnings_history.source != excluded.source AND INSTR(earnings_history.source, excluded.source) = 0
+                    THEN earnings_history.source || '+' || excluded.source
+                    ELSE earnings_history.source
+                END
+            """,
+            eh_rows,
+        ).rowcount
+
+        if ticker_rows:
+            cols = {r[1] for r in connection.execute("PRAGMA table_info(tickers)").fetchall()}
+            name_col = "name" if "name" in cols else "company_name"
+            if "name" in cols and "company_name" in cols:
+                dual_rows = [(r[0], r[1], r[1], r[2], r[3]) for r in ticker_rows]
+                connection.executemany(
+                    """
+                    INSERT INTO tickers (ticker, name, company_name, market_cap, last_updated)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker) DO UPDATE SET
+                        name = COALESCE(excluded.name, tickers.name),
+                        company_name = COALESCE(excluded.company_name, tickers.company_name),
+                        market_cap = COALESCE(excluded.market_cap, tickers.market_cap),
+                        last_updated = excluded.last_updated
+                    """,
+                    dual_rows,
+                )
+            else:
+                connection.executemany(
+                    f"""
+                    INSERT INTO tickers (ticker, {name_col}, market_cap, last_updated)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(ticker) DO UPDATE SET
+                        {name_col} = COALESCE(excluded.{name_col}, tickers.{name_col}),
+                        market_cap = COALESCE(excluded.market_cap, tickers.market_cap),
+                        last_updated = excluded.last_updated
+                    """,
+                    ticker_rows,
+                )
+        connection.commit()
+
+    logger.info("bse/multi-exchange result-calendar ingest complete total=%s inserted=%s", len(eh_rows), inserted)
+    return {"total": len(eh_rows), "inserted": inserted, "errors": 0}
+
+
 def ingest_earnings_incremental(tickers: list[str], settings: Settings) -> dict[str, int]:
     """Fetch earnings only for tickers that are missing earnings data.
     
@@ -767,10 +1022,11 @@ def sync_present_day_earnings_delta(settings: Settings, force: bool = False) -> 
         return status_info
 
     logger.info("Fetching present day earnings delta for date=%s (force=%s)...", today_str, force)
-    ingest_res = ingest_nse_result_calendar(settings, days=60)
+    ingest_nse = ingest_nse_result_calendar(settings, days=60)
+    ingest_bse = ingest_bse_result_calendar(settings, days=60)
     now_str = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    inserted = ingest_res.get("inserted", 0)
-    total_found = ingest_res.get("total", 0)
+    inserted = ingest_nse.get("inserted", 0) + ingest_bse.get("inserted", 0)
+    total_found = ingest_nse.get("total", 0) + ingest_bse.get("total", 0)
 
     with _connect(settings) as connection:
         total_events = connection.execute(

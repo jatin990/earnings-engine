@@ -600,6 +600,17 @@ const API_BASE = window.location.origin;
                 this._restoreBdControls?.();
                 this._restorePatternsControls?.();
 
+                // Close industry dropdown popover when clicking outside
+                document.addEventListener('click', (e) => {
+                    const wrap = document.getElementById('resultsIndustryDropdownWrapper');
+                    const panel = document.getElementById('resultsIndustryDropdownPanel');
+                    if (panel && panel.style.display === 'block') {
+                        if (!wrap || !wrap.contains(e.target)) {
+                            panel.style.display = 'none';
+                        }
+                    }
+                });
+
                 // Defer non-critical background data fetches so initial Market Pulse load is instant and non-blocking
                 setTimeout(() => {
                     this.populateWatchlistDropdowns();
@@ -2139,7 +2150,12 @@ const API_BASE = window.location.origin;
                         btn.style.display = 'none';
                     }
                 }
+                this.populateResultsIndustryDropdown();
                 this.updateResultsSummaryCards();
+                const curQ = (document.getElementById('resultsLiveSearch')?.value || '').toLowerCase().trim();
+                if (curQ || (this.resultsActiveCap && this.resultsActiveCap !== 'all')) {
+                    this.filterResultsTable(curQ);
+                }
             },
 
             showMoreResultsDays() {
@@ -2265,24 +2281,30 @@ const API_BASE = window.location.origin;
             },
 
             filterResultsTable(query) {
-                const q = (query || '').toLowerCase().trim();
+                const q = (query !== undefined ? query : (document.getElementById('resultsLiveSearch')?.value || '')).toLowerCase().trim();
                 const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not(.table-divider-row)');
                 const matchEl = document.getElementById('resultsFilterMatchCount');
                 let matchCount = 0;
                 let totalCount = rows.length;
 
                 const activeCap = this.resultsActiveCap || 'all';
+                const selectedInds = this.resultsSelectedIndustries;
+                const totalIndsCount = (this._allResultIndustries || []).length;
+                const hasIndFilter = selectedInds && totalIndsCount > 0 && selectedInds.size < totalIndsCount;
+                const isFiltered = q || activeCap !== 'all' || hasIndFilter;
+
                 rows.forEach(row => {
                     const rowId = row.id;
                     const drawerId = rowId ? rowId.replace('row_', 'drawer_') : null;
                     const drawerRow = drawerId ? document.getElementById(drawerId) : null;
                     const rowCap = row.getAttribute('data-cap') || 'large';
-                    const rowInd = row.getAttribute('data-industry') || '';
+                    const rowInd = row.getAttribute('data-industry') || 'General / Multi-Sector';
 
                     const capMatch = (activeCap === 'all' || rowCap === activeCap);
+                    const indMatch = !hasIndFilter || selectedInds.has(rowInd);
                     const text = row.textContent.toLowerCase();
                     const queryMatch = !q || text.includes(q) || rowInd.toLowerCase().includes(q);
-                    const isMatch = capMatch && queryMatch;
+                    const isMatch = capMatch && indMatch && queryMatch;
 
                     row.style.display = isMatch ? '' : 'none';
                     if (!isMatch && drawerRow) {
@@ -2302,10 +2324,10 @@ const API_BASE = window.location.origin;
                     allTrs.forEach(tr => {
                         if (tr.classList.contains('cap-divider-row')) {
                             if (currentIndDivider) {
-                                currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                                currentIndDivider.style.display = (!isFiltered || currentIndHasVisible) ? '' : 'none';
                             }
                             if (currentCapDivider) {
-                                currentCapDivider.style.display = (!q || currentCapHasVisible) ? '' : 'none';
+                                currentCapDivider.style.display = (!isFiltered || currentCapHasVisible) ? '' : 'none';
                             }
                             currentCapDivider = tr;
                             currentCapHasVisible = false;
@@ -2313,7 +2335,7 @@ const API_BASE = window.location.origin;
                             currentIndHasVisible = false;
                         } else if (tr.classList.contains('industry-divider-row')) {
                             if (currentIndDivider) {
-                                currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                                currentIndDivider.style.display = (!isFiltered || currentIndHasVisible) ? '' : 'none';
                             }
                             currentIndDivider = tr;
                             currentIndHasVisible = false;
@@ -2326,27 +2348,27 @@ const API_BASE = window.location.origin;
                     });
 
                     if (currentIndDivider) {
-                        currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                        currentIndDivider.style.display = (!isFiltered || currentIndHasVisible) ? '' : 'none';
                     }
                     if (currentCapDivider) {
-                        currentCapDivider.style.display = (!q || currentCapHasVisible) ? '' : 'none';
+                        currentCapDivider.style.display = (!isFiltered || currentCapHasVisible) ? '' : 'none';
                     }
                 });
 
                 // Also toggle legacy cap/industry sections if present
                 document.querySelectorAll('#resultsReportSections details.cap-section, #resultsReportSections div.industry-subgroup').forEach(sec => {
                     const visibleTrs = sec.querySelectorAll('tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
-                    sec.style.display = (!q || visibleTrs.length) ? '' : 'none';
+                    sec.style.display = (!isFiltered || visibleTrs.length) ? '' : 'none';
                 });
 
                 document.querySelectorAll('#resultsReportSections details.day-section').forEach(daySec => {
-                    if (!q) {
+                    if (!isFiltered) {
                         daySec.style.display = '';
                     } else {
                         const visibleTrs = daySec.querySelectorAll('tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
                         if (visibleTrs.length > 0) {
                             daySec.style.display = '';
-                            daySec.open = true; // Auto-expand when search query matches tickers inside this day
+                            if (q) daySec.open = true; // Auto-expand when search query matches tickers inside this day
                         } else {
                             daySec.style.display = 'none';
                         }
@@ -2354,7 +2376,163 @@ const API_BASE = window.location.origin;
                 });
 
                 if (matchEl) {
-                    matchEl.textContent = q ? `Showing ${matchCount}/${totalCount}` : '';
+                    matchEl.textContent = isFiltered ? `Showing ${matchCount}/${totalCount}` : '';
+                }
+            },
+
+            // Results Industry Categories Multiselect Filter Methods
+            toggleResultsIndustryDropdown(event) {
+                if (event) event.stopPropagation();
+                const panel = document.getElementById('resultsIndustryDropdownPanel');
+                if (!panel) return;
+                const isShown = panel.style.display === 'block';
+                panel.style.display = isShown ? 'none' : 'block';
+                if (!isShown) {
+                    const searchInp = document.getElementById('resultsIndustrySearchInput');
+                    if (searchInp) {
+                        searchInp.value = '';
+                        this.filterResultsIndustryList('');
+                        setTimeout(() => searchInp.focus(), 50);
+                    }
+                }
+            },
+
+            closeResultsIndustryDropdown() {
+                const panel = document.getElementById('resultsIndustryDropdownPanel');
+                if (panel) panel.style.display = 'none';
+            },
+
+            populateResultsIndustryDropdown() {
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not(.table-divider-row)');
+                const container = document.getElementById('resultsIndustryCheckboxList');
+                if (!container) return;
+
+                const counts = {};
+                rows.forEach(r => {
+                    const ind = (r.getAttribute('data-industry') || 'General / Multi-Sector').trim();
+                    counts[ind] = (counts[ind] || 0) + 1;
+                });
+
+                const sortedIndustries = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+                this._allResultIndustries = sortedIndustries;
+
+                // If resultsSelectedIndustries is not initialized or had all selected, select all
+                const prevSelected = this.resultsSelectedIndustries;
+                const isFresh = !prevSelected || prevSelected.size === 0;
+
+                const newSelected = new Set();
+                sortedIndustries.forEach(ind => {
+                    if (isFresh || (prevSelected && prevSelected.has(ind))) {
+                        newSelected.add(ind);
+                    }
+                });
+
+                // If previous selections no longer match anything, select all
+                if (newSelected.size === 0 && sortedIndustries.length > 0) {
+                    sortedIndustries.forEach(ind => newSelected.add(ind));
+                }
+
+                this.resultsSelectedIndustries = newSelected;
+
+                const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+                let html = '';
+                sortedIndustries.forEach(ind => {
+                    const isChecked = newSelected.has(ind);
+                    const escaped = escapeHtml(ind);
+                    const count = counts[ind];
+                    html += `
+                        <label class="results-ind-item" data-industry="${escaped.toLowerCase()}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0.35rem; border-radius: 4px; cursor: pointer; font-size: 0.68rem; color: #cbd5e1; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='transparent'">
+                            <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 0.4rem;">
+                                <input type="checkbox" class="results-ind-checkbox" value="${escaped}" ${isChecked ? 'checked' : ''} onchange="app.onResultsIndustryCheckboxChange(this)" style="cursor: pointer; accent-color: #38bdf8; width: 12px; height: 12px; margin: 0;">
+                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escaped}">${escaped}</span>
+                            </div>
+                            <span style="font-size: 0.6rem; padding: 0.1rem 0.3rem; background: rgba(255,255,255,0.08); border-radius: 3px; color: #94a3b8; font-family: var(--font-mono); font-variant-numeric: tabular-nums;">${count}</span>
+                        </label>
+                    `;
+                });
+
+                if (sortedIndustries.length === 0) {
+                    html = '<div style="color: #64748b; font-size: 0.68rem; text-align: center; padding: 0.5rem 0;">No categories available</div>';
+                }
+
+                container.innerHTML = html;
+                this.updateResultsIndustryBtnLabel();
+            },
+
+            filterResultsIndustryList(q) {
+                const term = (q || '').toLowerCase().trim();
+                const items = document.querySelectorAll('#resultsIndustryCheckboxList .results-ind-item');
+                items.forEach(item => {
+                    const ind = (item.getAttribute('data-industry') || '').toLowerCase();
+                    item.style.display = (!term || ind.includes(term)) ? 'flex' : 'none';
+                });
+            },
+
+            onResultsIndustryCheckboxChange(cb) {
+                if (!this.resultsSelectedIndustries) this.resultsSelectedIndustries = new Set();
+                const val = cb.value;
+                if (cb.checked) {
+                    this.resultsSelectedIndustries.add(val);
+                } else {
+                    this.resultsSelectedIndustries.delete(val);
+                }
+                this.updateResultsIndustryBtnLabel();
+                const curQ = (document.getElementById('resultsLiveSearch')?.value || '').toLowerCase().trim();
+                this.filterResultsTable(curQ);
+            },
+
+            selectAllResultsIndustries() {
+                if (!this._allResultIndustries) return;
+                if (!this.resultsSelectedIndustries) this.resultsSelectedIndustries = new Set();
+                this._allResultIndustries.forEach(ind => this.resultsSelectedIndustries.add(ind));
+                document.querySelectorAll('#resultsIndustryCheckboxList .results-ind-checkbox').forEach(cb => {
+                    cb.checked = true;
+                });
+                this.updateResultsIndustryBtnLabel();
+                const curQ = (document.getElementById('resultsLiveSearch')?.value || '').toLowerCase().trim();
+                this.filterResultsTable(curQ);
+            },
+
+            clearAllResultsIndustries() {
+                if (!this.resultsSelectedIndustries) this.resultsSelectedIndustries = new Set();
+                this.resultsSelectedIndustries.clear();
+                document.querySelectorAll('#resultsIndustryCheckboxList .results-ind-checkbox').forEach(cb => {
+                    cb.checked = false;
+                });
+                this.updateResultsIndustryBtnLabel();
+                const curQ = (document.getElementById('resultsLiveSearch')?.value || '').toLowerCase().trim();
+                this.filterResultsTable(curQ);
+            },
+
+            updateResultsIndustryBtnLabel() {
+                const total = (this._allResultIndustries || []).length;
+                const selected = this.resultsSelectedIndustries ? this.resultsSelectedIndustries.size : 0;
+                const labelEl = document.getElementById('resultsIndustryBtnLabel');
+                const countEl = document.getElementById('resultsIndustrySelectedCount');
+                const btn = document.getElementById('resultsIndustryDropdownBtn');
+
+                if (selected === total || total === 0) {
+                    if (labelEl) labelEl.textContent = '🏢 Industries (All)';
+                    if (countEl) countEl.textContent = `All (${total})`;
+                    if (btn) {
+                        btn.style.borderColor = 'rgba(255,255,255,0.15)';
+                        btn.style.color = '#cbd5e1';
+                    }
+                } else if (selected === 0) {
+                    if (labelEl) labelEl.textContent = '🏢 Industries (0)';
+                    if (countEl) countEl.textContent = '0 selected';
+                    if (btn) {
+                        btn.style.borderColor = 'rgba(248,113,113,0.4)';
+                        btn.style.color = '#f87171';
+                    }
+                } else {
+                    if (labelEl) labelEl.textContent = `🏢 Industries (${selected}/${total})`;
+                    if (countEl) countEl.textContent = `${selected} of ${total}`;
+                    if (btn) {
+                        btn.style.borderColor = 'rgba(56,189,248,0.4)';
+                        btn.style.color = '#38bdf8';
+                    }
                 }
             },
 

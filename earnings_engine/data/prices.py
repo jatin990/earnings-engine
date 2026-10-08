@@ -225,13 +225,9 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
 
     Reuses the cache when the last fetch is under ``ttl_minutes`` old, when the
     market has already closed for the day or it is a weekend (prices are settled),
-    provided the cached rows are reasonably fresh.
+    or when there is no recorded fetch stamp (legacy/seeded rows).
     """
     sym = canonical_symbol(ticker)
-    last_cached = _last_cached_date(sym, settings)
-    if last_cached is None:
-        return False
-
     fetched = _fetch_log_time(sym, settings)
     now = datetime.now()
 
@@ -239,6 +235,7 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     if now.weekday() >= 5:
         session = _get_market_session_status(sym)
         last_trading_date = session.get("last_trading_date")
+        last_cached = _last_cached_date(sym, settings)
         if last_cached is not None and last_trading_date:
             try:
                 if last_cached.strftime("%Y-%m-%d") >= last_trading_date:
@@ -258,8 +255,11 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
         return False
 
     if fetched is None:
-        # Check if last_cached is within 5 business days
-        return (now - last_cached).total_seconds() <= 5 * 86400
+        last_cached = _last_cached_date(sym, settings)
+        if last_cached is not None:
+            # Check if last_cached is within 5 business days
+            return (now - last_cached).total_seconds() <= 5 * 86400
+        return True
 
     if (now - fetched).total_seconds() <= ttl_minutes * 60:
         return True
