@@ -368,7 +368,7 @@ def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
 
 
 def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
-    """Build a compact next-gen interactive operations table HTML with 8 clean, high-density columns."""
+    """Build a compact next-gen interactive operations table HTML with 10 clean, high-density columns."""
     if not rows:
         return ""
     return (
@@ -379,11 +379,13 @@ def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
         '<th onclick="app.sortResultsTable(this, 0, \'text\')" title="Sort by Stock Symbol">Stock</th>'
         '<th onclick="app.sortResultsTable(this, 1, \'date\')" title="Sort by Result Date">Result Date</th>'
         '<th onclick="app.sortResultsTable(this, 2, \'num\')" title="Sort by Current Price">Price / MCap</th>'
-        '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by 7-Day Return">7D / 30D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 4, \'text\')" title="Actionable Technical Setup Classifier">Technical Setup</th>'
-        '<th onclick="app.sortResultsTable(this, 5, \'text\')" title="Multi-Timeframe Support / Resistance Channel">S/R Structure</th>'
-        '<th onclick="app.sortResultsTable(this, 6, \'text\')" title="52-Week High/Low Distance">52W Range</th>'
-        '<th onclick="app.sortResultsTable(this, 7, \'num\')" style="text-align:center;" title="Relative Volume (5D vs 63D Surge)">Rel Vol</th>'
+        '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by Consensus EPS Estimate / Reported">EPS & Est</th>'
+        '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by Historical Beat Rate & Quality Track Record">Past Results</th>'
+        '<th onclick="app.sortResultsTable(this, 5, \'num\')" title="Sort by 7-Day & 30-Day Returns">7D / 30D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 6, \'text\')" title="Actionable Technical Setup Classifier">Technical Setup</th>'
+        '<th onclick="app.sortResultsTable(this, 7, \'text\')" title="Multi-Timeframe Support / Resistance Channel">S/R Structure</th>'
+        '<th onclick="app.sortResultsTable(this, 8, \'text\')" title="52-Week High/Low Distance">52W Range</th>'
+        '<th onclick="app.sortResultsTable(this, 9, \'num\')" style="text-align:center;" title="Relative Volume (5D vs 63D Surge)">Rel Vol</th>'
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table></div>"
@@ -462,7 +464,7 @@ def _build_cap_section(title: str, badge_cls: str, rows: list[str] | dict[str, l
         ind_count = len(ind_rows)
         table_rows.append(
             f'<tr class="table-divider-row industry-subgroup industry-divider-row" data-ind="{html.escape(ind_name)}">'
-            f'<td colspan="8">'
+            f'<td colspan="10">'
             f'<div class="terminal-ind-divider">'
             f'<span class="ind-pill">🏭 Industry: {html.escape(ind_name)}</span>'
             f'<span class="ind-badge-count">{ind_count}</span>'
@@ -502,7 +504,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             count = len(data)
             table_rows.append(
                 f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-                f'<td colspan="8">'
+                f'<td colspan="10">'
                 f'<div class="terminal-cap-divider">'
                 f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
                 f'<span class="terminal-divider-meta">{count} stock{"s" if count != 1 else ""}</span>'
@@ -520,7 +522,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
         ind_count_total = len([k for k, v in data.items() if v])
         table_rows.append(
             f'<tr class="table-divider-row cap-section cap-divider-row" data-cap="{cap_tier}">'
-            f'<td colspan="8">'
+            f'<td colspan="10">'
             f'<div class="terminal-cap-divider">'
             f'<span class="{cap_badge_cls}">{cap_icon} {cap_title}</span>'
             f'<span class="terminal-divider-meta">{tier_count} stock{"s" if tier_count != 1 else ""} · {ind_count_total} industries</span>'
@@ -536,7 +538,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
             icount = len(ind_rows)
             table_rows.append(
                 f'<tr class="table-divider-row industry-subgroup industry-divider-row" data-cap="{cap_tier}" data-ind="{html.escape(ind_name)}">'
-                f'<td colspan="8">'
+                f'<td colspan="10">'
                 f'<div class="terminal-ind-divider">'
                 f'<span class="ind-pill">🏭 Industry: {html.escape(ind_name)}</span>'
                 f'<span class="ind-badge-count">{icount}</span>'
@@ -1119,6 +1121,43 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             except Exception:
                 relative_date_badge_html = ""
 
+        # EPS Estimate & Reported / Surprise HTML
+        surp_val = row.get("surprise_pct")
+        surp_f = _to_float(surp_val) if (surp_val is not None and not pd.isna(surp_val)) else None
+        if surp_f is not None:
+            surp_c = "#34d399" if surp_f > 0 else ("#f87171" if surp_f < 0 else "#94a3b8")
+            surp_txt = f"{'+' if surp_f > 0 else ''}{surp_f:.1f}%"
+            surp_badge = f' <span style="font-size:0.62rem;color:{surp_c};font-weight:700;">({surp_txt})</span>'
+        else:
+            surp_badge = ""
+
+        eps_estimates_html = (
+            f'<div style="display:flex;flex-direction:column;gap:0.1rem;" title="Consensus EPS Estimate: {eps_estimate} | Reported EPS: {eps_reported} | Surprise: {surprise_pct}">'
+            f'<div style="display:flex;align-items:center;gap:0.25rem;justify-content:space-between;">'
+            f'<span style="font-size:0.65rem;color:#64748b;">Est:</span>'
+            f'<span style="color:#f8fafc;font-weight:600;">{eps_estimate}</span>'
+            f'</div>'
+            f'<div style="display:flex;align-items:center;gap:0.25rem;justify-content:space-between;">'
+            f'<span style="font-size:0.65rem;color:#64748b;">Rep:</span>'
+            f'<span style="color:#cbd5e1;font-weight:500;">{eps_reported}{surp_badge}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
+        # Past Results / Track Record HTML (Beat Rate + 3Q Print Quality)
+        past_results_html = (
+            f'<div style="display:flex;flex-direction:column;gap:0.12rem;" title="Beat Rate: {beat_rate_plain}% | 3Q Quality: {q1_score} | {q2_score} | {q3_score} (Avg {prev_3q_score})">'
+            f'<div style="display:flex;align-items:center;gap:0.25rem;justify-content:space-between;">'
+            f'<span style="font-size:0.65rem;color:#64748b;">Beats:</span>'
+            f'{beat_rate_html}'
+            f'</div>'
+            f'<div style="display:flex;align-items:center;gap:0.25rem;justify-content:space-between;">'
+            f'<span style="font-size:0.65rem;color:#64748b;">3Q:</span>'
+            f'<span style="font-size:0.68rem;color:#38bdf8;font-weight:600;">{q1_score} | {q2_score} | {q3_score}</span>'
+            f'</div>'
+            f'</div>'
+        )
+
         # Consolidated 7D / 30D returns HTML
         r7_val = row.get("seven_day_return_pct")
         r30_val = row.get("thirty_day_return_pct")
@@ -1201,6 +1240,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "three_day_return": three_day_return,
             "seven_day_return": seven_day_return,
             "thirty_day_return": thirty_day_return,
+            "eps_estimates_html": eps_estimates_html,
+            "past_results_html": past_results_html,
             "returns_consolidated_html": returns_consolidated_html,
             "technical_setup_badge_html": technical_setup_badge_html,
             "rel_vol_html": rel_vol_html,
