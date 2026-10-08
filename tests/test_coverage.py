@@ -1,5 +1,6 @@
 """Tests for the Data Coverage tab and incremental earnings ingestion."""
 
+import datetime
 import sqlite3
 
 import pytest
@@ -204,10 +205,11 @@ def test_ingest_earnings_incremental_skips_too_new(cov_settings, monkeypatch):
     """Tickers listed < 90 days ago are skipped (too new for quarterly earnings)."""
     _seed_db(cov_settings)
     # Add a ticker whose first price date is recent (< 90 days ago).
+    recent_date = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
     conn = sqlite3.connect(str(_db_path(cov_settings)))
     conn.execute(
         "INSERT INTO price_history (ticker, date, close) VALUES (?, ?, ?)",
-        ("NEW.NS", "2026-07-01", 50.0),
+        ("NEW.NS", recent_date, 50.0),
     )
     conn.commit()
     conn.close()

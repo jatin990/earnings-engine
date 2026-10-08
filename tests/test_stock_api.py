@@ -107,3 +107,19 @@ def test_consensus_context_uses_live_data():
     assert "Live Real-Time" in prompt or "Price" in prompt
 
 
+def test_get_stock_earnings_endpoint_returns_quarterly_financials(client):
+    response = client.get("/api/v1/stock/RELIANCE.NS/earnings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["ticker"] == "RELIANCE.NS"
+    assert "earnings_history" in data
+    assert "quarterly_financials" in data
+    assert isinstance(data["quarterly_financials"], list)
+    if data["quarterly_financials"]:
+        first = data["quarterly_financials"][0]
+        for k in ["quarter", "revenue_cr", "ebitda_cr", "ebitda_margin_pct"]:
+            assert k in first
+
+
+

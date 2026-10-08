@@ -394,6 +394,21 @@ def get_stock_earnings(ticker: str, settings: Settings | None = None) -> dict[st
     except Exception as e:
         logger.debug("Error fetching earnings history for %s: %s", sym, e)
 
+    # Fetch quarterly fundamental statements (Revenue, EBITDA/Operating Profit, PAT, Margins, EPS)
+    quarterly_fin: list[dict[str, Any]] = []
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_quarterly_financials
+        quarterly_fin = get_stock_quarterly_financials(sym, limit=12, settings=settings)
+        if not quarterly_fin and sym.endswith(".NS"):
+            try:
+                from earnings_engine.data.nse_shareholding import ingest_stock_quarterly_financials
+                ingest_stock_quarterly_financials(sym, settings=settings)
+                quarterly_fin = get_stock_quarterly_financials(sym, limit=12, settings=settings)
+            except Exception as auto_qf_err:
+                logger.debug("Auto quarterly financials ingestion error for %s: %s", sym, auto_qf_err)
+    except Exception as qf_err:
+        logger.debug("Error retrieving quarterly financials in get_stock_earnings for %s: %s", sym, qf_err)
+
     # Compute beat streak
     streak = 0
     for e in earnings_history:
@@ -407,6 +422,7 @@ def get_stock_earnings(ticker: str, settings: Settings | None = None) -> dict[st
         "success": True,
         "ticker": sym,
         "earnings_history": earnings_history,
+        "quarterly_financials": quarterly_fin,
         "streak": streak,
     }
 

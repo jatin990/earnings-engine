@@ -591,16 +591,79 @@
         if (content) content.style.display = 'block';
     };
 
-    // EPS Derivation & History
+    // EPS Derivation & Quarterly Fundamental Forensics
     app._renderEPSCard = function (data) {
-        const body = document.getElementById('drawerEPSTableBody');
+        const sym = app._currentDrawerTicker || '';
+        const isUS = !sym.endsWith('.NS');
+        const currSym = isUS ? '$' : '₹';
+
+        // 1. Render Quarterly Fundamental Forensics (Revenue, EBITDA, Margins, PAT, EPS)
+        const fundBody = document.getElementById('drawerFundamentalsTableBody');
+        const fundList = data.quarterly_financials || [];
+        const provBadge = document.getElementById('drawerFundProvenanceBadge');
+
+        if (provBadge) {
+            const srcSet = new Set(fundList.map(f => f.source).filter(Boolean));
+            if (srcSet.size > 0) {
+                provBadge.textContent = Array.from(srcSet).join(' · ');
+            } else {
+                provBadge.textContent = isUS ? 'SEC EDGAR / yfinance' : 'BSE / NSE / Screener';
+            }
+        }
+
+        if (fundBody) {
+            if (!fundList || fundList.length === 0) {
+                fundBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#8e97a8;padding:1.2rem;">No quarterly fundamental filings on record for this equity</td></tr>`;
+            } else {
+                fundBody.innerHTML = fundList.slice(0, 12).map(q => {
+                    const qName = q.quarter || q.period || '--';
+                    const rev = q.revenue_cr != null ? `${currSym}${Number(q.revenue_cr).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : '--';
+                    const eb = (q.ebitda_cr != null ? q.ebitda_cr : q.operating_profit_cr);
+                    const ebStr = eb != null ? `${currSym}${Number(eb).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : '--';
+                    const opm = (q.operating_margin_pct != null ? q.operating_margin_pct : q.ebitda_margin_pct);
+                    const opmStr = opm != null ? `${Number(opm).toFixed(1)}%` : '--';
+                    const pat = q.net_profit_cr != null ? `${currSym}${Number(q.net_profit_cr).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : '--';
+                    const eps = q.eps != null ? `${currSym}${Number(q.eps).toFixed(2)}` : '--';
+
+                    // Growth badges
+                    const qoqEb = q.qoq_ebitda_growth_pct != null ? q.qoq_ebitda_growth_pct : q.qoq_revenue_growth_pct;
+                    const yoyEb = q.yoy_ebitda_growth_pct != null ? q.yoy_ebitda_growth_pct : q.yoy_revenue_growth_pct;
+
+                    const qoqClass = qoqEb > 0 ? '#34d399' : (qoqEb < 0 ? '#fb7185' : '#8e97a8');
+                    const yoyClass = yoyEb > 0 ? '#34d399' : (yoyEb < 0 ? '#fb7185' : '#8e97a8');
+
+                    const qoqTag = qoqEb != null ? `<span style="display:inline-block;padding:0.12rem 0.35rem;border-radius:3px;font-size:0.65rem;font-weight:700;background:rgba(255,255,255,0.04);color:${qoqClass};">QoQ: ${qoqEb > 0 ? '+' : ''}${qoqEb.toFixed(1)}%</span>` : '';
+                    const yoyTag = yoyEb != null ? `<span style="display:inline-block;padding:0.12rem 0.35rem;border-radius:3px;font-size:0.65rem;font-weight:700;background:rgba(255,255,255,0.04);color:${yoyClass};">YoY: ${yoyEb > 0 ? '+' : ''}${yoyEb.toFixed(1)}%</span>` : '';
+
+                    return `
+                        <tr>
+                            <td style="font-weight:700;color:#e2e8f0;white-space:nowrap;">${qName}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);">${rev}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);color:#38bdf8;">${ebStr}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);font-weight:700;color:${opm > 15 ? '#34d399' : (opm < 5 ? '#fb7185' : '#cbd5e1')};">${opmStr}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);">${pat}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);font-weight:700;">${eps}</td>
+                            <td style="text-align:right;white-space:nowrap;">
+                                <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.3rem;">
+                                    ${qoqTag}
+                                    ${yoyTag}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 2. Render EPS Surprise History
+        const epsBody = document.getElementById('drawerEPSTableBody');
         const history = data.earnings_history || data.quarters || (Array.isArray(data) ? data : []);
 
-        if (body) {
+        if (epsBody) {
             if (!history || history.length === 0) {
-                body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#8e97a8;padding:1.2rem;">No historical EPS filings on record</td></tr>`;
+                epsBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#8e97a8;padding:1.2rem;">No consensus estimate track record on record</td></tr>`;
             } else {
-                body.innerHTML = history.slice(0, 12).map(q => {
+                epsBody.innerHTML = history.slice(0, 12).map(q => {
                     const qName = q.quarter || q.period || q.date || '--';
                     const rep = q.reported_eps != null ? Number(q.reported_eps).toFixed(2) : '--';
                     const est = q.estimate_eps != null ? Number(q.estimate_eps).toFixed(2) : '--';
@@ -611,9 +674,9 @@
                     return `
                         <tr>
                             <td style="font-weight:700;color:#e2e8f0;">${qName}</td>
-                            <td style="text-align:right;">${rep}</td>
-                            <td style="text-align:right;color:#8e97a8;">${est}</td>
-                            <td style="text-align:right;font-weight:700;color:${surpClass};">${surp}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);">${rep}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);color:#8e97a8;">${est}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);font-weight:700;color:${surpClass};">${surp}</td>
                             <td style="text-align:right;color:#64748b;font-size:0.65rem;">${src}</td>
                         </tr>
                     `;

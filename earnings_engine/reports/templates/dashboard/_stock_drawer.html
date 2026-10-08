@@ -254,21 +254,59 @@
             </div>
 
             <div id="drawerEPSContent" style="display:none;">
-                <div class="drawer-table-wrap">
-                    <table class="drawer-table">
-                        <thead>
-                            <tr>
-                                <th>QUARTER</th>
-                                <th style="text-align:right;">REPORTED</th>
-                                <th style="text-align:right;">ESTIMATE</th>
-                                <th style="text-align:right;">SURPRISE</th>
-                                <th style="text-align:right;">SOURCE</th>
-                            </tr>
-                        </thead>
-                        <tbody id="drawerEPSTableBody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
+                <!-- Section A: Quarterly Fundamental Forensics (Revenue, EBITDA, Margins, PAT) -->
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;padding:0 0.2rem;">
+                        <span style="font-size:0.75rem;font-weight:700;color:#94a3b8;letter-spacing:0.04em;text-transform:uppercase;">
+                            📊 Quarterly Fundamental Forensics (QoQ &amp; YoY Trajectory)
+                        </span>
+                        <span id="drawerFundProvenanceBadge" style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono, monospace);">
+                            Official Regulatory Filings
+                        </span>
+                    </div>
+                    <div class="drawer-table-wrap" style="max-height:260px;overflow-y:auto;">
+                        <table class="drawer-table">
+                            <thead>
+                                <tr>
+                                    <th>QUARTER</th>
+                                    <th style="text-align:right;">SALES (₹ Cr)</th>
+                                    <th style="text-align:right;">EBITDA / OP (₹ Cr)</th>
+                                    <th style="text-align:right;">OPM %</th>
+                                    <th style="text-align:right;">PAT / NP (₹ Cr)</th>
+                                    <th style="text-align:right;">EPS (₹)</th>
+                                    <th style="text-align:right;">QoQ / YoY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drawerFundamentalsTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section B: Historical EPS Estimates & Surprises -->
+                <div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;padding:0 0.2rem;">
+                        <span style="font-size:0.75rem;font-weight:700;color:#94a3b8;letter-spacing:0.04em;text-transform:uppercase;">
+                            🎯 Consensus Estimates &amp; Earnings Surprise Track Record
+                        </span>
+                    </div>
+                    <div class="drawer-table-wrap" style="max-height:220px;overflow-y:auto;">
+                        <table class="drawer-table">
+                            <thead>
+                                <tr>
+                                    <th>QUARTER</th>
+                                    <th style="text-align:right;">REPORTED EPS</th>
+                                    <th style="text-align:right;">ESTIMATE EPS</th>
+                                    <th style="text-align:right;">BEAT / SURPRISE</th>
+                                    <th style="text-align:right;">PROVENANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drawerEPSTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>

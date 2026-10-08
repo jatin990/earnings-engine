@@ -2649,8 +2649,8 @@ const API_BASE = window.location.origin;
                                 <!-- Drawer Header Sub-tabs -->
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
                                     <div style="display:flex;align-items:center;gap:0.4rem;">
-                                        <button type="button" id="tabbtn_news_${rowTickerId}" onclick="app.switchDrawerTab('${rowTickerId}', '${ticker}', 'news')" class="btn-micro" style="background:${activeTab === 'news' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📰 Live News & Catalysts</button>
-                                        <button type="button" id="tabbtn_intel_${rowTickerId}" onclick="app.switchDrawerTab('${rowTickerId}', '${ticker}', 'intel')" class="btn-micro" style="background:${activeTab === 'intel' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📊 Intelligence & Consensus</button>
+                                        <button type="button" id="tabbtn_news_${rowTickerId}" onclick="app.switchInlineRowDrawerTab('${rowTickerId}', '${ticker}', 'news')" class="btn-micro" style="background:${activeTab === 'news' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📰 Live News & Catalysts</button>
+                                        <button type="button" id="tabbtn_intel_${rowTickerId}" onclick="app.switchInlineRowDrawerTab('${rowTickerId}', '${ticker}', 'intel')" class="btn-micro" style="background:${activeTab === 'intel' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📊 Intelligence & Consensus</button>
                                     </div>
                                     <div style="display:flex;gap:0.35rem;align-items:center;">
                                         <button type="button" class="btn-micro btn-micro-violet" onclick="app.openAiDetails('ALL', '${ticker}', event)">🤖 4-Model AI Breakdown</button>
@@ -2684,7 +2684,7 @@ const API_BASE = window.location.origin;
                 }
             },
 
-            switchDrawerTab(rowTickerId, ticker, tab) {
+            switchInlineRowDrawerTab(rowTickerId, ticker, tab) {
                 const newsTab = document.getElementById('drawer_tab_news_' + rowTickerId);
                 const intelTab = document.getElementById('drawer_tab_intel_' + rowTickerId);
                 const newsBtn = document.getElementById('tabbtn_news_' + rowTickerId);
@@ -2710,7 +2710,7 @@ const API_BASE = window.location.origin;
                 if (!drawerTr || drawerTr.style.display === 'none' || !drawerTr.style.display) {
                     this.toggleRowDrawer(rowTickerId, ticker, 'news');
                 } else {
-                    this.switchDrawerTab(rowTickerId, ticker, 'news');
+                    this.switchInlineRowDrawerTab(rowTickerId, ticker, 'news');
                 }
             },
 

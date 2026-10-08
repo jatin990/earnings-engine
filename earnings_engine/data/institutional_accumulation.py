@@ -4637,6 +4637,43 @@ def get_stock_quarterly_financials(
                 "created_at": r[15],
                 "updated_at": r[16],
             })
+
+        # Compute dynamic QoQ and EBITDA metrics across descending quarters
+        for i, q in enumerate(results):
+            rev = q.get("revenue_cr")
+            op = q.get("operating_profit_cr")
+            pat = q.get("net_profit_cr")
+
+            q["ebitda_cr"] = op
+            q["ebitda_margin_pct"] = q.get("operating_margin_pct")
+
+            qoq_rev = None
+            qoq_op = None
+            qoq_pat = None
+            if i + 1 < len(results):
+                prev_rev = results[i + 1].get("revenue_cr")
+                prev_op = results[i + 1].get("operating_profit_cr")
+                prev_pat = results[i + 1].get("net_profit_cr")
+                if prev_rev and prev_rev > 0 and rev is not None:
+                    qoq_rev = round(((rev - prev_rev) / prev_rev) * 100, 2)
+                if prev_op and prev_op != 0 and op is not None:
+                    qoq_op = round(((op - prev_op) / abs(prev_op)) * 100, 2)
+                if prev_pat and prev_pat != 0 and pat is not None:
+                    qoq_pat = round(((pat - prev_pat) / abs(prev_pat)) * 100, 2)
+
+            q["qoq_revenue_growth_pct"] = qoq_rev
+            q["qoq_operating_profit_growth_pct"] = qoq_op
+            q["qoq_ebitda_growth_pct"] = qoq_op
+            q["qoq_pat_growth_pct"] = qoq_pat
+
+            yoy_op = None
+            if i + 4 < len(results):
+                prev_y_op = results[i + 4].get("operating_profit_cr")
+                if prev_y_op and prev_y_op != 0 and op is not None:
+                    yoy_op = round(((op - prev_y_op) / abs(prev_y_op)) * 100, 2)
+            q["yoy_operating_profit_growth_pct"] = yoy_op
+            q["yoy_ebitda_growth_pct"] = yoy_op
+
         return results
     except Exception as e:
         logger.exception("[INSTITUTIONAL] Error fetching quarterly financials for %s: %s", ticker, e)
