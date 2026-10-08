@@ -2569,8 +2569,30 @@ const API_BASE = window.location.origin;
                     let valB = cellB.textContent.trim();
 
                     if (type === 'num') {
-                        const numA = parseFloat(valA.replace(/[^0-9.-]/g, '')) || 0;
-                        const numB = parseFloat(valB.replace(/[^0-9.-]/g, '')) || 0;
+                        let numA = 0;
+                        let numB = 0;
+
+                        if (colIndex === 2 && (a.row.getAttribute('data-price') !== null || b.row.getAttribute('data-price') !== null)) {
+                            numA = parseFloat(a.row.getAttribute('data-price')) || 0;
+                            numB = parseFloat(b.row.getAttribute('data-price')) || 0;
+                        } else if (colIndex === 4 && (a.row.getAttribute('data-beat-rate') !== null || b.row.getAttribute('data-beat-rate') !== null)) {
+                            numA = parseFloat(a.row.getAttribute('data-beat-rate')) || 0;
+                            numB = parseFloat(b.row.getAttribute('data-beat-rate')) || 0;
+                        } else if (colIndex === 5 && (a.row.getAttribute('data-7d-ret') !== null || b.row.getAttribute('data-7d-ret') !== null || a.row.getAttribute('data-30d-ret') !== null || b.row.getAttribute('data-30d-ret') !== null)) {
+                            const raw7A = a.row.getAttribute('data-7d-ret');
+                            const raw30A = a.row.getAttribute('data-30d-ret');
+                            numA = raw7A !== "" && raw7A !== null ? parseFloat(raw7A) : (raw30A !== "" && raw30A !== null ? parseFloat(raw30A) : (newDirection === 'asc' ? 999999 : -999999));
+
+                            const raw7B = b.row.getAttribute('data-7d-ret');
+                            const raw30B = b.row.getAttribute('data-30d-ret');
+                            numB = raw7B !== "" && raw7B !== null ? parseFloat(raw7B) : (raw30B !== "" && raw30B !== null ? parseFloat(raw30B) : (newDirection === 'asc' ? 999999 : -999999));
+                        } else if (colIndex === 9 && (a.row.getAttribute('data-rel-vol') !== null || b.row.getAttribute('data-rel-vol') !== null)) {
+                            numA = parseFloat(a.row.getAttribute('data-rel-vol')) || 0;
+                            numB = parseFloat(b.row.getAttribute('data-rel-vol')) || 0;
+                        } else {
+                            numA = parseFloat(valA.replace(/[^0-9.-]/g, '')) || 0;
+                            numB = parseFloat(valB.replace(/[^0-9.-]/g, '')) || 0;
+                        }
                         return newDirection === 'asc' ? numA - numB : numB - numA;
                     } else if (type === 'date') {
                         const dateA = valA.slice(0, 10);

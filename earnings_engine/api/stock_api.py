@@ -16,7 +16,7 @@ import yfinance as yf
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.prices import fetch_prices, fetch_live_quote, load_prices
-from earnings_engine.data.market_context import _week_high_low_around, detect_swing_range
+from earnings_engine.data.market_context import _close_n_calendar_days_ago, _week_high_low_around, detect_swing_range
 from earnings_engine.data.swing_ranges import get_swing_range, record_auto_range
 from earnings_engine.data.catalysts_news import get_short_term_catalysts
 from earnings_engine.consensus.storage import get_predictions
@@ -195,24 +195,37 @@ def get_stock_technicals(ticker: str, settings: Settings | None = None) -> dict[
             if first_c > 0:
                 technical["momentum_since_listing"] = round((latest_c / first_c - 1.0) * 100.0, 2)
 
-            if len(closes) >= 4:
-                p3 = float(closes.iloc[-4])
-                technical["momentum_3d"] = round((latest_c / p3 - 1.0) * 100.0, 2) if p3 else None
-            elif len(closes) >= 2:
-                p_first = float(closes.iloc[0])
-                technical["momentum_3d"] = round((latest_c / p_first - 1.0) * 100.0, 2) if p_first else None
+            _last_date = closes.index[-1]
+            first_dt = pd.to_datetime(closes.index[0]).tz_localize(None) if getattr(closes.index, "tz", None) is not None else pd.to_datetime(closes.index[0])
+            last_dt = pd.to_datetime(_last_date).tz_localize(None) if getattr(pd.to_datetime(_last_date), "tz", None) is not None else pd.to_datetime(_last_date)
+            days_span = (last_dt - first_dt).days
 
-            if len(closes) >= 8:
-                p7 = float(closes.iloc[-8])
-                technical["momentum_7d"] = round((latest_c / p7 - 1.0) * 100.0, 2) if p7 else None
-            elif len(closes) >= 2:
-                technical["momentum_7d"] = technical["momentum_since_listing"]
+            # 3-day momentum (calendar lookback)
+            p3 = _close_n_calendar_days_ago(closes, _last_date, 3)
+            if p3 is not None and p3 > 0:
+                technical["momentum_3d"] = round((latest_c / p3 - 1.0) * 100.0, 2)
+            elif days_span >= 3 and first_c > 0:
+                technical["momentum_3d"] = round((latest_c / first_c - 1.0) * 100.0, 2)
+            else:
+                technical["momentum_3d"] = None
 
-            if len(closes) >= 22:
-                p30 = float(closes.iloc[-22])
-                technical["momentum_30d"] = round((latest_c / p30 - 1.0) * 100.0, 2) if p30 else None
-            elif len(closes) >= 2:
-                technical["momentum_30d"] = technical["momentum_since_listing"]
+            # 7-day momentum (calendar lookback)
+            p7 = _close_n_calendar_days_ago(closes, _last_date, 7)
+            if p7 is not None and p7 > 0:
+                technical["momentum_7d"] = round((latest_c / p7 - 1.0) * 100.0, 2)
+            elif days_span >= 7 and first_c > 0:
+                technical["momentum_7d"] = round((latest_c / first_c - 1.0) * 100.0, 2)
+            else:
+                technical["momentum_7d"] = None
+
+            # 30-day momentum (calendar lookback)
+            p30 = _close_n_calendar_days_ago(closes, _last_date, 30)
+            if p30 is not None and p30 > 0:
+                technical["momentum_30d"] = round((latest_c / p30 - 1.0) * 100.0, 2)
+            elif days_span >= 30 and first_c > 0:
+                technical["momentum_30d"] = round((latest_c / first_c - 1.0) * 100.0, 2)
+            else:
+                technical["momentum_30d"] = None
 
             # DMA computation
             if len(closes) >= 20:
