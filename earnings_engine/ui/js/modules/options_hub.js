@@ -1988,6 +1988,111 @@
     };
 
     /**
+     * Interactive 6-Slide Options Guide Carousel Modal Controllers
+     */
+    app._optionsGuideSlide = 0;
+
+    app.openOptionsGuideModal = function () {
+        const modal = document.getElementById('optionsGuideModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        app.goToOptionsGuideSlide(app._optionsGuideSlide || 0);
+    };
+
+    app.closeOptionsGuideModal = function () {
+        const modal = document.getElementById('optionsGuideModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    app.goToOptionsGuideSlide = function (slideIndex) {
+        const idx = Math.max(0, Math.min(5, parseInt(slideIndex, 10) || 0));
+        app._optionsGuideSlide = idx;
+
+        const slides = document.querySelectorAll('#optionsGuideModal .opt-guide-slide');
+        slides.forEach((slide) => {
+            const sIdx = parseInt(slide.getAttribute('data-slide'), 10);
+            slide.style.display = sIdx === idx ? 'block' : 'none';
+        });
+
+        const dots = document.querySelectorAll('#optionsGuideModal .opt-guide-dot');
+        dots.forEach((dot, dIdx) => {
+            if (dIdx === idx) {
+                dot.classList.add('active');
+                dot.style.width = '10px';
+                dot.style.height = '10px';
+                dot.style.background = '#c084fc';
+            } else {
+                dot.classList.remove('active');
+                dot.style.width = '8px';
+                dot.style.height = '8px';
+                dot.style.background = 'rgba(255,255,255,0.2)';
+            }
+        });
+
+        const prevBtn = document.getElementById('optGuidePrevBtn');
+        if (prevBtn) {
+            if (idx === 0) {
+                prevBtn.style.opacity = '0.35';
+                prevBtn.style.pointerEvents = 'none';
+            } else {
+                prevBtn.style.opacity = '1';
+                prevBtn.style.pointerEvents = 'auto';
+            }
+        }
+
+        const nextBtn = document.getElementById('optGuideNextBtn');
+        if (nextBtn) {
+            if (idx === 5) {
+                nextBtn.innerHTML = 'Got it! 🚀';
+                nextBtn.style.background = '#34d399';
+                nextBtn.style.borderColor = '#34d399';
+                nextBtn.style.color = '#000000';
+            } else {
+                nextBtn.innerHTML = 'Next &rarr;';
+                nextBtn.style.background = '#c084fc';
+                nextBtn.style.borderColor = '#c084fc';
+                nextBtn.style.color = '#000000';
+            }
+        }
+
+        const container = document.getElementById('optionsGuideSlideContainer');
+        if (container) container.scrollTop = 0;
+    };
+
+    app.prevOptionsGuideSlide = function () {
+        if (app._optionsGuideSlide > 0) {
+            app.goToOptionsGuideSlide(app._optionsGuideSlide - 1);
+        }
+    };
+
+    app.nextOptionsGuideSlide = function () {
+        if (app._optionsGuideSlide < 5) {
+            app.goToOptionsGuideSlide(app._optionsGuideSlide + 1);
+        } else {
+            app.closeOptionsGuideModal();
+        }
+    };
+
+    // Close options guide modal when clicking outside dialog container or pressing Esc
+    const guideModalEl = document.getElementById('optionsGuideModal');
+    if (guideModalEl) {
+        guideModalEl.addEventListener('click', function (e) {
+            if (e.target === guideModalEl) {
+                app.closeOptionsGuideModal();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('optionsGuideModal');
+            if (modal && modal.style.display !== 'none') {
+                app.closeOptionsGuideModal();
+            }
+        }
+    });
+
+    /**
      * Entry point for tab activation from dashboard.js
      */
     app.initOptionsHub = function () {
