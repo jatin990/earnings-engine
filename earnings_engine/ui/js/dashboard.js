@@ -2277,10 +2277,11 @@ const API_BASE = window.location.origin;
                     const drawerId = rowId ? rowId.replace('row_', 'drawer_') : null;
                     const drawerRow = drawerId ? document.getElementById(drawerId) : null;
                     const rowCap = row.getAttribute('data-cap') || 'large';
+                    const rowInd = row.getAttribute('data-industry') || '';
 
                     const capMatch = (activeCap === 'all' || rowCap === activeCap);
                     const text = row.textContent.toLowerCase();
-                    const queryMatch = !q || text.includes(q);
+                    const queryMatch = !q || text.includes(q) || rowInd.toLowerCase().includes(q);
                     const isMatch = capMatch && queryMatch;
 
                     row.style.display = isMatch ? '' : 'none';

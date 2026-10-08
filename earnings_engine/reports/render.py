@@ -1175,9 +1175,19 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         is_large = mcap_value > LARGE_CAP_THRESHOLD
         cap_tier = "large" if is_large else "small"
 
+        # Load industry mapping for ticker
+        try:
+            from earnings_engine.config import Settings
+            from earnings_engine.data.industry import load_industry
+            ind_val = load_industry(ticker, Settings())
+        except Exception:
+            ind_val = None
+        industry_name = ind_val or row.get("industry") or row.get("sector") or "General / Multi-Sector"
+
         row_values = {
             "ticker": ticker,
             "cap_tier": cap_tier,
+            "industry": html.escape(str(industry_name)),
             "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
             "company_name": company_name,
             "result_sequence_badge_html": full_badges,
@@ -1225,15 +1235,6 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "raw_chan_pos": f"{chan_pos_num:.1f}",
         }
         row_html = _render_template("result_row.html", **row_values)
-
-        # Load industry mapping for ticker
-        try:
-            from earnings_engine.config import Settings
-            from earnings_engine.data.industry import load_industry
-            ind_val = load_industry(ticker, Settings())
-        except Exception:
-            ind_val = None
-        industry_name = ind_val or row.get("industry") or row.get("sector") or "General / Multi-Sector"
 
         # Group by day -> cap -> industry
         if earnings_text not in day_groups:
