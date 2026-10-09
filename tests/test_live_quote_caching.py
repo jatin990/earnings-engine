@@ -119,7 +119,7 @@ def test_build_quote_from_cached_record_structure_and_metrics():
     quote = _build_quote_from_cached_record("TEST.NS", record, session)
 
     expected_keys = {
-        "ticker", "current_price", "previous_close", "day_change", "day_change_pct",
+        "ticker", "symbol", "current_price", "previous_close", "day_change", "day_change_pct",
         "day_open", "day_high", "day_low", "week_52_high", "week_52_low",
         "volume", "avg_volume", "market_cap", "currency", "is_live",
         "last_updated", "pct_from_52w_high", "pct_from_52w_low",
