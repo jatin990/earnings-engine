@@ -2441,6 +2441,37 @@ def _migration_047_options_tracked_setups(conn: Any) -> None:
         pass
 
 
+def _migration_048_business_update_schedules(conn: Any) -> None:
+    """Create business_update_schedules table for corporate operational disclosures radar and anticipation calendar."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS business_update_schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            company_name TEXT,
+            update_type TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            typical_days_after_period INTEGER DEFAULT 5,
+            last_update_date TEXT,
+            last_update_headline TEXT,
+            last_update_reaction_1d REAL,
+            last_update_reaction_3d REAL,
+            next_expected_window_start TEXT,
+            next_expected_window_end TEXT,
+            confidence_score REAL DEFAULT 0.85,
+            status TEXT DEFAULT 'ANTICIPATED',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(ticker, update_type)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_ticker ON business_update_schedules (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_window ON business_update_schedules (next_expected_window_start, next_expected_window_end)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_status ON business_update_schedules (status)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2490,6 +2521,7 @@ MIGRATIONS: list[Migration] = [
     Migration(45, "045_market_pulse_and_pricing_indexes", _migration_045_market_pulse_and_pricing_indexes),
     Migration(46, "046_morning_setups_deals_and_board_meetings", _migration_046_morning_setups_deals_and_board_meetings),
     Migration(47, "047_options_tracked_setups", _migration_047_options_tracked_setups),
+    Migration(48, "048_business_update_schedules", _migration_048_business_update_schedules),
 ]
 
 

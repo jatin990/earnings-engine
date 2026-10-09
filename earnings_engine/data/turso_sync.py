@@ -134,6 +134,8 @@ SYNC_TABLES = [
     "upcoming_board_meetings",
     # Advanced Options Tracked Setups Ledger
     "options_tracked_setups",
+    # Corporate Business Updates Radar & Seasonality Schedules
+    "business_update_schedules",
 ]
 
 
@@ -207,6 +209,9 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "record_date",
     "util_date",
     "meeting_date",
+    "last_update_date",
+    "next_expected_window_start",
+    "next_expected_window_end",
     "synced_at",
     "iso_date",
     "date",
@@ -219,6 +224,9 @@ DATE_ONLY_COLUMNS = {
     "last_seen_date",
     "deal_date",
     "meeting_date",
+    "last_update_date",
+    "next_expected_window_start",
+    "next_expected_window_end",
     "as_of_date",
     "asof_date",
     "fetch_date",

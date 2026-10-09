@@ -116,6 +116,25 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "horizon": "📅 1-3 Days (Short-term)",
         "volatility_est": "±2% to ±6%",
     },
+    "Business Updates & Operational Disclosures": {
+        "keywords": [
+            "quarterly business update", "business update for q", "business update for the quarter",
+            "business update", "key operational highlights", "operational performance update",
+            "quarterly operating update", "q1 business update", "q2 business update",
+            "q3 business update", "q4 business update", "monthly sales", "production and sales",
+            "production and offtake", "monthly dispatch", "monthly dispatches", "vehicle sales",
+            "jlr wholesales", "sales & dispatches", "sales and dispatches", "quarterly pre-sales",
+            "quarterly bookings", "gross booking value", "collections update", "pre-sales & gross booking",
+            "pre-sales", "gross advances and deposits", "advances and deposits", "casa ratio update",
+            "quarterly loan growth", "disbursements update", "quarterly order inflow", "order book update",
+            "standalone revenue & store count", "store count update", "operational highlights",
+            "gross advances", "deposits update"
+        ],
+        "base_impact": 84,
+        "default_direction": "BULLISH",
+        "horizon": "📅 3-7 Days (Pre-Earnings Swing)",
+        "volatility_est": "±4% to ±10%",
+    },
     "Corporate Action & Dividends": {
         "keywords": [
             "bonus issue", "bonus shares", "stock split", "dividend declared", "special dividend",
@@ -168,7 +187,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
     "Miscellaneous Corporate Disclosures": {
         "keywords": [
             "intimation", "regulation 30", "lodr", "exchange disclosure", "commercial production",
-            "operations resume", "plant shutdown", "business update", "clarification on", "investor presentation",
+            "operations resume", "plant shutdown", "clarification on", "investor presentation",
             "general update", "press release", "outcome of board meeting", "submission of disclosure",
             "newspaper publication", "schedule of analyst meet", "transcript of conference call",
             "audio recording of earnings call", "resumption of operations", "temporary disruption",
@@ -286,6 +305,34 @@ def _connect(settings: Settings) -> Any:
             """
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nfr_feed_id_scanned ON news_feed_runs (feed_id, scanned_at DESC)")
+
+        # Corporate Business Update Schedules
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS business_update_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                company_name TEXT,
+                update_type TEXT NOT NULL,
+                frequency TEXT NOT NULL,
+                typical_days_after_period INTEGER DEFAULT 5,
+                last_update_date TEXT,
+                last_update_headline TEXT,
+                last_update_reaction_1d REAL,
+                last_update_reaction_3d REAL,
+                next_expected_window_start TEXT,
+                next_expected_window_end TEXT,
+                confidence_score REAL DEFAULT 0.85,
+                status TEXT DEFAULT 'ANTICIPATED',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(ticker, update_type)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_ticker ON business_update_schedules (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_window ON business_update_schedules (next_expected_window_start, next_expected_window_end)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bus_sched_status ON business_update_schedules (status)")
 
         try:
             existing_cols = set()
@@ -521,6 +568,44 @@ def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
     }
 
 
+def is_business_update_headline(title: str, summary: str = "") -> bool:
+    """Check if a headline/summary represents a corporate operational or business update disclosure."""
+    text = (title + " " + (summary or "")).lower()
+
+    # False positive exclusions: standard board meetings or declared financial results
+    strong_exclusions = [
+        "to consider financial results",
+        "to consider unaudited",
+        "to consider un-audited",
+        "to consider audited",
+        "un-audited financial results",
+        "unaudited financial results",
+        "audited financial results",
+        "board meeting on",
+        "notice of postal ballot",
+        "loss of share certificate",
+        "audio recording of earnings call",
+        "transcript of conference call",
+    ]
+    if any(ex in text for ex in strong_exclusions):
+        return False
+
+    keywords = [
+        "quarterly business update", "business update for q", "business update for the quarter",
+        "business update", "key operational highlights", "operational performance update",
+        "quarterly operating update", "q1 business update", "q2 business update",
+        "q3 business update", "q4 business update", "monthly sales", "production and sales",
+        "production and offtake", "monthly dispatch", "monthly dispatches", "vehicle sales",
+        "jlr wholesales", "sales & dispatches", "sales and dispatches", "quarterly pre-sales",
+        "quarterly bookings", "gross booking value", "collections update", "pre-sales & gross booking",
+        "pre-sales", "gross advances and deposits", "advances and deposits", "casa ratio update",
+        "quarterly loan growth", "disbursements update", "quarterly order inflow", "order book update",
+        "standalone revenue & store count", "store count update", "operational highlights",
+        "gross advances", "deposits update"
+    ]
+    return any(kw in text for kw in keywords)
+
+
 def _generate_why_it_matters(category: str, direction: str, horizon: str, volatility: str, title: str) -> str:
     """Generate concise trading rationale for why the headline can drive short-term price."""
     if category == "Order Wins & Contracts":
@@ -528,6 +613,8 @@ def _generate_why_it_matters(category: str, direction: str, horizon: str, volati
     elif category == "Earnings & Guidance Surprise":
         dir_text = "bullish momentum gap-up" if direction == "BULLISH" else "downward margin compression"
         return f"Fundamental quarter surprise. Expect {dir_text} with heightened volume over {horizon}."
+    elif category == "Business Updates & Operational Disclosures":
+        return f"Key lead indicator ahead of official earnings. Operational disclosures provide immediate alpha ({volatility}) over {horizon}."
     elif category == "Regulatory, Approvals & Policy":
         return f"Regulatory catalyst clears commercial hurdles. Can trigger strong institutional sector accumulation over {horizon}."
     elif category == "M&A, Stake & Expansion":
