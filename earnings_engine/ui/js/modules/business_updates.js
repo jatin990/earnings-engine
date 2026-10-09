@@ -7,6 +7,30 @@
     window.app = window.app || {};
     const app = window.app;
 
+    function escapeHtml(str) {
+        if (!str && str !== 0) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function sanitizeUrl(url) {
+        if (!url) return '#';
+        const clean = String(url).trim();
+        if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('/')) {
+            return clean.replace(/"/g, '%22').replace(/'/g, '%27').replace(/</g, '%3C').replace(/>/g, '%3E');
+        }
+        return '#';
+    }
+
+    function sanitizeTicker(ticker) {
+        if (!ticker) return '';
+        return String(ticker).replace(/[^a-zA-Z0-9._-]/g, '').toUpperCase();
+    }
+
     Object.assign(app, {
         bizUpdatesData: [],
         bizUpdatesStats: {},
@@ -148,18 +172,23 @@
             };
 
             grid.innerHTML = items.map(u => {
-                const ticker = u.ticker || '';
-                const stockName = u.company_name || u.stock_name || ticker;
+                const ticker = sanitizeTicker(u.ticker || '');
+                const rawStockName = u.company_name || u.stock_name || ticker;
+                const stockName = escapeHtml(rawStockName);
                 const isBull = (u.direction || 'BULLISH') === 'BULLISH';
                 const dirColor = isBull ? '#34d399' : '#f87171';
                 const dirBg = isBull ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
                 const dirBorder = isBull ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
                 const dirText = isBull ? '▲ BULLISH' : '▼ BEARISH';
-                const impactScore = u.impact_score || 84;
-                const pubDate = (u.published_at || u.date || '').slice(0, 16).replace('T', ' ');
-                const title = u.title || 'Operational Business Update';
-                const summary = u.summary || u.description || 'Pre-earnings operational metrics, sales volume and capacity utilization update.';
-                const link = u.url || u.link || '#';
+                const impactScore = Number(u.impact_score) || 84;
+                const pubDate = escapeHtml((u.published_at || u.date || '').slice(0, 16).replace('T', ' '));
+                const rawTitle = u.title || 'Operational Business Update';
+                const title = escapeHtml(rawTitle);
+                const summary = escapeHtml(u.summary || u.description || 'Pre-earnings operational metrics, sales volume and capacity utilization update.');
+                const link = sanitizeUrl(u.url || u.link || '#');
+                const encodedTitle = encodeURIComponent(rawTitle);
+                const encodedSummary = encodeURIComponent(u.summary || u.description || '');
+                const updateId = encodeURIComponent(String(u.id || ''));
 
                 return `
                     <div class="card" style="padding:0.75rem 0.95rem;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;flex-direction:column;justify-content:space-between;gap:0.5rem;transition:border-color 0.15s ease;" onmouseover="this.style.borderColor='rgba(59,130,246,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
@@ -167,8 +196,8 @@
                             <!-- Header Row: Stock + Pill + Impact -->
                             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;gap:0.4rem;flex-wrap:wrap;">
                                 <div style="display:flex;align-items:center;gap:0.4rem;">
-                                    <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-size:0.88rem;font-weight:800;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open ${ticker} intelligence page">
-                                        ${ticker} ↗
+                                    <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-size:0.88rem;font-weight:800;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open ${escapeHtml(ticker)} intelligence page">
+                                        ${escapeHtml(ticker)} ↗
                                     </a>
                                     <span style="font-size:0.72rem;color:#94a3b8;font-weight:500;">${stockName}</span>
                                 </div>
@@ -198,7 +227,7 @@
                                 🕒 Disclosed: ${pubDate}
                             </span>
                             <div style="display:flex;gap:0.25rem;align-items:center;">
-                                <button type="button" onclick="app.analyzeNewsWithAI('${encodeURIComponent(title.replace(/'/g, ''))}', '${encodeURIComponent(summary.replace(/'/g, ''))}', '${ticker}', '${u.id || ''}')" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.45rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-weight:600;" title="Run Instant LLM Analysis on this disclosure">
+                                <button type="button" onclick="app.analyzeNewsWithAI('${encodedTitle}', '${encodedSummary}', '${ticker}', '${updateId}')" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.45rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-weight:600;" title="Run Instant LLM Analysis on this disclosure">
                                     <span>🧠</span> Analyze
                                 </button>
                                 <button type="button" onclick="app.openStockDrawer('${ticker}')" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.45rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;" title="Open Stock Forensics Drawer">
@@ -370,18 +399,19 @@
                         </thead>
                         <tbody>
                             ${items.map(s => {
-                                const ticker = s.ticker || '';
-                                const company = s.company_name || ticker;
-                                const winStart = s.next_expected_window_start || '—';
-                                const winEnd = s.next_expected_window_end || '—';
-                                const conf = s.confidence_score ? `${Math.round(s.confidence_score * 100)}%` : '85%';
-                                const typicalDays = s.typical_days_after_period || 5;
+                                const ticker = sanitizeTicker(s.ticker || '');
+                                const company = escapeHtml(s.company_name || ticker);
+                                const winStart = escapeHtml(s.next_expected_window_start || '—');
+                                const winEnd = escapeHtml(s.next_expected_window_end || '—');
+                                const conf = s.confidence_score ? `${Math.round(Number(s.confidence_score) * 100)}%` : '85%';
+                                const typicalDays = Number(s.typical_days_after_period) || 5;
+                                const frequency = escapeHtml(s.frequency || 'QUARTERLY');
 
                                 return `
                                     <tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.12s ease;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                                         <td style="padding:0.45rem 0.6rem;white-space:nowrap;">
-                                            <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-weight:700;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open ${ticker} intelligence page">
-                                                ${ticker} ↗
+                                            <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-weight:700;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open ${escapeHtml(ticker)} intelligence page">
+                                                ${escapeHtml(ticker)} ↗
                                             </a>
                                             <div style="font-size:0.68rem;color:#94a3b8;">${company}</div>
                                         </td>
@@ -389,7 +419,7 @@
                                             ${getTypeBadge(s.update_type)}
                                         </td>
                                         <td style="padding:0.45rem 0.6rem;white-space:nowrap;color:#a1a1aa;font-family:var(--font-mono);font-size:0.7rem;">
-                                            ${s.frequency || 'QUARTERLY'}
+                                            ${frequency}
                                         </td>
                                         <td style="padding:0.45rem 0.6rem;color:#cbd5e1;font-size:0.72rem;">
                                             Day ${typicalDays} after period end
