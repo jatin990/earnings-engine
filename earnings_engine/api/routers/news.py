@@ -13,6 +13,10 @@ from earnings_engine.data.catalysts_news import (
     get_short_term_catalysts,
     scan_watchlist_catalysts,
 )
+from earnings_engine.data.business_updates_scheduler import (
+    get_anticipated_schedules,
+    sync_business_update_schedules_db,
+)
 from earnings_engine.data.news_outcomes import (
     evaluate_all_catalyst_outcomes,
     get_verified_catalyst_outcomes,
@@ -85,6 +89,110 @@ async def get_single_news_catalyst_endpoint(catalyst_id: int):
     except Exception as e:
         logger.exception("Error fetching single catalyst %s: %s", catalyst_id, e)
         raise HTTPException(status_code=500, detail=f"Error fetching catalyst: {str(e)}")
+
+
+@router.get("/api/v1/news/business-updates")
+async def get_business_updates_endpoint(
+    market: str | None = Query(None),
+    watchlist: str | None = Query(None),
+    universe: str | None = Query(None),
+    watchlist_or_universe: str | None = Query(None),
+    direction: str | None = Query(None),
+    search: str | None = Query(None),
+    days: int = Query(30, ge=0, le=365, description="Lookback window in days (7, 14, 30, 90, 0 for all)"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Retrieve corporate business updates, monthly sales, and operational disclosures with KPI metrics."""
+    try:
+        effective_market = watchlist_or_universe or universe or watchlist or market or "ALL"
+        category = "Business Updates & Operational Disclosures"
+
+        items = await asyncio.to_thread(
+            get_short_term_catalysts,
+            watchlist_or_universe=effective_market,
+            category_filter=category,
+            direction_filter=direction,
+            search_query=search,
+            days=days,
+            limit=limit,
+            settings=_settings,
+        )
+
+        # Compute summary KPIs
+        total_count = len(items)
+        bullish_count = sum(1 for it in items if it.get("direction") == "BULLISH")
+        bearish_count = sum(1 for it in items if it.get("direction") == "BEARISH")
+        high_impact_count = sum(1 for it in items if it.get("impact_level") == "HIGH" or (it.get("impact_score") or 0) >= 75)
+
+        returns = [float(it["price_change_pct"]) for it in items if it.get("price_change_pct") is not None]
+        avg_drift = round(sum(returns) / len(returns), 2) if returns else 0.0
+        bullish_bias_pct = round((bullish_count / total_count) * 100, 1) if total_count > 0 else 0.0
+
+        # Anticipated next 7 days count
+        try:
+            scheds = await asyncio.to_thread(get_anticipated_schedules, settings=_settings, days_ahead=7)
+            anticipated_7d = len(scheds)
+        except Exception:
+            anticipated_7d = 0
+
+        stats = {
+            "total_updates": total_count,
+            "bullish_count": bullish_count,
+            "bearish_count": bearish_count,
+            "bullish_bias_pct": bullish_bias_pct,
+            "high_impact_count": high_impact_count,
+            "avg_drift_pct": avg_drift,
+            "anticipated_7d_count": anticipated_7d,
+        }
+
+        return {
+            "success": True,
+            "count": total_count,
+            "updates": items,
+            "stats": stats,
+        }
+    except Exception as e:
+        logger.exception("Error in get_business_updates: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching business updates: {str(e)}")
+
+
+@router.get("/api/v1/news/business-updates/schedules")
+async def get_business_update_schedules_endpoint(
+    status: str | None = Query(None),
+    days_ahead: int = Query(14, ge=1, le=90),
+):
+    """Retrieve predicted operational disclosure schedules and upcoming announcement windows."""
+    try:
+        schedules = await asyncio.to_thread(
+            get_anticipated_schedules,
+            status=status,
+            days_ahead=days_ahead,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "count": len(schedules),
+            "days_ahead": days_ahead,
+            "schedules": schedules,
+        }
+    except Exception as e:
+        logger.exception("Error in get_business_update_schedules: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching update schedules: {str(e)}")
+
+
+@router.post("/api/v1/news/business-updates/sync-schedules")
+async def sync_business_update_schedules_endpoint(request: dict | None = None):
+    """Trigger recalculation and database upsert of anticipated business update schedules."""
+    try:
+        count = await asyncio.to_thread(sync_business_update_schedules_db, settings=_settings)
+        return {
+            "success": True,
+            "synced_count": count,
+            "message": f"Successfully calculated and synchronized {count} business update schedules.",
+        }
+    except Exception as e:
+        logger.exception("Error in sync_business_update_schedules: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error syncing update schedules: {str(e)}")
 
 
 @router.get("/api/v1/news/catalyst-stats")
