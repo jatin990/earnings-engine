@@ -2,7 +2,24 @@
         <div id="tab-catalysts" class="tab-content" style="width: 100%; max-width: 100%;">
 
             <!-- ⚡ Top Operations Control Toolbar -->
-            <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <!-- Left: View Switcher Buttons -->
+                <div style="display: flex; background: #06060a; padding: 0.25rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); gap: 0.25rem; flex-wrap: wrap;">
+                    <button type="button" id="catViewFeedBtn" onclick="app.switchCatalystsSubtab('feed')" class="btn btn-sm" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); font-weight: 700; padding: 0.3rem 0.75rem; font-size: 0.75rem;">
+                        ⚡ Live Catalysts
+                    </button>
+                    <button type="button" id="catViewBizUpdatesBtn" onclick="app.switchCatalystsSubtab('business-updates')" class="btn btn-sm" style="background: transparent; color: #a1a1aa; border: 1px solid transparent; font-weight: 600; padding: 0.3rem 0.75rem; font-size: 0.75rem;">
+                        📋 Business Updates
+                    </button>
+                    <button type="button" id="catViewSchedulesBtn" onclick="app.switchCatalystsSubtab('schedules')" class="btn btn-sm" style="background: transparent; color: #a1a1aa; border: 1px solid transparent; font-weight: 600; padding: 0.3rem 0.75rem; font-size: 0.75rem;">
+                        📅 Anticipated Cadences
+                    </button>
+                    <button type="button" id="catViewOutcomesBtn" onclick="app.switchCatalystsSubtab('outcomes')" class="btn btn-sm" style="background: transparent; color: #a1a1aa; border: 1px solid transparent; font-weight: 600; padding: 0.3rem 0.75rem; font-size: 0.75rem;">
+                        🎯 Trade Outcomes
+                    </button>
+                </div>
+
+                <!-- Right: Watchlist & Actions -->
                 <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                     <select id="catWatchlistSelect" onchange="app.onCatWatchlistChange(this.value)" style="height:30px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-weight:500;outline:none;" title="Select Watchlist / Universe to scan">
                         <option value="GLOBAL" selected>⭐ Active Watchlist</option>
@@ -13,6 +30,7 @@
                         <option value="US">🇺🇸 All US Equities</option>
                     </select>
                     <button type="button" onclick="app.scanCatalystsNow()" id="catScanBtn" class="btn btn-primary btn-sm" style="font-weight:600;"><span>⚡</span> Scan Feeds</button>
+                    <button type="button" onclick="app.syncBusinessUpdateSchedulesNow()" id="catSyncSchedulesBtn" class="btn btn-primary btn-sm" style="font-weight:600;display:none;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);"><span>🔄</span> Recalculate Cadences</button>
                     <button type="button" onclick="app.evaluateNewsOutcomesNow()" id="catEvalOutcomesBtn" class="btn btn-secondary btn-sm" style="font-weight:600;display:none;"><span>🎯</span> Re-Verify Outcomes</button>
                 </div>
             </div>
@@ -175,7 +193,180 @@
                 </section>
             </div>
 
-            <!-- ================= VIEW 2: HISTORICAL OUTCOMES & TRADE METRICS ================= -->
+            <!-- ================= VIEW 2: CORPORATE BUSINESS UPDATES & DISCLOSURES ================= -->
+            <div id="catalystsBizUpdatesView" style="display: none;">
+                <!-- 📋 KPI Summary Cards -->
+                <div id="bizUpdatesKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.65rem;">
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Business Updates</span>
+                            <span style="background:rgba(59,130,246,0.12);color:#60a5fa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:700;">PURE OPERATIONAL</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="bizUpdatesStatTotal">0</strong> <span style="font-size:0.75rem;color:#71717a;font-weight:400;">disclosures</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Excludes formal board meetings</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">High Impact Disclosures</span>
+                            <span style="background:rgba(239,68,68,0.08);color:#f87171;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">≥75%</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f87171;font-family:var(--font-heading);"><strong id="bizUpdatesStatHigh">0</strong> <span style="font-size:0.75rem;color:#fca5a5;font-weight:400;">catalysts</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Major sales / volume surprises</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Sentiment Bias</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Direction</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="bizUpdatesStatBias"><span style="color:#34d399;">0▲</span> / <span style="color:#f87171;">0▼</span></strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Bullish vs Bearish Bias</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Operational Mix</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Sectors</span>
+                        </div>
+                        <div style="font-size:0.95rem;font-weight:700;color:#e4e4e7;font-family:var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong id="bizUpdatesStatSectors">Qtr:0 · Auto:0 · RE:0 · Bank:0</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Sector breakdown</div>
+                    </div>
+                </div>
+
+                <!-- Business Updates Feed Grid Section -->
+                <section class="card" style="padding: 0.65rem 0.85rem; border: 1px solid rgba(255,255,255,0.07); background: #000000; border-radius: 6px;">
+                    <!-- Filter Toolbar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #050505; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; margin-bottom: 0.55rem; flex-wrap: wrap; gap: 0.35rem;">
+                        <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="bizUpdatesSearchInput" oninput="app.filterBusinessUpdates()" placeholder="🔍 Search stock, volume, bookings..." style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#f4f4f5;border:1px solid rgba(255,255,255,0.08);border-radius:4px;min-width:160px;font-family:var(--font-mono);outline:none;">
+                            <select id="bizUpdatesDaysFilter" onchange="app.loadBusinessUpdates(null, this.value)" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;font-weight:500;">
+                                <option value="7">📅 Last 7 Days</option>
+                                <option value="14">📅 Last 14 Days</option>
+                                <option value="30" selected>📅 Last 30 Days</option>
+                                <option value="90">📅 Last 90 Days</option>
+                                <option value="0">🌐 All Time</option>
+                            </select>
+                            <select id="bizUpdatesCategoryFilter" onchange="app.filterBusinessUpdates()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Update Types</option>
+                                <option value="QUARTERLY">📊 Quarterly Business Updates</option>
+                                <option value="MONTHLY">🚗 Auto Monthly Sales</option>
+                                <option value="REALTY">🏢 Realty Bookings & Pre-Sales</option>
+                                <option value="BANKING">🏦 Banking Advances & Deposits</option>
+                            </select>
+                            <select id="bizUpdatesDirectionFilter" onchange="app.filterBusinessUpdates()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Sentiment Bias</option>
+                                <option value="BULLISH">▲ Bullish Bias</option>
+                                <option value="BEARISH">▼ Bearish Bias</option>
+                            </select>
+                            <select id="bizUpdatesSortBy" onchange="app.filterBusinessUpdates()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="recency">🕒 Sort by Date (Newest)</option>
+                                <option value="impact">⚡ Sort by Impact Score</option>
+                                <option value="reaction">📈 Sort by 1D Return</option>
+                            </select>
+                        </div>
+                        <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);" id="bizUpdatesCountBadge">0 updates</div>
+                    </div>
+
+                    <!-- Updates Grid -->
+                    <div id="bizUpdatesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 0.65rem;">
+                        <div class="card" style="text-align:center;padding:2rem 1.5rem;color:var(--muted);background:#050505;border:1px dashed rgba(255,255,255,0.08);border-radius:6px;grid-column: 1 / -1;">
+                            <div style="font-size:1.6rem;margin-bottom:0.4rem;">📋</div>
+                            <h4 style="margin:0 0 0.25rem 0;color:var(--light);font-size:0.95rem;">Corporate Business Updates Ready</h4>
+                            <p style="max-width:480px;margin:0 auto 0.85rem auto;font-size:0.76rem;line-height:1.45;color:var(--text-muted);">
+                                Pure operational disclosures, monthly volume releases, and quarterly business updates.
+                            </p>
+                            <button type="button" onclick="app.loadBusinessUpdates()" class="btn btn-primary btn-sm" style="font-weight:600;padding:0.25rem 0.65rem;font-size:0.74rem;">⚡ Load Updates</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ================= VIEW 3: ANTICIPATED BUSINESS UPDATE SCHEDULES ================= -->
+            <div id="catalystsSchedulesView" style="display: none;">
+                <!-- 📅 KPI Summary Cards -->
+                <div id="schedulesKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.65rem;">
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Due Now (Actionable)</span>
+                            <span style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:700;">RADAR ALERT</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f87171;font-family:var(--font-heading);"><strong id="schedulesStatDueNow">0</strong> <span style="font-size:0.75rem;color:#fca5a5;font-weight:400;">companies</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Expected within next 48-72h</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Anticipated Windows</span>
+                            <span style="background:rgba(59,130,246,0.12);color:#60a5fa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">Upcoming</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#60a5fa;font-family:var(--font-heading);"><strong id="schedulesStatAnticipated">0</strong> <span style="font-size:0.75rem;color:#93c5fd;font-weight:400;">cadences</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Scheduled based on reporting history</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Tracked Cadences</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Universe</span>
+                        </div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="schedulesStatTracked">0</strong> <span style="font-size:0.75rem;color:#71717a;font-weight:400;">patterns</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">NSE autos, realty, jewellers, banks</div>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Active Radar</span>
+                            <span style="background:rgba(16,185,129,0.08);color:#34d399;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">Status</span>
+                        </div>
+                        <div style="font-size:1.05rem;font-weight:700;color:#34d399;font-family:var(--font-heading);"><strong id="schedulesStatAvgReact">0 Active</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Current cycle disclosures</div>
+                    </div>
+                </div>
+
+                <!-- Schedules Table Section -->
+                <section class="card" style="padding: 0.65rem 0.85rem; border: 1px solid rgba(255,255,255,0.07); background: #000000; border-radius: 6px;">
+                    <!-- Filter Toolbar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #050505; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; margin-bottom: 0.55rem; flex-wrap: wrap; gap: 0.35rem;">
+                        <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="schedulesSearchInput" oninput="app.filterBusinessUpdateSchedules()" placeholder="🔍 Search stock or cadence..." style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#f4f4f5;border:1px solid rgba(255,255,255,0.08);border-radius:4px;min-width:160px;font-family:var(--font-mono);outline:none;">
+                            <select id="schedulesDaysFilter" onchange="app.loadBusinessUpdateSchedules(null, this.value)" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;font-weight:500;">
+                                <option value="15">📅 Next 15 Days</option>
+                                <option value="30">📅 Next 30 Days</option>
+                                <option value="60" selected>📅 Next 60 Days</option>
+                                <option value="90">📅 Next 90 Days</option>
+                            </select>
+                            <select id="schedulesTypeFilter" onchange="app.filterBusinessUpdateSchedules()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Cadence Types</option>
+                                <option value="QUARTERLY_UPDATE">📊 Quarterly Business Updates</option>
+                                <option value="MONTHLY_SALES">🚗 Auto Monthly Sales</option>
+                                <option value="REALTY_BOOKINGS">🏢 Realty Bookings & Pre-Sales</option>
+                                <option value="BANKING_ADVANCES">🏦 Banking Advances & Deposits</option>
+                            </select>
+                            <select id="schedulesStatusFilter" onchange="app.filterBusinessUpdateSchedules()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Status</option>
+                                <option value="DUE_NOW">🚨 Due Now (Actionable)</option>
+                                <option value="ANTICIPATED">📅 Anticipated</option>
+                                <option value="OVERDUE">⚠️ Overdue</option>
+                            </select>
+                        </div>
+                        <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);" id="schedulesCountBadge">0 cadences</div>
+                    </div>
+
+                    <!-- Container for Table -->
+                    <div id="bizUpdateSchedulesContainer">
+                        <div class="card" style="text-align:center;padding:2rem 1.5rem;color:var(--muted);background:#050505;border:1px dashed rgba(255,255,255,0.08);border-radius:6px;">
+                            <div style="font-size:1.6rem;margin-bottom:0.4rem;">📅</div>
+                            <h4 style="margin:0 0 0.25rem 0;color:var(--light);font-size:0.95rem;">Anticipated Reporting Cadences Ready</h4>
+                            <p style="max-width:480px;margin:0 auto 0.85rem auto;font-size:0.76rem;line-height:1.45;color:var(--text-muted);">
+                                Historical reporting cycle predictions for auto dispatches, realty pre-sales, and quarterly operational notices.
+                            </p>
+                            <button type="button" onclick="app.loadBusinessUpdateSchedules()" class="btn btn-primary btn-sm" style="font-weight:600;padding:0.25rem 0.65rem;font-size:0.74rem;">📅 Load Cadences</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ================= VIEW 4: HISTORICAL OUTCOMES & TRADE METRICS ================= -->
             <div id="catalystsOutcomesView" style="display: none;">
 
                 <!-- 🎯 Quantitative Trade-Readiness KPI Cards -->

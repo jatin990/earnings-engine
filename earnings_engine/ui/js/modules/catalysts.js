@@ -173,6 +173,8 @@ Object.assign(app, {
                 const subItemMap = {
                     'feed': 'sidebarSubCatFeed',
                     'impact70': 'sidebarSubCatImpact',
+                    'business-updates': 'sidebarSubCatBizUpdates',
+                    'schedules': 'sidebarSubCatSchedules',
                     'outcomes': 'sidebarSubCatOutcomes',
                     'premarket': 'sidebarSubCatPremarket',
                     'premarket-outcomes': 'sidebarSubCatPremarketOutcomes'
@@ -218,6 +220,16 @@ Object.assign(app, {
                         if (!this.catalystsData || !this.catalystsData.length) {
                             this.loadCatalysts();
                         }
+                    } else if (subtab === 'business-updates') {
+                        this.switchCatalystsView('business-updates');
+                        if (!this.bizUpdatesData || !this.bizUpdatesData.length) {
+                            this.loadBusinessUpdates();
+                        }
+                    } else if (subtab === 'schedules') {
+                        this.switchCatalystsView('schedules');
+                        if (!this.bizUpdateSchedulesData || !this.bizUpdateSchedulesData.length) {
+                            this.loadBusinessUpdateSchedules();
+                        }
                     } else if (subtab === 'outcomes') {
                         this.switchCatalystsView('outcomes');
                     }
@@ -243,32 +255,50 @@ Object.assign(app, {
             switchCatalystsView(view) {
                 this.catalystsActiveView = view;
                 const feedView = document.getElementById('catalystsFeedView');
+                const bizUpdatesView = document.getElementById('catalystsBizUpdatesView');
+                const schedulesView = document.getElementById('catalystsSchedulesView');
                 const outcomesView = document.getElementById('catalystsOutcomesView');
+
                 const feedBtn = document.getElementById('catViewFeedBtn');
+                const bizUpdatesBtn = document.getElementById('catViewBizUpdatesBtn');
+                const schedulesBtn = document.getElementById('catViewSchedulesBtn');
                 const outcomesBtn = document.getElementById('catViewOutcomesBtn');
+
                 const scanBtn = document.getElementById('catScanBtn');
+                const syncSchedulesBtn = document.getElementById('catSyncSchedulesBtn');
                 const evalBtn = document.getElementById('catEvalOutcomesBtn');
 
                 if (feedView) feedView.style.display = (view === 'feed') ? 'block' : 'none';
+                if (bizUpdatesView) bizUpdatesView.style.display = (view === 'business-updates') ? 'block' : 'none';
+                if (schedulesView) schedulesView.style.display = (view === 'schedules') ? 'block' : 'none';
                 if (outcomesView) outcomesView.style.display = (view === 'outcomes') ? 'block' : 'none';
 
-                if (feedBtn) {
-                    feedBtn.style.background = (view === 'feed') ? 'rgba(59, 130, 246, 0.2)' : 'transparent';
-                    feedBtn.style.color = (view === 'feed') ? '#60a5fa' : '#a1a1aa';
-                    feedBtn.style.borderColor = (view === 'feed') ? 'rgba(59, 130, 246, 0.35)' : 'transparent';
-                    feedBtn.style.fontWeight = (view === 'feed') ? '700' : '600';
-                }
-                if (outcomesBtn) {
-                    outcomesBtn.style.background = (view === 'outcomes') ? 'rgba(59, 130, 246, 0.2)' : 'transparent';
-                    outcomesBtn.style.color = (view === 'outcomes') ? '#60a5fa' : '#a1a1aa';
-                    outcomesBtn.style.borderColor = (view === 'outcomes') ? 'rgba(59, 130, 246, 0.35)' : 'transparent';
-                    outcomesBtn.style.fontWeight = (view === 'outcomes') ? '700' : '600';
-                }
+                const updateBtnStyle = (btn, isActive) => {
+                    if (!btn) return;
+                    btn.style.background = isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent';
+                    btn.style.color = isActive ? '#60a5fa' : '#a1a1aa';
+                    btn.style.borderColor = isActive ? 'rgba(59, 130, 246, 0.35)' : 'transparent';
+                    btn.style.fontWeight = isActive ? '700' : '600';
+                };
 
-                if (scanBtn) scanBtn.style.display = (view === 'feed') ? 'inline-flex' : 'none';
+                updateBtnStyle(feedBtn, view === 'feed');
+                updateBtnStyle(bizUpdatesBtn, view === 'business-updates');
+                updateBtnStyle(schedulesBtn, view === 'schedules');
+                updateBtnStyle(outcomesBtn, view === 'outcomes');
+
+                if (scanBtn) scanBtn.style.display = (view === 'feed' || view === 'business-updates') ? 'inline-flex' : 'none';
+                if (syncSchedulesBtn) syncSchedulesBtn.style.display = (view === 'schedules') ? 'inline-flex' : 'none';
                 if (evalBtn) evalBtn.style.display = (view === 'outcomes') ? 'inline-flex' : 'none';
 
-                if (view === 'outcomes') {
+                if (view === 'business-updates') {
+                    if (!this.bizUpdatesData || !this.bizUpdatesData.length) {
+                        this.loadBusinessUpdates();
+                    }
+                } else if (view === 'schedules') {
+                    if (!this.bizUpdateSchedulesData || !this.bizUpdateSchedulesData.length) {
+                        this.loadBusinessUpdateSchedules();
+                    }
+                } else if (view === 'outcomes') {
                     this.loadNewsOutcomes();
                 }
             },
