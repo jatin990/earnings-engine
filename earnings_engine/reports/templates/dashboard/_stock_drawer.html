@@ -148,26 +148,107 @@
         </section>
 
         <!-- ======================================================== -->
-        <!-- 2. QUANTUM CHART STUDIO CARD                             -->
+        <!-- 2. QUANTUM CHART STUDIO CARD (NATIVE HIGH-DENSITY ENGINE) -->
         <!-- ======================================================== -->
         <section id="drawerSecChart" class="drawer-card">
             <div class="drawer-card-header">
                 <div class="drawer-card-title">
                     <span class="drawer-card-title-icon">📉</span>
                     <span>Quantum Chart Studio</span>
+                    <span class="drawer-timeframe-badge" id="drawerChartDataStatus">1D OHLCV</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:0.35rem;">
-                    <button type="button" onclick="app.setDrawerChartTF('1D')" class="btn-preset-chip">1D</button>
-                    <button type="button" onclick="app.setDrawerChartTF('1W')" class="btn-preset-chip">1W</button>
-                    <button type="button" onclick="app.setDrawerChartTF('1M')" class="btn-preset-chip">1M</button>
-                    <button type="button" onclick="app.setDrawerChartTF('1Y')" class="btn-preset-chip active">1Y</button>
+                <div class="drawer-chart-header-actions">
+                    <!-- Technical Overlay Toggles -->
+                    <div class="drawer-chart-toggles" role="toolbar" aria-label="Technical Overlays">
+                        <button type="button" id="drawerToggleSMA20" onclick="app.toggleDrawerChartIndicator('sma20')" class="drawer-chart-toggle-btn active" title="20-Day Simple Moving Average (Tactical Momentum)">SMA 20</button>
+                        <button type="button" id="drawerToggleSMA50" onclick="app.toggleDrawerChartIndicator('sma50')" class="drawer-chart-toggle-btn active" title="50-Day Simple Moving Average (Institutional Baseline)">SMA 50</button>
+                        <button type="button" id="drawerToggleSMA200" onclick="app.toggleDrawerChartIndicator('sma200')" class="drawer-chart-toggle-btn active" title="200-Day Simple Moving Average (Primary Regime / Trend Floor)">SMA 200</button>
+                        <button type="button" id="drawerToggleVWAP" onclick="app.toggleDrawerChartIndicator('vwap')" class="drawer-chart-toggle-btn active" title="Volume-Weighted Average Price + 1.5σ Standard Deviation Bands">VWAP ±1.5σ</button>
+                        <button type="button" id="drawerToggleBounds" onclick="app.toggleDrawerChartIndicator('bounds')" class="drawer-chart-toggle-btn active" title="Algorithmic Support & Resistance Execution Bounds">S/R Bounds</button>
+                    </div>
+                    <!-- Timeframe Range Chips -->
+                    <div class="drawer-chart-range-chips" role="group" aria-label="Chart Visible Range">
+                        <button type="button" id="btnDrawerRange1M" onclick="app.setDrawerChartTF('1M')" class="btn-preset-chip" title="1 Month (~22 Trading Sessions)">1M</button>
+                        <button type="button" id="btnDrawerRange3M" onclick="app.setDrawerChartTF('3M')" class="btn-preset-chip" title="3 Months (~65 Trading Sessions)">3M</button>
+                        <button type="button" id="btnDrawerRange6M" onclick="app.setDrawerChartTF('6M')" class="btn-preset-chip" title="6 Months (~130 Trading Sessions)">6M</button>
+                        <button type="button" id="btnDrawerRange1Y" onclick="app.setDrawerChartTF('1Y')" class="btn-preset-chip active" title="1 Year (~252 Trading Sessions)">1Y</button>
+                        <button type="button" id="btnDrawerRangeALL" onclick="app.setDrawerChartTF('ALL')" class="btn-preset-chip" title="All Historical PIT Price Data">ALL</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Chart Container / Embed -->
-            <div id="drawerChartFrameContainer" class="drawer-chart-frame-container" style="background:#05070d;border:1px solid rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;position:relative;">
-                <div id="drawerChartShimmer" class="drawer-shimmer drawer-shimmer-chart" style="position:absolute;inset:0;"></div>
-                <iframe id="drawerChartIframe" src="" style="width:100%;height:100%;border:none;background:transparent;display:block;" onload="document.getElementById('drawerChartShimmer').style.display='none';"></iframe>
+            <!-- Native Chart Container & Crosshair HUD -->
+            <div class="drawer-chart-viewport-wrapper">
+                <!-- Sticky Crosshair Bar HUD -->
+                <div id="drawerChartCrosshairHUD" class="drawer-chart-crosshair-hud">
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">DATE:</span><span id="drawerHudDate" class="drawer-hud-val">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">O:</span><span id="drawerHudOpen" class="drawer-hud-val">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">H:</span><span id="drawerHudHigh" class="drawer-hud-val" style="color:#34d399;">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">L:</span><span id="drawerHudLow" class="drawer-hud-val" style="color:#fb7185;">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">C:</span><span id="drawerHudClose" class="drawer-hud-val">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">VOL:</span><span id="drawerHudVol" class="drawer-hud-val">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">SURGE:</span><span id="drawerHudSurge" class="drawer-hud-val" style="color:#38bdf8;">--</span></div>
+                    <div class="drawer-hud-metric"><span class="drawer-hud-lbl">TR:</span><span id="drawerHudTR" class="drawer-hud-val">--</span></div>
+                </div>
+
+                <!-- Canvas Mount -->
+                <div id="drawerChartFrameContainer" class="drawer-chart-frame-container">
+                    <div id="drawerChartShimmer" class="drawer-shimmer drawer-shimmer-chart"></div>
+                    <div id="drawerNativeChartCanvas" class="drawer-native-chart-canvas"></div>
+                </div>
+            </div>
+
+            <!-- Technical Intelligence & Execution Explainer Cards -->
+            <div id="drawerChartExplainerGrid" class="drawer-chart-explainer-grid">
+                <!-- 1. Trend & Moving Average Alignment -->
+                <div class="drawer-explainer-card">
+                    <div class="drawer-explainer-head">
+                        <span class="drawer-explainer-title">Trend Bias &amp; DMA Alignment</span>
+                        <span id="drawerChartBadgeTrend" class="drawer-tech-pill neutral">--</span>
+                    </div>
+                    <p id="drawerChartExplainerTrend" class="drawer-explainer-text">
+                        Evaluating moving average alignment (SMA 20, 50, 200) to confirm structural trend regime and institutional participation.
+                    </p>
+                    <div class="drawer-explainer-metrics">
+                        <div class="drawer-explainer-stat">
+                            <span>SMA 20 (Tactical):</span>
+                            <strong id="drawerChartValSMA20">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>SMA 50 (Institutional):</span>
+                            <strong id="drawerChartValSMA50">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>SMA 200 (Long-Term):</span>
+                            <strong id="drawerChartValSMA200">--</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Execution Bounds & Range Volatility -->
+                <div class="drawer-explainer-card">
+                    <div class="drawer-explainer-head">
+                        <span class="drawer-explainer-title">Execution Bounds &amp; Volatility</span>
+                        <span id="drawerChartBadgeRSI" class="drawer-tech-pill neutral">RSI --</span>
+                    </div>
+                    <p id="drawerChartExplainerBounds" class="drawer-explainer-text">
+                        Key support floor and overhead resistance ceilings calculated via swing cluster pivots and daily true range.
+                    </p>
+                    <div class="drawer-explainer-metrics">
+                        <div class="drawer-explainer-stat">
+                            <span>Support (S1 Floor):</span>
+                            <strong id="drawerChartValSupport" style="color:#34d399;">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>Resistance (R1 Ceiling):</span>
+                            <strong id="drawerChartValResistance" style="color:#fb7185;">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>ATR 14D (Daily Volatility):</span>
+                            <strong id="drawerChartValATR">--</strong>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 

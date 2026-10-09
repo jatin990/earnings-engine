@@ -28,9 +28,9 @@ def test_stock_page_html_endpoint(client):
     res = client.get("/stock/TCS.NS")
     assert res.status_code == 200
     assert "TCS.NS" in res.text
-    assert "valListingDate" in res.text
-    assert "cardAICommandCenter" in res.text
-    assert "btnFetchNewsDelta" in res.text
+    assert "stockChartCanvas" in res.text
+    assert "btnRunConsensus" in res.text
+    assert "tabContent_consensus" in res.text
 
 
 def test_stock_api_endpoint(client):

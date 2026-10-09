@@ -41,6 +41,29 @@
     app._drawerChartTimeframe = '1Y';
     app._stockDrawerContext = { list: [], currentIndex: -1 };
 
+    // Native Chart State
+    app._drawerChartInstance = null;
+    app._drawerCandleSeries = null;
+    app._drawerVolumeSeries = null;
+    app._drawerSMA20Series = null;
+    app._drawerSMA50Series = null;
+    app._drawerSMA200Series = null;
+    app._drawerVWAPSeries = null;
+    app._drawerVWAPUpperSeries = null;
+    app._drawerVWAPLowerSeries = null;
+    app._drawerSRLines = [];
+    app._drawerChartRecords = [];
+    app._drawerAvgVol20 = 1;
+    app._drawerTechnicalData = null;
+    app._drawerResizeObserver = null;
+    app._drawerToggles = {
+        sma20: true,
+        sma50: true,
+        sma200: true,
+        vwap: true,
+        bounds: true,
+    };
+
     // Formatters
     function formatCurrency(val, currency = '₹') {
         if (val == null || isNaN(val)) return '--';
@@ -285,6 +308,19 @@
             });
         }
 
+        // If chart tab is active, trigger resize to ensure proper canvas layout
+        if ((tabKey === 'chart' || tabKey === 'all') && app._drawerChartInstance) {
+            setTimeout(() => {
+                const container = document.getElementById('drawerNativeChartCanvas');
+                if (container && container.clientWidth > 0 && app._drawerChartInstance) {
+                    app._drawerChartInstance.applyOptions({ width: container.clientWidth });
+                    if (app._drawerChartTimeframe) {
+                        app.setDrawerChartTF(app._drawerChartTimeframe);
+                    }
+                }
+            }, 60);
+        }
+
         const body = document.getElementById('stockDrawerBody');
         if (body) body.scrollTop = 0;
     };
@@ -314,18 +350,19 @@
         if (consLoad) consLoad.style.display = 'none';
         if (consContent) consContent.style.display = 'none';
 
-        // Reset chart shimmer
+        // Reset chart shimmer & crosshair HUD
         const chartShimmer = document.getElementById('drawerChartShimmer');
         if (chartShimmer) chartShimmer.style.display = 'block';
+        ['drawerHudDate', 'drawerHudOpen', 'drawerHudHigh', 'drawerHudLow', 'drawerHudClose', 'drawerHudVol', 'drawerHudSurge', 'drawerHudTR'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '--';
+        });
     };
 
-    // Tier 1: Quote, Technicals, Chart Frame
+    // Tier 1: Quote, Technicals, Native Chart Engine
     app._hydrateTier1 = async function (sym, signal) {
-        // 1. Chart Iframe
-        const chartFrame = document.getElementById('drawerChartIframe');
-        if (chartFrame) {
-            chartFrame.src = `/stock/${encodeURIComponent(sym)}?embed=chart&tf=${app._drawerChartTimeframe}`;
-        }
+        // 1. Initialize & populate Native LightweightCharts Canvas
+        app._initOrUpdateDrawerChart(sym, signal);
 
         // 2. Quote API
         try {
@@ -584,6 +621,18 @@
         setVal('drawerValSMA50', formatCurrency(data.sma_50 || data.dma_50, currSym));
         setVal('drawerValSMA200', formatCurrency(data.sma_200 || data.dma_200, currSym));
         setVal('drawerValTrendBias', data.trend_bias || data.trend || 'NEUTRAL');
+
+        app._drawerTechnicalData = data;
+
+        // Apply S/R price lines to chart canvas if active
+        if (app._drawerCandleSeries && app._drawerToggles && app._drawerToggles.bounds) {
+            app._applyDrawerSRPriceLines(data);
+        }
+
+        // Update Technical Explainer Cards
+        if (app._drawerChartRecords && app._drawerChartRecords.length > 0) {
+            _updateDrawerTechnicalExplainers(app._drawerChartRecords, data);
+        }
 
         const shimmer = document.getElementById('drawerStructureShimmer');
         const content = document.getElementById('drawerStructureContent');
@@ -1063,29 +1112,588 @@
         }
     };
 
-    app.setDrawerChartTF = function (tf) {
-        app._drawerChartTimeframe = tf;
-        const sym = app._currentDrawerTicker;
-        if (!sym) return;
+    // =========================================================================
+    // 4. QUANTUM CHART STUDIO ENGINE & TECHNICAL CALCULATIONS
+    // =========================================================================
 
-        const chartFrame = document.getElementById('drawerChartIframe');
-        const chartShimmer = document.getElementById('drawerChartShimmer');
-        if (chartShimmer) chartShimmer.style.display = 'block';
-        if (chartFrame) {
-            chartFrame.src = `/stock/${encodeURIComponent(sym)}?embed=chart&tf=${tf}`;
+    function calculateSMA(records, period) {
+        const result = [];
+        for (let i = period - 1; i < records.length; i++) {
+            let sum = 0;
+            for (let j = 0; j < period; j++) {
+                sum += records[i - j].close;
+            }
+            result.push({
+                time: records[i].date,
+                value: sum / period,
+            });
+        }
+        return result;
+    }
+
+    function calculateVWAPWithBands(records) {
+        const vwapArr = [];
+        const upperArr = [];
+        const lowerArr = [];
+
+        let cumVol = 0;
+        let cumTypicalVol = 0;
+        const typicalPrices = [];
+
+        records.forEach((r) => {
+            const typical = (r.high + r.low + r.close) / 3;
+            const vol = r.volume || 1;
+            cumVol += vol;
+            cumTypicalVol += typical * vol;
+            typicalPrices.push(typical);
+
+            const vwap = cumTypicalVol / Math.max(1, cumVol);
+
+            // Rolling variance for 20-period standard deviation band
+            const slice = typicalPrices.slice(-20);
+            const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+            const variance = slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / slice.length;
+            const stdDev = Math.sqrt(variance);
+
+            vwapArr.push({ time: r.date, value: vwap });
+            upperArr.push({ time: r.date, value: vwap + 1.5 * stdDev });
+            lowerArr.push({ time: r.date, value: vwap - 1.5 * stdDev });
+        });
+
+        return { vwap: vwapArr, upper: upperArr, lower: lowerArr };
+    }
+
+    function handleDrawerCrosshairMove(param) {
+        if (!param || !param.time || !app._drawerCandleSeries || !param.seriesData) {
+            updateDrawerHudWithLastBar();
+            return;
         }
 
-        document.querySelectorAll('#drawerSecChart .btn-preset-chip').forEach(btn => {
-            if (btn.textContent.trim() === tf) {
+        const candle = param.seriesData.get(app._drawerCandleSeries);
+        if (!candle) {
+            updateDrawerHudWithLastBar();
+            return;
+        }
+
+        const timeStr = typeof param.time === 'string' ? param.time : (window.formatIST ? window.formatIST(param.time, { includeTime: false, includeYear: true, suffix: false }) : String(param.time));
+        renderDrawerHudData(candle, timeStr);
+    }
+
+    function updateDrawerHudWithLastBar() {
+        if (!app._drawerChartRecords || app._drawerChartRecords.length === 0) return;
+        const last = app._drawerChartRecords[app._drawerChartRecords.length - 1];
+        renderDrawerHudData({
+            open: last.open,
+            high: last.high,
+            low: last.low,
+            close: last.close,
+            volume: last.volume,
+        }, last.date);
+    }
+
+    function renderDrawerHudData(candle, timeStr) {
+        const sym = app._currentDrawerTicker || '';
+        const currSym = !sym.endsWith('.NS') ? '$' : '₹';
+
+        const setEl = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        setEl('drawerHudDate', timeStr || '--');
+        setEl('drawerHudOpen', formatCurrency(candle.open, currSym));
+        setEl('drawerHudHigh', formatCurrency(candle.high, currSym));
+        setEl('drawerHudLow', formatCurrency(candle.low, currSym));
+        setEl('drawerHudClose', formatCurrency(candle.close, currSym));
+
+        const tr = (candle.high != null && candle.low != null) ? (candle.high - candle.low) : 0;
+        setEl('drawerHudTR', formatCurrency(tr, currSym));
+
+        let vol = candle.volume;
+        if (vol === undefined && app._drawerChartRecords) {
+            const match = app._drawerChartRecords.find(r => r.date === timeStr);
+            if (match) vol = match.volume;
+        }
+
+        setEl('drawerHudVol', vol != null ? Number(vol).toLocaleString() : '--');
+
+        if (vol && app._drawerAvgVol20 > 0) {
+            const surge = (vol / app._drawerAvgVol20).toFixed(1);
+            setEl('drawerHudSurge', `${surge}x`);
+            const surgeEl = document.getElementById('drawerHudSurge');
+            if (surgeEl) {
+                surgeEl.style.color = Number(surge) >= 2.0 ? '#34d399' : Number(surge) >= 1.2 ? '#38bdf8' : '#8e97a8';
+            }
+        } else {
+            setEl('drawerHudSurge', '--');
+        }
+    }
+
+    app._applyDrawerSRPriceLines = function (data) {
+        if (!app._drawerCandleSeries || !app._drawerToggles || !app._drawerToggles.bounds) return;
+
+        // Clear existing S/R lines
+        if (app._drawerSRLines && app._drawerSRLines.length > 0) {
+            app._drawerSRLines.forEach(line => {
+                try {
+                    app._drawerCandleSeries.removePriceLine(line);
+                } catch (e) {}
+            });
+        }
+        app._drawerSRLines = [];
+
+        const s1 = data.support_level || data.support || data.s1;
+        const r1 = data.resistance_level || data.resistance || data.r1;
+
+        if (s1 != null && !isNaN(Number(s1)) && Number(s1) > 0) {
+            const supportLine = app._drawerCandleSeries.createPriceLine({
+                price: Number(s1),
+                color: '#10b981',
+                lineWidth: 1.5,
+                lineStyle: window.LightweightCharts && window.LightweightCharts.LineStyle ? window.LightweightCharts.LineStyle.Dashed : 1,
+                axisLabelVisible: true,
+                title: 'S1 Floor',
+            });
+            app._drawerSRLines.push(supportLine);
+        }
+
+        if (r1 != null && !isNaN(Number(r1)) && Number(r1) > 0) {
+            const resistLine = app._drawerCandleSeries.createPriceLine({
+                price: Number(r1),
+                color: '#ef4444',
+                lineWidth: 1.5,
+                lineStyle: window.LightweightCharts && window.LightweightCharts.LineStyle ? window.LightweightCharts.LineStyle.Dashed : 1,
+                axisLabelVisible: true,
+                title: 'R1 Ceiling',
+            });
+            app._drawerSRLines.push(resistLine);
+        }
+    };
+
+    function _applyDrawerIndicatorToggles() {
+        if (app._drawerSMA20Series) app._drawerSMA20Series.applyOptions({ visible: !!app._drawerToggles.sma20 });
+        if (app._drawerSMA50Series) app._drawerSMA50Series.applyOptions({ visible: !!app._drawerToggles.sma50 });
+        if (app._drawerSMA200Series) app._drawerSMA200Series.applyOptions({ visible: !!app._drawerToggles.sma200 });
+
+        const showVwap = !!app._drawerToggles.vwap;
+        if (app._drawerVWAPSeries) app._drawerVWAPSeries.applyOptions({ visible: showVwap });
+        if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.applyOptions({ visible: showVwap });
+        if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.applyOptions({ visible: showVwap });
+
+        if (app._drawerCandleSeries) {
+            if (!app._drawerToggles.bounds) {
+                if (app._drawerSRLines && app._drawerSRLines.length > 0) {
+                    app._drawerSRLines.forEach(l => {
+                        try { app._drawerCandleSeries.removePriceLine(l); } catch (e) {}
+                    });
+                    app._drawerSRLines = [];
+                }
+            } else if (app._drawerTechnicalData) {
+                app._applyDrawerSRPriceLines(app._drawerTechnicalData);
+            }
+        }
+    }
+
+    app.toggleDrawerChartIndicator = function (name) {
+        if (!app._drawerToggles) {
+            app._drawerToggles = { sma20: true, sma50: true, sma200: true, vwap: true, bounds: true };
+        }
+        app._drawerToggles[name] = !app._drawerToggles[name];
+
+        const btnMap = {
+            sma20: 'drawerToggleSMA20',
+            sma50: 'drawerToggleSMA50',
+            sma200: 'drawerToggleSMA200',
+            vwap: 'drawerToggleVWAP',
+            bounds: 'drawerToggleBounds',
+        };
+
+        const btn = document.getElementById(btnMap[name]);
+        if (btn) {
+            if (app._drawerToggles[name]) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
             }
+        }
+
+        _applyDrawerIndicatorToggles();
+    };
+
+    app.setDrawerChartTF = function (tf) {
+        app._drawerChartTimeframe = tf;
+        ['1M', '3M', '6M', '1Y', 'ALL'].forEach(r => {
+            const btn = document.getElementById(`btnDrawerRange${r}`);
+            if (btn) {
+                if (r === tf) btn.classList.add('active');
+                else btn.classList.remove('active');
+            }
         });
+
+        if (!app._drawerChartInstance || !app._drawerChartRecords || app._drawerChartRecords.length === 0) return;
+
+        if (tf === 'ALL') {
+            app._drawerChartInstance.timeScale().fitContent();
+            return;
+        }
+
+        const total = app._drawerChartRecords.length;
+        let barsToShow = 252;
+        if (tf === '1M') barsToShow = 22;
+        else if (tf === '3M') barsToShow = 65;
+        else if (tf === '6M') barsToShow = 130;
+        else if (tf === '1Y') barsToShow = 252;
+
+        const fromIdx = Math.max(0, total - barsToShow);
+        const fromDate = app._drawerChartRecords[fromIdx]?.date;
+        const toDate = app._drawerChartRecords[total - 1]?.date;
+
+        if (fromDate && toDate) {
+            app._drawerChartInstance.timeScale().setVisibleRange({
+                from: fromDate,
+                to: toDate,
+            });
+        } else {
+            app._drawerChartInstance.timeScale().fitContent();
+        }
+    };
+
+    function _updateDrawerTechnicalExplainers(records, techData) {
+        if (!records || records.length === 0) return;
+        const sym = app._currentDrawerTicker || '';
+        const currSym = !sym.endsWith('.NS') ? '$' : '₹';
+
+        const lastBar = records[records.length - 1];
+        const lastClose = lastBar.close;
+
+        // Derive or read SMAs
+        const sma20Val = techData?.sma_20 || techData?.dma_20 || calculateSMA(records, 20).slice(-1)[0]?.value;
+        const sma50Val = techData?.sma_50 || techData?.dma_50 || calculateSMA(records, 50).slice(-1)[0]?.value;
+        const sma200Val = techData?.sma_200 || techData?.dma_200 || calculateSMA(records, 200).slice(-1)[0]?.value;
+
+        const setEl = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+
+        setEl('drawerChartValSMA20', formatCurrency(sma20Val, currSym));
+        setEl('drawerChartValSMA50', formatCurrency(sma50Val, currSym));
+        setEl('drawerChartValSMA200', formatCurrency(sma200Val, currSym));
+
+        // Evaluate Regime / Alignment
+        const badgeTrend = document.getElementById('drawerChartBadgeTrend');
+        const textTrend = document.getElementById('drawerChartExplainerTrend');
+
+        if (sma20Val && sma50Val && sma200Val) {
+            if (lastClose > sma20Val && sma20Val > sma50Val && sma50Val > sma200Val) {
+                if (badgeTrend) {
+                    badgeTrend.className = 'drawer-tech-pill bullish';
+                    badgeTrend.textContent = 'BULLISH ALIGNMENT';
+                }
+                if (textTrend) {
+                    textTrend.textContent = `Golden Alignment: Price (${formatCurrency(lastClose, currSym)}) trades above SMA 20, 50, and 200 baselines. Tactical momentum and institutional sponsorship are strongly aligned to the upside.`;
+                }
+            } else if (lastClose > sma50Val && lastClose > sma200Val) {
+                if (badgeTrend) {
+                    badgeTrend.className = 'drawer-tech-pill bullish';
+                    badgeTrend.textContent = 'ACCUMULATION REGIME';
+                }
+                if (textTrend) {
+                    textTrend.textContent = `Constructive Structure: Price (${formatCurrency(lastClose, currSym)}) holds above the 50-day (${formatCurrency(sma50Val, currSym)}) and 200-day (${formatCurrency(sma200Val, currSym)}) institutional floors, indicating sustained accumulation.`;
+                }
+            } else if (lastClose < sma20Val && sma20Val < sma50Val && sma50Val < sma200Val) {
+                if (badgeTrend) {
+                    badgeTrend.className = 'drawer-tech-pill bearish';
+                    badgeTrend.textContent = 'BEARISH ALIGNMENT';
+                }
+                if (textTrend) {
+                    textTrend.textContent = `Downward Alignment: Price trades below declining SMA 20, 50, and 200 baselines. Overhead supply pressure remains dominant across all timeframes.`;
+                }
+            } else if (lastClose < sma50Val) {
+                if (badgeTrend) {
+                    badgeTrend.className = 'drawer-tech-pill bearish';
+                    badgeTrend.textContent = 'DISTRIBUTION / RETEST';
+                }
+                if (textTrend) {
+                    textTrend.textContent = `Institutional Retest: Price (${formatCurrency(lastClose, currSym)}) is trading below the 50 DMA benchmark (${formatCurrency(sma50Val, currSym)}). Monitor for base formation before aggressive exposure.`;
+                }
+            } else {
+                if (badgeTrend) {
+                    badgeTrend.className = 'drawer-tech-pill neutral';
+                    badgeTrend.textContent = 'RANGE CONSOLIDATION';
+                }
+                if (textTrend) {
+                    textTrend.textContent = `Equilibrium Regime: Price is oscillating inside moving average boundaries, indicating contraction and volatility digestion ahead of directional expansion.`;
+                }
+            }
+        }
+
+        // Support, Resistance, ATR, RSI
+        const s1 = techData?.support_level || techData?.support || techData?.s1;
+        const r1 = techData?.resistance_level || techData?.resistance || techData?.r1;
+        const atr = techData?.atr_14 || techData?.atr;
+        const rsi = techData?.rsi_14 || techData?.rsi;
+
+        setEl('drawerChartValSupport', formatCurrency(s1, currSym));
+        setEl('drawerChartValResistance', formatCurrency(r1, currSym));
+        setEl('drawerChartValATR', atr ? `${formatCurrency(atr, currSym)} (~${((atr / lastClose) * 100).toFixed(1)}%)` : '--');
+
+        const badgeRSI = document.getElementById('drawerChartBadgeRSI');
+        const textBounds = document.getElementById('drawerChartExplainerBounds');
+
+        if (rsi != null && !isNaN(Number(rsi))) {
+            const rsiNum = Number(rsi);
+            if (badgeRSI) {
+                if (rsiNum >= 70) {
+                    badgeRSI.className = 'drawer-tech-pill warning';
+                    badgeRSI.textContent = `RSI ${rsiNum.toFixed(1)} · Overbought Surge`;
+                } else if (rsiNum <= 30) {
+                    badgeRSI.className = 'drawer-tech-pill oversold';
+                    badgeRSI.textContent = `RSI ${rsiNum.toFixed(1)} · Oversold Floor`;
+                } else if (rsiNum >= 55) {
+                    badgeRSI.className = 'drawer-tech-pill bullish';
+                    badgeRSI.textContent = `RSI ${rsiNum.toFixed(1)} · Bullish Expansion`;
+                } else {
+                    badgeRSI.className = 'drawer-tech-pill neutral';
+                    badgeRSI.textContent = `RSI ${rsiNum.toFixed(1)} · Neutral Zone`;
+                }
+            }
+        }
+
+        if (textBounds && (s1 || r1 || atr)) {
+            const sText = s1 ? `immediate floor at ${formatCurrency(s1, currSym)}` : 'algorithmic support floor';
+            const rText = r1 ? `resistance barrier at ${formatCurrency(r1, currSym)}` : 'overhead supply ceiling';
+            const atrText = atr ? `Daily expected true range is ${formatCurrency(atr, currSym)}.` : '';
+            textBounds.textContent = `Execution corridor defined by ${sText} and ${rText}. ${atrText}`;
+        }
+    }
+
+    app._initOrUpdateDrawerChart = async function (sym, signal) {
+        const container = document.getElementById('drawerNativeChartCanvas');
+        const shimmer = document.getElementById('drawerChartShimmer');
+        if (shimmer) shimmer.style.display = 'block';
+
+        if (!container || !window.LightweightCharts) {
+            if (shimmer) shimmer.style.display = 'none';
+            return;
+        }
+
+        // Initialize Canvas Instance if not created
+        if (!app._drawerChartInstance) {
+            const chart = window.LightweightCharts.createChart(container, {
+                width: container.clientWidth || 700,
+                height: 480,
+                layout: {
+                    background: { type: 'solid', color: '#050505' },
+                    textColor: '#94a3b8',
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                },
+                crosshair: {
+                    mode: window.LightweightCharts.CrosshairMode ? window.LightweightCharts.CrosshairMode.Normal : 1,
+                    vertLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 2 },
+                    horzLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 2 },
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    autoScale: true,
+                    scaleMargins: { top: 0.08, bottom: 0.16 },
+                },
+                localization: {
+                    locale: 'en-IN',
+                    dateFormat: 'dd MMM yyyy',
+                },
+                timeScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    timeVisible: false,
+                    secondsVisible: false,
+                },
+            });
+
+            // 1. Candlestick Series
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderVisible: false,
+                wickUpColor: '#10b981',
+                wickDownColor: '#ef4444',
+            });
+
+            // 2. Volume Histogram Overlay
+            const volumeSeries = chart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: '', // overlay
+                scaleMargins: { top: 0.82, bottom: 0 },
+            });
+
+            // 3. Moving Averages
+            const sma20Series = chart.addLineSeries({
+                color: '#f59e0b',
+                lineWidth: 1.5,
+                title: 'SMA 20',
+                priceLineVisible: false,
+            });
+
+            const sma50Series = chart.addLineSeries({
+                color: '#38bdf8',
+                lineWidth: 1.5,
+                title: 'SMA 50',
+                priceLineVisible: false,
+            });
+
+            const sma200Series = chart.addLineSeries({
+                color: '#a855f7',
+                lineWidth: 1.5,
+                title: 'SMA 200',
+                priceLineVisible: false,
+            });
+
+            // 4. VWAP & Standard Deviation Bands
+            const vwapSeries = chart.addLineSeries({
+                color: '#06b6d4',
+                lineWidth: 2,
+                title: 'VWAP',
+                priceLineVisible: false,
+            });
+
+            const vwapUpperSeries = chart.addLineSeries({
+                color: 'rgba(6, 182, 212, 0.5)',
+                lineWidth: 1,
+                lineStyle: window.LightweightCharts.LineStyle ? window.LightweightCharts.LineStyle.Dotted : 2,
+                title: 'VWAP +1.5σ',
+                priceLineVisible: false,
+            });
+
+            const vwapLowerSeries = chart.addLineSeries({
+                color: 'rgba(6, 182, 212, 0.5)',
+                lineWidth: 1,
+                lineStyle: window.LightweightCharts.LineStyle ? window.LightweightCharts.LineStyle.Dotted : 2,
+                title: 'VWAP -1.5σ',
+                priceLineVisible: false,
+            });
+
+            app._drawerChartInstance = chart;
+            app._drawerCandleSeries = candleSeries;
+            app._drawerVolumeSeries = volumeSeries;
+            app._drawerSMA20Series = sma20Series;
+            app._drawerSMA50Series = sma50Series;
+            app._drawerSMA200Series = sma200Series;
+            app._drawerVWAPSeries = vwapSeries;
+            app._drawerVWAPUpperSeries = vwapUpperSeries;
+            app._drawerVWAPLowerSeries = vwapLowerSeries;
+
+            chart.subscribeCrosshairMove(handleDrawerCrosshairMove);
+
+            // Responsive Resize Observer
+            if (!app._drawerResizeObserver && window.ResizeObserver) {
+                app._drawerResizeObserver = new ResizeObserver((entries) => {
+                    if (!entries || entries.length === 0 || !app._drawerChartInstance) return;
+                    const { width } = entries[0].contentRect;
+                    if (width > 0) {
+                        app._drawerChartInstance.applyOptions({ width });
+                    }
+                });
+                app._drawerResizeObserver.observe(container);
+            }
+        }
+
+        // Fetch Historical Price Bars
+        try {
+            const cacheKey = `price_history_${sym}`;
+            let records = getCached(cacheKey);
+            if (!records) {
+                const res = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(sym)}`, { signal });
+                if (res.ok) {
+                    records = await res.json();
+                    setCached(cacheKey, records);
+                }
+            }
+
+            if (!records || records.length === 0) {
+                if (shimmer) shimmer.style.display = 'none';
+                return;
+            }
+
+            if (app._currentDrawerTicker !== sym) return;
+
+            app._drawerChartRecords = records;
+
+            // Calculate 20D average volume for surge ratios
+            const recentVols = records.slice(-20).map(r => r.volume || 0);
+            app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+            const candles = [];
+            const volumes = [];
+
+            records.forEach(r => {
+                const itemTime = r.date;
+                candles.push({
+                    time: itemTime,
+                    open: r.open,
+                    high: r.high,
+                    low: r.low,
+                    close: r.close,
+                });
+
+                const isBull = r.close >= r.open;
+                const isSurge = app._drawerAvgVol20 > 0 && r.volume > app._drawerAvgVol20 * 1.8;
+                const volColor = isSurge
+                    ? isBull
+                        ? 'rgba(16, 185, 129, 0.85)'
+                        : 'rgba(239, 68, 68, 0.85)'
+                    : isBull
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : 'rgba(239, 68, 68, 0.35)';
+
+                volumes.push({
+                    time: itemTime,
+                    value: r.volume,
+                    color: volColor,
+                });
+            });
+
+            if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candles);
+            if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumes);
+
+            // Technical Overlays
+            if (app._drawerSMA20Series) app._drawerSMA20Series.setData(calculateSMA(records, 20));
+            if (app._drawerSMA50Series) app._drawerSMA50Series.setData(calculateSMA(records, 50));
+            if (app._drawerSMA200Series) app._drawerSMA200Series.setData(calculateSMA(records, 200));
+
+            // VWAP Bands
+            const vwapData = calculateVWAPWithBands(records);
+            if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(vwapData.vwap);
+            if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(vwapData.upper);
+            if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(vwapData.lower);
+
+            // Apply indicator toggle visibility
+            _applyDrawerIndicatorToggles();
+
+            // Apply S/R Price Lines if technical data exists
+            if (app._drawerTechnicalData) {
+                app._applyDrawerSRPriceLines(app._drawerTechnicalData);
+            }
+
+            if (shimmer) shimmer.style.display = 'none';
+
+            // Set Visible Range & HUD
+            app.setDrawerChartTF(app._drawerChartTimeframe || '1Y');
+            updateDrawerHudWithLastBar();
+
+            // Update Technical Explainer Cards
+            _updateDrawerTechnicalExplainers(records, app._drawerTechnicalData);
+        } catch (err) {
+            if (err.name !== 'AbortError') console.error('[STOCK-DRAWER] Price history chart error:', err);
+            if (shimmer) shimmer.style.display = 'none';
+        }
     };
 
     // =========================================================================
-    // 4. DRAG RESIZER INITIALIZATION
+    // 5. DRAG RESIZER INITIALIZATION
     // =========================================================================
 
     function initDrawerResizer() {
