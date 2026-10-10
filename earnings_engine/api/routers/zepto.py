@@ -1425,12 +1425,11 @@ async def ingest_all_emails_endpoint(
                                             email_parsed_count += 1
 
                                     # Persist granular worker records into zepto_manpower_utilization
-                                    if should_parse_manpower:
-                                        w_records = parsed_met.get("worker_records", [])
-                                        if w_records:
-                                            zepto_db.save_manpower_utilization_batch(w_records, settings=_settings)
-                                            processed_details["manpower_records"] += len(w_records)
-                                            email_parsed_count += len(w_records)
+                                    w_records = parsed_met.get("worker_records", [])
+                                    if w_records and (should_parse_manpower or should_parse_store_metrics):
+                                        zepto_db.save_manpower_utilization_batch(w_records, settings=_settings)
+                                        processed_details["manpower_records"] += len(w_records)
+                                        email_parsed_count += len(w_records)
 
                                     email_parsed_status = "PARSED"
                                 except Exception as e:
