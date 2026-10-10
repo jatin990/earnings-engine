@@ -258,9 +258,9 @@ def build_targeted_gmail_query(month: str | None = None, metric_type: str | None
     elif normalized_metric in ("LOSS", "LOSSES"):
         pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Dispatch Quality" OR "Cycle Count")'
     elif normalized_metric in ("IPP", "MANPOWER_UTILIZATION", "UTILIZATION", "MANPOWER"):
-        pattern_clause = 'subject:("Manpower" OR "Utilization" OR "IPP" OR "Flex" OR "Manpower Plan")'
+        pattern_clause = 'subject:("Manpower" OR "Utilization" OR "IPP" OR "Flex" OR "Manpower Plan" OR "Store Metric Summary" OR "Metrics" OR "Scorecard")'
     elif normalized_metric in ("STORE_METRICS", "SCORECARD", "METRICS", "GMV", "SLA"):
-        pattern_clause = 'subject:("Metrics" OR "Metric" OR "Daily Update" OR "Scorecard")'
+        pattern_clause = 'subject:("Metrics" OR "Metric" OR "Daily Update" OR "Scorecard" OR "Store Metric Summary")'
     else:
         pattern_clause = 'subject:("DQ Loss" OR "Shrinkage" OR "Attendance-report" OR "Attendance" OR "Metrics" OR "Metric" OR "Manpower" OR "Daily Update" OR "Scorecard" OR "Shift Summary" OR "Muster")'
 
@@ -711,40 +711,40 @@ def parse_zepto_manpower_utilization_html(
                 val_mtd = clean_cells[3] if len(clean_cells) >= 4 else ""
                 val_plan = clean_cells[1] if len(clean_cells) >= 2 else ""
 
-                if "packer hc" in row_label:
+                if "packer hc" in row_label or "hc plan" in row_label or "weighted avg" in row_label or "headcount plan" in row_label:
                     metrics_map["packer_plan_hc"] = _clean_num(val_plan)
                     metrics_map["packer_d1_hc"] = _clean_num(val_d1)
                     metrics_map["packer_mtd_hc"] = _clean_num(val_mtd)
                     metrics_map["packer_headcount"] = int(_clean_num(val_d1))
-                elif "delta inc absenteeism" in row_label:
+                elif "delta" in row_label and "absent" in row_label:
                     metrics_map["delta_absenteeism_d1"] = _clean_num(val_d1)
                     metrics_map["delta_absenteeism_mtd"] = _clean_num(val_mtd)
-                elif "flex hc" in row_label and "arbitrage" not in row_label and "extra" not in row_label:
+                elif "flex hc" in row_label and "arbitrage" not in row_label and "extra" not in row_label and "deduction" not in row_label:
                     metrics_map["flex_hc_plan"] = _clean_num(val_plan)
                     metrics_map["flex_hc_d1"] = _clean_num(val_d1)
                     metrics_map["flex_hc_mtd"] = _clean_num(val_mtd)
                     metrics_map["flex_headcount"] = int(_clean_num(val_d1))
-                elif "arbitrage flex hc deduction" in row_label:
+                elif "arbitrage flex hc deduction" in row_label or ("arbitrage" in row_label and "deduction" in row_label):
                     metrics_map["arbitrage_flex_deduction_d1"] = _clean_float(val_d1)
                     metrics_map["arbitrage_flex_deduction_mtd"] = _clean_float(val_mtd)
-                elif "total flex deduction" in row_label:
+                elif "total flex deduction" in row_label or ("flex" in row_label and "deduction" in row_label and "arbitrage" not in row_label and "extra" not in row_label):
                     metrics_map["total_flex_deduction_d1"] = _clean_float(val_d1)
                     metrics_map["total_flex_deduction_mtd"] = _clean_float(val_mtd)
                     metrics_map["flex_deductions"] = _clean_float(val_d1)
-                elif "head-count (si)" in row_label or "headcount (si)" in row_label:
+                elif "head-count (si)" in row_label or "headcount (si)" in row_label or "(si)" in row_label or "shift incharge" in row_label or "shift-incharge" in row_label:
                     metrics_map["si_plan_hc"] = _clean_num(val_plan)
                     metrics_map["si_d1_hc"] = _clean_num(val_d1)
                     metrics_map["si_mtd_hc"] = _clean_num(val_mtd)
                     metrics_map["shift_incharge_count"] = int(_clean_num(val_d1))
-                elif "head-count (security)" in row_label:
+                elif "security" in row_label:
                     metrics_map["security_hc_d1"] = _clean_num(val_d1)
                     metrics_map["security_count"] = int(_clean_num(val_d1))
-                elif "head-count (house keeping)" in row_label:
+                elif "house keeping" in row_label or "housekeeping" in row_label or "hk" in row_label:
                     metrics_map["housekeeping_hc_d1"] = _clean_num(val_d1)
                     metrics_map["housekeeping_count"] = int(_clean_num(val_d1))
-                elif "d-1 ipp" in row_label or "d1 ipp" in row_label:
+                elif "d-1 ipp" in row_label or "d1 ipp" in row_label or ("d-1" in row_label and "ipp" in row_label):
                     metrics_map["d1_ipp"] = _clean_float(val_d1)
-                elif "mtd ipp" in row_label:
+                elif "mtd ipp" in row_label or ("mtd" in row_label and "ipp" in row_label):
                     metrics_map["mtd_ipp"] = _clean_float(val_mtd if val_mtd else val_d1)
 
     result = {

@@ -314,6 +314,89 @@ def test_hidden_staff_resigned_and_excluded_from_operational_queries():
     assert hidden_emp["status"] == "RESIGNED"
 
 
+def test_resigned_or_hidden_staff_excluded_from_watchlist_and_roster():
+    """Verify that resigned or hidden employees (with high absence counts) never appear in Absenteeism Watchlist or Active Staff Roster."""
+    import uuid
+    from earnings_engine.data import zepto_db
+
+    uid = uuid.uuid4().hex[:6]
+    emp_resigned_id = f"test_resigned_{uid}"
+    emp_resigned_name = f"Resigned Staff {uid}"
+
+    emp_hidden_id = f"test_hidden_only_{uid}"
+    emp_hidden_name = f"Hidden Only Staff {uid}"
+
+    # 1. Create employee with explicit status = 'RESIGNED'
+    zepto_db.create_employee({
+        "id": emp_resigned_id,
+        "name": emp_resigned_name,
+        "role": "PACKER",
+        "status": "RESIGNED",
+    })
+
+    # 2. Create employee with is_hidden = 1
+    zepto_db.create_employee({
+        "id": emp_hidden_id,
+        "name": emp_hidden_name,
+        "role": "PICKER",
+        "status": "ACTIVE",
+    })
+    zepto_db.toggle_employee_visibility(emp_hidden_id, is_hidden=True)
+
+    # 3. Add multiple ABSENT shifts for both to qualify for high risk / critical Absenteeism Watchlist
+    records = []
+    for day in range(1, 8):
+        records.append({
+            "employee_id": emp_resigned_id,
+            "employee_name": emp_resigned_name,
+            "designation": "Packer",
+            "shift_date": f"2026-09-0{day}",
+            "status": "ABSENT",
+            "work_duration_mins": 0,
+        })
+        records.append({
+            "employee_id": emp_hidden_id,
+            "employee_name": emp_hidden_name,
+            "designation": "Picker",
+            "shift_date": f"2026-09-0{day}",
+            "status": "ABSENT",
+            "work_duration_mins": 0,
+        })
+
+    zepto_db.save_attendance_batch({
+        "store_name": "JMU-Sainik Colony",
+        "file_name": f"test_resigned_watchlist_{uid}.xlsx",
+        "records": records,
+    })
+
+    summary = zepto_db.get_attendance_summary(store_name="JMU-Sainik Colony")
+
+    # Assert neither employee appears in Absenteeism & Churn Risk Watchlist
+    watchlist_ids = [w["employee_id"] for w in summary["absenteeism_watchlist"]]
+    watchlist_names = [w["employee_name"] for w in summary["absenteeism_watchlist"]]
+    assert emp_resigned_id not in watchlist_ids
+    assert emp_resigned_name not in watchlist_names
+    assert emp_hidden_id not in watchlist_ids
+    assert emp_hidden_name not in watchlist_names
+
+    # Assert neither employee appears in Active Staff Attendance & Work Log (staff_roster)
+    roster_ids = [s["employee_id"] for s in summary["staff_roster"]]
+    roster_names = [s["employee_name"] for s in summary["staff_roster"]]
+    assert emp_resigned_id not in roster_ids
+    assert emp_resigned_name not in roster_names
+    assert emp_hidden_id not in roster_ids
+    assert emp_hidden_name not in roster_names
+
+    # Assert neither employee appears in daily records
+    daily_records = zepto_db.get_attendance_records(store_name="JMU-Sainik Colony")
+    record_emp_ids = [r["employee_id"] for r in daily_records]
+    record_emp_names = [r["employee_name"] for r in daily_records]
+    assert emp_resigned_id not in record_emp_ids
+    assert emp_resigned_name not in record_emp_names
+    assert emp_hidden_id not in record_emp_ids
+    assert emp_hidden_name not in record_emp_names
+
+
 def test_picker_summary_and_punch_timing_metrics():
     """Test picker role segmentation, MTD whole month averages, and shift duration calculations."""
     import uuid

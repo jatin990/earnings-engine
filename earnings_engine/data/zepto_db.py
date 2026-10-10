@@ -2977,7 +2977,17 @@ def get_attendance_summary(
 
     where_clauses = [
         "1=1",
-        "(employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+        """(
+            (employee_id IS NULL OR TRIM(employee_id) = '' OR LOWER(TRIM(employee_id)) NOT IN (
+                SELECT LOWER(TRIM(id)) FROM zepto_employees
+                WHERE id IS NOT NULL AND TRIM(id) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+            ))
+            AND
+            (employee_name IS NULL OR TRIM(employee_name) = '' OR LOWER(TRIM(employee_name)) NOT IN (
+                SELECT LOWER(TRIM(name)) FROM zepto_employees
+                WHERE name IS NOT NULL AND TRIM(name) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+            ))
+        )"""
     ]
     params: list[Any] = []
 
@@ -3205,6 +3215,25 @@ def get_attendance_summary(
             "si_attendance_rate_pct": round((si_present / (si_present + si_absent)) * 100.0, 1) if (si_present + si_absent) > 0 else 100.0,
         }
 
+        # Fetch employee master records for base salary and metadata mapping
+        emp_rows = conn.execute("SELECT id, name, role, status, is_hidden, joining_date, base_salary_monthly FROM zepto_employees").fetchall()
+        emp_info_map = {}
+        resigned_or_hidden_keys = set()
+        for er in emp_rows:
+            is_inactive = bool(er["is_hidden"] == 1 or str(er["status"] or "").strip().upper() in ("RESIGNED", "TERMINATED", "LEFT", "INACTIVE"))
+            if er["id"]:
+                clean_id = str(er["id"]).strip()
+                emp_info_map[clean_id.lower()] = er
+                emp_info_map[clean_id] = er
+                if is_inactive:
+                    resigned_or_hidden_keys.add(clean_id.lower())
+            if er["name"]:
+                clean_name = str(er["name"]).strip()
+                emp_info_map[clean_name.lower()] = er
+                emp_info_map[clean_name] = er
+                if is_inactive:
+                    resigned_or_hidden_keys.add(clean_name.lower())
+
         # Absenteeism Watchlist (employees with absences >= 2 or high absence rate)
         emp_absent_rows = conn.execute(
             f"""
@@ -3229,6 +3258,10 @@ def get_attendance_summary(
 
         absenteeism_watchlist = []
         for ea in emp_absent_rows:
+            eid_str = str(ea["employee_id"] or "").strip().lower()
+            ename_str = str(ea["employee_name"] or "").strip().lower()
+            if (eid_str and eid_str in resigned_or_hidden_keys) or (ename_str and ename_str in resigned_or_hidden_keys):
+                continue
             e_denom = (ea["present_count"] or 0) + (ea["absent_count"] or 0) + (ea["half_day_count"] or 0)
             e_rate = round((((ea["present_count"] or 0) + 0.5 * (ea["half_day_count"] or 0)) / e_denom) * 100.0, 1) if e_denom > 0 else 0.0
             abs_count = ea["absent_count"] or 0
@@ -3302,17 +3335,6 @@ def get_attendance_summary(
             params,
         ).fetchall()
 
-        # Fetch employee master records for base salary and metadata mapping
-        emp_rows = conn.execute("SELECT id, name, role, status, joining_date, base_salary_monthly FROM zepto_employees").fetchall()
-        emp_info_map = {}
-        for er in emp_rows:
-            if er["id"]:
-                emp_info_map[str(er["id"]).strip().lower()] = er
-                emp_info_map[str(er["id"]).strip()] = er
-            if er["name"]:
-                emp_info_map[str(er["name"]).strip().lower()] = er
-                emp_info_map[str(er["name"]).strip()] = er
-
         days_in_m = 30
         if year_month and year_month.upper() != "ALL" and len(year_month) >= 7:
             try:
@@ -3323,6 +3345,10 @@ def get_attendance_summary(
 
         staff_roster = []
         for s in staff_summary_rows:
+            emp_key_id = str(s["employee_id"] or "").strip().lower()
+            emp_key_name = str(s["employee_name"] or "").strip().lower()
+            if (emp_key_id and emp_key_id in resigned_or_hidden_keys) or (emp_key_name and emp_key_name in resigned_or_hidden_keys):
+                continue
             s_denom = (s["present_count"] or 0) + (s["absent_count"] or 0) + (s["half_day_count"] or 0)
             s_rate = round((((s["present_count"] or 0) + 0.5 * (s["half_day_count"] or 0)) / s_denom) * 100.0, 1) if s_denom > 0 else 0.0
             s_pres = s["present_count"] or 0
@@ -3454,7 +3480,17 @@ def get_attendance_records(
 
     where_clauses = [
         "1=1",
-        "(zar.employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED') AND zar.employee_name NOT IN (SELECT name FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED'))"
+        """(
+            (zar.employee_id IS NULL OR TRIM(zar.employee_id) = '' OR LOWER(TRIM(zar.employee_id)) NOT IN (
+                SELECT LOWER(TRIM(id)) FROM zepto_employees
+                WHERE id IS NOT NULL AND TRIM(id) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+            ))
+            AND
+            (zar.employee_name IS NULL OR TRIM(zar.employee_name) = '' OR LOWER(TRIM(zar.employee_name)) NOT IN (
+                SELECT LOWER(TRIM(name)) FROM zepto_employees
+                WHERE name IS NOT NULL AND TRIM(name) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+            ))
+        )"""
     ]
     params: list[Any] = []
 
@@ -5438,7 +5474,17 @@ def get_zepto_dashboard_analytics(
                     COALESCE(SUM(work_duration_mins), 0) AS total_work_mins
                 FROM zepto_attendance_records
                 WHERE substr(shift_date, 1, 7) = ?
-                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                  AND (
+                      (employee_id IS NULL OR TRIM(employee_id) = '' OR LOWER(TRIM(employee_id)) NOT IN (
+                          SELECT LOWER(TRIM(id)) FROM zepto_employees
+                          WHERE id IS NOT NULL AND TRIM(id) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+                      ))
+                      AND
+                      (employee_name IS NULL OR TRIM(employee_name) = '' OR LOWER(TRIM(employee_name)) NOT IN (
+                          SELECT LOWER(TRIM(name)) FROM zepto_employees
+                          WHERE name IS NOT NULL AND TRIM(name) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+                      ))
+                  )
                 """,
                 (ym,),
             ).fetchone()
@@ -5553,7 +5599,17 @@ def get_zepto_dashboard_analytics(
                     COALESCE(SUM(work_duration_mins), 0) AS total_mins
                 FROM zepto_attendance_records
                 WHERE shift_date = ?
-                  AND employee_id NOT IN (SELECT id FROM zepto_employees WHERE is_hidden = 1 OR status = 'RESIGNED')
+                  AND (
+                      (employee_id IS NULL OR TRIM(employee_id) = '' OR LOWER(TRIM(employee_id)) NOT IN (
+                          SELECT LOWER(TRIM(id)) FROM zepto_employees
+                          WHERE id IS NOT NULL AND TRIM(id) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+                      ))
+                      AND
+                      (employee_name IS NULL OR TRIM(employee_name) = '' OR LOWER(TRIM(employee_name)) NOT IN (
+                          SELECT LOWER(TRIM(name)) FROM zepto_employees
+                          WHERE name IS NOT NULL AND TRIM(name) != '' AND (is_hidden = 1 OR UPPER(TRIM(COALESCE(status, ''))) IN ('RESIGNED', 'TERMINATED', 'LEFT', 'INACTIVE'))
+                      ))
+                  )
                 """,
                 (dt,),
             ).fetchone()
