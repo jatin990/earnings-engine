@@ -20,7 +20,7 @@ import requests
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.nse_api import _get_session, fetch_event_calendar
-from earnings_engine.data.prices import load_prices_batch
+from earnings_engine.data.prices import fetch_batch_live_quotes, load_prices_batch
 
 logger = logging.getLogger("earnings_engine.data.morning_setups")
 
@@ -172,6 +172,63 @@ def enrich_tickers_with_technicals(
             results[t] = base_record
 
     return results
+
+
+def enrich_grouped_deals_with_live_quotes(
+    grouped_deals: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Merge current/live market quotes into already-grouped deal records.
+
+    For each group, attach the live quote fields (current_price, day_change_pct,
+    is_live) and a `vs_deal_vwap_pct` that expresses where the live price sits
+    relative to the group's executed VWAP. Uses the batched live-quote path with
+    DB-first TTL caching, slowing to the cached/settled close on non-market hours
+    rather than fabricating data.
+
+    Anti-fabrication: if no quote could be resolved, fields are left as None /
+    is_live False and the group's existing technicals still stand.
+    """
+    settings = settings or Settings()
+    if not grouped_deals:
+        return []
+
+    tickers = list(dict.fromkeys([g.get("ticker") for g in grouped_deals if g.get("ticker")]))
+    if not tickers:
+        return grouped_deals
+
+    try:
+        quotes = fetch_batch_live_quotes(tickers, settings=settings)
+    except Exception as e:
+        logger.error("[MORNING-SETUPS] Failed to fetch live quotes for grouped deals: %s", e)
+        quotes = {}
+
+    enriched: list[dict[str, Any]] = []
+    for g in grouped_deals:
+        g_out = dict(g)
+        t = g.get("ticker")
+        quote = quotes.get(t) if t else None
+
+        live_price = None
+        if quote:
+            try:
+                live_price = float(quote.get("current_price") or 0) or None
+            except (TypeError, ValueError):
+                live_price = None
+
+        vs_vwap = None
+        vwap = float(g.get("vwap") or 0)
+        if live_price is not None and live_price > 0 and vwap > 0:
+            vs_vwap = round(((live_price / vwap) - 1.0) * 100.0, 2)
+
+        g_out["live_price"] = live_price
+        g_out["live_day_change_pct"] = quote.get("day_change_pct") if quote else None
+        g_out["live_is_live"] = bool(quote.get("is_live")) if quote else False
+        g_out["live_last_updated"] = quote.get("last_updated") if quote else None
+        g_out["vs_deal_vwap_pct"] = vs_vwap
+        enriched.append(g_out)
+
+    return enriched
 
 
 def parse_date_to_iso(dt_str: str | None) -> str:

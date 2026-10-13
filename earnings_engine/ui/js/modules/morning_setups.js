@@ -145,6 +145,41 @@
             </div>`;
         },
 
+        renderLivePriceCell(g) {
+            const live = g.live_price;
+            const liveFmt = (live !== null && live !== undefined)
+                ? Number(live).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : null;
+
+            const isLive = Boolean(g.live_is_live);
+            const dotColor = isLive ? '#34d399' : '#94a3b8';
+            const dotTitle = isLive ? 'Live quote' : 'Settled / cached close';
+
+            const vs = g.vs_deal_vwap_pct;
+            let vsBadge = `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.68rem;">--</span>`;
+            if (vs !== null && vs !== undefined) {
+                const v = Number(vs);
+                const col = v > 0 ? '#34d399' : (v < 0 ? '#f87171' : '#94a3b8');
+                const prefix = v > 0 ? '+' : (v < 0 ? '-' : '');
+                vsBadge = `<span style="color:${col};font-weight:700;">${prefix}${Math.abs(v).toFixed(2)}%</span>`;
+            }
+
+            if (liveFmt === null) {
+                return `<div style="font-family:var(--font-mono);font-size:0.68rem;color:#64748b;">Live --</div>`;
+            }
+
+            return `
+            <div style="display:flex;flex-direction:column;gap:0.12rem;font-family:var(--font-mono);white-space:nowrap;">
+                <div style="display:flex;align-items:center;gap:0.32rem;">
+                    <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;" title="${dotTitle}"></span>
+                    <span style="color:#f8fafc;font-weight:700;font-size:0.72rem;">&#8377;${liveFmt}</span>
+                </div>
+                <div style="font-size:0.65rem;color:#94a3b8;">
+                    vs VWAP: ${vsBadge}
+                </div>
+            </div>`;
+        },
+
         // ---------------------------------------------------------------------
         // Block & Bulk Deals Handlers
         // ---------------------------------------------------------------------
@@ -272,6 +307,7 @@
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Total Qty</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">VWAP</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Total Turnover</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Live Price vs VWAP</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
@@ -374,7 +410,7 @@
             if (!tbody) return;
 
             if (!groupedDeals || groupedDeals.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🗂️</div><div>No grouped deal records found for the selected filters.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🗂️</div><div>No grouped deal records found for the selected filters.</div></td></tr>`;
                 return;
             }
 
@@ -461,6 +497,9 @@
                         ₹${totalValFmt} Cr
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderLivePriceCell(g)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
                         ${this.renderReturnsBadges(tech)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
@@ -473,7 +512,7 @@
                     </td>
                 </tr>
                 <tr id="prints-accordion-${idx}" style="display: none; background: rgba(6, 6, 10, 0.7);">
-                    <td colspan="11" style="padding: 0.6rem 1rem 0.8rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <td colspan="12" style="padding: 0.6rem 1rem 0.8rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
                         <div style="font-size: 0.67rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.35rem; font-family: var(--font-mono);">
                             Executed Prints for ${cleanSym} (${prints.length} Transactions)
                         </div>

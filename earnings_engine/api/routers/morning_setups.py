@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from earnings_engine.config import Settings
 from earnings_engine.data.morning_setups import (
+    enrich_grouped_deals_with_live_quotes,
     enrich_tickers_with_technicals,
     get_board_meetings_summary,
     get_morning_block_deals,
@@ -72,6 +73,7 @@ def list_morning_deals_endpoint(
     min_value_cr: Optional[float] = Query(None, ge=0.0, description="Minimum deal value in ₹ Crores (e.g., 5.0, 10.0, 50.0)"),
     group_by_symbol: bool = Query(False, description="Group and aggregate deals by symbol"),
     include_technicals: bool = Query(True, description="Enrich with 1D/7D/30D returns and 20/50 DMA"),
+    include_live_quotes: bool = Query(True, description="When grouping, merge current/live market prices and vs-VWAP positioning"),
     limit: int = Query(200, ge=1, le=1000, description="Max records to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -99,12 +101,15 @@ def list_morning_deals_endpoint(
 
         if group_by_symbol:
             grouped = group_deals_by_symbol(deals)
+            if include_live_quotes:
+                grouped = enrich_grouped_deals_with_live_quotes(grouped, settings=_settings)
             return {
                 "status": "success",
                 "count": len(grouped),
                 "deals": grouped,
                 "grouped": True,
                 "technicals": technicals,
+                "live_quotes": include_live_quotes,
             }
 
         return {
