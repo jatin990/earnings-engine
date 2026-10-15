@@ -309,6 +309,7 @@ def get_results_report_components(
     market: str | None = None,
     past_days: int = 0,
     start_date: str | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Build report-style HTML fragments for the dashboard Results tab.
 
@@ -331,7 +332,7 @@ def get_results_report_components(
     except (TypeError, ValueError):
         past_days = 0
 
-    settings = _settings()
+    settings = settings or _settings()
     tickers = _resolve_tickers(market)
     if not tickers:
         return {"success": False, "error": "No tickers", "day_legend": "", "day_sections": "", "popups": ""}
@@ -383,21 +384,22 @@ def get_month_filter_report_components(
     market: str | None = None,
     past_days: int = 60,
     force_sync: bool = False,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Get precalculated Month Filter report components with present-day delta sync."""
-    settings = _settings()
-    
+    settings = settings or _settings()
+
     # Always ensure present-day earnings calendar is synced
     fetch_rec = earnings_mod.sync_present_day_earnings_delta(settings, force=force_sync)
 
     cache_key = f"month_filter_{market or 'ALL'}_{past_days}_{days}"
     if not force_sync:
         cached = earnings_mod.get_cached_month_filter(settings, cache_key)
-        if cached:
+        if cached and "sections" in cached:
             cached["fetch_record"] = fetch_rec
             return cached
 
-    fragments = get_results_report_components(days=days, market=market, past_days=past_days)
+    fragments = get_results_report_components(days=days, market=market, past_days=past_days, settings=settings)
     if fragments.get("success"):
         fragments["fetch_record"] = fetch_rec
         earnings_mod.set_cached_month_filter(settings, cache_key, fragments)

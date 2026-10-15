@@ -96,6 +96,16 @@ def test_hierarchy_date_cap_industry_fragments():
     fragments = build_upcoming_results_fragments(df, on_demand=True)
     assert fragments["total_stocks"] == 3
     assert len(fragments["day_sections_list"]) == 1
+    assert "sections" in fragments
+    assert len(fragments["sections"]) == 1
+    sec = fragments["sections"][0]
+    assert sec["date"] == "2026-08-25"
+    assert len(sec["stocks"]) == 3
+    for s in sec["stocks"]:
+        assert "ticker" in s
+        assert "industry" in s
+        assert "cap_tier" in s
+        assert "row_html" in s
 
     section_html = fragments["day_sections_list"][0]
     assert "2026-08-25" in section_html
@@ -112,3 +122,35 @@ def test_month_filter_api_endpoint(test_settings):
     data = response.json()
     assert "fetch_record" in data
     assert "day_sections_list" in data
+    assert "sections" in data
+
+
+def test_stale_cache_without_sections_bypassed(test_settings, monkeypatch):
+    """Test that cache entries missing the 'sections' key are rejected."""
+    from earnings_engine.api.dashboard_api import get_month_filter_report_components
+    from earnings_engine.data import earnings as earnings_mod
+
+    cache_key = "month_filter_TEST_10_10"
+    # Populate cache with old schema lacking "sections"
+    stale_payload = {
+        "success": True,
+        "day_sections_list": ["<div>dummy</div>"],
+        "months": [],
+    }
+    earnings_mod.set_cached_month_filter(test_settings, cache_key, stale_payload)
+
+    # Mock get_results_report_components to verify it gets called because stale cache was ignored
+    called = []
+    def mock_results(days=10, market="TEST", past_days=10, settings=None, **kwargs):
+        called.append(True)
+        return {
+            "success": True,
+            "sections": [{"date": "2026-10-15", "stocks": []}],
+            "months": [],
+        }
+
+    monkeypatch.setattr("earnings_engine.api.dashboard_api.get_results_report_components", mock_results)
+
+    result = get_month_filter_report_components(days=10, market="TEST", past_days=10, settings=test_settings)
+    assert called == [True]
+    assert "sections" in result

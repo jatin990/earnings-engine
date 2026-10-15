@@ -55,8 +55,8 @@ class DataProviderManager:
                     logger.info("[PROVIDER-SUCCESS] Fetched %d rows from '%s' for %s", len(df), preferred_provider, ticker)
                     return df
 
-        # 2. For Indian equities: try NSE Direct first
-        if mkt == "IN":
+        # 2. For Indian equities: try NSE Direct first (skip for BSE .BO tickers)
+        if mkt == "IN" and not ticker.upper().endswith(".BO"):
             nse_prov = self._providers["nse_direct"]
             if nse_prov.is_available:
                 logger.info("[PROVIDER-ROUTE] [NSE-Direct] Querying official NSE archives (nselib / jugaad-data) for %s...", ticker)
@@ -82,7 +82,7 @@ class DataProviderManager:
     def fetch_quote(self, ticker: str) -> dict[str, Any]:
         """Fetch latest price snapshot with fallback."""
         mkt = market_of(ticker)
-        if mkt == "IN":
+        if mkt == "IN" and not ticker.upper().endswith(".BO"):
             nse_prov = self._providers["nse_direct"]
             if nse_prov.is_available:
                 logger.info("[PROVIDER-QUOTE] [NSE-Direct] Fetching real-time quote for %s...", ticker)

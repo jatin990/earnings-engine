@@ -1947,7 +1947,7 @@ def fetch_batch_live_quotes(
 
             def _worker(t: str) -> tuple[str, dict[str, Any]]:
                 return t, fetch_live_quote(
-                    t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes, silent=True
+                    t, settings=settings, sync_db=sync_db, force=force, ttl_minutes=ttl_minutes, silent=True
                 )
 
             with ThreadPoolExecutor(max_workers=min(max_workers, len(missing_tickers))) as executor:

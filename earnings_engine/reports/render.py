@@ -1128,8 +1128,10 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             surp_c = "#34d399" if surp_f > 0 else ("#f87171" if surp_f < 0 else "#94a3b8")
             surp_txt = f"{'+' if surp_f > 0 else ''}{surp_f:.1f}%"
             surp_badge = f' <span style="font-size:0.62rem;color:{surp_c};font-weight:700;">({surp_txt})</span>'
+            eps_surprise_pct = f'<span style="color:{surp_c};font-weight:600;">{surp_txt}</span>'
         else:
             surp_badge = ""
+            eps_surprise_pct = '<span style="color:#64748b;">—</span>'
 
         eps_estimates_html = (
             f'<div style="display:flex;flex-direction:column;gap:0.1rem;" title="Consensus EPS Estimate: {eps_estimate} | Reported EPS: {eps_reported} | Surprise: {surprise_pct}">'
@@ -1223,10 +1225,35 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             ind_val = None
         industry_name = ind_val or row.get("industry") or row.get("sector") or "General / Multi-Sector"
 
+        # Relative date plain text for section header
+        day_rel_str = ""
+        if pd.notna(ed_val):
+            try:
+                days_diff = (pd.Timestamp(ed_val).normalize() - pd.Timestamp.today().normalize()).days
+                if days_diff == 0:
+                    day_rel_str = "Today"
+                elif days_diff == 1:
+                    day_rel_str = "Tomorrow"
+                elif days_diff > 1:
+                    day_rel_str = f"In {days_diff}d"
+                elif days_diff == -1:
+                    day_rel_str = "Yesterday"
+                else:
+                    day_rel_str = f"{abs(days_diff)}d ago"
+            except Exception:
+                day_rel_str = ""
+
+        try:
+            day_label_str = pd.Timestamp(earnings_text).strftime("%A, %b %d, %Y")
+        except Exception:
+            day_label_str = earnings_text
+
         row_values = {
             "ticker": ticker,
+            "date": earnings_text,
             "cap_tier": cap_tier,
             "industry": html.escape(str(industry_name)),
+            "technical_setup_label": html.escape(ts_label),
             "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
             "company_name": company_name,
             "result_sequence_badge_html": full_badges,
@@ -1241,8 +1268,10 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "seven_day_return": seven_day_return,
             "thirty_day_return": thirty_day_return,
             "eps_estimates_html": eps_estimates_html,
+            "eps_surprise_pct": eps_surprise_pct,
             "past_results_html": past_results_html,
             "returns_consolidated_html": returns_consolidated_html,
+            "ai_edge_score": consensus_badge,
             "technical_setup_badge_html": technical_setup_badge_html,
             "rel_vol_html": rel_vol_html,
             "rel_vol_plain": rel_vol_plain,
@@ -1284,8 +1313,17 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 "large_popups": [],
                 "small_by_ind": {},
                 "small_popups": [],
+                "stocks": [],
+                "day_label": day_label_str,
+                "day_relative": day_rel_str,
             }
         group = day_groups[earnings_text]
+        group["stocks"].append({
+            "ticker": ticker,
+            "industry": str(industry_name),
+            "cap_tier": cap_tier,
+            "row_html": row_html,
+        })
         if is_large:
             if industry_name not in group["large_by_ind"]:
                 group["large_by_ind"][industry_name] = []
@@ -1300,6 +1338,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
     # Build day sections with metadata
     day_sections: list[str] = []
     day_sections_meta: list[dict[str, Any]] = []
+    sections_list: list[dict[str, Any]] = []
     months_map: dict[str, dict[str, Any]] = {}
     today_dt = pd.Timestamp.today().normalize()
     current_month_key = today_dt.strftime("%Y-%m")
@@ -1332,6 +1371,12 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "stocks_count": stocks_count,
             "html": section_html,
         })
+        sections_list.append({
+            "date": date_str,
+            "day_label": group.get("day_label") or date_str,
+            "day_relative": group.get("day_relative") or "",
+            "stocks": group.get("stocks", []),
+        })
 
         if m_key not in months_map:
             is_cur = (m_key == current_month_key)
@@ -1359,6 +1404,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         "day_sections": "\n".join(day_sections) if day_sections else "<p>No upcoming earnings data.</p>",
         "day_sections_list": day_sections,
         "day_sections_meta": day_sections_meta,
+        "sections": sections_list,
         "months": months_list,
         "total_stocks": sum(m["stocks_count"] for m in months_list),
         "popups": popups_html,

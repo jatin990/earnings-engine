@@ -44,10 +44,7 @@ const ResultsLedger = (() => {
     _syncSliderBadge();
     document.addEventListener('click', _onDocClick);
   }
-
-  function destroy() {
-    document.removeEventListener('click', _onDocClick);
-  }
+  function destroy() { document.removeEventListener('click', _onDocClick); }
 
   function _onDocClick(e) {
     const panel = _el('resultsIndustryDropdownPanel');
@@ -128,7 +125,36 @@ const ResultsLedger = (() => {
   function cancel() { if (_abortCtrl) _abortCtrl.abort(); }
   /* ── Response processing ────────────────────────────────────────────────*/
   function _processApiResponse(data) {
-    const sections = data.sections || [];
+    let sections = Array.isArray(data.sections) ? data.sections : [];
+
+    // Defensive fallback: Parse day_sections_list if sections array was omitted by a legacy response
+    if (!sections.length && Array.isArray(data.day_sections_list) && data.day_sections_list.length > 0) {
+      try {
+        const parser = new DOMParser();
+        sections = data.day_sections_list.map((htmlStr, idx) => {
+          const doc = parser.parseFromString(htmlStr, 'text/html');
+          const groupEl = doc.querySelector('.day-group');
+          const date = groupEl?.getAttribute('data-date') || (data.day_sections_meta?.[idx]?.date) || '';
+          const meta = (data.day_sections_meta || []).find(m => m.date === date) || {};
+          const rowEls = doc.querySelectorAll('tr.results-row');
+          const stocks = Array.from(rowEls).map(tr => ({
+            ticker: tr.getAttribute('data-ticker') || '',
+            industry: tr.getAttribute('data-industry') || '',
+            cap_tier: tr.getAttribute('data-cap') || '',
+            row_html: tr.outerHTML,
+          }));
+          return {
+            date: date,
+            day_label: meta.day_label || date,
+            day_relative: meta.day_relative || '',
+            stocks: stocks,
+          };
+        }).filter(s => s.stocks.length > 0);
+      } catch (err) {
+        console.warn('[RESULTS-LEDGER] Fallback day_sections parsing error:', err);
+      }
+    }
+
     _state.daySectionsMeta = [];
     _state.months = data.months || [];
     _state.totalStocks = 0;
@@ -514,7 +540,7 @@ const ResultsLedger = (() => {
     const lines = [cols.join(',')];
     rows.forEach(r => {
       lines.push([
-        r.dataset.ticker || '', '', r.dataset.cap || '', r.dataset.industry || '',
+        r.dataset.ticker || '', r.dataset.date || '', r.dataset.cap || '', r.dataset.industry || '',
         r.dataset.price || '', r.dataset.mcap || '',
         r.dataset['3dRet'] || '', r.dataset['7dRet'] || '', r.dataset['30dRet'] || '',
         r.dataset.relVol || '', r.dataset.beatRate || '',
@@ -525,7 +551,7 @@ const ResultsLedger = (() => {
 
   function exportJson() {
     const rows = _visibleRows().map(r => ({
-      ticker: r.dataset.ticker, cap: r.dataset.cap, industry: r.dataset.industry,
+      ticker: r.dataset.ticker, date: r.dataset.date, cap: r.dataset.cap, industry: r.dataset.industry,
       price: r.dataset.price, mcap: r.dataset.mcap,
       ret_3d: r.dataset['3dRet'], ret_7d: r.dataset['7dRet'], ret_30d: r.dataset['30dRet'],
       rel_vol: r.dataset.relVol, beat_rate: r.dataset.beatRate,
