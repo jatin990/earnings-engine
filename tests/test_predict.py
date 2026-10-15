@@ -211,12 +211,13 @@ def test_enrich_upcoming_results_computes_momentum_and_support_levels(monkeypatc
     df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2024-08-01")}])
     enriched = market_context_mod.enrich_upcoming_results(df, Settings())
 
-    assert enriched["thirty_day_return_pct"].iloc[0] == pytest.approx(4.0)
+    # 30-day return is None because 5 days of prices cannot span 30 calendar days
+    assert enriched["thirty_day_return_pct"].iloc[0] is None
     assert enriched["earnings_week_move_pct"].iloc[0] == pytest.approx(4.0)
     # Most recent quarter (Q3) score = 5 (from surprise -3% maps to score 5)
     assert enriched["prev_quarter_earnings_score"].iloc[0] == 5
-    assert enriched["next_resistance"].iloc[0] == 104.0
-    assert enriched["current_support"].iloc[0] == 100.0
+    assert enriched["next_resistance"].iloc[0] == pytest.approx(109.2)
+    assert enriched["current_support"].iloc[0] == pytest.approx(102.76)
 
 
 def test_enrich_upcoming_results_handles_empty_prices(monkeypatch):

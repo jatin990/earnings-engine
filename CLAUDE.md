@@ -19,7 +19,7 @@
 - FastAPI Routes: Define static/literal routes before parameterized routes (e.g. /quotes before /{symbol}).
 - Tickers: Indian equities require .NS (TCS.NS), US have no suffix. Resolve via market_of(ticker) from earnings_engine.config.
 - Testing and Hygiene: Targeted tests only (./.venv/Scripts/python.exe -m pytest tests/<file>.py -k "<test>"), never slow E2E/full-suite during iteration. Batch tool calls. Bound outputs (head_limit, offsets). Persist new schemas/contracts to .claude/projects/.../memory/.
-- Model Tiers: ANTHROPIC_DEFAULT_SONNET_MODEL / ANTHROPIC_DEFAULT_HAIKU_MODEL ('claude only' / 'gemini-3.8-fast' / 'gemini-3.8-plan') for planning & architecture; ANTHROPIC_SMALL_FAST_MODEL ('free only') for routine/mundane non-intensive tasks; ANTHROPIC_MODEL / ANTHROPIC_DEFAULT_OPUS_MODEL ('gemini-3.7-fast' / 'antigravityonly') for fast coding, test execution, and active workflow.
+- Model Tiers: ANTHROPIC_DEFAULT_SONNET_MODEL / ANTHROPIC_DEFAULT_HAIKU_MODEL ('claude only' / 'gemini-3.8-fast' / 'gemini-3.8-plan') for planning & architecture; ANTHROPIC_SMALL_FAST_MODEL ('free only') for routine/mundane non-intensive tasks; ANTHROPIC_MODEL / ANTHROPIC_DEFAULT_OPUS_MODEL ('gemini-3.8-fast') for fast coding, test execution, and active workflow.
 
 ## 3. Directory Layout
 earnings-engine/

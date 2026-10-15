@@ -1,12 +1,10 @@
-<tr class="results-row {day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}" data-cap="{cap_tier}" data-industry="{industry}" data-price="{raw_price}" data-mcap="{raw_mcap}" data-3d-ret="{raw_3d}" data-7d-ret="{raw_7d}" data-30d-ret="{raw_30d}" data-rel-vol="{rel_vol_plain}" data-beat-rate="{beat_rate_plain}" data-quality="{quality_scores_plain}" onclick="app.openStockDrawer('{ticker}')" style="cursor:pointer;" title="Click to inspect {ticker} in slide-over drawer">
+<tr class="results-row {day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}" data-cap="{cap_tier}" data-industry="{industry}" data-price="{raw_price}" data-mcap="{raw_mcap}" data-3d-ret="{raw_3d}" data-7d-ret="{raw_7d}" data-30d-ret="{raw_30d}" data-rel-vol="{rel_vol_plain}" data-beat-rate="{beat_rate_plain}" data-quality="{quality_scores_plain}" onclick="window.resultsLedger && window.resultsLedger.openDrawer('{ticker}')" style="cursor:pointer;" title="Click to inspect {ticker} in slide-over drawer">
   <td class="stock-cell">
     <div class="stock-cell-wrap">
       <div style="display:flex;align-items:center;gap:0.35rem;">
-        <span class="stock-ticker-main" style="font-weight:700;color:#f8fafc;font-size:0.82rem;">
-          {ticker}
-        </span>
-        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('{ticker}', this, event);" style="background:transparent;border:none;color:#64748b;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;line-height:1;transition:all 0.15s;" onmouseenter="this.style.color='#38bdf8';" onmouseleave="this.style.color='#64748b';" title="Refresh live price & S/R for {ticker}">↻</button>
-        <a href="/stock/{ticker}" target="_blank" style="color:#64748b;text-decoration:none;font-size:0.72rem;" onclick="event.stopPropagation();" onmouseenter="this.style.color='#38bdf8';" onmouseleave="this.style.color='#64748b';" title="Open full profile in new tab">↗</a>
+        <span class="stock-ticker-main" style="font-weight:700;color:#f8fafc;font-size:0.82rem;">{ticker}</span>
+        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); window.resultsLedger && window.resultsLedger.refreshSinglePrice('{ticker}', this);" style="background:transparent;border:none;color:#64748b;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;line-height:1;transition:color 0.15s;" onmouseenter="this.style.color='#f8fafc';" onmouseleave="this.style.color='#64748b';" title="Refresh live price & S/R for {ticker}">↻</button>
+        <a href="/stock/{ticker}" target="_blank" style="color:#64748b;text-decoration:none;font-size:0.72rem;" onclick="event.stopPropagation();" onmouseenter="this.style.color='#f8fafc';" onmouseleave="this.style.color='#64748b';" title="Open full profile in new tab">↗</a>
         {result_sequence_badge_html}
       </div>
       <span class="stock-company-sub" style="color:#94a3b8;font-size:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;" title="{company_name} · {industry}">{company_name}</span>
@@ -30,8 +28,14 @@
   <td class="cell-past-results mono" style="font-size:0.75rem;white-space:nowrap;">
     {past_results_html}
   </td>
+  <td class="cell-surprise mono" style="font-size:0.75rem;white-space:nowrap;text-align:center;">
+    {eps_surprise_pct}
+  </td>
   <td class="cell-returns-consolidated mono" style="font-size:0.75rem;white-space:nowrap;">
     {returns_consolidated_html}
+  </td>
+  <td class="cell-ai-edge mono" style="font-size:0.75rem;white-space:nowrap;text-align:center;">
+    {ai_edge_score}
   </td>
   <td class="cell-technical-setup" style="font-size:0.72rem;white-space:nowrap;">
     {technical_setup_badge_html}
