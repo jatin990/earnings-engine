@@ -1046,6 +1046,12 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 if len(closes) >= 2:
                     latest = float(current_price) if current_price is not None and current_price > 0 else float(closes.iloc[-1])
                     _last_date = closes.index[-1]
+                    # For 7D/30D/3D returns, always use the DB's last closing
+                    # price — NOT the live `current_price` — so the return
+                    # window is consistent with `_last_date`.  A live quote
+                    # from *today* paired with `_last_date` from *yesterday*
+                    # would silently add an extra day to every window.
+                    _last_close = float(closes.iloc[-1])
                     first_dt = pd.to_datetime(closes.index[0]).tz_localize(None) if getattr(closes.index, "tz", None) is not None else pd.to_datetime(closes.index[0])
                     last_dt = pd.to_datetime(_last_date).tz_localize(None) if getattr(pd.to_datetime(_last_date), "tz", None) is not None else pd.to_datetime(_last_date)
                     days_span = (last_dt - first_dt).days
@@ -1054,28 +1060,28 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     # they match external sources — not trading days, which overstate the move.
                     prior_30 = _close_n_calendar_days_ago(closes, _last_date, 30)
                     if prior_30 is not None and prior_30 > 0:
-                        thirty_day_return_pct = ((latest - prior_30) / prior_30) * 100
+                        thirty_day_return_pct = ((_last_close - prior_30) / prior_30) * 100
                     elif days_span >= 30:
                         prior_30 = float(closes.iloc[0])
-                        thirty_day_return_pct = ((latest - prior_30) / prior_30) * 100 if prior_30 > 0 else None
+                        thirty_day_return_pct = ((_last_close - prior_30) / prior_30) * 100 if prior_30 > 0 else None
                     else:
                         thirty_day_return_pct = None
 
                     prior_7 = _close_n_calendar_days_ago(closes, _last_date, 7)
                     if prior_7 is not None and prior_7 > 0:
-                        seven_day_return_pct = ((latest - prior_7) / prior_7) * 100
+                        seven_day_return_pct = ((_last_close - prior_7) / prior_7) * 100
                     elif days_span >= 7:
                         prior_7 = float(closes.iloc[0])
-                        seven_day_return_pct = ((latest - prior_7) / prior_7) * 100 if prior_7 > 0 else None
+                        seven_day_return_pct = ((_last_close - prior_7) / prior_7) * 100 if prior_7 > 0 else None
                     else:
                         seven_day_return_pct = None
 
                     prior_3 = _close_n_calendar_days_ago(closes, _last_date, 3)
                     if prior_3 is not None and prior_3 > 0:
-                        three_day_return_pct = ((latest - prior_3) / prior_3) * 100
+                        three_day_return_pct = ((_last_close - prior_3) / prior_3) * 100
                     elif days_span >= 3:
                         prior_3 = float(closes.iloc[0])
-                        three_day_return_pct = ((latest - prior_3) / prior_3) * 100 if prior_3 > 0 else None
+                        three_day_return_pct = ((_last_close - prior_3) / prior_3) * 100 if prior_3 > 0 else None
                     else:
                         three_day_return_pct = None
 

@@ -406,10 +406,13 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
     """List upcoming earnings events in the next N days.
 
     If ``source`` is given (``"yfinance"``, ``"nse"``), only rows from that
-    source are returned.  ``None`` means all sources (default).  When all
-    sources are loaded, a ``source`` column is included so the report can show
-    which calendar each date came from.  Rows are NOT deduplicated by date —
-    if a ticker has the same date from both yfinance and nse, both rows appear.
+    source are returned.  ``None`` means all sources (default).
+
+    When all sources are loaded, a ``source`` column is included so the report
+    can show which calendar each date came from.  For each ticker, if an NSE
+    row exists it is treated as the authoritative date and any conflicting
+    rows from other sources are dropped.  Tickers that only appear in
+    non-NSE sources are kept as-is.
 
     The window is ``[start_date, start_date + days)``.  ``start_date`` defaults
     to today, so the default behaviour is unchanged (next ``days`` days).
@@ -448,6 +451,19 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
 
     df = pd.DataFrame(rows, columns=["ticker", "earnings_date", "source"])
     df["earnings_date"] = pd.to_datetime(df["earnings_date"])
+
+    # ── NSE-as-truth deduplication ──
+    # For each ticker, if an NSE row exists, prefer it over other sources.
+    # This ensures the official NSE board meeting date is the authoritative
+    # earnings date shown in the Results Ledger.
+    if source is None and "source" in df.columns:
+        nse_tickers = set(df.loc[df["source"] == "nse", "ticker"].unique())
+        if nse_tickers:
+            # Keep: all NSE rows + non-NSE rows whose ticker has NO NSE entry
+            df = df[
+                (df["source"] == "nse") | (~df["ticker"].isin(nse_tickers))
+            ].reset_index(drop=True)
+
     loaded_tickers = df["ticker"].nunique()
     source_label = source if source is not None else "ALL_SOURCES"
     logger.info("[EARNINGS-CACHE] Loaded cached earnings dates for %s/%s tickers (source=%s, window: %s to %s)", loaded_tickers, len(unique_tickers), source_label, start_str, end_str)
