@@ -95,6 +95,84 @@ def clean_nse_deal_symbol(sym: str) -> str:
     return s
 
 
+def get_upcoming_results_for_tickers(
+    tickers: list[str],
+    days_ahead: int = 10,
+    settings: Settings | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Query upcoming corporate board meetings for specified tickers within the next N days.
+
+    Filters to financial results or earnings catalyst meetings.
+    Returns mapping from clean ticker (e.g. 'TRENT.NS') to upcoming result details:
+    {
+        "has_upcoming_result": bool,
+        "meeting_date": str | None,
+        "days_until": int | None,
+        "purpose": str | None,
+        "impact_tier": str | None,
+    }
+    """
+    settings = settings or Settings()
+    if not tickers:
+        return {}
+
+    clean_tickers = list(dict.fromkeys([clean_nse_deal_symbol(t) for t in tickers if t]))
+    if not clean_tickers:
+        return {}
+
+    res_map: dict[str, dict[str, Any]] = {
+        t: {
+            "has_upcoming_result": False,
+            "meeting_date": None,
+            "days_until": None,
+            "purpose": None,
+            "impact_tier": None,
+        }
+        for t in clean_tickers
+    }
+
+    today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    max_date_str = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+
+    conn = get_db_connection(settings)
+    placeholders = ",".join(["?"] * len(clean_tickers))
+    query = f"""
+        SELECT ticker, meeting_date, purpose, impact_tier
+        FROM upcoming_board_meetings
+        WHERE ticker IN ({placeholders})
+          AND meeting_date BETWEEN ? AND ?
+          AND (UPPER(purpose) LIKE '%RESULT%' OR UPPER(purpose) LIKE '%FINANCIAL%')
+        ORDER BY meeting_date ASC
+    """
+    params = list(clean_tickers) + [today_str, max_date_str]
+
+    try:
+        cur = conn.execute(query, params)
+        for row in cur.fetchall():
+            row_ticker = clean_nse_deal_symbol(row[0])
+            if row_ticker in res_map and not res_map[row_ticker]["has_upcoming_result"]:
+                m_date_str = row[1]
+                days_until = None
+                try:
+                    m_dt = datetime.strptime(m_date_str, "%Y-%m-%d").date()
+                    days_until = (m_dt - today).days
+                except Exception:
+                    pass
+
+                res_map[row_ticker] = {
+                    "has_upcoming_result": True,
+                    "meeting_date": m_date_str,
+                    "days_until": days_until,
+                    "purpose": row[2],
+                    "impact_tier": row[3],
+                }
+    except Exception as e:
+        logger.error("[MORNING-SETUPS] Failed to query upcoming results for tickers: %s", e)
+
+    return res_map
+
+
 def enrich_tickers_with_technicals(
     tickers: list[str],
     settings: Settings | None = None,
@@ -133,8 +211,24 @@ def enrich_tickers_with_technicals(
         logger.error("[MORNING-SETUPS] Failed to load batch prices for technical indicators: %s", e)
         price_dfs = {}
 
+    # Query upcoming corporate financial results in next 10 days
+    try:
+        upcoming_results_map = get_upcoming_results_for_tickers(clean_tickers, days_ahead=10, settings=settings)
+    except Exception as e:
+        logger.error("[MORNING-SETUPS] Failed to query upcoming results for tickers: %s", e)
+        upcoming_results_map = {}
+
     results: dict[str, dict[str, Any]] = {}
     for t in clean_tickers:
+        clean_t = clean_nse_deal_symbol(t)
+        upcoming_res = upcoming_results_map.get(clean_t) or upcoming_results_map.get(t) or {
+            "has_upcoming_result": False,
+            "meeting_date": None,
+            "days_until": None,
+            "purpose": None,
+            "impact_tier": None,
+        }
+
         df = price_dfs.get(t)
         base_record = {
             "latest_close": None,
@@ -147,6 +241,8 @@ def enrich_tickers_with_technicals(
             "price_vs_dma20_pct": None,
             "price_vs_dma50_pct": None,
             "is_live_price": False,
+            "structure": None,
+            "upcoming_result": upcoming_res,
         }
         if df is None or df.empty or "close" not in df.columns:
             results[t] = base_record
@@ -204,6 +300,55 @@ def enrich_tickers_with_technicals(
             pct_dma20 = round(((eff_price / dma20) - 1.0) * 100.0, 2) if dma20 and dma20 > 0 else None
             pct_dma50 = round(((eff_price / dma50) - 1.0) * 100.0, 2) if dma50 and dma50 > 0 else None
 
+            # 20-Day Technical Structure (Swing Channel Support / Resistance / Pivot / Posture)
+            structure = None
+            if len(closes) >= 5:
+                tail_bars = df.tail(min(20, len(df)))
+                if (
+                    "high" in tail_bars.columns
+                    and "low" in tail_bars.columns
+                    and not tail_bars["high"].isna().all()
+                    and not tail_bars["low"].isna().all()
+                ):
+                    high_20d = float(tail_bars["high"].dropna().max())
+                    low_20d = float(tail_bars["low"].dropna().min())
+                else:
+                    close_tail = closes.tail(min(20, len(closes)))
+                    high_20d = float(close_tail.max())
+                    low_20d = float(close_tail.min())
+
+                support_20d = round(low_20d, 2)
+                resistance_20d = round(high_20d, 2)
+                pivot_20d = round((support_20d + resistance_20d) / 2.0, 2)
+                range_20d = resistance_20d - support_20d
+
+                pct_from_support = round(((eff_price - support_20d) / support_20d) * 100.0, 2) if support_20d > 0 else None
+                pct_to_resistance = round(((resistance_20d - eff_price) / eff_price) * 100.0, 2) if eff_price > 0 else None
+                channel_pos_pct = round(((eff_price - support_20d) / range_20d) * 100.0, 1) if range_20d > 0 else 50.0
+
+                if eff_price >= resistance_20d:
+                    posture = "BREAKOUT"
+                elif eff_price <= support_20d:
+                    posture = "BREAKDOWN"
+                elif pct_to_resistance is not None and 0.0 <= pct_to_resistance <= 2.0:
+                    posture = "NEAR RESISTANCE"
+                elif pct_from_support is not None and 0.0 <= pct_from_support <= 2.0:
+                    posture = "NEAR SUPPORT"
+                elif eff_price > pivot_20d:
+                    posture = "CHANNEL UPPER"
+                else:
+                    posture = "CHANNEL LOWER"
+
+                structure = {
+                    "support": support_20d,
+                    "resistance": resistance_20d,
+                    "pivot": pivot_20d,
+                    "pct_from_support": pct_from_support,
+                    "pct_to_resistance": pct_to_resistance,
+                    "channel_position_pct": channel_pos_pct,
+                    "posture": posture,
+                }
+
             results[t] = {
                 "latest_close": round(latest_c, 2),
                 "effective_price": round(eff_price, 2),
@@ -215,6 +360,8 @@ def enrich_tickers_with_technicals(
                 "price_vs_dma20_pct": pct_dma20,
                 "price_vs_dma50_pct": pct_dma50,
                 "is_live_price": is_live_price,
+                "structure": structure,
+                "upcoming_result": upcoming_res,
             }
         except Exception as err:
             logger.debug("[MORNING-SETUPS] Error computing technicals for %s: %s", t, err)

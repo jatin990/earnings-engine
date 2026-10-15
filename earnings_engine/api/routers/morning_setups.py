@@ -76,6 +76,7 @@ def list_morning_deals_endpoint(
     group_by_symbol: bool = Query(False, description="Group and aggregate deals by symbol"),
     include_technicals: bool = Query(True, description="Enrich with 1D/7D/30D returns and 20/50 DMA"),
     include_live_quotes: bool = Query(True, description="When grouping, merge current/live market prices and vs-VWAP positioning"),
+    upcoming_results_only: bool = Query(False, description="Filter deals strictly to tickers with financial results scheduled in next 10 days"),
     limit: int = Query(200, ge=1, le=1000, description="Max records to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -99,7 +100,7 @@ def list_morning_deals_endpoint(
         technicals: dict[str, Any] = {}
         quotes: dict[str, dict[str, Any]] = {}
 
-        if deals and (include_technicals or (group_by_symbol and include_live_quotes)):
+        if deals and (include_technicals or (group_by_symbol and include_live_quotes) or upcoming_results_only):
             all_tickers = list(dict.fromkeys([clean_nse_deal_symbol(d.get("ticker")) for d in deals if d.get("ticker")]))
             try:
                 quotes = fetch_batch_live_quotes(all_tickers, settings=_settings)
@@ -107,9 +108,18 @@ def list_morning_deals_endpoint(
                 logger.error("[MORNING-SETUPS] Batch quote fetch failed: %s", e)
                 quotes = {}
 
-        if include_technicals and deals:
+        if (include_technicals or upcoming_results_only) and deals:
             tickers = [d.get("ticker") for d in deals if d.get("ticker")]
             technicals = enrich_tickers_with_technicals(tickers, settings=_settings, live_quotes=quotes)
+
+        # Filter to upcoming results if requested
+        if upcoming_results_only:
+            def _has_upcoming(t_sym: str) -> bool:
+                c_sym = clean_nse_deal_symbol(t_sym)
+                info = technicals.get(c_sym) or technicals.get(t_sym) or {}
+                return bool(info.get("upcoming_result", {}).get("has_upcoming_result"))
+
+            deals = [d for d in deals if _has_upcoming(d.get("ticker", ""))]
 
         if group_by_symbol:
             grouped = group_deals_by_symbol(deals)

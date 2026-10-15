@@ -180,6 +180,87 @@
             </div>`;
         },
 
+        renderUpcomingResultBadge(tech) {
+            if (!tech || !tech.upcoming_result || !tech.upcoming_result.has_upcoming_result) {
+                return '';
+            }
+            const info = tech.upcoming_result;
+            const days = info.days_until;
+            let badgeText = '📅 Result';
+            if (days === 0) {
+                badgeText = '📅 Result TODAY';
+            } else if (days === 1) {
+                badgeText = '📅 Result TOMORROW';
+            } else if (days !== null && days !== undefined) {
+                badgeText = `📅 Result in ${days}d`;
+            }
+            const meetingDate = info.meeting_date || '';
+            const purpose = this.escapeHtml(info.purpose || 'Board meeting for financial results');
+            const tooltip = `${purpose} (${meetingDate})`;
+
+            return `
+                <span title="${tooltip}" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.62rem; font-family: var(--font-mono); font-weight: 700; white-space: nowrap; cursor: help; display: inline-flex; align-items: center; gap: 0.2rem;">
+                    ${badgeText}
+                </span>`;
+        },
+
+        renderStructureBadge(tech) {
+            if (!tech || !tech.structure) {
+                return `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.7rem;">--</span>`;
+            }
+            const s = tech.structure;
+            const posture = s.posture || 'CHANNEL';
+            let pColor = '#94a3b8';
+            let pBg = 'rgba(148, 163, 184, 0.12)';
+            let pBorder = 'rgba(148, 163, 184, 0.25)';
+
+            if (posture === 'BREAKOUT') {
+                pColor = '#34d399';
+                pBg = 'rgba(16, 185, 129, 0.2)';
+                pBorder = 'rgba(16, 185, 129, 0.45)';
+            } else if (posture === 'BREAKDOWN') {
+                pColor = '#f87171';
+                pBg = 'rgba(239, 68, 68, 0.2)';
+                pBorder = 'rgba(239, 68, 68, 0.45)';
+            } else if (posture === 'NEAR RESISTANCE') {
+                pColor = '#fbbf24';
+                pBg = 'rgba(245, 158, 11, 0.18)';
+                pBorder = 'rgba(245, 158, 11, 0.35)';
+            } else if (posture === 'NEAR SUPPORT') {
+                pColor = '#38bdf8';
+                pBg = 'rgba(56, 189, 248, 0.18)';
+                pBorder = 'rgba(56, 189, 248, 0.35)';
+            } else if (posture === 'CHANNEL UPPER') {
+                pColor = '#a78bfa';
+                pBg = 'rgba(167, 139, 250, 0.15)';
+                pBorder = 'rgba(167, 139, 250, 0.3)';
+            } else if (posture === 'CHANNEL LOWER') {
+                pColor = '#94a3b8';
+                pBg = 'rgba(148, 163, 184, 0.12)';
+                pBorder = 'rgba(148, 163, 184, 0.25)';
+            }
+
+            const supFmt = s.support !== null ? Number(s.support).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '--';
+            const resFmt = s.resistance !== null ? Number(s.resistance).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '--';
+            const distSup = s.pct_from_support !== null ? `+${s.pct_from_support.toFixed(1)}%` : '--';
+            const distRes = s.pct_to_resistance !== null ? `${s.pct_to_resistance.toFixed(1)}%` : '--';
+
+            return `
+            <div style="display:flex;flex-direction:column;gap:0.18rem;font-family:var(--font-mono);font-size:0.67rem;white-space:nowrap;">
+                <div style="display:flex;align-items:center;gap:0.3rem;">
+                    <span style="background:${pBg};color:${pColor};border:1px solid ${pBorder};padding:0.08rem 0.35rem;border-radius:3px;font-size:0.62rem;font-weight:800;letter-spacing:0.02em;">
+                        ${posture}
+                    </span>
+                    <span style="color:#64748b;font-size:0.62rem;" title="Channel position (${s.channel_position_pct}% of 20D range)">${s.channel_position_pct}% pos</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.35rem;font-size:0.62rem;color:#94a3b8;">
+                    <span title="20D Support: &#8377;${supFmt} (${distSup} away)">S: &#8377;${supFmt}</span>
+                    <span style="color:rgba(255,255,255,0.18);">|</span>
+                    <span title="20D Resistance: &#8377;${resFmt} (${distRes} away)">R: &#8377;${resFmt}</span>
+                </div>
+            </div>`;
+        },
+
         // ---------------------------------------------------------------------
         // Block & Bulk Deals Handlers
         // ---------------------------------------------------------------------
@@ -240,7 +321,7 @@
 
             const tbody = document.getElementById('morningDealsTableBody');
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading executed block &amp; bulk deals...</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 2rem; color: #94a3b8;"><div class="spinner" style="margin: 0 auto 0.5rem auto;"></div>Loading executed block &amp; bulk deals...</td></tr>`;
             }
 
             try {
@@ -268,6 +349,10 @@
                 if (this.groupBySymbol) {
                     params.append('group_by_symbol', 'true');
                 }
+                const upcomingOnly = document.getElementById('morningDealsUpcomingResultsCheckbox')?.checked;
+                if (upcomingOnly) {
+                    params.append('upcoming_results_only', 'true');
+                }
                 params.append('include_technicals', 'true');
                 params.append('limit', '300');
 
@@ -286,7 +371,7 @@
             } catch (err) {
                 console.error('Error loading morning deals:', err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load deals data: ${this.escapeHtml(err.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 2rem; color: #f87171;">Failed to load deals data: ${this.escapeHtml(err.message)}</td></tr>`;
                 }
             } finally {
                 this.dealsLoading = false;
@@ -309,6 +394,7 @@
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Total Turnover</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Live Price vs VWAP</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Structure (20D)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
                 `;
@@ -323,6 +409,7 @@
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Trade Price</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: right;">Value (₹ Cr)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Returns (1D / 7D / 30D)</th>
+                    <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Structure (20D)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700;">Trend (20 / 50 DMA)</th>
                     <th style="padding: 0.65rem 0.75rem; color: #94a3b8; font-weight: 700; text-align: center;">Actions</th>
                 `;
@@ -334,7 +421,7 @@
             if (!tbody) return;
 
             if (!deals || deals.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📦</div><div>No executed block or bulk deals found matching the selected filters.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try relaxing minimum deal value (₹ Cr) or expanding the date range.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📦</div><div>No executed block or bulk deals found matching the selected filters.</div><div style="font-size: 0.72rem; color: #475569; margin-top: 0.35rem;">Try relaxing minimum deal value (₹ Cr) or expanding the date range.</div></td></tr>`;
                 return;
             }
 
@@ -356,7 +443,7 @@
                 const rawSym = ticker.toUpperCase().replace('.NS', '');
                 const cleanSym = this.escapeHtml(rawSym);
                 const clientName = this.escapeHtml(d.client_name || '—');
-                const tech = technicals ? technicals[ticker] : null;
+                const tech = technicals ? (technicals[ticker] || technicals[`${rawSym}.NS`]) : null;
 
                 return `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.02)'" onmouseleave="this.style.background='transparent'">
@@ -364,9 +451,12 @@
                         ${this.escapeHtml(d.deal_date || '—')}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; font-family: var(--font-mono); font-weight: 700;">
-                        <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
-                            <span>${cleanSym}</span>
-                        </a>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                                <span>${cleanSym}</span>
+                            </a>
+                            ${this.renderUpcomingResultBadge(tech)}
+                        </div>
                     </td>
                     <td style="padding: 0.55rem 0.75rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0;" title="${clientName}">
                         ${clientName}
@@ -394,6 +484,9 @@
                         ${this.renderReturnsBadges(tech)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderStructureBadge(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
                         ${this.renderTrendBadges(tech)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; text-align: center;">
@@ -410,7 +503,7 @@
             if (!tbody) return;
 
             if (!groupedDeals || groupedDeals.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🗂️</div><div>No grouped deal records found for the selected filters.</div></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 3rem 1rem; color: #64748b;"><div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🗂️</div><div>No grouped deal records found for the selected filters.</div></td></tr>`;
                 return;
             }
 
@@ -418,7 +511,7 @@
                 const ticker = g.ticker || '';
                 const rawSym = ticker.toUpperCase().replace('.NS', '');
                 const cleanSym = this.escapeHtml(rawSym);
-                const tech = technicals ? technicals[ticker] : null;
+                const tech = technicals ? (technicals[ticker] || technicals[`${rawSym}.NS`]) : null;
 
                 const netCr = Number(g.net_value_cr || 0);
                 const isNetBuy = netCr > 0;
@@ -463,9 +556,12 @@
                         </button>
                     </td>
                     <td style="padding: 0.55rem 0.75rem; font-family: var(--font-mono); font-weight: 700;">
-                        <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
-                            <span>${cleanSym}</span>
-                        </a>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            <a href="javascript:void(0)" onclick="morningSetupsModule.openInspect('${cleanSym}.NS')" style="color: #60a5fa; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                                <span>${cleanSym}</span>
+                            </a>
+                            ${this.renderUpcomingResultBadge(tech)}
+                        </div>
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 400; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             ${this.escapeHtml(g.security_name || cleanSym)}
                         </div>
@@ -503,6 +599,9 @@
                         ${this.renderReturnsBadges(tech)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
+                        ${this.renderStructureBadge(tech)}
+                    </td>
+                    <td style="padding: 0.55rem 0.75rem;">
                         ${this.renderTrendBadges(tech)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; text-align: center;">
@@ -512,7 +611,7 @@
                     </td>
                 </tr>
                 <tr id="prints-accordion-${idx}" style="display: none; background: rgba(6, 6, 10, 0.7);">
-                    <td colspan="12" style="padding: 0.6rem 1rem 0.8rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <td colspan="13" style="padding: 0.6rem 1rem 0.8rem 2.2rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
                         <div style="font-size: 0.67rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.35rem; font-family: var(--font-mono);">
                             Executed Prints for ${cleanSym} (${prints.length} Transactions)
                         </div>

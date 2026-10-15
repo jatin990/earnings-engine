@@ -243,6 +243,14 @@ def test_morning_setups_api_endpoints(test_settings):
         assert data["count"] == 1
         assert data["deals"][0]["ticker"] == "TRENT.NS"
 
+        # Test Deals List endpoint with upcoming_results_only filter
+        resp_filtered = client.get("/api/v1/morning-setups/deals?upcoming_results_only=true")
+        assert resp_filtered.status_code == 200
+        data_filtered = resp_filtered.json()
+        assert data_filtered["status"] == "success"
+        assert data_filtered["count"] == 1
+        assert data_filtered["deals"][0]["ticker"] == "TRENT.NS"
+
         # Test Board Meetings Summary endpoint (static route)
         resp = client.get("/api/v1/morning-setups/board-meetings/summary")
         assert resp.status_code == 200
@@ -394,5 +402,77 @@ def test_enrich_tickers_with_technicals():
         assert missing_tech["return_30d"] is None
         assert missing_tech["dma_20"] is None
         assert missing_tech["dma_50"] is None
+        assert missing_tech["structure"] is None
+
+
+def test_technical_structure_and_upcoming_results_correlation(test_settings):
+    """Verify 20-day technical structure calculation and upcoming earnings correlation."""
+    import pandas as pd
+    from earnings_engine.data.morning_setups import get_upcoming_results_for_tickers
+
+    today = date.today()
+    meeting_dt_str = (today + timedelta(days=4)).strftime("%Y-%m-%d")
+
+    # Seed an upcoming financial results meeting
+    store_upcoming_board_meetings(test_settings, [
+        {
+            "ticker": "TRENT.NS",
+            "company_name": "Trent Limited",
+            "meeting_date": meeting_dt_str,
+            "purpose": "Consider and approve Unaudited Financial Results for Q2",
+            "impact_tier": "HIGH",
+        },
+        {
+            "ticker": "INFY.NS",
+            "company_name": "Infosys Limited",
+            "meeting_date": (today + timedelta(days=25)).strftime("%Y-%m-%d"),
+            "purpose": "Financial Results Q2",
+            "impact_tier": "HIGH",
+        },
+    ])
+
+    # 1. Test get_upcoming_results_for_tickers (10-day window)
+    res_map = get_upcoming_results_for_tickers(["TRENT.NS", "INFY.NS", "RELIANCE.NS"], days_ahead=10, settings=test_settings)
+    assert res_map["TRENT.NS"]["has_upcoming_result"] is True
+    assert res_map["TRENT.NS"]["days_until"] == 4
+    assert res_map["TRENT.NS"]["meeting_date"] == meeting_dt_str
+    assert res_map["TRENT.NS"]["impact_tier"] == "HIGH"
+
+    # INFY is 25 days out, outside the 10-day window
+    assert res_map["INFY.NS"]["has_upcoming_result"] is False
+    assert res_map["RELIANCE.NS"]["has_upcoming_result"] is False
+
+    # 2. Test 20-Day Technical Structure computation
+    # High: 150.0, Low: 100.0, Close: 140.0
+    # Pivot = (100 + 150) / 2 = 125.0
+    # Channel pos % = (140 - 100) / 50 = 80.0% -> CHANNEL UPPER
+    highs = [120.0 + i * 0.5 for i in range(25)]
+    lows = [100.0 + i * 0.5 for i in range(25)]
+    closes = [110.0 + i * 0.5 for i in range(25)]
+    # Set explicit extremes in last 20 bars
+    highs[-1] = 150.0
+    lows[-10] = 100.0
+    closes[-1] = 140.0
+
+    df_trent = pd.DataFrame({"high": highs, "low": lows, "close": closes}, index=pd.date_range("2026-08-01", periods=25, freq="D"))
+
+    with patch("earnings_engine.data.morning_setups.load_prices_batch") as mock_load, \
+         patch("earnings_engine.data.morning_setups.fetch_batch_live_quotes", return_value={}):
+        mock_load.return_value = {"TRENT.NS": df_trent}
+
+        tech = enrich_tickers_with_technicals(["TRENT.NS"], settings=test_settings)
+        assert "TRENT.NS" in tech
+        trent_tech = tech["TRENT.NS"]
+        assert trent_tech["upcoming_result"]["has_upcoming_result"] is True
+        assert trent_tech["upcoming_result"]["days_until"] == 4
+
+        struct = trent_tech["structure"]
+        assert struct is not None
+        assert struct["support"] == 100.0
+        assert struct["resistance"] == 150.0
+        assert struct["pivot"] == 125.0
+        assert struct["channel_position_pct"] == 80.0
+        assert struct["posture"] == "CHANNEL UPPER"
+
 
 
