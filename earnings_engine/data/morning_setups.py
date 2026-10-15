@@ -98,8 +98,15 @@ def clean_nse_deal_symbol(sym: str) -> str:
 def enrich_tickers_with_technicals(
     tickers: list[str],
     settings: Settings | None = None,
+    live_quotes: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Batch-calculate 1D, 7D, 30D returns and 20 / 50 DMA positioning from historical prices.
+    """Batch-calculate 1D, 7D, 30D returns and 20 / 50 DMA positioning.
+
+    Dynamically incorporates live market quotes when available:
+    - effective_price = live_price if (live_price is not None and live_price > 0) else latest_close
+    - 1D Return: anchored to live_quote["previous_close"] if available, otherwise previous daily bar p1
+    - 7D / 30D Return: (effective_price / p7 - 1.0) and (effective_price / p30 - 1.0)
+    - 20 / 50 DMA: (effective_price / dma20 - 1.0) and (effective_price / dma50 - 1.0)
 
     Follows Point-in-Time and strict anti-fabrication standards:
     - If price history is unavailable or insufficient, returns None rather than synthetic defaults.
@@ -113,6 +120,13 @@ def enrich_tickers_with_technicals(
     if not clean_tickers:
         return {}
 
+    if live_quotes is None:
+        try:
+            live_quotes = fetch_batch_live_quotes(clean_tickers, settings=settings)
+        except Exception as e:
+            logger.error("[MORNING-SETUPS] Failed to fetch live quotes for technicals: %s", e)
+            live_quotes = {}
+
     try:
         price_dfs = load_prices_batch(clean_tickers, settings)
     except Exception as e:
@@ -124,6 +138,7 @@ def enrich_tickers_with_technicals(
         df = price_dfs.get(t)
         base_record = {
             "latest_close": None,
+            "effective_price": None,
             "return_1d": None,
             "return_7d": None,
             "return_30d": None,
@@ -131,6 +146,7 @@ def enrich_tickers_with_technicals(
             "dma_50": None,
             "price_vs_dma20_pct": None,
             "price_vs_dma50_pct": None,
+            "is_live_price": False,
         }
         if df is None or df.empty or "close" not in df.columns:
             results[t] = base_record
@@ -143,22 +159,54 @@ def enrich_tickers_with_technicals(
                 continue
 
             latest_c = float(closes.iloc[-1])
-            p1 = float(closes.iloc[-2]) if len(closes) >= 2 else None
+
+            # Resolve live quote if present
+            quote = (live_quotes.get(t) or live_quotes.get(t.replace(".NS", ""))) if live_quotes else None
+            live_p = None
+            if quote:
+                try:
+                    live_p = float(quote.get("current_price") or 0) or None
+                except (TypeError, ValueError):
+                    live_p = None
+
+            is_live_price = bool(live_p is not None and live_p > 0)
+            eff_price = live_p if is_live_price else latest_c
+
+            # 1D baseline anchor: prefer quote's previous_close, fall back to settled T-1 bar
+            p1 = None
+            if quote and quote.get("previous_close") is not None:
+                try:
+                    p1_val = float(quote.get("previous_close") or 0)
+                    if p1_val > 0:
+                        p1 = p1_val
+                except (TypeError, ValueError):
+                    p1 = None
+
+            if p1 is None:
+                p1 = float(closes.iloc[-2]) if len(closes) >= 2 else None
+
             p7 = float(closes.iloc[-8]) if len(closes) >= 8 else (float(closes.iloc[0]) if len(closes) >= 2 else None)
             p30 = float(closes.iloc[-22]) if len(closes) >= 22 else (float(closes.iloc[0]) if len(closes) >= 2 else None)
 
             dma20 = round(float(closes.tail(20).mean()), 2) if len(closes) >= 20 else None
             dma50 = round(float(closes.tail(50).mean()), 2) if len(closes) >= 50 else None
 
-            r1 = round(((latest_c / p1) - 1.0) * 100.0, 2) if p1 and p1 > 0 else None
-            r7 = round(((latest_c / p7) - 1.0) * 100.0, 2) if p7 and p7 > 0 else None
-            r30 = round(((latest_c / p30) - 1.0) * 100.0, 2) if p30 and p30 > 0 else None
+            # 1D day change %: if live quote already computed day_change_pct, prefer it; otherwise compute against p1
+            r1 = None
+            if quote and quote.get("day_change_pct") is not None and is_live_price:
+                r1 = float(quote.get("day_change_pct"))
+            elif p1 and p1 > 0:
+                r1 = round(((eff_price / p1) - 1.0) * 100.0, 2)
 
-            pct_dma20 = round(((latest_c / dma20) - 1.0) * 100.0, 2) if dma20 and dma20 > 0 else None
-            pct_dma50 = round(((latest_c / dma50) - 1.0) * 100.0, 2) if dma50 and dma50 > 0 else None
+            r7 = round(((eff_price / p7) - 1.0) * 100.0, 2) if p7 and p7 > 0 else None
+            r30 = round(((eff_price / p30) - 1.0) * 100.0, 2) if p30 and p30 > 0 else None
+
+            pct_dma20 = round(((eff_price / dma20) - 1.0) * 100.0, 2) if dma20 and dma20 > 0 else None
+            pct_dma50 = round(((eff_price / dma50) - 1.0) * 100.0, 2) if dma50 and dma50 > 0 else None
 
             results[t] = {
                 "latest_close": round(latest_c, 2),
+                "effective_price": round(eff_price, 2),
                 "return_1d": r1,
                 "return_7d": r7,
                 "return_30d": r30,
@@ -166,6 +214,7 @@ def enrich_tickers_with_technicals(
                 "dma_50": dma50,
                 "price_vs_dma20_pct": pct_dma20,
                 "price_vs_dma50_pct": pct_dma50,
+                "is_live_price": is_live_price,
             }
         except Exception as err:
             logger.debug("[MORNING-SETUPS] Error computing technicals for %s: %s", t, err)
@@ -177,6 +226,7 @@ def enrich_tickers_with_technicals(
 def enrich_grouped_deals_with_live_quotes(
     grouped_deals: list[dict[str, Any]],
     settings: Settings | None = None,
+    quotes: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Merge current/live market quotes into already-grouped deal records.
 
@@ -197,11 +247,12 @@ def enrich_grouped_deals_with_live_quotes(
     if not tickers:
         return grouped_deals
 
-    try:
-        quotes = fetch_batch_live_quotes(tickers, settings=settings)
-    except Exception as e:
-        logger.error("[MORNING-SETUPS] Failed to fetch live quotes for grouped deals: %s", e)
-        quotes = {}
+    if quotes is None:
+        try:
+            quotes = fetch_batch_live_quotes(tickers, settings=settings)
+        except Exception as e:
+            logger.error("[MORNING-SETUPS] Failed to fetch live quotes for grouped deals: %s", e)
+            quotes = {}
 
     enriched: list[dict[str, Any]] = []
     for g in grouped_deals:
@@ -952,7 +1003,7 @@ def get_upcoming_board_meetings(
     settings: Settings | None = None,
     ticker: str | None = None,
     impact_tier: str | None = None,
-    days_ahead: int | None = 30,
+    days_ahead: int | None = None,
     from_date: str | None = None,
     to_date: str | None = None,
     purpose_contains: str | None = None,
@@ -977,14 +1028,11 @@ def get_upcoming_board_meetings(
     elif to_date:
         where_clauses.append("meeting_date <= ?")
         params.append(to_date)
-    else:
+    elif days_ahead is not None and days_ahead > 0:
         min_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")  # Include today
-        where_clauses.append("meeting_date >= ?")
-        params.append(min_date)
-        if days_ahead is not None and days_ahead > 0:
-            max_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
-            where_clauses.append("meeting_date <= ?")
-            params.append(max_date)
+        max_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+        where_clauses.append("meeting_date BETWEEN ? AND ?")
+        params.extend([min_date, max_date])
 
     if ticker:
         t_clean = f"%{ticker.strip().upper()}%"

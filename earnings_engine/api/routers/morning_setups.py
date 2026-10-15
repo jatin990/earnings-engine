@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from earnings_engine.config import Settings
 from earnings_engine.data.morning_setups import (
+    clean_nse_deal_symbol,
     enrich_grouped_deals_with_live_quotes,
     enrich_tickers_with_technicals,
     get_board_meetings_summary,
@@ -19,6 +20,7 @@ from earnings_engine.data.morning_setups import (
     sync_all_morning_deals,
     sync_upcoming_board_meetings,
 )
+from earnings_engine.data.prices import fetch_batch_live_quotes
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.api.routers.morning_setups")
@@ -93,16 +95,26 @@ def list_morning_deals_endpoint(
             offset=offset,
         )
 
-        # Technical indicators enrichment
+        # Live quotes and technical indicators enrichment
         technicals: dict[str, Any] = {}
+        quotes: dict[str, dict[str, Any]] = {}
+
+        if deals and (include_technicals or (group_by_symbol and include_live_quotes)):
+            all_tickers = list(dict.fromkeys([clean_nse_deal_symbol(d.get("ticker")) for d in deals if d.get("ticker")]))
+            try:
+                quotes = fetch_batch_live_quotes(all_tickers, settings=_settings)
+            except Exception as e:
+                logger.error("[MORNING-SETUPS] Batch quote fetch failed: %s", e)
+                quotes = {}
+
         if include_technicals and deals:
             tickers = [d.get("ticker") for d in deals if d.get("ticker")]
-            technicals = enrich_tickers_with_technicals(tickers, settings=_settings)
+            technicals = enrich_tickers_with_technicals(tickers, settings=_settings, live_quotes=quotes)
 
         if group_by_symbol:
             grouped = group_deals_by_symbol(deals)
             if include_live_quotes:
-                grouped = enrich_grouped_deals_with_live_quotes(grouped, settings=_settings)
+                grouped = enrich_grouped_deals_with_live_quotes(grouped, settings=_settings, quotes=quotes)
             return {
                 "status": "success",
                 "count": len(grouped),

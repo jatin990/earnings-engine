@@ -4,6 +4,7 @@ Unit tests for Morning Setups: Block & Bulk Deals Intelligence and Upcoming Boar
 Asserts database persistence, catalyst impact tiering, query filtering, and API contracts.
 """
 import pytest
+from datetime import date, timedelta
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
@@ -138,32 +139,38 @@ def test_store_and_query_morning_deals(test_settings):
 
 def test_store_and_query_board_meetings(test_settings):
     """Test storage, deduplication, and catalyst impact querying of board meetings."""
+    today = date.today()
+    d_today = today.strftime("%Y-%m-%d")
+    d_plus5 = (today + timedelta(days=5)).strftime("%Y-%m-%d")
+    d_plus10 = (today + timedelta(days=10)).strftime("%Y-%m-%d")
+    d_plus20 = (today + timedelta(days=20)).strftime("%Y-%m-%d")
+
     meetings = [
         {
             "ticker": "TRENT.NS",
             "company_name": "Trent Limited",
-            "meeting_date": "2026-10-14",
+            "meeting_date": d_today,
             "purpose": "Financial Results for Q2 FY27 and Interim Dividend",
             "impact_tier": "HIGH",
         },
         {
             "ticker": "NYKAA.NS",
             "company_name": "FSN E-Commerce Ventures Limited",
-            "meeting_date": "2026-10-20",
+            "meeting_date": d_plus5,
             "purpose": "Consider proposal for Bonus Issue of Shares",
             "impact_tier": "HIGH",
         },
         {
             "ticker": "TCS.NS",
             "company_name": "Tata Consultancy Services Limited",
-            "meeting_date": "2026-10-08",
+            "meeting_date": d_plus10,
             "purpose": "Quarterly Financial Results",
             "impact_tier": "HIGH",
         },
         {
             "ticker": "RELIANCE.NS",
             "company_name": "Reliance Industries Limited",
-            "meeting_date": "2026-11-05",
+            "meeting_date": d_plus20,
             "purpose": "Routine General Administration",
             "impact_tier": "ROUTINE",
         },
