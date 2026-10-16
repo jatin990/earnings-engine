@@ -2472,6 +2472,19 @@ def _migration_048_business_update_schedules(conn: Any) -> None:
         pass
 
 
+def _migration_049_purge_unconfirmed_indian_yfinance_earnings(conn: Any) -> None:
+    """Purge unconfirmed future yfinance earnings dates for Indian (.NS/.BO) equities."""
+    try:
+        conn.execute("""
+            DELETE FROM earnings_history
+            WHERE (ticker LIKE '%.NS' OR ticker LIKE '%.BO')
+              AND earnings_date >= date('now')
+              AND source LIKE '%yfinance%'
+        """)
+    except Exception as e:
+        logger.warning("Migration 049 purge warning: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2522,6 +2535,7 @@ MIGRATIONS: list[Migration] = [
     Migration(46, "046_morning_setups_deals_and_board_meetings", _migration_046_morning_setups_deals_and_board_meetings),
     Migration(47, "047_options_tracked_setups", _migration_047_options_tracked_setups),
     Migration(48, "048_business_update_schedules", _migration_048_business_update_schedules),
+    Migration(49, "049_purge_unconfirmed_indian_yfinance_earnings", _migration_049_purge_unconfirmed_indian_yfinance_earnings),
 ]
 
 

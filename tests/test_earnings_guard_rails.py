@@ -101,6 +101,46 @@ def test_guard_rail_skips_duplicate_quarterly_income_stmt_near_auth_source():
     assert dup_row is None
 
 
+def test_yfinance_future_earnings_date_gated_for_indian_equities():
+    """Future earnings dates from yfinance must never be written for Indian equities (.NS / .BO)."""
+    import pandas as pd
+    from earnings_engine.data.earnings import _write_earnings
+
+    settings = Settings()
+    conn = get_db_connection(settings)
+
+    # Prepare DataFrame with past date and future date
+    future_date = (pd.Timestamp.today().normalize() + pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+    past_date = "2024-05-10"
+
+    df_indian = pd.DataFrame([
+        {"earnings_date": past_date, "eps_estimate": 10.0, "eps_reported": 12.0, "surprise_pct": 20.0},
+        {"earnings_date": future_date, "eps_estimate": 15.0, "eps_reported": None, "surprise_pct": None},
+    ])
+
+    _write_earnings("TESTBAN.NS", settings, df_indian)
+
+    # Check database: past date should exist, future date must NOT exist
+    rows = conn.execute(
+        "SELECT earnings_date, source FROM earnings_history WHERE ticker = 'TESTBAN.NS'"
+    ).fetchall()
+    dates = {r[0] for r in rows}
+
+    assert past_date in dates
+    assert future_date not in dates
+
+    # For US equities, future estimates from yfinance are allowed
+    df_us = pd.DataFrame([
+        {"earnings_date": future_date, "eps_estimate": 2.5, "eps_reported": None, "surprise_pct": None},
+    ])
+    _write_earnings("AAPL", settings, df_us)
+    us_rows = conn.execute(
+        "SELECT earnings_date FROM earnings_history WHERE ticker = 'AAPL' AND earnings_date = ?",
+        (future_date,),
+    ).fetchall()
+    assert len(us_rows) == 1
+
+
 def test_refresh_earnings_from_source_endpoint():
     """API endpoint /api/v1/stock/{ticker}/refresh-earnings-source refreshes data cleanly."""
     token = create_session_token(

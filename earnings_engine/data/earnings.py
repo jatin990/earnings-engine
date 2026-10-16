@@ -140,9 +140,14 @@ def _write_earnings(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
         return
     # Deduplicate by earnings_date (keep last occurrence)
     df = df.drop_duplicates(subset=["earnings_date"], keep="last")
+    is_indian = ticker.upper().endswith((".NS", ".BO"))
+    today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
     rows = []
     for _, row in df.iterrows():
         edate = pd.Timestamp(row["earnings_date"]).strftime("%Y-%m-%d")
+        # Anti-fabrication rule: never take future results dates from yfinance for Indian equities
+        if is_indian and edate >= today_str:
+            continue
         rows.append(
             (
                 ticker,
@@ -153,6 +158,8 @@ def _write_earnings(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
                 "yfinance",
             )
         )
+    if not rows:
+        return
     with _connect(settings) as connection:
         connection.executemany(
             """
@@ -432,9 +439,24 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
     max_retries = 5
     backoff = 0.5
     inserted = 0
+    today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
+    sym_list = list({r[0] for r in rows})
     for attempt in range(max_retries):
         try:
             with _connect(settings) as connection:
+                # Purge any unconfirmed yfinance future dates for these tickers
+                for i in range(0, len(sym_list), 500):
+                    chunk = sym_list[i : i + 500]
+                    ph = ", ".join(["?"] * len(chunk))
+                    connection.execute(
+                        f"""
+                        DELETE FROM earnings_history
+                        WHERE ticker IN ({ph})
+                          AND earnings_date >= ?
+                          AND source LIKE '%yfinance%'
+                        """,
+                        chunk + [today_str],
+                    )
                 inserted = connection.executemany(
                     """
                     INSERT INTO earnings_history (ticker, earnings_date, source)
@@ -667,6 +689,21 @@ def ingest_bse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
             ticker_rows.append((ticker, cname, mcap, now_str))
 
     with _connect(settings) as connection:
+        # Purge any unconfirmed yfinance future dates for incoming symbols before merging verified BSE dates
+        today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
+        sym_list = list({r[0] for r in eh_rows})
+        for i in range(0, len(sym_list), 500):
+            chunk = sym_list[i : i + 500]
+            ph = ", ".join(["?"] * len(chunk))
+            connection.execute(
+                f"""
+                DELETE FROM earnings_history
+                WHERE ticker IN ({ph})
+                  AND earnings_date >= ?
+                  AND source LIKE '%yfinance%'
+                """,
+                chunk + [today_str],
+            )
         inserted = connection.executemany(
             """
             INSERT INTO earnings_history (ticker, earnings_date, source)

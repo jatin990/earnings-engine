@@ -1009,12 +1009,16 @@ def calculate_or_fetch_eps(
         except Exception as e:
             logger.warning("[CALC-EPS] Error saving quarterly income statements for %s: %s", sym, e)
 
-    # Save discovered consensus dates
+    # Save discovered consensus dates (gate out future dates for Indian equities)
     if quarterly_eps_records:
         try:
+            is_indian = sym.endswith((".NS", ".BO"))
             with conn:
                 for rec in quarterly_eps_records:
                     r_dt = rec["date"]
+                    # Never accept future consensus dates from yfinance for Indian equities
+                    if is_indian and r_dt >= now_date_str:
+                        continue
                     r_rep = rec["eps_reported"]
                     r_est = rec["eps_estimate"]
                     r_surp = round(((r_rep - r_est) / abs(r_est)) * 100.0, 2) if (r_rep is not None and r_est is not None and abs(r_est) > 0.0001) else None
