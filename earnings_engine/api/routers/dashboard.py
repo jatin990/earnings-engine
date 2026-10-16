@@ -179,6 +179,59 @@ async def dashboard_results_recalculate_prices(
         raise HTTPException(status_code=500, detail=f"Failed to recalculate prices: {str(e)}")
 
 
+@router.get("/api/v1/dashboard/results/refresh-price")
+async def dashboard_results_refresh_price(
+    ticker: str = Query(..., description="Stock ticker symbol"),
+):
+    """Refresh live market price snapshot for a single ticker in Results Ledger."""
+    from earnings_engine.data import prices as prices_mod
+    from earnings_engine.data.universe import load_market_cap
+
+    sym = ticker.strip().upper()
+    if not sym:
+        raise HTTPException(status_code=400, detail="Ticker cannot be empty")
+
+    try:
+        quote = await asyncio.to_thread(prices_mod.fetch_live_quote, sym, force=True, settings=_settings)
+        cur_price = quote.get("current_price")
+        if cur_price is None:
+            df = await asyncio.to_thread(prices_mod.load_prices, sym, _settings)
+            if not df.empty and "close" in df.columns:
+                closes = df["close"].dropna()
+                if not closes.empty:
+                    cur_price = float(closes.iloc[-1])
+
+        mcap = quote.get("market_cap")
+        if mcap is None:
+            mcap = await asyncio.to_thread(load_market_cap, sym, _settings)
+
+        formatted_price = f"{float(cur_price):,.2f}" if cur_price is not None else "—"
+        if mcap is not None and float(mcap) > 0:
+            formatted_mcap = f"{float(mcap) / 1e7:,.1f} Cr" if sym.endswith(".NS") else f"${float(mcap) / 1e9:,.2f}B"
+        else:
+            formatted_mcap = "—"
+
+        return {
+            "success": True,
+            "ticker": sym,
+            "metrics": {
+                "current_price": formatted_price,
+                "raw_price": round(float(cur_price), 2) if cur_price is not None else None,
+                "market_cap": formatted_mcap,
+                "raw_mcap": round(float(mcap), 0) if mcap is not None else None,
+                "previous_close": quote.get("previous_close"),
+                "day_change": quote.get("day_change"),
+                "day_change_pct": quote.get("day_change_pct"),
+                "week_52_high": quote.get("week_52_high"),
+                "week_52_low": quote.get("week_52_low"),
+            },
+            "quote": quote,
+        }
+    except Exception as e:
+        logger.exception("Error in dashboard_results_refresh_price for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh price for {sym}: {str(e)}")
+
+
 @router.get("/api/v1/dashboard/results/summarize")
 async def dashboard_results_summarize(
     market: str = Query("ALL", description="Market universe"),

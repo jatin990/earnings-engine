@@ -512,16 +512,34 @@ const ResultsLedger = (() => {
   }
 
   async function refreshSinglePrice(ticker, btn) {
-    const orig = btn?.textContent ?? '↻';
-    if (btn) { btn.disabled = true; btn.textContent = '⌛'; }
+    const orig = btn?.innerHTML ?? '↻';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">↻</span>';
+    }
     try {
       const res = await fetch(`/api/v1/dashboard/results/refresh-price?ticker=${encodeURIComponent(ticker)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
-      if (d.metrics) updateDomRowWithMetrics(ticker, d.metrics);
-    } catch (err) { _toast(`Refresh failed for ${ticker}: ${err.message}`, 'error'); }
-    finally {
-      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      if (d.metrics) {
+        updateDomRowWithMetrics(ticker, d.metrics);
+        if (btn) {
+          btn.innerHTML = '✓';
+          btn.style.color = '#34d399';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+            btn.style.color = '';
+          }, 1200);
+        }
+        _toast(`Refreshed quote for ${ticker}`, 'info');
+      }
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+      }
+      _toast(`Refresh failed for ${ticker}: ${err.message}`, 'error');
     }
   }
 
@@ -529,8 +547,17 @@ const ResultsLedger = (() => {
     const row = document.querySelector(`.results-row[data-ticker="${_esc(ticker)}"]`);
     if (!row) return;
     if (metrics.current_price != null) {
-      const priceEl = row.querySelector('.cell-current-price span:first-of-type');
+      const priceEl = row.querySelector('.price-val') ||
+                      row.querySelector('.cell-current-price div > div > span:not(.live-pulse-dot)') ||
+                      row.querySelector('.cell-current-price span:first-of-type');
       if (priceEl) priceEl.textContent = metrics.current_price;
+      if (metrics.raw_price != null) row.dataset.price = String(metrics.raw_price);
+    }
+    if (metrics.market_cap != null) {
+      const mcapEl = row.querySelector('.mcap-val') ||
+                     row.querySelector('.cell-current-price > div > span:last-child');
+      if (mcapEl) mcapEl.textContent = metrics.market_cap;
+      if (metrics.raw_mcap != null) row.dataset.mcap = String(metrics.raw_mcap);
     }
   }
 

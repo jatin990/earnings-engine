@@ -154,3 +154,36 @@ def test_stale_cache_without_sections_bypassed(test_settings, monkeypatch):
     result = get_month_filter_report_components(days=10, market="TEST", past_days=10, settings=test_settings)
     assert called == [True]
     assert "sections" in result
+
+
+def test_results_refresh_price_endpoint(monkeypatch):
+    """Test /api/v1/dashboard/results/refresh-price returns updated quote and metrics."""
+    from earnings_engine.data import prices as prices_mod
+
+    def mock_fetch_live_quote(sym, force=True, settings=None):
+        return {
+            "ticker": sym,
+            "current_price": 4520.50,
+            "previous_close": 4480.00,
+            "day_change": 40.50,
+            "day_change_pct": 0.90,
+            "week_52_high": 5000.00,
+            "week_52_low": 3200.00,
+            "market_cap": 85000000000.0,
+        }
+
+    monkeypatch.setattr(prices_mod, "fetch_live_quote", mock_fetch_live_quote)
+
+    client = TestClient(app)
+    response = client.get("/api/v1/dashboard/results/refresh-price?ticker=E2E.NS")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["ticker"] == "E2E.NS"
+    assert data["metrics"]["current_price"] == "4,520.50"
+    assert data["metrics"]["raw_price"] == 4520.50
+    assert "Cr" in data["metrics"]["market_cap"]
+    assert data["metrics"]["raw_mcap"] == 85000000000.0
+    assert data["metrics"]["day_change"] == 40.50
+    assert data["metrics"]["day_change_pct"] == 0.90
+
