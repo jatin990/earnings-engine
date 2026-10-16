@@ -230,8 +230,14 @@ def _rebuild_candidates() -> None:
     _pool["warm_count"] = len(_pool["warm"])
 
 
+_BREAKOUT_DB_INITIALIZED: bool = False
+
+
 def _init_breakout_db(conn: Any) -> None:
     """Ensure breakout_radar table and performance indices exist with strategy tracking."""
+    global _BREAKOUT_DB_INITIALIZED
+    if _BREAKOUT_DB_INITIALIZED:
+        return
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS breakout_radar (
@@ -287,6 +293,7 @@ def _init_breakout_db(conn: Any) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strat_tier ON breakout_radar(strategy, tier)")
     except Exception:
         pass
+    _BREAKOUT_DB_INITIALIZED = True
 
 
 def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
@@ -594,6 +601,12 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             pass
     except Exception as e:
         logger.error("[BREAKOUT-DB] Failed persisting breakout setups to DB: %s", e)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
@@ -1194,6 +1207,12 @@ def prune_breakout_audit_log(days: int = 30, settings: Settings | None = None) -
             logger.info("[BREAKOUT-AUDIT] Pruned %d records older than %d days (%s)", deleted, days, cutoff_iso[:10])
     except Exception as e:
         logger.warning("[BREAKOUT-AUDIT] Failed pruning audit log: %s", e)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
     return deleted
 
 

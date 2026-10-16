@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import sqlite3
 import time
 from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
-from typing import Any
+from typing import Any, Iterator
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
@@ -25,137 +26,24 @@ def _db_path(settings: Settings) -> Path:
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings) -> Any:
-    """Connect to the shared database and create the earnings table if missing."""
+@contextmanager
+def _connect(settings: Settings) -> Iterator[Any]:
+    """Connect to the shared database with automated lifecycle management."""
     settings.ensure_dirs()
     connection = get_db_connection(settings)
-
-    # Check if the old schema (PK = ticker+earnings_date, no source in PK) exists.
-    needs_migration = False
     try:
-        schema = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='earnings_history'").fetchone()
-        sql_text = ""
-        if schema is not None:
-            if hasattr(schema, "get"):
-                sql_text = schema.get("sql") or ""
-            elif isinstance(schema, (tuple, list)) and len(schema) > 0:
-                sql_text = schema[0] or ""
-            elif hasattr(schema, "keys") and "sql" in schema.keys():
-                sql_text = schema["sql"] or ""
-        if sql_text and "source TEXT DEFAULT 'yfinance'" in sql_text and "PRIMARY KEY (ticker, earnings_date)" in sql_text:
-            needs_migration = True
+        yield connection
     except Exception:
-        pass
-
-    if needs_migration:
-        # Migrate from old schema (PK=ticker+earnings_date) to new schema
-        # (PK=ticker+earnings_date+source) so both yfinance and nse rows can
-        # coexist for the same date.
-        connection.execute("ALTER TABLE earnings_history RENAME TO earnings_history_old")
-        connection.execute(
-            """
-            CREATE TABLE earnings_history (
-                ticker TEXT NOT NULL,
-                earnings_date TEXT NOT NULL,
-                eps_estimate REAL,
-                eps_reported REAL,
-                surprise_pct REAL,
-                source TEXT NOT NULL DEFAULT 'yfinance',
-                PRIMARY KEY (ticker, earnings_date, source)
-            )
-            """
-        )
-        # Copy old rows; rows that were re-tagged as 'nse' by the UPDATE
-        # statement get duplicated as both 'yfinance' (with EPS) and 'nse'.
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
-            SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source FROM earnings_history_old
-            """
-        )
-        # For rows tagged 'nse' that have EPS data, also create a 'yfinance'
-        # copy so the yfinance calendar isn't lost.
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
-            SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, 'yfinance'
-            FROM earnings_history_old WHERE source = 'nse' AND eps_estimate IS NOT NULL
-            """
-        )
-        connection.execute("DROP TABLE earnings_history_old")
-    else:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS earnings_history (
-                ticker TEXT NOT NULL,
-                earnings_date TEXT NOT NULL,
-                eps_estimate REAL,
-                eps_reported REAL,
-                surprise_pct REAL,
-                source TEXT NOT NULL DEFAULT 'yfinance',
-                PRIMARY KEY (ticker, earnings_date)
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_earnings_history_date
-            ON earnings_history (earnings_date)
-            """
-        )
-
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS tickers (
-            ticker TEXT PRIMARY KEY,
-            name TEXT,
-            company_name TEXT,
-            industry TEXT,
-            sector TEXT,
-            market_cap REAL,
-            current_price REAL,
-            earnings_fetched_at TEXT,
-            prices_fetched_at TEXT,
-            last_updated TEXT
-        )
-        """
-    )
-    try:
-        cols = {r[1] for r in connection.execute("PRAGMA table_info(earnings_fetch_log)").fetchall()}
-        if cols and "fetch_date" not in cols:
-            connection.execute("DROP TABLE IF EXISTS earnings_fetch_log")
-    except Exception:
-        pass
-
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS earnings_fetch_log (
-            fetch_date TEXT NOT NULL PRIMARY KEY,
-            fetched_at TEXT NOT NULL,
-            status TEXT NOT NULL,
-            events_count INTEGER DEFAULT 0,
-            inserted_count INTEGER DEFAULT 0
-        )
-        """
-    )
-    try:
-        cols_mc = {r[1] for r in connection.execute("PRAGMA table_info(earnings_month_cache)").fetchall()}
-        if cols_mc and "payload_json" not in cols_mc:
-            connection.execute("DROP TABLE IF EXISTS earnings_month_cache")
-    except Exception:
-        pass
-
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS earnings_month_cache (
-            cache_key TEXT NOT NULL PRIMARY KEY,
-            updated_at TEXT NOT NULL,
-            payload_json TEXT NOT NULL
-        )
-        """
-    )
-    connection.commit()
-    return connection
+        try:
+            connection.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
 
 def _is_fresh(ticker: str, settings: Settings) -> bool:
@@ -541,16 +429,34 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
         logger.info("nse result-calendar returned no rows")
         return {"total": 0, "inserted": 0, "errors": 0}
 
-    with _connect(settings) as connection:
-        inserted = connection.executemany(
-            """
-            INSERT INTO earnings_history (ticker, earnings_date, source)
-            VALUES (?, ?, 'nse')
-            ON CONFLICT(ticker, earnings_date) DO NOTHING
-            """,
-            rows,
-        ).rowcount
-        connection.commit()
+    max_retries = 5
+    backoff = 0.5
+    inserted = 0
+    for attempt in range(max_retries):
+        try:
+            with _connect(settings) as connection:
+                inserted = connection.executemany(
+                    """
+                    INSERT INTO earnings_history (ticker, earnings_date, source)
+                    VALUES (?, ?, 'nse')
+                    ON CONFLICT(ticker, earnings_date) DO NOTHING
+                    """,
+                    rows,
+                ).rowcount
+                connection.commit()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                logger.warning(
+                    "Database locked during NSE results calendar ingest (attempt %d/%d), retrying in %.1fs...",
+                    attempt + 1,
+                    max_retries,
+                    backoff,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
 
     logger.info("nse result-calendar ingest complete total=%s inserted=%s", len(rows), inserted)
     return {"total": len(rows), "inserted": inserted, "errors": 0}
@@ -1044,17 +950,35 @@ def sync_present_day_earnings_delta(settings: Settings, force: bool = False) -> 
     inserted = ingest_nse.get("inserted", 0) + ingest_bse.get("inserted", 0)
     total_found = ingest_nse.get("total", 0) + ingest_bse.get("total", 0)
 
-    with _connect(settings) as connection:
-        total_events = connection.execute(
-            "SELECT COUNT(*) FROM earnings_history WHERE earnings_date >= ?",
-            (today_str,),
-        ).fetchone()[0]
+    max_retries = 5
+    backoff = 0.5
+    total_events = 0
+    for attempt in range(max_retries):
+        try:
+            with _connect(settings) as connection:
+                total_events = connection.execute(
+                    "SELECT COUNT(*) FROM earnings_history WHERE earnings_date >= ?",
+                    (today_str,),
+                ).fetchone()[0]
 
-        connection.execute(
-            "INSERT OR REPLACE INTO earnings_fetch_log (fetch_date, fetched_at, status, events_count, inserted_count) VALUES (?, ?, ?, ?, ?)",
-            (today_str, now_str, "UP_TO_DATE", total_events, inserted),
-        )
-        connection.commit()
+                connection.execute(
+                    "INSERT OR REPLACE INTO earnings_fetch_log (fetch_date, fetched_at, status, events_count, inserted_count) VALUES (?, ?, ?, ?, ?)",
+                    (today_str, now_str, "UP_TO_DATE", total_events, inserted),
+                )
+                connection.commit()
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                logger.warning(
+                    "Database locked during present day earnings delta sync (attempt %d/%d), retrying in %.1fs...",
+                    attempt + 1,
+                    max_retries,
+                    backoff,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
 
     return {
         "today": today_str,

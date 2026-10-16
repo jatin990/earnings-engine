@@ -161,45 +161,58 @@ def match_industry_benchmark(industry_str: str | None) -> tuple[str, dict[str, f
 # ---------------------------------------------------------------------------
 # Database Tables Initialization
 # ---------------------------------------------------------------------------
+_STOCK_RATING_SCHEMA_INITIALIZED: bool = False
+
+
 def ensure_stock_rating_schema(settings: Settings) -> None:
     """Ensure tables exist for stock ratings, snapshots, and recalculation logs."""
-    with get_db_connection(settings) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS stock_ratings (
-                ticker TEXT PRIMARY KEY,
-                industry TEXT,
-                matched_benchmark TEXT,
-                fundamental_score REAL,
-                fundamental_grade TEXT,
-                technical_score REAL,
-                technical_grade TEXT,
-                composite_score REAL,
-                composite_grade TEXT,
-                metrics_json TEXT,
-                technical_json TEXT,
-                ai_note TEXT,
-                last_updated TEXT
+    global _STOCK_RATING_SCHEMA_INITIALIZED
+    if _STOCK_RATING_SCHEMA_INITIALIZED:
+        return
+    conn = get_db_connection(settings)
+    try:
+        with conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_ratings (
+                    ticker TEXT PRIMARY KEY,
+                    industry TEXT,
+                    matched_benchmark TEXT,
+                    fundamental_score REAL,
+                    fundamental_grade TEXT,
+                    technical_score REAL,
+                    technical_grade TEXT,
+                    composite_score REAL,
+                    composite_grade TEXT,
+                    metrics_json TEXT,
+                    technical_json TEXT,
+                    ai_note TEXT,
+                    last_updated TEXT
+                )
+                """
             )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS stock_rating_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT,
-                fundamental_score REAL,
-                fundamental_grade TEXT,
-                technical_score REAL,
-                technical_grade TEXT,
-                metrics_json TEXT,
-                ai_note TEXT,
-                source TEXT,
-                created_at TEXT
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_rating_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT,
+                    fundamental_score REAL,
+                    fundamental_grade TEXT,
+                    technical_score REAL,
+                    technical_grade TEXT,
+                    metrics_json TEXT,
+                    ai_note TEXT,
+                    source TEXT,
+                    created_at TEXT
+                )
+                """
             )
-            """
-        )
-        conn.commit()
+        _STOCK_RATING_SCHEMA_INITIALIZED = True
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +501,8 @@ def recalculate_stock_rating(
 
     # 1. Fetch previous snapshot for diffing
     prev_snapshot: dict[str, Any] | None = None
-    with get_db_connection(settings) as conn:
+    conn = get_db_connection(settings)
+    try:
         row = conn.execute(
             """
             SELECT fundamental_score, fundamental_grade, technical_score, technical_grade, metrics_json, ai_note, last_updated
@@ -506,6 +520,11 @@ def recalculate_stock_rating(
                 "ai_note": row[5],
                 "last_updated": row[6],
             }
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     # 2. Fetch fresh live data from yfinance & DB with local fallback
     info: dict[str, Any] = {}
@@ -522,27 +541,32 @@ def recalculate_stock_rating(
 
     # Fallback to local DB if yfinance was rate-limited or failed
     if not info or not any(k in info for k in ("trailingPE", "priceToBook", "debtToEquity", "operatingMargins")):
+        conn_fb = get_db_connection(settings)
         try:
-            with get_db_connection(settings) as conn:
-                t_row = conn.execute(
-                    "SELECT metrics, sector, industry FROM tickers WHERE ticker = ?",
-                    (ticker,),
-                ).fetchone()
-                if t_row and t_row[0]:
-                    try:
-                        cached_m = json.loads(t_row[0])
-                        if isinstance(cached_m, dict):
-                            for k, v in cached_m.items():
-                                if k not in info and v is not None:
-                                    info[k] = v
-                    except Exception:
-                        pass
-                if t_row and len(t_row) > 1 and t_row[1] and "sector" not in info:
-                    info["sector"] = t_row[1]
-                if t_row and len(t_row) > 2 and t_row[2] and "industry" not in info:
-                    info["industry"] = t_row[2]
+            t_row = conn_fb.execute(
+                "SELECT metrics, sector, industry FROM tickers WHERE ticker = ?",
+                (ticker,),
+            ).fetchone()
+            if t_row and t_row[0]:
+                try:
+                    cached_m = json.loads(t_row[0])
+                    if isinstance(cached_m, dict):
+                        for k, v in cached_m.items():
+                            if k not in info and v is not None:
+                                info[k] = v
+                except Exception:
+                    pass
+            if t_row and len(t_row) > 1 and t_row[1] and "sector" not in info:
+                info["sector"] = t_row[1]
+            if t_row and len(t_row) > 2 and t_row[2] and "industry" not in info:
+                info["industry"] = t_row[2]
         except Exception as ex:
             logger.debug(f"DB fallback query failed for {ticker}: {ex}")
+        finally:
+            try:
+                conn_fb.close()
+            except Exception:
+                pass
 
     # Load industry
     from earnings_engine.data.industry import load_industry
@@ -623,65 +647,88 @@ def recalculate_stock_rating(
             "technical_score_diff": 0.0,
         }
 
-    # 4. Save to Database
-    with get_db_connection(settings) as conn:
-        conn.execute(
-            """
-            INSERT INTO stock_ratings (
-                ticker, industry, matched_benchmark, fundamental_score, fundamental_grade,
-                technical_score, technical_grade, composite_score, composite_grade,
-                metrics_json, technical_json, ai_note, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticker) DO UPDATE SET
-                industry = excluded.industry,
-                matched_benchmark = excluded.matched_benchmark,
-                fundamental_score = excluded.fundamental_score,
-                fundamental_grade = excluded.fundamental_grade,
-                technical_score = excluded.technical_score,
-                technical_grade = excluded.technical_grade,
-                composite_score = excluded.composite_score,
-                composite_grade = excluded.composite_grade,
-                metrics_json = excluded.metrics_json,
-                technical_json = excluded.technical_json,
-                ai_note = excluded.ai_note,
-                last_updated = excluded.last_updated
-            """,
-            (
-                ticker,
-                ind,
-                fund_res["sector"],
-                fund_res["score"],
-                fund_res["grade"],
-                tech_res["score"],
-                tech_res["grade"],
-                comp_score,
-                comp_grade,
-                json.dumps(fund_res["metrics"]),
-                json.dumps(tech_res["metrics"]),
-                ai_note,
-                now_str,
-            ),
-        )
-        conn.execute(
-            """
-            INSERT INTO stock_rating_snapshots (
-                ticker, fundamental_score, fundamental_grade, technical_score,
-                technical_grade, metrics_json, ai_note, source, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                ticker,
-                fund_res["score"],
-                fund_res["grade"],
-                tech_res["score"],
-                tech_res["grade"],
-                json.dumps(fund_res["metrics"]),
-                ai_note,
-                source,
-                now_str,
-            ),
-        )
-        conn.commit()
+    # 4. Save to Database with write retry on lock
+    max_retries = 5
+    backoff = 0.5
+    for attempt in range(max_retries):
+        conn_w = get_db_connection(settings)
+        try:
+            with conn_w:
+                conn_w.execute(
+                    """
+                    INSERT INTO stock_ratings (
+                        ticker, industry, matched_benchmark, fundamental_score, fundamental_grade,
+                        technical_score, technical_grade, composite_score, composite_grade,
+                        metrics_json, technical_json, ai_note, last_updated
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker) DO UPDATE SET
+                        industry = excluded.industry,
+                        matched_benchmark = excluded.matched_benchmark,
+                        fundamental_score = excluded.fundamental_score,
+                        fundamental_grade = excluded.fundamental_grade,
+                        technical_score = excluded.technical_score,
+                        technical_grade = excluded.technical_grade,
+                        composite_score = excluded.composite_score,
+                        composite_grade = excluded.composite_grade,
+                        metrics_json = excluded.metrics_json,
+                        technical_json = excluded.technical_json,
+                        ai_note = excluded.ai_note,
+                        last_updated = excluded.last_updated
+                    """,
+                    (
+                        ticker,
+                        ind,
+                        fund_res["sector"],
+                        fund_res["score"],
+                        fund_res["grade"],
+                        tech_res["score"],
+                        tech_res["grade"],
+                        comp_score,
+                        comp_grade,
+                        json.dumps(fund_res["metrics"]),
+                        json.dumps(tech_res["metrics"]),
+                        ai_note,
+                        now_str,
+                    ),
+                )
+                conn_w.execute(
+                    """
+                    INSERT INTO stock_rating_snapshots (
+                        ticker, fundamental_score, fundamental_grade, technical_score,
+                        technical_grade, metrics_json, ai_note, source, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ticker,
+                        fund_res["score"],
+                        fund_res["grade"],
+                        tech_res["score"],
+                        tech_res["grade"],
+                        json.dumps(fund_res["metrics"]),
+                        ai_note,
+                        source,
+                        now_str,
+                    ),
+                )
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                logger.warning(
+                    "Database locked in recalculate_stock_rating for %s (attempt %d/%d), retrying in %.1fs...",
+                    ticker,
+                    attempt + 1,
+                    max_retries,
+                    backoff,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+        finally:
+            try:
+                conn_w.close()
+            except Exception:
+                pass
 
     return {
         "ticker": ticker,
@@ -700,7 +747,8 @@ def recalculate_stock_rating(
 def get_stock_rating(ticker: str, settings: Settings) -> dict[str, Any] | None:
     """Retrieve the cached rating for a ticker, or None if not computed."""
     ensure_stock_rating_schema(settings)
-    with get_db_connection(settings) as conn:
+    conn = get_db_connection(settings)
+    try:
         row = conn.execute(
             """
             SELECT industry, matched_benchmark, fundamental_score, fundamental_grade,
@@ -710,6 +758,11 @@ def get_stock_rating(ticker: str, settings: Settings) -> dict[str, Any] | None:
             """,
             (ticker,),
         ).fetchone()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     if not row:
         return None

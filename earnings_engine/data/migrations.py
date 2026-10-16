@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, NamedTuple
 
 from earnings_engine.config import Settings
-from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.db import get_db_connection, _cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.migrations")
@@ -2536,7 +2536,10 @@ def reset_migration_cache() -> None:
 def apply_migrations(settings: Settings | None = None, force: bool = False) -> list[str]:
     """Execute all pending database migrations in order."""
     settings = settings or Settings()
-    db_key = str(getattr(settings, "db_path", ""))
+    try:
+        db_key = str(_cache_path(settings))
+    except Exception:
+        db_key = str(getattr(settings, "db_path", "default"))
     if not force and db_key and db_key in _APPLIED_DBS:
         return []
 

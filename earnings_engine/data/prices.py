@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import math
 import sqlite3
@@ -9,7 +10,7 @@ import threading
 import time
 from datetime import datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 try:
     from zoneinfo import ZoneInfo
@@ -137,12 +138,23 @@ def _empty_frame() -> pd.DataFrame:
     return df
 
 
-def _connect(settings: Settings) -> sqlite3.Connection | Any:
+@contextmanager
+def _connect(settings: Settings) -> Iterator[Any]:
     settings.ensure_dirs()
-    from earnings_engine.data.migrations import apply_migrations
-    apply_migrations(settings)
     connection = get_db_connection(settings)
-    return connection
+    try:
+        yield connection
+    except Exception:
+        try:
+            connection.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
 
 def _is_fresh(ticker: str, settings: Settings) -> bool:
