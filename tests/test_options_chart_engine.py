@@ -139,3 +139,16 @@ def test_non_fno_symbol_handling():
     res = oce.get_options_chart_intelligence(symbol="UNSUPPORTED_NON_FNO_EQUITY_ABC")
     assert res["status"] == "NOT_FNO"
     assert res["candles"] == []
+
+
+def test_non_fno_symbol_with_allow_non_fno(monkeypatch):
+    sample_df = _sample_intraday_df()
+    monkeypatch.setattr(oce, "fetch_chart_candles", lambda *args, **kwargs: sample_df)
+    res = oce.get_options_chart_intelligence(symbol="UNSUPPORTED_NON_FNO_EQUITY_XYZ", allow_non_fno=True)
+    assert res["success"] is True
+    assert res["status"] in ["LIVE", "EOD_SNAPSHOT"]
+    assert len(res["candles"]) == len(sample_df)
+    assert res["derivatives_levels"] == {}
+    assert "vwap" in res["indicators"]
+    assert "where_to_buy" in res["tactical_signals"]
+

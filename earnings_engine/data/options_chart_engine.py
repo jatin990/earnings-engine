@@ -82,9 +82,11 @@ def fetch_chart_candles(
     if norm_interval not in valid_intervals:
         norm_interval = "5m"
 
-    # Default periods based on interval
-    if not period:
-        period = "5d" if norm_interval in {"1m", "5m", "15m", "30m", "1h", "60m"} else "6mo"
+    # Default periods based on interval: auto-expand daily to 6mo
+    if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
+        period = "6mo"
+    elif not period:
+        period = "5d"
 
     try:
         t = yf.Ticker(yf_symbol)
@@ -496,11 +498,15 @@ def get_options_chart_intelligence(
     interval: str = "5m",
     period: str = "5d",
     force_refresh: bool = False,
+    allow_non_fno: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve full candlestick history, quantitative indicators, SMC levels, and tactical trade plans."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
-    cache_key = f"{clean_sym}:{interval}:{period}"
+    norm_interval = interval.lower() if interval.lower() != "1d" else "1d"
+    if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
+        period = "6mo"
+    cache_key = f"{clean_sym}:{norm_interval}:{period}:{allow_non_fno}"
 
     now = time.monotonic()
     if not force_refresh and cache_key in _CHART_CACHE:
@@ -509,7 +515,8 @@ def get_options_chart_intelligence(
             return cached_res
 
     # Anti-fabrication check for F&O eligibility
-    if not is_fno_eligible(clean_sym):
+    is_fno = is_fno_eligible(clean_sym)
+    if not is_fno and not allow_non_fno:
         res = {
             "success": True,
             "status": "NOT_FNO",
@@ -526,12 +533,14 @@ def get_options_chart_intelligence(
 
     settings = settings or Settings()
 
-    # 1. Fetch Option Chain intelligence (Max Pain, Walls, PCR)
-    try:
-        opt_analysis = oc_mod.analyze_option_chain(clean_sym, force_refresh=force_refresh, settings=settings)
-    except Exception as e:
-        logger.debug("[OPTIONS-CHART] Option chain analysis fallback for %s: %s", clean_sym, e)
-        opt_analysis = {}
+    # 1. Fetch Option Chain intelligence (Max Pain, Walls, PCR) if F&O eligible
+    opt_analysis = {}
+    if is_fno:
+        try:
+            opt_analysis = oc_mod.analyze_option_chain(clean_sym, force_refresh=force_refresh, settings=settings)
+        except Exception as e:
+            logger.debug("[OPTIONS-CHART] Option chain analysis fallback for %s: %s", clean_sym, e)
+            opt_analysis = {}
 
     spot_price = float(opt_analysis.get("spot_price") or 0.0)
 
@@ -555,7 +564,7 @@ def get_options_chart_intelligence(
                 "put_wall": opt_analysis.get("support_strike"),
                 "pcr_oi": opt_analysis.get("pcr_oi"),
                 "sentiment": opt_analysis.get("sentiment") or "NEUTRAL",
-            },
+            } if is_fno else {},
             "tactical_signals": {},
         }
         _CHART_CACHE[cache_key] = (now, res)
@@ -591,17 +600,20 @@ def get_options_chart_intelligence(
     trendlines = _detect_trendlines(df)
 
     # 5. Derivatives Structural Levels
-    derivatives_levels = {
-        "max_pain": opt_analysis.get("max_pain_strike") or round(spot_price, 2),
-        "call_wall": opt_analysis.get("resistance_strike") or round(spot_price * 1.02, 2),
-        "call_wall_oi": opt_analysis.get("call_oi_total") or 0,
-        "put_wall": opt_analysis.get("support_strike") or round(spot_price * 0.98, 2),
-        "put_wall_oi": opt_analysis.get("put_oi_total") or 0,
-        "pcr_oi": opt_analysis.get("pcr_oi") or 1.0,
-        "sentiment": opt_analysis.get("sentiment") or "NEUTRAL",
-        "straddle_expected_high": round(spot_price * 1.015, 2),
-        "straddle_expected_low": round(spot_price * 0.985, 2),
-    }
+    if is_fno:
+        derivatives_levels = {
+            "max_pain": opt_analysis.get("max_pain_strike") or round(spot_price, 2),
+            "call_wall": opt_analysis.get("resistance_strike") or round(spot_price * 1.02, 2),
+            "call_wall_oi": opt_analysis.get("call_oi_total") or 0,
+            "put_wall": opt_analysis.get("support_strike") or round(spot_price * 0.98, 2),
+            "put_wall_oi": opt_analysis.get("put_oi_total") or 0,
+            "pcr_oi": opt_analysis.get("pcr_oi") or 1.0,
+            "sentiment": opt_analysis.get("sentiment") or "NEUTRAL",
+            "straddle_expected_high": round(spot_price * 1.015, 2),
+            "straddle_expected_low": round(spot_price * 0.985, 2),
+        }
+    else:
+        derivatives_levels = {}
 
     # 6. Tactical Confluence Signals
     tactical_signals = _generate_tactical_signals(
@@ -641,3 +653,7 @@ def get_options_chart_intelligence(
 
     _CHART_CACHE[cache_key] = (now, res)
     return res
+
+
+# Export alias
+fetch_options_chart_intelligence = get_options_chart_intelligence

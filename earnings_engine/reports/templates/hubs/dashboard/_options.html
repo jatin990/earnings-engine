@@ -415,13 +415,13 @@
             </div>
         </div>
 
-        <!-- GEX Tactical Market Briefing & Action Directive Header Bar -->
-        <div id="optGexMarketBriefing" style="background:#090a0f;border:1px solid rgba(168,85,247,0.25);border-radius:10px;padding:1rem 1.15rem;margin-bottom:1.15rem;box-shadow:0 4px 20px rgba(0,0,0,0.35);">
+        <!-- Tactical Derivatives Market Briefing & Action Directive Header Bar -->
+        <div id="optGexMarketBriefing" style="background:#090a0f;border:1px solid rgba(168,85,247,0.25);border-radius:10px;padding:1rem 1.15rem;margin-bottom:1.15rem;box-shadow:0 4px 20px rgba(0,0,0,0.35);transition:border-color 0.2s ease;">
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1.25rem;align-items:start;">
                 <!-- 1. Market Condition & Texture -->
                 <div style="border-right:1px solid rgba(255,255,255,0.06);padding-right:0.75rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem;">
-                        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">1. Market Condition Today</span>
+                        <span id="optGexMarketConditionTitle" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">1. Market Condition Today</span>
                         <span id="optGexRegimeBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;">
                             🛡️ POSITIVE GAMMA
                         </span>
@@ -437,32 +437,32 @@
                 <!-- 2. Expected Daily Derivatives Range -->
                 <div style="border-right:1px solid rgba(255,255,255,0.06);padding-right:0.75rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem;">
-                        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">2. Expected Range</span>
+                        <span id="optGexRangeTitle" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">2. Expected Range</span>
                         <span id="optGexRangeSpread" class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;font-family:var(--font-mono);">
                             -- pts
                         </span>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.45rem;">
                         <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:0.35rem 0.55rem;flex:1;">
-                            <span style="font-size:0.62rem;color:#f87171;font-weight:700;display:block;">SUPPORT (PUT WALL)</span>
+                            <span id="optGexSupportLabel" style="font-size:0.62rem;color:#f87171;font-weight:700;display:block;">SUPPORT (PUT WALL)</span>
                             <span id="optGexRangeSupport" style="font-size:0.95rem;font-weight:800;color:#fca5a5;font-family:var(--font-mono);">₹--</span>
                         </div>
                         <span style="color:#64748b;font-weight:800;font-size:0.85rem;">↔</span>
                         <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:0.35rem 0.55rem;flex:1;">
-                            <span style="font-size:0.62rem;color:#34d399;font-weight:700;display:block;">RESISTANCE (CALL WALL)</span>
+                            <span id="optGexResistanceLabel" style="font-size:0.62rem;color:#34d399;font-weight:700;display:block;">RESISTANCE (CALL WALL)</span>
                             <span id="optGexRangeResistance" style="font-size:0.95rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);">₹--</span>
                         </div>
                     </div>
                     <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">
-                        <span>±1σ Move: <strong id="optGexStraddleBounds" style="color:#e2e8f0;">₹-- – ₹--</strong></span>
-                        <span>Gamma Flip: <strong id="optGexFlipLevel" style="color:#c084fc;">₹--</strong></span>
+                        <span><span id="optGexPivot1Label">±1σ Move</span>: <strong id="optGexStraddleBounds" style="color:#e2e8f0;">₹-- – ₹--</strong></span>
+                        <span><span id="optGexPivot2Label">Gamma Flip</span>: <strong id="optGexFlipLevel" style="color:#c084fc;">₹--</strong></span>
                     </div>
                 </div>
 
                 <!-- 3. Tactical Action Directive -->
                 <div>
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.45rem;">
-                        <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">3. Tactical Action Directive</span>
+                        <span id="optGexActionTitle" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">3. Tactical Action Directive</span>
                         <span id="optGexActionBadge" class="badge" style="background:rgba(99,102,241,0.18);color:#818cf8;border:1px solid rgba(99,102,241,0.35);font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:800;">
                             RANGE FADE
                         </span>

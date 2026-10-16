@@ -27,6 +27,8 @@ def test_get_stock_technicals_direct():
     assert res["ticker"] == "RELIANCE.NS"
     assert "technical" in res
     assert "swing_range_20d" in res["technical"]
+    assert "rsi" in res["technical"]
+    assert "rsi_14" in res["technical"]
 
 
 def test_get_stock_earnings_direct():

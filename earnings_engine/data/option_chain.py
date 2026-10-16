@@ -28,6 +28,32 @@ _OPTION_CHAIN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = 900.0  # 15 minutes
 
 
+def _build_unavailable_subtab_summary(message: str = "No equity derivatives listed for this symbol.") -> dict[str, Any]:
+    return {
+        "gamma_regime": "NEUTRAL",
+        "market_texture": "Non-FNO Cash Equity",
+        "texture_badge": "N/A",
+        "texture_theme": "zinc",
+        "narrative": message,
+        "expected_range": {"support": None, "resistance": None, "spread_points": 0, "spread_pct": 0, "range_display": "--"},
+        "action_type": "UNAVAILABLE",
+        "action_badge": "NO DERIVATIVES",
+        "action_theme": "zinc",
+        "action_headline": "No F&O Options Data Available",
+        "action_details": "Cash market equity without exchange-traded options chain.",
+        "buy_level": None,
+        "sell_level": None,
+        "gamma_flip_strike": None,
+        "max_pain_strike": None,
+        "pivot_1_label": "Pivot 1",
+        "pivot_1_val": "--",
+        "pivot_2_label": "Pivot 2",
+        "pivot_2_val": "--",
+        "support_label": "SUPPORT",
+        "resistance_label": "RESISTANCE",
+    }
+
+
 def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: Settings | None = None) -> float:
     """Resolve spot price from local price_history database first before hitting network quote."""
     if spot_price is not None and spot_price > 0:
@@ -234,22 +260,15 @@ def analyze_option_chain(
             "strikes": [],
             "signals": ["NOT_FNO_ELIGIBLE"],
             "spot_price": spot_price,
-            "gex_summary": {
-                "gamma_regime": "NEUTRAL",
-                "market_texture": "Non-FNO Cash Equity",
-                "texture_badge": "N/A",
-                "texture_theme": "zinc",
-                "narrative": "No equity derivatives listed for this symbol.",
-                "expected_range": {"support": None, "resistance": None, "spread_points": 0, "spread_pct": 0, "range_display": "--"},
-                "action_type": "UNAVAILABLE",
-                "action_badge": "NO DERIVATIVES",
-                "action_theme": "zinc",
-                "action_headline": "No F&O Options Data Available",
-                "action_details": "Cash market equity without exchange-traded options chain.",
-                "buy_level": None,
-                "sell_level": None,
-                "gamma_flip_strike": None,
-                "max_pain_strike": None,
+            "gex_summary": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+            "oi_summary": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+            "net_delta_summary": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+            "iv_summary": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+            "subtab_summaries": {
+                "gex": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+                "oi": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+                "net_delta": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
+                "iv": _build_unavailable_subtab_summary("No equity derivatives listed for this symbol."),
             },
         }
         _OPTION_CHAIN_CACHE[cache_key] = (now, res)
@@ -315,6 +334,16 @@ def analyze_option_chain(
             "selected_expiry": selected_expiry,
             "strikes": [],
             "signals": ["OPTION_CHAIN_UNREACHABLE"],
+            "gex_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+            "oi_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+            "net_delta_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+            "iv_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+            "subtab_summaries": {
+                "gex": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+                "oi": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+                "net_delta": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+                "iv": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
+            },
         }
         _OPTION_CHAIN_CACHE[cache_key] = (now, res)
         return res
@@ -569,6 +598,39 @@ def _calculate_option_metrics_from_records(
         sentiment=sentiment,
     )
 
+    oi_summary = derive_oi_action_summary(
+        spot_price=current_spot,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+        max_pain=max_pain,
+        pcr_oi=pcr_oi,
+        pcr_volume=pcr_vol,
+        sentiment=sentiment,
+        call_oi_total=int(call_oi),
+        put_oi_total=int(put_oi),
+    )
+
+    net_delta_summary = derive_net_delta_action_summary(
+        spot_price=current_spot,
+        records=formatted_strikes,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+    )
+
+    iv_summary = derive_iv_action_summary(
+        spot_price=current_spot,
+        records=formatted_strikes,
+        vix_data=vix_profile,
+        expected_move=expected_move_dict,
+    )
+
+    subtab_summaries = {
+        "gex": gex_summary,
+        "oi": oi_summary,
+        "net_delta": net_delta_summary,
+        "iv": iv_summary,
+    }
+
     return {
         "symbol": symbol,
         "pcr_oi": pcr_oi,
@@ -588,6 +650,10 @@ def _calculate_option_metrics_from_records(
         "gamma_regime_label": gamma_profile_data.get("gamma_regime_label"),
         "expected_move": expected_move_dict,
         "gex_summary": gex_summary,
+        "oi_summary": oi_summary,
+        "net_delta_summary": net_delta_summary,
+        "iv_summary": iv_summary,
+        "subtab_summaries": subtab_summaries,
         "vix_profile": vix_profile,
         "market_setups": setups,
         "records_count": len(formatted_strikes),
@@ -1157,6 +1223,405 @@ def derive_gex_action_summary(
         "sell_level": sell_level,
         "gamma_flip_strike": flip_strike,
         "max_pain_strike": mp_val,
+        "pivot_1_label": "±1σ Move",
+        "pivot_1_val": f"₹{em_lower:,.0f} – ₹{em_upper:,.0f}" if (em_lower and em_upper) else "--",
+        "pivot_2_label": "Gamma Flip",
+        "pivot_2_val": f"₹{flip_strike:,.0f}" if flip_strike else "--",
+        "support_label": "SUPPORT (PUT WALL)",
+        "resistance_label": "RESISTANCE (CALL WALL)",
+    }
+
+
+def derive_oi_action_summary(
+    spot_price: float,
+    call_wall: float | None,
+    put_wall: float | None,
+    max_pain: float | None,
+    pcr_oi: float | None = None,
+    pcr_volume: float | None = None,
+    sentiment: str | None = None,
+    call_oi_total: int = 0,
+    put_oi_total: int = 0,
+) -> dict[str, Any]:
+    """Derive Open Interest (OI) & ΔOI header intelligence: writer accumulation, structural barriers, and execution directives."""
+    mp_val = float(max_pain) if max_pain else spot_price
+    c_wall = float(call_wall) if call_wall else round(spot_price * 1.015, 1)
+    p_wall = float(put_wall) if put_wall else round(spot_price * 0.985, 1)
+
+    range_support = p_wall
+    range_resistance = c_wall
+    if range_support > range_resistance:
+        range_support, range_resistance = range_resistance, range_support
+
+    spread_pts = round(range_resistance - range_support, 1)
+    spread_pct = round((spread_pts / spot_price * 100), 2) if spot_price > 0 else 0.0
+
+    pcr_val = float(pcr_oi) if pcr_oi is not None else 1.0
+    sent = sentiment or ("BULLISH" if pcr_val >= 1.2 else ("BEARISH" if pcr_val <= 0.8 else "NEUTRAL"))
+
+    # 1. Market Texture & Writer Mechanics
+    if pcr_val >= 1.2 or sent == "BULLISH":
+        texture = "Bullish Put Writing Dominance (Support Floor Locked)"
+        texture_badge = f"🟢 BULLISH OI (PCR {pcr_val:.2f})"
+        texture_theme = "emerald"
+        narrative = (
+            f"Put writers heavily outweigh call writers with total Put OI of {put_oi_total:,} vs Call OI of {call_oi_total:,} "
+            f"(PCR {pcr_val:.2f}). Heavy institutional put writing builds an immovable demand floor at Put Wall (₹{range_support:,.0f}). "
+            f"Downside drops into support offer high-conviction accumulation entries."
+        )
+    elif pcr_val <= 0.8 or sent == "BEARISH":
+        texture = "Bearish Call Writing Dominance (Overhead Supply Ceiling)"
+        texture_badge = f"🔴 BEARISH OI (PCR {pcr_val:.2f})"
+        texture_theme = "rose"
+        narrative = (
+            f"Call writers dominate the ladder with total Call OI of {call_oi_total:,} vs Put OI of {put_oi_total:,} "
+            f"(PCR {pcr_val:.2f}). A massive supply ceiling is locked at Call Wall (₹{range_resistance:,.0f}). "
+            f"Rallies into overhead resistance face heavy institutional selling and distribution."
+        )
+    else:
+        texture = "Balanced Open Interest Equilibrium (Two-Way Distribution)"
+        texture_badge = f"⚖️ BALANCED OI (PCR {pcr_val:.2f})"
+        texture_theme = "amber"
+        narrative = (
+            f"Option writing inventory is evenly distributed across calls and puts (PCR {pcr_val:.2f}). "
+            f"Price is bounded between institutional Put Wall support at ₹{range_support:,.0f} and Call Wall resistance at ₹{range_resistance:,.0f}, "
+            f"with Max Pain pinning gravity at ₹{mp_val:,.0f}."
+        )
+
+    # 2. Tactical Action Directive
+    dist_to_support = (spot_price - range_support) / spot_price if spot_price > 0 else 0.0
+    dist_to_resistance = (range_resistance - spot_price) / spot_price if spot_price > 0 else 0.0
+
+    if pcr_val >= 1.2 or sent == "BULLISH":
+        if dist_to_support <= 0.005:
+            action_type = "TACTICAL_BUY"
+            action_badge = "BUY AT SUPPORT"
+            action_theme = "emerald"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"BUY AT SUPPORT ₹{range_support:,.0f} (PUT WALL ACCUMULATION)"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is testing high-density Put writing support at ₹{range_support:,.0f}. "
+                f"Writers are defending their premiums. Accumulate with invalidation stop below ₹{range_support * 0.995:,.0f}, "
+                f"targeting Call Wall resistance at ₹{range_resistance:,.0f}."
+            )
+        else:
+            action_type = "BUY_DIPS"
+            action_badge = "BUY THE DIP"
+            action_theme = "emerald"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"BUY DIPS TOWARD ₹{range_support:,.0f} & TARGET ₹{range_resistance:,.0f}"
+            action_details = (
+                f"Bullish open interest structure favors buying pullbacks. Accumulate on dips toward Put Wall support "
+                f"at ₹{range_support:,.0f} (SL: ₹{range_support * 0.995:,.0f}) and take profits at Call Wall resistance at ₹{range_resistance:,.0f}."
+            )
+    elif pcr_val <= 0.8 or sent == "BEARISH":
+        if dist_to_resistance <= 0.005:
+            action_type = "TACTICAL_SELL"
+            action_badge = "SELL AT RESISTANCE"
+            action_theme = "rose"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"SELL / SHORT AT RESISTANCE ₹{range_resistance:,.0f} (CALL WALL CEILING)"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is testing heavy Call writing supply at ₹{range_resistance:,.0f}. "
+                f"Overhead absorption is high. Initiate fade shorts or exit longs with stop above ₹{range_resistance * 1.005:,.0f}, "
+                f"targeting Put Wall at ₹{range_support:,.0f}."
+            )
+        else:
+            action_type = "SELL_RALLIES"
+            action_badge = "FADE RALLIES"
+            action_theme = "rose"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"SELL RALLIES TOWARD ₹{range_resistance:,.0f} & TARGET ₹{range_support:,.0f}"
+            action_details = (
+                f"Bearish call writing overhang caps upside. Sell or hedge into counter-trend bounces approaching "
+                f"Call Wall at ₹{range_resistance:,.0f}; downside targets Put Wall support at ₹{range_support:,.0f}."
+            )
+    else:
+        action_type = "BUY_SUPPORT_SELL_RESISTANCE"
+        action_badge = "RANGE FADE"
+        action_theme = "indigo"
+        buy_level = range_support
+        sell_level = range_resistance
+        action_headline = f"BUY ON SUPPORT ₹{range_support:,.0f} & SELL AT RESISTANCE ₹{range_resistance:,.0f}"
+        action_details = (
+            f"Balanced OI distribution dictates pure range trading. Buy pullbacks at Put Wall support (₹{range_support:,.0f}) "
+            f"and take profits / sell rallies at Call Wall resistance (₹{range_resistance:,.0f})."
+        )
+
+    return {
+        "gamma_regime": "NEUTRAL",
+        "market_texture": texture,
+        "texture_badge": texture_badge,
+        "texture_theme": texture_theme,
+        "narrative": narrative,
+        "expected_range": {
+            "support": range_support,
+            "resistance": range_resistance,
+            "spread_points": spread_pts,
+            "spread_pct": spread_pct,
+            "range_display": f"₹{range_support:,.0f} – ₹{range_resistance:,.0f}",
+        },
+        "action_type": action_type,
+        "action_badge": action_badge,
+        "action_theme": action_theme,
+        "action_headline": action_headline,
+        "action_details": action_details,
+        "buy_level": buy_level,
+        "sell_level": sell_level,
+        "pivot_1_label": "Max Pain Strike",
+        "pivot_1_val": f"₹{mp_val:,.0f}",
+        "pivot_2_label": "PCR (OI / Vol)",
+        "pivot_2_val": f"{pcr_val:.2f} / {pcr_volume:.2f}" if pcr_volume is not None else f"{pcr_val:.2f}",
+        "support_label": "SUPPORT (PUT WALL)",
+        "resistance_label": "RESISTANCE (CALL WALL)",
+    }
+
+
+def derive_net_delta_action_summary(
+    spot_price: float,
+    records: list[dict[str, Any]],
+    call_wall: float | None = None,
+    put_wall: float | None = None,
+) -> dict[str, Any]:
+    """Derive Net OI Delta header intelligence: strike-by-strike writer velocity, flow builds, and dynamic barriers."""
+    c_wall = float(call_wall) if call_wall else round(spot_price * 1.015, 1)
+    p_wall = float(put_wall) if put_wall else round(spot_price * 0.985, 1)
+
+    peak_put_build_strike = None
+    peak_put_build_val = 0
+    peak_call_build_strike = None
+    peak_call_build_val = 0
+    total_net_delta = 0
+
+    for r in records or []:
+        stk = float(r.get("strike") or r.get("strikePrice") or 0.0)
+        if stk <= 0:
+            continue
+        pe_change = int(r.get("pe_change_oi") or 0)
+        ce_change = int(r.get("ce_change_oi") or 0)
+        delta_net = int(r.get("net_oi_delta") or (pe_change - ce_change))
+        total_net_delta += delta_net
+
+        if delta_net > peak_put_build_val:
+            peak_put_build_val = delta_net
+            peak_put_build_strike = stk
+        elif delta_net < peak_call_build_val:
+            peak_call_build_val = delta_net
+            peak_call_build_strike = stk
+
+    dyn_support = peak_put_build_strike or p_wall
+    dyn_resistance = peak_call_build_strike or c_wall
+    if dyn_support > dyn_resistance:
+        dyn_support, dyn_resistance = dyn_resistance, dyn_support
+
+    spread_pts = round(dyn_resistance - dyn_support, 1)
+    spread_pct = round((spread_pts / spot_price * 100), 2) if spot_price > 0 else 0.0
+
+    # 1. Market Texture & Intraday Velocity
+    if total_net_delta > 5000:
+        texture = "Aggressive Put Writer Accumulation (Dynamic Support Building)"
+        texture_badge = f"🟢 NET PUT BUILD (+{total_net_delta:,})"
+        texture_theme = "emerald"
+        narrative = (
+            f"Option writers are heavily writing put options today (Net Delta: +{total_net_delta:,} contracts). "
+            f"Strongest intraday accumulation is concentrated at strike ₹{dyn_support:,.0f} (+{peak_put_build_val:,} net PE contracts), "
+            f"fortifying dynamic support and reducing breakdown risk."
+        )
+        action_type = "BUY_ON_ACCUMULATION"
+        action_badge = "BUY AT ACCUMULATION"
+        action_theme = "emerald"
+        action_headline = f"BUY ON SUPPORT ₹{dyn_support:,.0f} (INTRADAY PUT INFLOW)"
+        action_details = (
+            f"Intraday put writers are actively defending strike ₹{dyn_support:,.0f}. Accumulate on intraday dips "
+            f"toward ₹{dyn_support:,.0f} with invalidation stop below ₹{dyn_support * 0.995:,.0f}, targeting ₹{dyn_resistance:,.0f}."
+        )
+    elif total_net_delta < -5000:
+        texture = "Aggressive Call Writer Supply (Dynamic Overhead Cap Building)"
+        texture_badge = f"🔴 NET CALL BUILD ({total_net_delta:,})"
+        texture_theme = "rose"
+        narrative = (
+            f"Option writers are aggressively shorting call options today (Net Delta: {total_net_delta:,} contracts). "
+            f"Heavy intraday supply is concentrated at strike ₹{dyn_resistance:,.0f} ({peak_call_build_val:,} net CE contracts), "
+            f"building an intraday supply ceiling and restricting upside expansion."
+        )
+        action_type = "SELL_ON_SUPPLY"
+        action_badge = "SELL AT SUPPLY"
+        action_theme = "rose"
+        action_headline = f"SELL AT RESISTANCE ₹{dyn_resistance:,.0f} (INTRADAY CALL OVERHANG)"
+        action_details = (
+            f"Intraday call writers have stacked heavy contracts at ₹{dyn_resistance:,.0f}. Sell into intraday rallies "
+            f"approaching ₹{dyn_resistance:,.0f} with stop above ₹{dyn_resistance * 1.005:,.0f}, targeting pullbacks to ₹{dyn_support:,.0f}."
+        )
+    else:
+        texture = "Balanced Intraday Writer Flow (Two-Way Position Building)"
+        texture_badge = f"⚖️ BALANCED DELTA ({total_net_delta:+,})"
+        texture_theme = "amber"
+        narrative = (
+            f"Intraday net writer flow is evenly matched across calls and puts ({total_net_delta:+,} contracts). "
+            f"Intraday support is anchored at ₹{dyn_support:,.0f} and supply resistance at ₹{dyn_resistance:,.0f}."
+        )
+        action_type = "BUY_SUPPORT_SELL_RESISTANCE"
+        action_badge = "RANGE FADE"
+        action_theme = "indigo"
+        action_headline = f"BUY ON SUPPORT ₹{dyn_support:,.0f} & SELL AT RESISTANCE ₹{dyn_resistance:,.0f}"
+        action_details = (
+            f"Trade the intraday flow boundaries: Buy on support near dynamic put build at ₹{dyn_support:,.0f} "
+            f"and take profits / sell rallies approaching dynamic call build at ₹{dyn_resistance:,.0f}."
+        )
+
+    return {
+        "gamma_regime": "NEUTRAL",
+        "market_texture": texture,
+        "texture_badge": texture_badge,
+        "texture_theme": texture_theme,
+        "narrative": narrative,
+        "expected_range": {
+            "support": dyn_support,
+            "resistance": dyn_resistance,
+            "spread_points": spread_pts,
+            "spread_pct": spread_pct,
+            "range_display": f"₹{dyn_support:,.0f} – ₹{dyn_resistance:,.0f}",
+        },
+        "action_type": action_type,
+        "action_badge": action_badge,
+        "action_theme": action_theme,
+        "action_headline": action_headline,
+        "action_details": action_details,
+        "buy_level": dyn_support,
+        "sell_level": dyn_resistance,
+        "pivot_1_label": "Peak Put Build",
+        "pivot_1_val": f"₹{dyn_support:,.0f}" if dyn_support else "--",
+        "pivot_2_label": "Peak Call Build",
+        "pivot_2_val": f"₹{dyn_resistance:,.0f}" if dyn_resistance else "--",
+        "support_label": "INTRADAY SUPPORT BUILD",
+        "resistance_label": "INTRADAY RESISTANCE BUILD",
+    }
+
+
+def derive_iv_action_summary(
+    spot_price: float,
+    records: list[dict[str, Any]],
+    vix_data: dict[str, Any] | None = None,
+    expected_move: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Derive Implied Volatility (IV) Skew & Statistical Range intelligence: fear/greed asymmetry and ±1σ channels."""
+    em = expected_move or {}
+    lower_1s = float(em["lower_1sigma"]) if em.get("lower_1sigma") is not None else round(spot_price * 0.985, 1)
+    upper_1s = float(em["upper_1sigma"]) if em.get("upper_1sigma") is not None else round(spot_price * 1.015, 1)
+
+    spread_pts = round(upper_1s - lower_1s, 1)
+    spread_pct = round((spread_pts / spot_price * 100), 2) if spot_price > 0 else 0.0
+
+    # Extract ATM IV and Skew (OTM Put IV vs OTM Call IV)
+    atm_iv = 14.0
+    otm_put_ivs = []
+    otm_call_ivs = []
+    min_dist = float("inf")
+
+    for r in records or []:
+        stk = float(r.get("strike") or r.get("strikePrice") or 0.0)
+        if stk <= 0:
+            continue
+        c_iv = float(r.get("ce_iv") or 0.0)
+        p_iv = float(r.get("pe_iv") or 0.0)
+
+        dist = abs(stk - spot_price)
+        if dist < min_dist and (c_iv > 0 or p_iv > 0):
+            min_dist = dist
+            atm_iv = round((c_iv + p_iv) / 2.0 if (c_iv > 0 and p_iv > 0) else (c_iv or p_iv), 1)
+
+        # Collect OTM strikes within 1-3% range
+        pct_diff = (stk - spot_price) / spot_price if spot_price > 0 else 0.0
+        if -0.03 <= pct_diff <= -0.008 and p_iv > 0:
+            otm_put_ivs.append(p_iv)
+        elif 0.008 <= pct_diff <= 0.03 and c_iv > 0:
+            otm_call_ivs.append(c_iv)
+
+    avg_put_iv = sum(otm_put_ivs) / len(otm_put_ivs) if otm_put_ivs else atm_iv
+    avg_call_iv = sum(otm_call_ivs) / len(otm_call_ivs) if otm_call_ivs else atm_iv
+    iv_skew = round(avg_put_iv - avg_call_iv, 2)
+
+    vix_val = float(vix_data.get("vix_value") or 13.5) if vix_data else 13.5
+
+    # 1. Market Texture & Volatility Smile
+    if iv_skew >= 1.5:
+        texture = "Elevated Put Skew (Downside Crash Fear Priced In)"
+        texture_badge = f"⚠️ PUT SKEW ELEVATED (+{iv_skew:.1f}%)"
+        texture_theme = "amber"
+        narrative = (
+            f"OTM Put IV exceeds Call IV by +{iv_skew:.1f}% (ATM IV: {atm_iv:.1f}%, India VIX: {vix_val:.1f}). "
+            f"Institutional participants are paying a heavy premium for downside tail-risk crash protection. "
+            f"High put premium inflates credit spreads; favor bull put credit spreads on dips over naked call buying."
+        )
+    elif iv_skew <= -1.0:
+        texture = "Call Skew Expansion (Upside Greed / FOMO Squeeze Priced In)"
+        texture_badge = f"🚀 CALL SKEW EXPANSION ({iv_skew:.1f}%)"
+        texture_theme = "emerald"
+        narrative = (
+            f"OTM Call IV is trading at an unusual premium over Puts ({iv_skew:.1f}% skew, ATM IV: {atm_iv:.1f}%). "
+            f"Market participants are aggressively bidding up upside calls for momentum breakouts and short-covering squeezes."
+        )
+    else:
+        texture = "Balanced Volatility Smile (Normal Dispersion Expectations)"
+        texture_badge = f"📈 BALANCED IV SKEW ({iv_skew:+.1f}%)"
+        texture_theme = "indigo"
+        narrative = (
+            f"Implied volatility smile is symmetrical across calls and puts (ATM IV: {atm_iv:.1f}%, India VIX: {vix_val:.1f}). "
+            f"Market is pricing orderly statistical dispersion within the ±1σ statistical expected move channel."
+        )
+
+    # 2. Tactical Action Directive based on Statistical Range
+    if atm_iv >= 18.0 or vix_val >= 16.5:
+        action_type = "SELL_HIGH_IV_CREDIT_SPREADS"
+        action_badge = "SELL HIGH VOLATILITY"
+        action_theme = "emerald"
+        action_headline = f"BUY ON SUPPORT ₹{lower_1s:,.0f} & SELL AT RESISTANCE ₹{upper_1s:,.0f} (HARVEST HIGH IV)"
+        action_details = (
+            f"Elevated IV (ATM {atm_iv:.1f}%) inflates option premiums. Price has a 68.2% statistical probability of remaining "
+            f"inside ±1σ bounds (₹{lower_1s:,.0f} – ₹{upper_1s:,.0f}). Sell out-of-the-money credit spreads to harvest rapid theta decay."
+        )
+    else:
+        action_type = "BUY_SUPPORT_SELL_RESISTANCE"
+        action_badge = "STATISTICAL ±1σ CHANNEL"
+        action_theme = "indigo"
+        action_headline = f"BUY ON SUPPORT ₹{lower_1s:,.0f} & SELL AT RESISTANCE ₹{upper_1s:,.0f}"
+        action_details = (
+            f"Statistical 1-sigma bounds define the standard institutional trading band (₹{lower_1s:,.0f} to ₹{upper_1s:,.0f}). "
+            f"Buy pullbacks into 1σ statistical support (₹{lower_1s:,.0f}) and take profits approaching 1σ resistance (₹{upper_1s:,.0f})."
+        )
+
+    return {
+        "gamma_regime": "NEUTRAL",
+        "market_texture": texture,
+        "texture_badge": texture_badge,
+        "texture_theme": texture_theme,
+        "narrative": narrative,
+        "expected_range": {
+            "support": lower_1s,
+            "resistance": upper_1s,
+            "lower_1sigma": lower_1s,
+            "upper_1sigma": upper_1s,
+            "spread_points": spread_pts,
+            "spread_pct": spread_pct,
+            "range_display": f"₹{lower_1s:,.0f} – ₹{upper_1s:,.0f}",
+        },
+        "action_type": action_type,
+        "action_badge": action_badge,
+        "action_theme": action_theme,
+        "action_headline": action_headline,
+        "action_details": action_details,
+        "buy_level": lower_1s,
+        "sell_level": upper_1s,
+        "pivot_1_label": "ATM IV",
+        "pivot_1_val": f"{atm_iv:.1f}%",
+        "pivot_2_label": "IV Skew (PE-CE)",
+        "pivot_2_val": f"{iv_skew:+.1f}%",
+        "support_label": "STATISTICAL SUPPORT (-1σ)",
+        "resistance_label": "STATISTICAL RESISTANCE (+1σ)",
     }
 
 

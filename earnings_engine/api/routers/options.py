@@ -151,6 +151,7 @@ async def get_options_chart_intelligence(
     interval: str = Query("5m", description="Candle interval (1m, 5m, 15m, 1h, 1d)"),
     period: str = Query("5d", description="Lookback window (e.g. 5d, 1mo, 6mo)"),
     force_refresh: bool = Query(False, description="Bypass cache and refresh live candles"),
+    allow_non_fno: bool = Query(False, description="Allow fallback for non-FNO tickers"),
 ) -> dict[str, Any]:
     """Retrieve full candlestick history, indicators (VWAP, ORB), Order Blocks, and tactical trade plans."""
     clean_symbol = symbol.strip().upper().replace(".NS", "")
@@ -161,6 +162,7 @@ async def get_options_chart_intelligence(
             interval=interval,
             period=period,
             force_refresh=force_refresh,
+            allow_non_fno=allow_non_fno,
             settings=_get_settings(),
         )
         return data

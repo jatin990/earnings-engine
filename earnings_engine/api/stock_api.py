@@ -10,6 +10,7 @@ from datetime import datetime
 import json
 import logging
 from typing import Any
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -163,6 +164,8 @@ def get_stock_technicals(ticker: str, settings: Settings | None = None) -> dict[
         "dma_50": None,
         "dma_200": None,
         "volume_ratio_5d_20d": None,
+        "rsi": None,
+        "rsi_14": None,
     }
 
     prices_df = pd.DataFrame()
@@ -238,6 +241,20 @@ def get_stock_technicals(ticker: str, settings: Settings | None = None) -> dict[
 
             if len(closes) >= 200:
                 technical["dma_200"] = round(float(closes.tail(200).mean()), 2)
+
+            # 14-period Wilder's smoothed RSI
+            if len(closes) >= 15:
+                delta = closes.diff()
+                gain = delta.clip(lower=0)
+                loss = -delta.clip(upper=0)
+                avg_gain = gain.ewm(com=13, min_periods=14).mean()
+                avg_loss = loss.ewm(com=13, min_periods=14).mean()
+                rs = avg_gain / avg_loss.replace(0, np.nan)
+                rsi_series = 100 - (100 / (1 + rs))
+                last_rsi = rsi_series.iloc[-1]
+                if not pd.isna(last_rsi):
+                    technical["rsi_14"] = round(float(last_rsi), 1)
+                    technical["rsi"] = technical["rsi_14"]
 
             # Volume surge ratio 5d vs 20d
             if "volume" in prices_df.columns:

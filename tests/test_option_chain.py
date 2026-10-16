@@ -296,6 +296,114 @@ def test_derive_gex_action_summary_negative_gamma():
     assert "SELL RALLIES" in summary_bear["action_headline"]
 
 
+def test_derive_oi_action_summary():
+    from earnings_engine.data.option_chain import derive_oi_action_summary
+
+    # Bullish scenario: PCR >= 1.2
+    summary_bull = derive_oi_action_summary(
+        spot_price=24050.0,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        pcr_oi=1.35,
+        pcr_volume=1.20,
+        sentiment="BULLISH",
+        call_oi_total=100000,
+        put_oi_total=135000,
+    )
+    assert "BULLISH OI" in summary_bull["texture_badge"]
+    assert summary_bull["texture_theme"] == "emerald"
+    assert summary_bull["action_type"] in ("BUY_DIPS", "TACTICAL_BUY")
+    assert summary_bull["buy_level"] == 24000.0
+    assert summary_bull["sell_level"] == 24500.0
+    assert summary_bull["pivot_1_label"] == "Max Pain Strike"
+    assert "24,200" in summary_bull["pivot_1_val"]
+
+    # Bearish scenario: PCR <= 0.8
+    summary_bear = derive_oi_action_summary(
+        spot_price=24250.0,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        pcr_oi=0.65,
+        pcr_volume=0.70,
+        sentiment="BEARISH",
+        call_oi_total=150000,
+        put_oi_total=97500,
+    )
+    assert "BEARISH OI" in summary_bear["texture_badge"]
+    assert summary_bear["texture_theme"] == "rose"
+    assert summary_bear["action_type"] in ("SELL_RALLIES", "TACTICAL_SELL")
+    assert "SELL RALLIES" in summary_bear["action_headline"]
+
+
+def test_derive_net_delta_action_summary():
+    from earnings_engine.data.option_chain import derive_net_delta_action_summary
+
+    records = [
+        {"strike": 24000.0, "ce_change_oi": -2000, "pe_change_oi": 15000},  # net delta +17000 (support build)
+        {"strike": 24200.0, "ce_change_oi": 5000, "pe_change_oi": 6000},    # net delta +1000
+        {"strike": 24500.0, "ce_change_oi": 25000, "pe_change_oi": 1000},   # net delta -24000 (resistance build)
+    ]
+    summary = derive_net_delta_action_summary(
+        spot_price=24250.0,
+        records=records,
+        call_wall=24500.0,
+        put_wall=24000.0,
+    )
+    assert summary["expected_range"]["support"] == 24000.0
+    assert summary["expected_range"]["resistance"] == 24500.0
+    assert summary["pivot_1_label"] == "Peak Put Build"
+    assert summary["pivot_2_label"] == "Peak Call Build"
+    assert "24,500" in summary["action_headline"]
+
+
+def test_derive_iv_action_summary():
+    from earnings_engine.data.option_chain import derive_iv_action_summary
+
+    records = [
+        {"strike": 24000.0, "pe_iv": 16.5, "ce_iv": 14.0},
+        {"strike": 24200.0, "pe_iv": 14.5, "ce_iv": 14.2},
+        {"strike": 24500.0, "pe_iv": 13.5, "ce_iv": 13.0},
+    ]
+    vix_data = {"vix_value": 13.5, "vix_regime": "LOW_VOL"}
+    expected_move = {
+        "lower_1sigma": 24050.0,
+        "upper_1sigma": 24450.0,
+        "lower_2sigma": 23850.0,
+        "upper_2sigma": 24650.0,
+    }
+    summary = derive_iv_action_summary(
+        spot_price=24250.0,
+        records=records,
+        vix_data=vix_data,
+        expected_move=expected_move,
+    )
+    assert summary["expected_range"]["support"] == 24050.0
+    assert summary["expected_range"]["resistance"] == 24450.0
+    assert summary["action_type"] in ("SELL_HIGH_IV_CREDIT_SPREADS", "BUY_SUPPORT_SELL_RESISTANCE")
+    assert summary["pivot_1_label"] == "ATM IV"
+    assert summary["pivot_2_label"] == "IV Skew (PE-CE)"
+
+
+def test_calculate_option_metrics_subtab_summaries_attached():
+    from earnings_engine.data.option_chain import _calculate_option_metrics_from_records
+
+    records = [
+        {"strikePrice": 2400.0, "CE_openInterest": 10000, "PE_openInterest": 5000, "CE_changeinOpenInterest": 1000, "PE_changeinOpenInterest": 2000},
+        {"strikePrice": 2500.0, "CE_openInterest": 20000, "PE_openInterest": 25000, "CE_changeinOpenInterest": 3000, "PE_changeinOpenInterest": 4000},
+        {"strikePrice": 2600.0, "CE_openInterest": 5000, "PE_openInterest": 20000, "CE_changeinOpenInterest": -500, "PE_changeinOpenInterest": 1500},
+    ]
+    res = _calculate_option_metrics_from_records("RELIANCE", records, spot_price=2500.0)
+    assert "subtab_summaries" in res
+    assert "gex" in res["subtab_summaries"]
+    assert "oi" in res["subtab_summaries"]
+    assert "net_delta" in res["subtab_summaries"]
+    assert "iv" in res["subtab_summaries"]
+    assert res["subtab_summaries"]["oi"]["expected_range"]["support"] is not None
+
+
+
 
 
 

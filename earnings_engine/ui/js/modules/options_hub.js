@@ -1016,6 +1016,7 @@
         }
 
         if (app._optionsChainData) {
+            app.renderOptionSubtabBriefing(cleanMode, app._optionsChainData);
             app.renderOiDistributionChart(app._optionsChainData);
         }
     };
@@ -1241,111 +1242,214 @@
     };
 
     /**
-     * Render the Tactical GEX Market Briefing & Action Directive Header Bar
+     * Render the Tactical Derivatives Briefing & Action Directive Header Bar
+     * Dynamically updates across all 4 modes: GEX, OI, NET_DELTA, IV
      */
-    app.renderGexMarketBriefing = function (data) {
+    app.renderOptionSubtabBriefing = function (mode, data) {
         const briefingEl = document.getElementById('optGexMarketBriefing');
         if (!briefingEl) return;
 
-        const gexSummary = data && data.gex_summary ? data.gex_summary : null;
-        if (!gexSummary || gexSummary.action_type === 'UNAVAILABLE') {
+        const cleanMode = (mode || app._optionsChartMode || 'gex').toLowerCase();
+
+        // Retrieve summary for the selected mode
+        let summary = null;
+        if (data && data.subtab_summaries && data.subtab_summaries[cleanMode]) {
+            summary = data.subtab_summaries[cleanMode];
+        } else if (cleanMode === 'gex' && data && data.gex_summary) {
+            summary = data.gex_summary;
+        } else if (cleanMode === 'oi' && data && data.oi_summary) {
+            summary = data.oi_summary;
+        } else if (cleanMode === 'net_delta' && data && data.net_delta_summary) {
+            summary = data.net_delta_summary;
+        } else if (cleanMode === 'iv' && data && data.iv_summary) {
+            summary = data.iv_summary;
+        }
+
+        if (!summary || summary.action_type === 'UNAVAILABLE') {
             briefingEl.style.display = 'none';
             return;
         }
 
         briefingEl.style.display = 'block';
 
+        // Border accents per mode
+        const modeBorders = {
+            'gex': 'rgba(168, 85, 247, 0.35)',
+            'oi': 'rgba(56, 189, 248, 0.35)',
+            'net_delta': 'rgba(16, 185, 129, 0.35)',
+            'iv': 'rgba(245, 158, 11, 0.35)'
+        };
+        briefingEl.style.borderColor = modeBorders[cleanMode] || 'rgba(168, 85, 247, 0.25)';
+
+        // DOM elements
+        const marketTitle = document.getElementById('optGexMarketConditionTitle');
         const regimeBadge = document.getElementById('optGexRegimeBadge');
         const textureHeadline = document.getElementById('optGexTextureHeadline');
         const narrative = document.getElementById('optGexNarrative');
+
+        const rangeTitle = document.getElementById('optGexRangeTitle');
         const rangeSpread = document.getElementById('optGexRangeSpread');
+        const supportLabel = document.getElementById('optGexSupportLabel');
         const rangeSupport = document.getElementById('optGexRangeSupport');
+        const resistanceLabel = document.getElementById('optGexResistanceLabel');
         const rangeResistance = document.getElementById('optGexRangeResistance');
+        const pivot1Label = document.getElementById('optGexPivot1Label');
         const straddleBounds = document.getElementById('optGexStraddleBounds');
+        const pivot2Label = document.getElementById('optGexPivot2Label');
         const flipLevel = document.getElementById('optGexFlipLevel');
+
+        const actionTitle = document.getElementById('optGexActionTitle');
         const actionBadge = document.getElementById('optGexActionBadge');
         const actionHeadline = document.getElementById('optGexActionHeadline');
         const actionDetails = document.getElementById('optGexActionDetails');
 
-        // 1. Market Texture & Regime
-        if (regimeBadge) {
-            regimeBadge.textContent = gexSummary.texture_badge || gexSummary.gamma_regime || 'NEUTRAL';
-            if (gexSummary.gamma_regime === 'POSITIVE_GAMMA') {
-                regimeBadge.style.background = 'rgba(16, 185, 129, 0.15)';
-                regimeBadge.style.color = '#34d399';
-                regimeBadge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
-            } else if (gexSummary.gamma_regime === 'NEGATIVE_GAMMA') {
-                regimeBadge.style.background = 'rgba(239, 68, 68, 0.15)';
-                regimeBadge.style.color = '#f87171';
-                regimeBadge.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-            } else {
-                regimeBadge.style.background = 'rgba(245, 158, 11, 0.15)';
-                regimeBadge.style.color = '#fbbf24';
-                regimeBadge.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+        // Helper to apply badge colors based on theme
+        const applyTheme = (el, theme) => {
+            if (!el) return;
+            if (theme === 'emerald') {
+                el.style.background = 'rgba(16, 185, 129, 0.15)';
+                el.style.color = '#34d399';
+                el.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+            } else if (theme === 'rose') {
+                el.style.background = 'rgba(239, 68, 68, 0.15)';
+                el.style.color = '#f87171';
+                el.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            } else if (theme === 'amber') {
+                el.style.background = 'rgba(245, 158, 11, 0.15)';
+                el.style.color = '#fbbf24';
+                el.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+            } else if (theme === 'sky') {
+                el.style.background = 'rgba(56, 189, 248, 0.15)';
+                el.style.color = '#38bdf8';
+                el.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+            } else if (theme === 'purple') {
+                el.style.background = 'rgba(168, 85, 247, 0.15)';
+                el.style.color = '#c084fc';
+                el.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+            } else { // indigo / default
+                el.style.background = 'rgba(99, 102, 241, 0.18)';
+                el.style.color = '#818cf8';
+                el.style.borderColor = 'rgba(99, 102, 241, 0.35)';
             }
+        };
+
+        // 1. Market Condition & Texture
+        if (marketTitle) {
+            const titleMap = {
+                'gex': '1. Market Condition (Dealer Gamma)',
+                'oi': '1. Market Condition (Open Interest)',
+                'net_delta': '1. Market Condition (Writer Delta Velocity)',
+                'iv': '1. Market Condition (IV Skew & Smile)'
+            };
+            marketTitle.textContent = titleMap[cleanMode] || '1. Market Condition Today';
+        }
+
+        if (regimeBadge) {
+            regimeBadge.textContent = summary.texture_badge || summary.gamma_regime || 'NEUTRAL';
+            applyTheme(regimeBadge, summary.texture_theme || (summary.gamma_regime === 'POSITIVE_GAMMA' ? 'emerald' : summary.gamma_regime === 'NEGATIVE_GAMMA' ? 'rose' : 'amber'));
         }
 
         if (textureHeadline) {
-            textureHeadline.textContent = gexSummary.market_texture || 'Market Consolidation';
+            textureHeadline.textContent = summary.market_texture || 'Market Consolidation';
         }
         if (narrative) {
-            narrative.textContent = gexSummary.narrative || '--';
+            narrative.textContent = summary.narrative || '--';
         }
 
-        // 2. Expected Daily Range
-        const expRange = gexSummary.expected_range || {};
+        // 2. Expected Daily Range & Boundary Pivots
+        if (rangeTitle) {
+            const rangeTitleMap = {
+                'gex': '2. Expected Range (Put/Call Wall)',
+                'oi': '2. Expected Range (OI Barriers)',
+                'net_delta': '2. Expected Range (Intraday Flow Limits)',
+                'iv': '2. Expected Range (±1σ Statistical Bounds)'
+            };
+            rangeTitle.textContent = rangeTitleMap[cleanMode] || '2. Expected Range';
+        }
+
+        const expRange = summary.expected_range || {};
         if (rangeSpread) {
             const pts = expRange.spread_points !== undefined && expRange.spread_points !== null ? Number(expRange.spread_points).toFixed(1) : '--';
             const pct = expRange.spread_pct !== undefined && expRange.spread_pct !== null ? Number(expRange.spread_pct).toFixed(2) : '--';
             rangeSpread.textContent = `${pts} pts (${pct}%)`;
         }
+
+        if (supportLabel) {
+            supportLabel.textContent = summary.support_label || 'SUPPORT (PUT WALL)';
+        }
         if (rangeSupport) {
             rangeSupport.textContent = expRange.support ? `₹${Number(expRange.support).toLocaleString('en-IN')}` : '--';
+        }
+
+        if (resistanceLabel) {
+            resistanceLabel.textContent = summary.resistance_label || 'RESISTANCE (CALL WALL)';
         }
         if (rangeResistance) {
             rangeResistance.textContent = expRange.resistance ? `₹${Number(expRange.resistance).toLocaleString('en-IN')}` : '--';
         }
-        if (straddleBounds) {
-            const low = expRange.lower_1sigma ? `₹${Number(expRange.lower_1sigma).toLocaleString('en-IN')}` : '--';
-            const high = expRange.upper_1sigma ? `₹${Number(expRange.upper_1sigma).toLocaleString('en-IN')}` : '--';
-            straddleBounds.textContent = `${low} – ${high}`;
-        }
-        if (flipLevel) {
-            flipLevel.textContent = gexSummary.gamma_flip_strike ? `₹${Number(gexSummary.gamma_flip_strike).toLocaleString('en-IN')}` : '--';
-        }
 
-        // 3. Action Directive
-        if (actionBadge) {
-            actionBadge.textContent = gexSummary.action_badge || 'TACTICAL PLAN';
-            const theme = gexSummary.action_theme || 'indigo';
-            if (theme === 'emerald') {
-                actionBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-                actionBadge.style.color = '#34d399';
-                actionBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-            } else if (theme === 'rose') {
-                actionBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                actionBadge.style.color = '#f87171';
-                actionBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        if (pivot1Label) {
+            pivot1Label.textContent = summary.pivot_1_label || '±1σ Move';
+        }
+        if (straddleBounds) {
+            if (summary.pivot_1_val) {
+                straddleBounds.textContent = summary.pivot_1_val;
             } else {
-                actionBadge.style.background = 'rgba(99, 102, 241, 0.2)';
-                actionBadge.style.color = '#a5b4fc';
-                actionBadge.style.borderColor = 'rgba(99, 102, 241, 0.4)';
+                const low = expRange.lower_1sigma ? `₹${Number(expRange.lower_1sigma).toLocaleString('en-IN')}` : '--';
+                const high = expRange.upper_1sigma ? `₹${Number(expRange.upper_1sigma).toLocaleString('en-IN')}` : '--';
+                straddleBounds.textContent = `${low} – ${high}`;
             }
         }
+
+        if (pivot2Label) {
+            pivot2Label.textContent = summary.pivot_2_label || 'Gamma Flip';
+        }
+        if (flipLevel) {
+            if (summary.pivot_2_val) {
+                flipLevel.textContent = summary.pivot_2_val;
+            } else if (summary.gamma_flip_strike) {
+                flipLevel.textContent = `₹${Number(summary.gamma_flip_strike).toLocaleString('en-IN')}`;
+            } else {
+                flipLevel.textContent = '--';
+            }
+        }
+
+        // 3. Tactical Action Directive
+        if (actionTitle) {
+            actionTitle.textContent = '3. Tactical Action Directive';
+        }
+
+        if (actionBadge) {
+            actionBadge.textContent = summary.action_badge || 'TACTICAL PLAN';
+            applyTheme(actionBadge, summary.action_theme || 'indigo');
+        }
+
         if (actionHeadline) {
-            actionHeadline.textContent = gexSummary.action_headline || '--';
-            const theme = gexSummary.action_theme || 'indigo';
+            actionHeadline.textContent = summary.action_headline || '--';
+            const theme = summary.action_theme || 'indigo';
             if (theme === 'emerald') {
                 actionHeadline.style.color = '#34d399';
             } else if (theme === 'rose') {
                 actionHeadline.style.color = '#f87171';
+            } else if (theme === 'amber') {
+                actionHeadline.style.color = '#fbbf24';
+            } else if (theme === 'sky') {
+                actionHeadline.style.color = '#38bdf8';
             } else {
                 actionHeadline.style.color = '#c7d2fe';
             }
         }
+
         if (actionDetails) {
-            actionDetails.textContent = gexSummary.action_details || '--';
+            actionDetails.textContent = summary.action_details || '--';
         }
+    };
+
+    /**
+     * Backward-compatible wrapper for GEX briefing
+     */
+    app.renderGexMarketBriefing = function (data) {
+        app.renderOptionSubtabBriefing(app._optionsChartMode || 'gex', data);
     };
 
     /**
