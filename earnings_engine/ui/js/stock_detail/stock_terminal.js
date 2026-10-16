@@ -60,7 +60,7 @@
                 // If switching to chart tab, trigger chart resize/fit
                 if (targetTab === 'chart' && State.chartInstance) {
                     setTimeout(() => {
-                        const container = document.getElementById('stockChartCanvas');
+                        const container = document.getElementById('optionsSmartChartCanvas') || document.getElementById('stockChartCanvas');
                         if (container) {
                             State.chartInstance.applyOptions({
                                 width: container.clientWidth,
@@ -84,7 +84,7 @@
 
             if (data && data.success) {
                 State.quote = data.quote;
-                State.technicals = data.technicals;
+                State.technicals = data.technicals || data.technical;
                 renderHeroHeader(data);
                 renderKpiStrip(data);
             }
@@ -98,19 +98,23 @@
      */
     function renderHeroHeader(data) {
         const q = data.quote || {};
+        const p = data.profile || {};
         const isINR = State.ticker.endsWith('.NS') || State.ticker.endsWith('.BO');
 
+        const companyName = p.name || p.company_name || q.company_name || q.shortName || State.cleanTicker;
+        const sectorText = p.sector ? `${p.sector} · ${p.industry || 'Equities'}` : (q.sector ? `${q.sector} · ${q.industry || 'Equities'}` : 'NSE Equities');
+
         window.setElText('heroTicker', State.ticker);
-        window.setElText('heroCompanyName', q.company_name || q.shortName || State.cleanTicker);
-        window.setElText('heroSector', q.sector ? `${q.sector} · ${q.industry || 'Equities'}` : 'NSE Equities');
+        window.setElText('heroCompanyName', companyName);
+        window.setElText('heroSector', sectorText);
 
         // Price & Change
-        if (q.current_price || q.ltp) {
-            const ltp = q.current_price || q.ltp;
+        const ltp = q.current_price !== undefined && q.current_price !== null ? q.current_price : q.ltp;
+        if (ltp !== undefined && ltp !== null) {
             window.setElText('heroLtp', window.formatPrice(ltp, isINR));
 
-            const change = q.change !== undefined ? q.change : 0;
-            const changePct = q.change_pct !== undefined ? q.change_pct : (q.percent_change !== undefined ? q.percent_change : 0);
+            const change = q.day_change !== undefined && q.day_change !== null ? q.day_change : (q.change !== undefined && q.change !== null ? q.change : 0);
+            const changePct = q.day_change_pct !== undefined && q.day_change_pct !== null ? q.day_change_pct : (q.change_pct !== undefined && q.change_pct !== null ? q.change_pct : (q.percent_change !== undefined && q.percent_change !== null ? q.percent_change : 0));
             const isBull = changePct >= 0;
 
             const changePill = document.getElementById('heroChangePill');
@@ -121,18 +125,22 @@
         }
 
         // Day Range & 52W Range Bars
-        if (q.day_low && q.day_high && q.current_price) {
-            window.setElText('dayLowVal', window.formatPrice(q.day_low, isINR));
-            window.setElText('dayHighVal', window.formatPrice(q.day_high, isINR));
-            const dayRangePct = Math.min(Math.max(((q.current_price - q.day_low) / (q.day_high - q.day_low)) * 100, 0), 100);
+        const dayLow = q.day_low !== undefined && q.day_low !== null ? q.day_low : q.low;
+        const dayHigh = q.day_high !== undefined && q.day_high !== null ? q.day_high : q.high;
+        if (dayLow && dayHigh && ltp) {
+            window.setElText('dayLowVal', window.formatPrice(dayLow, isINR));
+            window.setElText('dayHighVal', window.formatPrice(dayHigh, isINR));
+            const dayRangePct = dayHigh > dayLow ? Math.min(Math.max(((ltp - dayLow) / (dayHigh - dayLow)) * 100, 0), 100) : 50;
             const dayFill = document.getElementById('dayRangeFill');
             if (dayFill) dayFill.style.width = `${dayRangePct}%`;
         }
 
-        if (q.week52_low && q.week52_high && q.current_price) {
-            window.setElText('w52LowVal', window.formatPrice(q.week52_low, isINR));
-            window.setElText('w52HighVal', window.formatPrice(q.week52_high, isINR));
-            const w52RangePct = Math.min(Math.max(((q.current_price - q.week52_low) / (q.week52_high - q.week52_low)) * 100, 0), 100);
+        const week52Low = q.week_52_low !== undefined && q.week_52_low !== null ? q.week_52_low : q.week52_low;
+        const week52High = q.week_52_high !== undefined && q.week_52_high !== null ? q.week_52_high : q.week52_high;
+        if (week52Low && week52High && ltp) {
+            window.setElText('w52LowVal', window.formatPrice(week52Low, isINR));
+            window.setElText('w52HighVal', window.formatPrice(week52High, isINR));
+            const w52RangePct = week52High > week52Low ? Math.min(Math.max(((ltp - week52Low) / (week52High - week52Low)) * 100, 0), 100) : 50;
             const w52Fill = document.getElementById('w52RangeFill');
             if (w52Fill) w52Fill.style.width = `${w52RangePct}%`;
         }
@@ -149,25 +157,39 @@
      * Render Technical & Fundamental KPI Strip
      */
     function renderKpiStrip(data) {
-        const t = data.technicals || {};
+        const t = data.technical || data.technicals || {};
         const q = data.quote || {};
 
-        if (t.rsi_14 !== undefined) {
-            window.setElText('kpiRsi', Number(t.rsi_14).toFixed(1));
+        const rsiVal = t.rsi_14 !== undefined && t.rsi_14 !== null ? t.rsi_14 : (t.rsi !== undefined && t.rsi !== null ? t.rsi : null);
+        if (rsiVal !== null) {
+            const numRsi = Number(rsiVal);
+            window.setElText('kpiRsi', numRsi.toFixed(1));
             const rsiBadge = document.getElementById('kpiRsiBadge');
             if (rsiBadge) {
-                rsiBadge.textContent = t.rsi_14 >= 70 ? 'Overbought' : t.rsi_14 <= 30 ? 'Oversold' : 'Neutral';
-                rsiBadge.style.color = t.rsi_14 >= 70 ? '#fb7185' : t.rsi_14 <= 30 ? '#34d399' : '#8e97a8';
+                rsiBadge.textContent = numRsi >= 70 ? 'Overbought' : numRsi <= 30 ? 'Oversold' : 'Neutral';
+                rsiBadge.style.color = numRsi >= 70 ? '#fb7185' : numRsi <= 30 ? '#34d399' : '#8e97a8';
             }
+        } else {
+            window.setElText('kpiRsi', '—');
         }
 
         if (t.dma_20) window.setElText('kpiDma20', window.formatPrice(t.dma_20));
+        else window.setElText('kpiDma20', '—');
+
         if (t.dma_50) window.setElText('kpiDma50', window.formatPrice(t.dma_50));
+        else window.setElText('kpiDma50', '—');
+
         if (t.dma_200) window.setElText('kpiDma200', window.formatPrice(t.dma_200));
+        else window.setElText('kpiDma200', '—');
 
         if (q.pe_ratio) window.setElText('kpiPe', `${Number(q.pe_ratio).toFixed(1)}x`);
+        else window.setElText('kpiPe', '—');
+
         if (q.market_cap) window.setElText('kpiMarketCap', window.formatCrores(q.market_cap));
+        else window.setElText('kpiMarketCap', '—');
+
         if (q.volume) window.setElText('kpiVolume', window.formatVolume(q.volume));
+        else window.setElText('kpiVolume', '—');
     }
 
     /**

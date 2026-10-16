@@ -161,47 +161,234 @@
 
         <!-- ─── TAB 1: Advanced Lightweight Charts Terminal ───────────────────── -->
         <section id="tabContent_chart" class="stock-tab-content active">
-            <div class="stock-chart-card">
-                <div class="stock-chart-header">
-                    <div class="stock-chart-title-group">
-                        <span class="stock-chart-title">
-                            <span>⚡ Interactive Technical Canvas</span>
-                        </span>
-                        <div class="stock-chart-range-group">
-                            <button id="btnRange1M" type="button" class="stock-range-btn" onclick="window.setChartRange('1M')">1M</button>
-                            <button id="btnRange3M" type="button" class="stock-range-btn" onclick="window.setChartRange('3M')">3M</button>
-                            <button id="btnRange6M" type="button" class="stock-range-btn" onclick="window.setChartRange('6M')">6M</button>
-                            <button id="btnRange1Y" type="button" class="stock-range-btn active" onclick="window.setChartRange('1Y')">1Y</button>
-                            <button id="btnRangeALL" type="button" class="stock-range-btn" onclick="window.setChartRange('ALL')">ALL</button>
+            <style>
+                .opt-chart-fullscreen-mode {
+                    position: fixed !important;
+                    inset: 0 !important;
+                    z-index: 999999 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    max-height: 100vh !important;
+                    margin: 0 !important;
+                    border-radius: 0 !important;
+                    padding: 1rem 1.5rem !important;
+                    background: #07080b !important;
+                    overflow-y: auto !important;
+                    box-sizing: border-box !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                }
+                .opt-chart-fullscreen-mode #optionsSmartChartWrapper {
+                    flex: 1 1 auto !important;
+                    min-height: calc(100vh - 310px) !important;
+                    height: auto !important;
+                }
+            </style>
+            <div id="optionsSmartChartCard" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:14px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 8px 30px rgba(0,0,0,0.35);">
+                <!-- Chart Header & Action Controls Bar -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.6rem;">
+                            <h2 style="margin:0;font-size:1.15rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.01em;">
+                                <span>📈</span> Tactical Smart Chart &amp; SMC Order Blocks
+                            </h2>
+                            <span id="optChartRegimeBadge" class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:6px;font-weight:700;">
+                                ⚡ Initializing Quant Model...
+                            </span>
+                            <span id="optChartConfidenceBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-weight:700;">
+                                85% Confluence
+                            </span>
+                            <span id="optChartTimestamp" style="font-size:0.72rem;color:var(--text-secondary);font-family:var(--font-mono);margin-left:0.35rem;">--</span>
+                        </div>
+                        <p style="margin:0.25rem 0 0 0;font-size:0.78rem;color:var(--text-secondary);">
+                            Live intraday candles, Session VWAP bands, 15m ORB, institutional Order Blocks (OB/FVG), dynamic trendlines, and structural key levels.
+                        </p>
+                    </div>
+
+                    <!-- Timeframe & Layer Toolbar -->
+                    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                        <!-- Timeframe Switcher -->
+                        <div style="display:flex;background:#0d0e12;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:2px;gap:2px;">
+                            <button class="btn btn-sm opt-tf-btn" data-tf="1m" onclick="app.setOptionTimeframe('1m')" style="padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;border:none;border-radius:6px;background:transparent;color:#94a3b8;cursor:pointer;">1m</button>
+                            <button class="btn btn-sm opt-tf-btn active" data-tf="5m" onclick="app.setOptionTimeframe('5m')" style="padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;border:none;border-radius:6px;background:#38bdf8;color:#000000;cursor:pointer;">5m</button>
+                            <button class="btn btn-sm opt-tf-btn" data-tf="15m" onclick="app.setOptionTimeframe('15m')" style="padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;border:none;border-radius:6px;background:transparent;color:#94a3b8;cursor:pointer;">15m</button>
+                            <button class="btn btn-sm opt-tf-btn" data-tf="1h" onclick="app.setOptionTimeframe('1h')" style="padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;border:none;border-radius:6px;background:transparent;color:#94a3b8;cursor:pointer;">1h</button>
+                            <button class="btn btn-sm opt-tf-btn" data-tf="1d" onclick="app.setOptionTimeframe('1d')" style="padding:0.2rem 0.55rem;font-size:0.75rem;font-weight:700;border:none;border-radius:6px;background:transparent;color:#94a3b8;cursor:pointer;">1D</button>
+                        </div>
+
+                        <!-- Layer Toggles -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;font-size:0.75rem;">
+                            <button class="btn btn-sm opt-layer-btn active" id="optToggleVwap" onclick="app.toggleOptionLayer('vwap')" style="padding:0.25rem 0.55rem;border-radius:6px;border:1px solid rgba(56,189,248,0.4);background:rgba(56,189,248,0.12);color:#38bdf8;font-weight:600;cursor:pointer;">
+                                ⚡ VWAP
+                            </button>
+                            <button class="btn btn-sm opt-layer-btn active" id="optToggleOb" onclick="app.toggleOptionLayer('ob')" style="padding:0.25rem 0.55rem;border-radius:6px;border:1px solid rgba(16,185,129,0.4);background:rgba(16,185,129,0.12);color:#34d399;font-weight:600;cursor:pointer;">
+                                📦 Order Blocks
+                            </button>
+                            <button class="btn btn-sm opt-layer-btn active" id="optToggleDeriv" onclick="app.toggleOptionLayer('derivatives')" style="padding:0.25rem 0.55rem;border-radius:6px;border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.12);color:#fbbf24;font-weight:600;cursor:pointer;">
+                                🎯 Derivatives Rays
+                            </button>
+                            <button class="btn btn-sm opt-layer-btn active" id="optToggleOrb" onclick="app.toggleOptionLayer('orb')" style="padding:0.25rem 0.55rem;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.12);color:#c084fc;font-weight:600;cursor:pointer;">
+                                🌅 ORB-15
+                            </button>
+                            <button class="btn btn-sm opt-layer-btn active" id="optToggleTrendlines" onclick="app.toggleOptionLayer('trendlines')" style="padding:0.25rem 0.55rem;border-radius:6px;border:1px solid rgba(244,63,94,0.4);background:rgba(244,63,94,0.12);color:#fb7185;font-weight:600;cursor:pointer;">
+                                📐 Trendlines
+                            </button>
+                        </div>
+
+                        <!-- Fullscreen Toggle Button -->
+                        <button class="btn btn-sm" id="optFullscreenBtn" onclick="app.toggleOptionChartFullscreen()" style="padding:0.25rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#e2e8f0;font-weight:700;display:flex;align-items:center;gap:0.35rem;cursor:pointer;" title="Toggle Fullscreen Mode (or press Esc to exit)">
+                            <span id="optFullscreenIcon" style="font-size:0.85rem;">⛶</span>
+                            <span id="optFullscreenText" style="font-size:0.75rem;">Full Screen</span>
+                        </button>
+
+                        <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.25rem;font-family:var(--font-mono);margin-left:0.25rem;">
+                            <span id="optLivePulseDot" style="display:inline-block;width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 6px #10b981;"></span>
+                            <span id="optAutoRefreshText">Auto: 15s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sticky Real-time Hover Inspector Bar -->
+                <div id="optHoverInspectorCard" style="background: rgba(15,15,18,0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.78rem;">
+                    <!-- Left: Cursor Time & OHLC & TR -->
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <span id="optInspectTime" style="color: #38bdf8; font-weight: 700;">Cursor: --</span>
+                        <span style="color: var(--text-secondary);">O: <strong id="optInspectOpen" style="color: #fff;">--</strong></span>
+                        <span style="color: var(--text-secondary);">H: <strong id="optInspectHigh" style="color: #10b981;">--</strong></span>
+                        <span style="color: var(--text-secondary);">L: <strong id="optInspectLow" style="color: #f43f5e;">--</strong></span>
+                        <span style="color: var(--text-secondary);">C: <strong id="optInspectClose" style="color: #fff;">--</strong></span>
+                        <span style="color: var(--text-secondary);">TR: <strong id="optInspectTr" style="color: #fbbf24;">--</strong></span>
+                    </div>
+
+                    <!-- Middle: Volume Surge & Wick Pressure -->
+                    <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                        <span id="optInspectVol" class="badge" style="background: rgba(255,255,255,0.08); color: #ededed; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Vol: --</span>
+                        <span id="optInspectDelta" class="badge" style="background: rgba(56,189,248,0.12); color: #38bdf8; font-size: 0.7rem; padding: 0.15rem 0.45rem; border-radius: 4px;">Delta: --</span>
+                    </div>
+
+                    <!-- Right: Active SMC & F&O Key Level Collision Forensics -->
+                    <div id="optInspectZone" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.73rem; background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.25); color: #eab308; padding: 0.2rem 0.55rem; border-radius: 5px;">
+                        <span>🎯</span>
+                        <span id="optInspectZoneDetails">Hover over chart / SMC Order Blocks &amp; Key Levels</span>
+                    </div>
+                </div>
+
+                <!-- High-Resolution Interactive Lightweight Charts Canvas -->
+                <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:560px;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
+                    <div id="optionsSmartChartCanvas" style="width:100%;height:100%;"></div>
+                    <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:none;pointer-events:none;align-items:center;justify-content:center;background:rgba(5,5,5,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
+                            <div style="width:24px;height:24px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                            <span>Streaming live candlestick bars &amp; computing Order Blocks...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tactical "Where to Buy & Where to Sell" Operational HUD Deck -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
+                    <!-- Long Setup: Where to Buy -->
+                    <div id="optBuySignalCard" style="background:linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(6,78,59,0.15) 100%);border:1px solid rgba(16,185,129,0.35);border-radius:10px;padding:1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span style="font-size:1.1rem;">🟢</span>
+                                <h4 style="margin:0;font-size:0.92rem;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.04em;">Where to Buy (Long Plan)</h4>
+                            </div>
+                            <span id="optBuyRRBadge" class="badge" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:5px;font-weight:800;font-family:var(--font-mono);">
+                                R:R 1 : --
+                            </span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;font-size:0.8rem;">
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:var(--text-secondary);font-size:0.7rem;display:block;">ACCUMULATION / ENTRY ZONE</span>
+                                <strong id="optBuyEntryZone" style="color:#ffffff;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#f87171;font-size:0.7rem;display:block;">INVALIDATION STOP-LOSS</span>
+                                <strong id="optBuyStopLoss" style="color:#f87171;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;font-size:0.8rem;">
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#38bdf8;font-size:0.7rem;display:block;">TARGET 1 (CONFLUENCE / VWAP)</span>
+                                <strong id="optBuyTarget1" style="color:#38bdf8;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#34d399;font-size:0.7rem;display:block;">TARGET 2 (EXPANSION / CALL WALL)</span>
+                                <strong id="optBuyTarget2" style="color:#34d399;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                        </div>
+                        <div style="font-size:0.74rem;color:var(--text-secondary);border-top:1px solid rgba(16,185,129,0.2);padding-top:0.45rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span>Trigger:</span>
+                            <span id="optBuyTriggerText" style="color:#e2e8f0;font-weight:600;">--</span>
                         </div>
                     </div>
 
-                    <div class="stock-chart-toggles">
-                        <button id="toggleSMA20" type="button" class="stock-toggle-pill active sma20" onclick="window.toggleIndicator('sma20')">SMA 20</button>
-                        <button id="toggleSMA50" type="button" class="stock-toggle-pill active sma50" onclick="window.toggleIndicator('sma50')">SMA 50</button>
-                        <button id="toggleSMA200" type="button" class="stock-toggle-pill active sma200" onclick="window.toggleIndicator('sma200')">SMA 200</button>
-                        <button id="toggleVWAP" type="button" class="stock-toggle-pill active vwap" onclick="window.toggleIndicator('vwap')">VWAP ±1.5σ</button>
-                        <button id="toggleWALLS" type="button" class="stock-toggle-pill active walls" onclick="window.toggleIndicator('walls')">Liquidity Walls</button>
+                    <!-- Short Setup: Where to Sell -->
+                    <div id="optSellSignalCard" style="background:linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(127,29,29,0.15) 100%);border:1px solid rgba(239,68,68,0.35);border-radius:10px;padding:1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span style="font-size:1.1rem;">🔴</span>
+                                <h4 style="margin:0;font-size:0.92rem;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:0.04em;">Where to Sell (Short Plan)</h4>
+                            </div>
+                            <span id="optSellRRBadge" class="badge" style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:5px;font-weight:800;font-family:var(--font-mono);">
+                                R:R 1 : --
+                            </span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;font-size:0.8rem;">
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:var(--text-secondary);font-size:0.7rem;display:block;">SUPPLY / SHORT ENTRY ZONE</span>
+                                <strong id="optSellEntryZone" style="color:#ffffff;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#f87171;font-size:0.7rem;display:block;">INVALIDATION STOP-LOSS</span>
+                                <strong id="optSellStopLoss" style="color:#f87171;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;font-size:0.8rem;">
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#38bdf8;font-size:0.7rem;display:block;">TARGET 1 (PULLBACK / VWAP)</span>
+                                <strong id="optSellTarget1" style="color:#38bdf8;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                            <div style="background:rgba(0,0,0,0.35);padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                                <span style="color:#f87171;font-size:0.7rem;display:block;">TARGET 2 (EXPANSION / PUT WALL)</span>
+                                <strong id="optSellTarget2" style="color:#f87171;font-size:0.95rem;font-family:var(--font-mono);">--</strong>
+                            </div>
+                        </div>
+                        <div style="font-size:0.74rem;color:var(--text-secondary);border-top:1px solid rgba(239,68,68,0.2);padding-top:0.45rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span>Trigger:</span>
+                            <span id="optSellTriggerText" style="color:#e2e8f0;font-weight:600;">--</span>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Sticky Crosshair HUD Inspector -->
-                <div class="stock-chart-hud">
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">Date:</span> <span id="hudDate" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">O:</span> <span id="hudOpen" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">H:</span> <span id="hudHigh" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">L:</span> <span id="hudLow" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">C:</span> <span id="hudClose" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">TR:</span> <span id="hudTr" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">Vol:</span> <span id="hudVol" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">Surge:</span> <span id="hudSurge" class="stock-hud-val">—</span></div>
-                    <div class="stock-hud-item"><span class="stock-hud-lbl">Wick Delta:</span> <span id="hudWickDelta" class="stock-hud-val">—</span></div>
-                </div>
+                    <!-- Micro-Structure & Market Regime -->
+                    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:1rem;display:flex;flex-direction:column;justify-content:space-between;">
+                        <div>
+                            <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;margin-bottom:0.4rem;">
+                                ⚡ Institutional Micro-Structure
+                            </div>
+                            <div id="optStructureRegimeText" style="font-size:1.02rem;font-weight:800;color:#38bdf8;margin-bottom:0.75rem;">
+                                --
+                            </div>
+                        </div>
 
-                <div id="stockChartCanvas" class="stock-canvas-container">
-                    <div id="stockChartLoading" class="stock-chart-loading">
-                        <div class="stock-spinner"></div>
-                        <span>Initializing High-Density Quantum Canvas...</span>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.75rem;">
+                            <div>
+                                <span style="color:var(--text-secondary);">15m ORB Status:</span>
+                                <div id="optStructureOrbText" style="font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
+                            </div>
+                            <div>
+                                <span style="color:var(--text-secondary);">Straddle Range (±1σ):</span>
+                                <div id="optStructureStraddleText" style="font-weight:700;color:#fbbf24;font-family:var(--font-mono);">--</div>
+                            </div>
+                            <div>
+                                <span style="color:var(--text-secondary);">Major Gamma Pivot:</span>
+                                <div id="optStructurePivotText" style="font-weight:700;color:#e2e8f0;font-family:var(--font-mono);">--</div>
+                            </div>
+                            <div>
+                                <span style="color:var(--text-secondary);">Order Flow Bias:</span>
+                                <div id="optStructureFlowText" style="font-weight:700;color:#34d399;font-family:var(--font-mono);">--</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
