@@ -74,7 +74,10 @@ def list_baskets() -> dict[str, Any]:
 
 
 @router.get("/graph")
-def get_graph(basket_id: str = Query(..., description="ID of the basket, e.g. AI_INFRA_HARDWARE")) -> dict[str, Any]:
+def get_graph(
+    basket_id: str = Query(..., description="ID of the basket, e.g. AI_INFRA_HARDWARE"),
+    refresh: bool = Query(False, description="Force real-time quote and price bar hydration"),
+) -> dict[str, Any]:
     """Return enriched graph payload including nodes, edges, telemetry, and reentry gates."""
     conn = get_db_connection(_settings)
     try:
@@ -85,7 +88,7 @@ def get_graph(basket_id: str = Query(..., description="ID of the basket, e.g. AI
         if not exists:
             raise HTTPException(status_code=404, detail=f"Basket '{basket_id}' not found.")
 
-        payload = get_transmission_graph_payload(basket_id, conn)
+        payload = get_transmission_graph_payload(basket_id, conn, settings=_settings, refresh=refresh)
         return payload
     finally:
         if hasattr(conn, "close"):

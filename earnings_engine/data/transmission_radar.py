@@ -188,7 +188,121 @@ def compute_shockwave_bfs(
     return results
 
 
-def get_transmission_graph_payload(basket_id: str, conn: sqlite3.Connection) -> dict[str, Any]:
+def sync_transmission_snapshots(
+    conn: sqlite3.Connection,
+    basket_id: str = "AI_INFRA_HARDWARE",
+    force: bool = False,
+    settings: Any | None = None,
+) -> int:
+    """Fetch authoritative quotes and historical price bars for all nodes in basket and store fresh snapshots.
+
+    Zero mock fallback: uses real quotes from fetch_live_quote and price bars from load_prices.
+    """
+    from earnings_engine.config import Settings
+    from earnings_engine.data.prices import fetch_live_quote, load_prices, fetch_prices
+    from earnings_engine.data.transmission_schema import prune_old_snapshots
+
+    if settings is None:
+        settings = Settings()
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround
+        FROM transmission_nodes
+        WHERE basket_id = ? AND is_active = 1
+        """,
+        (basket_id,),
+    )
+    nodes = cur.fetchall()
+    if not nodes:
+        return 0
+
+    anchor_pes = [r[4] for r in nodes if r[2] == "GLOBAL_ANCHOR" and r[4] and r[4] > 0]
+    default_anchor_pe = anchor_pes[0] if anchor_pes else 55.0
+
+    synced_count = 0
+    for node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround in nodes:
+        try:
+            quote = fetch_live_quote(symbol, settings=settings, force=force)
+            df = load_prices(symbol, settings=settings)
+            if df is None or df.empty:
+                df = fetch_prices(symbol, settings=settings, force=False)
+
+            current_price = quote.get("current_price") if quote else None
+            closes = df["close"].dropna() if df is not None and not df.empty and "close" in df.columns else []
+
+            if current_price is None and len(closes) > 0:
+                current_price = float(closes.iloc[-1])
+
+            if current_price is None:
+                continue
+
+            c1d = quote.get("day_change_pct") if quote else None
+            if c1d is None and len(closes) >= 2:
+                c1d = round(((current_price - float(closes.iloc[-2])) / float(closes.iloc[-2])) * 100.0, 2)
+            c1d = c1d or 0.0
+
+            c5d = round(((current_price - float(closes.iloc[-5])) / float(closes.iloc[-5])) * 100.0, 2) if len(closes) >= 5 else None
+            c20d = round(((current_price - float(closes.iloc[-20])) / float(closes.iloc[-20])) * 100.0, 2) if len(closes) >= 20 else None
+
+            vol = quote.get("volume") if quote else None
+            vol_mult = 1.0
+            if df is not None and not df.empty and "volume" in df.columns and len(df) >= 5:
+                avg_vol = float(df["volume"].tail(20).mean() or 1.0)
+                if vol and avg_vol > 0:
+                    vol_mult = round(float(vol) / avg_vol, 2)
+
+            ref_close = float(closes.iloc[-2]) if len(closes) >= 2 else None
+            dist_lc, c_status = compute_circuit_proximity(current_price, circuit_band_pct, reference_close=ref_close)
+
+            if role == "GLOBAL_ANCHOR":
+                e_ratio, e_label = None, "N/A (Anchor)"
+            else:
+                e_ratio, e_label = compute_valuation_elasticity(
+                    trailing_pe, default_anchor_pe, is_turnaround=bool(is_turnaround)
+                )
+
+            anom_flag = detect_delivery_divergence(None, vol_mult, None, data_mode="EOD")
+            if not anom_flag:
+                if c_status == "CIRCUIT_LOCKED":
+                    anom_flag = "CIRCUIT_FREEZE"
+                elif e_label == "EXTREME":
+                    anom_flag = "VALUATION_ELASTICITY_TRAP"
+                else:
+                    anom_flag = "NONE"
+
+            cur.execute(
+                """
+                INSERT INTO transmission_snapshots (
+                    node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct,
+                    delivery_pct, bid_qty_total, volume_multiple_20d, volume_velocity_ratio,
+                    intraday_volume_velocity_flag, distance_to_lower_circuit_pct,
+                    circuit_status, elasticity_ratio, elasticity_label, anomaly_flag, data_mode
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    node_id, current_price, c1d, c5d, c20d,
+                    None, None, vol_mult, None,
+                    0, dist_lc, c_status, e_ratio, e_label, anom_flag, "EOD"
+                ),
+            )
+            prune_old_snapshots(node_id, conn, keep=100)
+            synced_count += 1
+        except Exception as e:
+            logger.warning("[TRANSMISSION] Failed to sync snapshot for node %s (%s): %s", node_id, symbol, e)
+
+    conn.commit()
+    logger.info("[TRANSMISSION] Synced %d node snapshots for basket %s", synced_count, basket_id)
+    return synced_count
+
+
+def get_transmission_graph_payload(
+    basket_id: str,
+    conn: sqlite3.Connection,
+    settings: Any | None = None,
+    refresh: bool = False,
+) -> dict[str, Any]:
     """Build full transmission graph response payload for a basket.
 
     Includes:
@@ -200,6 +314,25 @@ def get_transmission_graph_payload(basket_id: str, conn: sqlite3.Connection) -> 
     - Re-entry gate criteria evaluation
     """
     cur = conn.cursor()
+
+    # If refresh is requested or active nodes have no snapshots, sync real market data first
+    if refresh:
+        sync_transmission_snapshots(conn, basket_id=basket_id, force=True, settings=settings)
+    else:
+        cur.execute(
+            """
+            SELECT COUNT(DISTINCT s.node_id)
+            FROM transmission_snapshots s
+            JOIN transmission_nodes n ON s.node_id = n.node_id
+            WHERE n.basket_id = ?;
+            """,
+            (basket_id,),
+        )
+        existing_nodes = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM transmission_nodes WHERE basket_id = ? AND is_active = 1;", (basket_id,))
+        total_active_nodes = cur.fetchone()[0]
+        if total_active_nodes > 0 and existing_nodes < total_active_nodes:
+            sync_transmission_snapshots(conn, basket_id=basket_id, force=False, settings=settings)
 
     # 1. Basket Info
     cur.execute("""

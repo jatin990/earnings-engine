@@ -380,16 +380,17 @@
     // Data Fetch & Render
     // ---------------------------------------------------------------------------
 
-    async function _fetchAndRender(basketId) {
+    async function _fetchAndRender(basketId, forceRefresh = false) {
         if (_state.isLoading) return;
         _state.isLoading = true;
         _state.currentBasketId = basketId;
 
         const btn = document.getElementById('btnRefreshTransmission');
-        if (btn) btn.textContent = '⟳ Loading…';
+        if (btn) btn.textContent = '⟳ Refreshing…';
 
         try {
-            const res = await fetch(`${API_BASE}/api/transmission/graph?basket_id=${encodeURIComponent(basketId)}`);
+            const refreshParam = forceRefresh ? '&refresh=true' : '';
+            const res = await fetch(`${API_BASE}/api/transmission/graph?basket_id=${encodeURIComponent(basketId)}${refreshParam}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
@@ -538,7 +539,7 @@
         },
 
         refreshGraph() {
-            _fetchAndRender(_state.currentBasketId);
+            _fetchAndRender(_state.currentBasketId, true);
         },
 
         openDrawer(nodeId) {

@@ -207,29 +207,32 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, e)
 
-    # 4. Seed initial baseline snapshots so radar operates cleanly immediately
-    initial_snapshots = [
-        ("BE", 18.42, -4.20, -12.10, -18.5, None, None, 1.15, 1.15, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-        ("NVDA_CLUSTER", 135.20, -1.80, -3.40, 4.20, None, None, 1.05, 1.05, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-        ("CIEN", 64.50, 1.20, 2.50, 8.10, None, None, 0.95, 0.95, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-        ("GLW", 46.20, -0.80, -1.50, 3.80, None, None, 0.90, 0.90, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-        ("DIXON.NS", 14850.0, 4.20, 8.50, 14.20, 38.5, 25000, 1.85, 1.85, 0, 18.5, "NORMAL", 2.11, "ELEVATED", "NONE", "EOD"),
-        ("STLTECH.NS", 138.20, -1.80, -5.20, -8.10, 22.1, 45000, 1.25, 1.25, 0, 12.4, "NORMAL", None, "N/A (Turnaround)", "NONE", "EOD"),
-        ("HFCL.NS", 96.20, 3.40, 7.80, 11.50, 18.4, 65000, 2.45, 2.45, 0, 14.8, "NORMAL", 1.29, "NORMAL", "LEADER_DUMP_FOLLOWER_PUMP", "EOD"),
-        ("MTARTECH.NS", 1820.0, -5.00, -14.20, -22.50, 45.2, 0, 0.85, 0.85, 0, 0.0, "CIRCUIT_LOCKED", 3.73, "EXTREME", "CIRCUIT_FREEZE", "EOD"),
-        ("SYRMA.NS", 485.0, 1.50, 3.20, 5.40, 32.0, 38000, 1.35, 1.35, 0, 15.2, "NORMAL", 1.95, "ELEVATED", "NONE", "EOD"),
-        ("AEROFLEX.NS", 175.50, -2.10, -4.50, 1.20, 26.5, 22000, 1.10, 1.10, 0, 12.0, "NORMAL", 1.38, "NORMAL", "NONE", "EOD"),
-    ]
+    # 4. Seed initial baseline snapshots ONLY if table is empty
+    cur.execute("SELECT COUNT(*) FROM transmission_snapshots;")
+    snap_count = cur.fetchone()[0]
+    if snap_count == 0:
+        initial_snapshots = [
+            ("BE", 221.76, -5.23, -15.82, -19.81, None, None, 1.15, 1.15, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
+            ("NVDA_CLUSTER", 214.88, -0.85, -5.97, -6.11, None, None, 1.05, 1.05, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
+            ("CIEN", 334.87, -5.64, -16.37, -9.14, None, None, 0.95, 0.95, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
+            ("GLW", 133.03, -3.04, -10.44, -16.69, None, None, 0.90, 0.90, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
+            ("DIXON.NS", 12322.0, -2.72, -2.67, -7.62, 38.5, 25000, 1.85, 1.85, 0, 18.5, "NORMAL", 1.73, "NORMAL", "NONE", "EOD"),
+            ("STLTECH.NS", 868.85, -1.09, -13.98, 0.47, 22.1, 45000, 1.25, 1.25, 0, 12.4, "NORMAL", None, "N/A (Turnaround)", "NONE", "EOD"),
+            ("HFCL.NS", 256.01, 5.00, -3.57, 14.36, 18.4, 65000, 2.45, 2.45, 0, 14.8, "NORMAL", 1.05, "NORMAL", "LEADER_DUMP_FOLLOWER_PUMP", "EOD"),
+            ("MTARTECH.NS", 7065.0, -3.07, -8.37, 1.70, 45.2, 0, 0.85, 0.85, 0, 3.2, "NORMAL", 3.05, "EXTREME", "VALUATION_ELASTICITY_TRAP", "EOD"),
+            ("SYRMA.NS", 1596.6, -5.47, -7.27, 5.90, 32.0, 38000, 1.35, 1.35, 0, 15.2, "NORMAL", 1.60, "NORMAL", "NONE", "EOD"),
+            ("AEROFLEX.NS", 526.0, 3.51, -8.46, 3.62, 26.5, 22000, 1.10, 1.10, 0, 12.0, "NORMAL", 1.13, "NORMAL", "NONE", "EOD"),
+        ]
 
-    for s in initial_snapshots:
-        cur.execute("""
-        INSERT INTO transmission_snapshots (
-            node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct,
-            delivery_pct, bid_qty_total, volume_multiple_20d, volume_velocity_ratio,
-            intraday_volume_velocity_flag, distance_to_lower_circuit_pct,
-            circuit_status, elasticity_ratio, elasticity_label, anomaly_flag, data_mode
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, s)
+        for s in initial_snapshots:
+            cur.execute("""
+            INSERT INTO transmission_snapshots (
+                node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct,
+                delivery_pct, bid_qty_total, volume_multiple_20d, volume_velocity_ratio,
+                intraday_volume_velocity_flag, distance_to_lower_circuit_pct,
+                circuit_status, elasticity_ratio, elasticity_label, anomaly_flag, data_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, s)
 
     conn.commit()
 
