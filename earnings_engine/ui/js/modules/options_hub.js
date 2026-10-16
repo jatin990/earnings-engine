@@ -304,6 +304,9 @@
             // Render KPI cards & Radar HUD
             app.renderOptionKpiCards(data);
 
+            // Render Tactical GEX Market Briefing & Action Directive Header Bar
+            app.renderGexMarketBriefing(data);
+
             // Render Multi-Mode Open Interest / GEX / Delta / IV Chart
             app.renderOiDistributionChart(data);
 
@@ -1235,6 +1238,114 @@
             `;
         });
         container.innerHTML = html;
+    };
+
+    /**
+     * Render the Tactical GEX Market Briefing & Action Directive Header Bar
+     */
+    app.renderGexMarketBriefing = function (data) {
+        const briefingEl = document.getElementById('optGexMarketBriefing');
+        if (!briefingEl) return;
+
+        const gexSummary = data && data.gex_summary ? data.gex_summary : null;
+        if (!gexSummary || gexSummary.action_type === 'UNAVAILABLE') {
+            briefingEl.style.display = 'none';
+            return;
+        }
+
+        briefingEl.style.display = 'block';
+
+        const regimeBadge = document.getElementById('optGexRegimeBadge');
+        const textureHeadline = document.getElementById('optGexTextureHeadline');
+        const narrative = document.getElementById('optGexNarrative');
+        const rangeSpread = document.getElementById('optGexRangeSpread');
+        const rangeSupport = document.getElementById('optGexRangeSupport');
+        const rangeResistance = document.getElementById('optGexRangeResistance');
+        const straddleBounds = document.getElementById('optGexStraddleBounds');
+        const flipLevel = document.getElementById('optGexFlipLevel');
+        const actionBadge = document.getElementById('optGexActionBadge');
+        const actionHeadline = document.getElementById('optGexActionHeadline');
+        const actionDetails = document.getElementById('optGexActionDetails');
+
+        // 1. Market Texture & Regime
+        if (regimeBadge) {
+            regimeBadge.textContent = gexSummary.texture_badge || gexSummary.gamma_regime || 'NEUTRAL';
+            if (gexSummary.gamma_regime === 'POSITIVE_GAMMA') {
+                regimeBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                regimeBadge.style.color = '#34d399';
+                regimeBadge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+            } else if (gexSummary.gamma_regime === 'NEGATIVE_GAMMA') {
+                regimeBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                regimeBadge.style.color = '#f87171';
+                regimeBadge.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+            } else {
+                regimeBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                regimeBadge.style.color = '#fbbf24';
+                regimeBadge.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+            }
+        }
+
+        if (textureHeadline) {
+            textureHeadline.textContent = gexSummary.market_texture || 'Market Consolidation';
+        }
+        if (narrative) {
+            narrative.textContent = gexSummary.narrative || '--';
+        }
+
+        // 2. Expected Daily Range
+        const expRange = gexSummary.expected_range || {};
+        if (rangeSpread) {
+            const pts = expRange.spread_points !== undefined && expRange.spread_points !== null ? Number(expRange.spread_points).toFixed(1) : '--';
+            const pct = expRange.spread_pct !== undefined && expRange.spread_pct !== null ? Number(expRange.spread_pct).toFixed(2) : '--';
+            rangeSpread.textContent = `${pts} pts (${pct}%)`;
+        }
+        if (rangeSupport) {
+            rangeSupport.textContent = expRange.support ? `₹${Number(expRange.support).toLocaleString('en-IN')}` : '--';
+        }
+        if (rangeResistance) {
+            rangeResistance.textContent = expRange.resistance ? `₹${Number(expRange.resistance).toLocaleString('en-IN')}` : '--';
+        }
+        if (straddleBounds) {
+            const low = expRange.lower_1sigma ? `₹${Number(expRange.lower_1sigma).toLocaleString('en-IN')}` : '--';
+            const high = expRange.upper_1sigma ? `₹${Number(expRange.upper_1sigma).toLocaleString('en-IN')}` : '--';
+            straddleBounds.textContent = `${low} – ${high}`;
+        }
+        if (flipLevel) {
+            flipLevel.textContent = gexSummary.gamma_flip_strike ? `₹${Number(gexSummary.gamma_flip_strike).toLocaleString('en-IN')}` : '--';
+        }
+
+        // 3. Action Directive
+        if (actionBadge) {
+            actionBadge.textContent = gexSummary.action_badge || 'TACTICAL PLAN';
+            const theme = gexSummary.action_theme || 'indigo';
+            if (theme === 'emerald') {
+                actionBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+                actionBadge.style.color = '#34d399';
+                actionBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            } else if (theme === 'rose') {
+                actionBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                actionBadge.style.color = '#f87171';
+                actionBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            } else {
+                actionBadge.style.background = 'rgba(99, 102, 241, 0.2)';
+                actionBadge.style.color = '#a5b4fc';
+                actionBadge.style.borderColor = 'rgba(99, 102, 241, 0.4)';
+            }
+        }
+        if (actionHeadline) {
+            actionHeadline.textContent = gexSummary.action_headline || '--';
+            const theme = gexSummary.action_theme || 'indigo';
+            if (theme === 'emerald') {
+                actionHeadline.style.color = '#34d399';
+            } else if (theme === 'rose') {
+                actionHeadline.style.color = '#f87171';
+            } else {
+                actionHeadline.style.color = '#c7d2fe';
+            }
+        }
+        if (actionDetails) {
+            actionDetails.textContent = gexSummary.action_details || '--';
+        }
     };
 
     /**

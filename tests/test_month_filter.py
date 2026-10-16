@@ -187,3 +187,31 @@ def test_results_refresh_price_endpoint(monkeypatch):
     assert data["metrics"]["day_change"] == 40.50
     assert data["metrics"]["day_change_pct"] == 0.90
 
+
+def test_results_refresh_price_empty_ticker():
+    """Test /api/v1/dashboard/results/refresh-price with empty ticker returns 400."""
+    client = TestClient(app)
+    resp = client.get("/api/v1/dashboard/results/refresh-price?ticker=%20%20")
+    assert resp.status_code == 400
+    assert "Ticker cannot be empty" in resp.json()["detail"]
+
+
+def test_hierarchy_date_cap_industry_handles_none_mcap():
+    """Test build_upcoming_results_fragments safely handles None market cap and industry."""
+    df = pd.DataFrame([
+        {
+            "ticker": "NOMCAP.NS",
+            "company_name": "No Cap Corp",
+            "earnings_date": "2026-08-25",
+            "source": "nse",
+            "market_cap": None,
+            "industry": None,
+        }
+    ])
+    fragments = build_upcoming_results_fragments(df, on_demand=True)
+    assert fragments["total_stocks"] == 1
+    sec = fragments["sections"][0]
+    assert sec["stocks"][0]["cap_tier"] == "small"
+    assert sec["stocks"][0]["industry"] == "General / Multi-Sector"
+
+

@@ -1323,7 +1323,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
             # Only recompute 52W gaps if not already cached today (once-per-day refresh)
             if pct_from_52w_high is None:
-                if week_high is None or current_price is None:
+                if week_high is None or week_high <= 0 or current_price is None:
                     pct_from_high = None
                 else:
                     pct_from_high = ((week_high - current_price) / week_high) * 100
@@ -1331,7 +1331,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 pct_from_high = pct_from_52w_high
 
             if pct_from_52w_low is None:
-                if week_low is None or current_price is None:
+                if week_low is None or week_low <= 0 or current_price is None:
                     pct_from_low = None
                 else:
                     pct_from_low = ((current_price - week_low) / week_low) * 100

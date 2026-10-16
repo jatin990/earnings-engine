@@ -211,6 +211,92 @@ def test_derive_market_setups_gamma_squeeze():
     assert any(s["type"] == "BREAKOUT" or "squeeze" in s["id"].lower() for s in setups)
 
 
+def test_derive_gex_action_summary_positive_gamma():
+    from earnings_engine.data.option_chain import derive_gex_action_summary
+
+    gamma_profile = {
+        "gamma_regime": "POSITIVE_GAMMA",
+        "net_gex": 142.5,
+        "gamma_flip_strike": 24200.0,
+    }
+    expected_move = {
+        "lower_1sigma": 24100.0,
+        "upper_1sigma": 24500.0,
+    }
+
+    # 1. Spot in middle: range fade
+    summary = derive_gex_action_summary(
+        spot_price=24300.0,
+        gamma_profile=gamma_profile,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24250.0,
+        expected_move=expected_move,
+    )
+    assert summary["gamma_regime"] == "POSITIVE_GAMMA"
+    assert "Range-Bound" in summary["market_texture"]
+    assert summary["expected_range"]["support"] == 24000.0
+    assert summary["expected_range"]["resistance"] == 24500.0
+    assert summary["action_type"] == "BUY_SUPPORT_SELL_RESISTANCE"
+    assert "BUY ON SUPPORT" in summary["action_headline"]
+    assert "SELL AT RESISTANCE" in summary["action_headline"]
+    assert summary["buy_level"] == 24000.0
+    assert summary["sell_level"] == 24500.0
+
+    # 2. Spot near support: tactical buy zone
+    summary_support = derive_gex_action_summary(
+        spot_price=24010.0,
+        gamma_profile=gamma_profile,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24250.0,
+        expected_move=expected_move,
+    )
+    assert summary_support["action_type"] == "TACTICAL_BUY"
+    assert "BUY AT SUPPORT" in summary_support["action_headline"]
+
+
+def test_derive_gex_action_summary_negative_gamma():
+    from earnings_engine.data.option_chain import derive_gex_action_summary
+
+    gamma_profile = {
+        "gamma_regime": "NEGATIVE_GAMMA",
+        "net_gex": -210.0,
+        "gamma_flip_strike": 24200.0,
+    }
+    expected_move = {
+        "lower_1sigma": 23900.0,
+        "upper_1sigma": 24600.0,
+    }
+
+    # Spot above flip -> breakout buy
+    summary_bull = derive_gex_action_summary(
+        spot_price=24350.0,
+        gamma_profile=gamma_profile,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        expected_move=expected_move,
+    )
+    assert summary_bull["gamma_regime"] == "NEGATIVE_GAMMA"
+    assert "Volatile" in summary_bull["market_texture"]
+    assert summary_bull["action_type"] == "BUY_BREAKOUT_MOMENTUM"
+    assert "BUY MOMENTUM" in summary_bull["action_headline"]
+
+    # Spot below flip -> breakdown sell
+    summary_bear = derive_gex_action_summary(
+        spot_price=24100.0,
+        gamma_profile=gamma_profile,
+        call_wall=24500.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        expected_move=expected_move,
+    )
+    assert summary_bear["action_type"] == "SELL_BREAKDOWN_MOMENTUM"
+    assert "SELL RALLIES" in summary_bear["action_headline"]
+
+
+
 
 
 

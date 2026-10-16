@@ -43,8 +43,40 @@ const ResultsLedger = (() => {
     _app = app;
     _syncSliderBadge();
     document.addEventListener('click', _onDocClick);
+    _setupSliderInteraction();
   }
   function destroy() { document.removeEventListener('click', _onDocClick); }
+
+  function _setupSliderInteraction() {
+    const sliderBox = document.querySelector('.rl-range-slider');
+    const pastInput = _el('rl-slider-past');
+    const aheadInput = _el('rl-slider-ahead');
+    if (!sliderBox || !pastInput || !aheadInput) return;
+
+    function _arbitrateZIndex(e) {
+      const rect = sliderBox.getBoundingClientRect();
+      if (!rect.width) return;
+      const xPct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const pastVal = parseFloat(pastInput.value) || 0;
+      const pastMax = parseFloat(pastInput.max) || 180;
+      const aheadVal = parseFloat(aheadInput.value) || 1;
+      const aheadMax = parseFloat(aheadInput.max) || 90;
+      const pastPct = pastVal / pastMax;
+      const aheadPct = aheadVal / aheadMax;
+      if (Math.abs(xPct - pastPct) < Math.abs(xPct - aheadPct)) {
+        pastInput.style.zIndex = '10';
+        aheadInput.style.zIndex = '2';
+      } else {
+        aheadInput.style.zIndex = '10';
+        pastInput.style.zIndex = '2';
+      }
+    }
+
+    sliderBox.addEventListener('pointermove', _arbitrateZIndex);
+    sliderBox.addEventListener('pointerdown', _arbitrateZIndex);
+    pastInput.addEventListener('focus', () => { pastInput.style.zIndex = '10'; aheadInput.style.zIndex = '2'; });
+    aheadInput.addEventListener('focus', () => { aheadInput.style.zIndex = '10'; pastInput.style.zIndex = '2'; });
+  }
 
   function _onDocClick(e) {
     const panel = _el('resultsIndustryDropdownPanel');
@@ -190,7 +222,7 @@ const ResultsLedger = (() => {
     rows.push(`<table class="results-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
       <thead>
         <tr style="background:#000;position:sticky;top:0;z-index:10;">
-          <th style="${_thStyle()}text-align:left;min-width:140px;">TICKER</th><th style="${_thStyle()}">DATE</th><th style="${_thStyle()}">PRICE / CAP</th><th style="${_thStyle()}">EPS EST</th><th style="${_thStyle()}">BEAT RATE</th><th style="${_thStyle()}text-align:center;">SURPRISE %</th><th style="${_thStyle()}">RETURNS</th><th style="${_thStyle()}text-align:center;">AI EDGE</th><th style="${_thStyle()}">SETUP</th><th style="${_thStyle()}">S/R RANGE</th><th style="${_thStyle()}">52W</th><th style="${_thStyle()}text-align:center;">REL VOL</th>
+          <th style="${_thStyle()}text-align:left;min-width:140px;">TICKER</th><th style="${_thStyle()}">DATE</th><th style="${_thStyle()}text-align:center;">SIGNAL</th><th style="${_thStyle()}">PRICE / CAP</th><th style="${_thStyle()}">EPS EST</th><th style="${_thStyle()}">BEAT RATE</th><th style="${_thStyle()}text-align:center;">SURPRISE %</th><th style="${_thStyle()}">RETURNS</th><th style="${_thStyle()}text-align:center;">AI EDGE</th><th style="${_thStyle()}">SETUP</th><th style="${_thStyle()}">S/R RANGE</th><th style="${_thStyle()}">52W</th><th style="${_thStyle()}text-align:center;">REL VOL</th>
         </tr>
       </thead>
       <tbody id="rl-tbody">`);
@@ -202,7 +234,7 @@ const ResultsLedger = (() => {
       const stocks    = sec.stocks || [];
       const startRow  = rowRangeCursor;
       rows.push(`<tr class="rl-day-divider results-day-divider" data-date="${_esc(dateKey)}" data-month="${_esc(monthKey)}" data-row-start="${startRow}" data-count="${stocks.length}">
-        <td colspan="12" class="rl-day-divider" style="padding:0.3rem 0.65rem;background:#000;border-top:1px solid rgba(255,255,255,0.07);">
+        <td colspan="13" class="rl-day-divider" style="padding:0.3rem 0.65rem;background:#000;border-top:1px solid rgba(255,255,255,0.07);">
           <div style="display:flex;align-items:center;gap:0.4rem;">
             <span style="font-size:0.66rem;font-weight:700;color:#94a3b8;font-family:var(--font-mono);">${_esc(dayLabel)}</span>
             ${dayRel ? `<span style="font-size:0.58rem;background:rgba(255,255,255,0.06);color:#f8fafc;padding:0.04rem 0.3rem;border-radius:3px;font-weight:600;">${_esc(dayRel)}</span>` : ''}
@@ -291,18 +323,11 @@ const ResultsLedger = (() => {
     const selDates = _state.selectedDates;
     const aMonth = _state.activeMonth;
     let visible = 0;
-    /* Hide/show day-divider rows */
-    document.querySelectorAll('.results-day-divider').forEach(divRow => {
-      const date  = divRow.dataset.date || '';
-      const month = divRow.dataset.month || '';
-      /* Check month + date filters on divider */
-      const monthOk = aMonth === 'ALL' || month === aMonth;
-      const dateOk  = !selDates.size || selDates.has(date);
-      divRow.style.display = (monthOk && dateOk) ? '' : 'none';
-    });
+    const visibleDates = new Set();
+
     /* Hide/show stock rows */
     document.querySelectorAll('.results-row').forEach(row => {
-      const date    = (row.closest('tr[data-date]') || _prevDivider(row))?.dataset?.date || '';
+      const date    = row.dataset.date || (row.closest('tr[data-date]') || _prevDivider(row))?.dataset?.date || '';
       const month   = date.substring(0, 7);
       const ticker  = (row.dataset.ticker || '').toLowerCase();
       const capTier = (row.dataset.cap    || '').toLowerCase();
@@ -313,11 +338,25 @@ const ResultsLedger = (() => {
       const indOk   = !excl.size || !excl.has(row.dataset.industry || '');
       const searchOk= !q || ticker.includes(q) || industry.includes(q)
         || (row.querySelector('.stock-company-sub')?.textContent || '').toLowerCase().includes(q)
-        || (row.dataset.setup || '').toLowerCase().includes(q);
+        || (row.dataset.setup || '').toLowerCase().includes(q)
+        || (row.dataset.buySignal || '').toLowerCase().includes(q);
       const show = monthOk && dateOk && capOk && indOk && searchOk;
       row.style.display = show ? '' : 'none';
-      if (show) visible++;
+      if (show) {
+        visible++;
+        if (date) visibleDates.add(date);
+      }
     });
+
+    /* Hide/show day-divider rows: only show if date has visible rows and matches date/month filters */
+    document.querySelectorAll('.results-day-divider').forEach(divRow => {
+      const date  = divRow.dataset.date || '';
+      const month = divRow.dataset.month || '';
+      const monthOk = aMonth === 'ALL' || month === aMonth;
+      const dateOk  = !selDates.size || selDates.has(date);
+      divRow.style.display = (monthOk && dateOk && visibleDates.has(date)) ? '' : 'none';
+    });
+
     _el('resultsFilterMatchCount') && (_el('resultsFilterMatchCount').textContent = visible || '');
     _updateCountBadge();
   }
@@ -563,11 +602,12 @@ const ResultsLedger = (() => {
 
   function exportCsv() {
     const rows = _visibleRows();
-    const cols = ['ticker', 'date', 'cap', 'industry', 'price', 'mcap', '3d', '7d', '30d', 'rel_vol', 'beat_rate'];
+    const cols = ['ticker', 'date', 'signal', 'buy_score', 'cap', 'industry', 'price', 'mcap', '3d', '7d', '30d', 'rel_vol', 'beat_rate'];
     const lines = [cols.join(',')];
     rows.forEach(r => {
       lines.push([
-        r.dataset.ticker || '', r.dataset.date || '', r.dataset.cap || '', r.dataset.industry || '',
+        r.dataset.ticker || '', r.dataset.date || '', r.dataset.buySignal || '', r.dataset.buyScore || '',
+        r.dataset.cap || '', r.dataset.industry || '',
         r.dataset.price || '', r.dataset.mcap || '',
         r.dataset['3dRet'] || '', r.dataset['7dRet'] || '', r.dataset['30dRet'] || '',
         r.dataset.relVol || '', r.dataset.beatRate || '',
@@ -578,7 +618,10 @@ const ResultsLedger = (() => {
 
   function exportJson() {
     const rows = _visibleRows().map(r => ({
-      ticker: r.dataset.ticker, date: r.dataset.date, cap: r.dataset.cap, industry: r.dataset.industry,
+      ticker: r.dataset.ticker, date: r.dataset.date,
+      signal: r.dataset.buySignal || null,
+      buy_score: r.dataset.buyScore ? Number(r.dataset.buyScore) : null,
+      cap: r.dataset.cap, industry: r.dataset.industry,
       price: r.dataset.price, mcap: r.dataset.mcap,
       ret_3d: r.dataset['3dRet'], ret_7d: r.dataset['7dRet'], ret_30d: r.dataset['30dRet'],
       rel_vol: r.dataset.relVol, beat_rate: r.dataset.beatRate,
@@ -619,6 +662,7 @@ const ResultsLedger = (() => {
     setCapFilter, setDensity, onSearchInput, toggleIndustryDropdown, filterIndustryList,
     onIndustryCheckboxChange, selectAllIndustries, clearAllIndustries, syncCalendar,
     recalcPrices, summarize, openDrawer, openMonthModal, refreshSinglePrice,
+    onMonthCellClick: setMonth,
     updateDomRowWithMetrics, exportCsv, exportJson,
   };
 })();

@@ -234,6 +234,23 @@ def analyze_option_chain(
             "strikes": [],
             "signals": ["NOT_FNO_ELIGIBLE"],
             "spot_price": spot_price,
+            "gex_summary": {
+                "gamma_regime": "NEUTRAL",
+                "market_texture": "Non-FNO Cash Equity",
+                "texture_badge": "N/A",
+                "texture_theme": "zinc",
+                "narrative": "No equity derivatives listed for this symbol.",
+                "expected_range": {"support": None, "resistance": None, "spread_points": 0, "spread_pct": 0, "range_display": "--"},
+                "action_type": "UNAVAILABLE",
+                "action_badge": "NO DERIVATIVES",
+                "action_theme": "zinc",
+                "action_headline": "No F&O Options Data Available",
+                "action_details": "Cash market equity without exchange-traded options chain.",
+                "buy_level": None,
+                "sell_level": None,
+                "gamma_flip_strike": None,
+                "max_pain_strike": None,
+            },
         }
         _OPTION_CHAIN_CACHE[cache_key] = (now, res)
         return res
@@ -532,6 +549,26 @@ def _calculate_option_metrics_from_records(
         put_wall=high_put_strike,
     )
 
+    expected_move_dict = {
+        "straddle_price": gamma_profile_data.get("atm_straddle_price"),
+        "range_1sigma": gamma_profile_data.get("atm_straddle_price"),
+        "upper_1sigma": gamma_profile_data.get("expected_move_upper"),
+        "lower_1sigma": gamma_profile_data.get("expected_move_lower"),
+        "upper_2sigma": gamma_profile_data.get("expected_move_2sigma_upper"),
+        "lower_2sigma": gamma_profile_data.get("expected_move_2sigma_lower"),
+    }
+
+    gex_summary = derive_gex_action_summary(
+        spot_price=current_spot,
+        gamma_profile=gamma_profile_data,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+        max_pain=max_pain,
+        expected_move=expected_move_dict,
+        pcr_oi=pcr_oi,
+        sentiment=sentiment,
+    )
+
     return {
         "symbol": symbol,
         "pcr_oi": pcr_oi,
@@ -549,14 +586,8 @@ def _calculate_option_metrics_from_records(
         "gamma_flip_strike": gamma_profile_data.get("gamma_flip_strike"),
         "gamma_regime": gamma_profile_data.get("gamma_regime"),
         "gamma_regime_label": gamma_profile_data.get("gamma_regime_label"),
-        "expected_move": {
-            "straddle_price": gamma_profile_data.get("atm_straddle_price"),
-            "range_1sigma": gamma_profile_data.get("atm_straddle_price"),
-            "upper_1sigma": gamma_profile_data.get("expected_move_upper"),
-            "lower_1sigma": gamma_profile_data.get("expected_move_lower"),
-            "upper_2sigma": gamma_profile_data.get("expected_move_2sigma_upper"),
-            "lower_2sigma": gamma_profile_data.get("expected_move_2sigma_lower"),
-        },
+        "expected_move": expected_move_dict,
+        "gex_summary": gex_summary,
         "vix_profile": vix_profile,
         "market_setups": setups,
         "records_count": len(formatted_strikes),
@@ -947,6 +978,186 @@ def derive_market_setups(
             })
 
     return setups
+
+
+def derive_gex_action_summary(
+    spot_price: float,
+    gamma_profile: dict[str, Any] | None,
+    call_wall: float | None,
+    put_wall: float | None,
+    max_pain: float | None,
+    expected_move: dict[str, Any] | None = None,
+    pcr_oi: float | None = None,
+    sentiment: str | None = None,
+) -> dict[str, Any]:
+    """Derive institutional GEX header intelligence: market texture, expected range, and tactical action directives."""
+    gp = gamma_profile or {}
+    em = expected_move or {}
+    gamma_regime = gp.get("gamma_regime", "NEUTRAL")
+    net_gex = float(gp.get("net_gex") or 0.0)
+    flip_strike = gp.get("gamma_flip_strike")
+    if flip_strike is not None:
+        try:
+            flip_strike = float(flip_strike)
+        except (ValueError, TypeError):
+            flip_strike = None
+
+    mp_val = float(max_pain) if max_pain else spot_price
+    c_wall = float(call_wall) if call_wall else None
+    p_wall = float(put_wall) if put_wall else None
+
+    em_lower = float(em["lower_1sigma"]) if em.get("lower_1sigma") is not None else None
+    em_upper = float(em["upper_1sigma"]) if em.get("upper_1sigma") is not None else None
+
+    # Resolve range bounds (Put Wall Support to Call Wall Resistance)
+    range_support = p_wall if p_wall else (em_lower or round(spot_price * 0.985, 1))
+    range_resistance = c_wall if c_wall else (em_upper or round(spot_price * 1.015, 1))
+    if range_support > range_resistance:
+        range_support, range_resistance = range_resistance, range_support
+
+    spread_pts = round(range_resistance - range_support, 1)
+    spread_pct = round((spread_pts / spot_price * 100), 2) if spot_price > 0 else 0.0
+
+    # 1. Market Texture & Dealer Mechanics Narrative
+    if gamma_regime == "POSITIVE_GAMMA":
+        texture = "Range-Bound & Mean-Reverting (Vol Dampening)"
+        texture_badge = "🛡️ POSITIVE GAMMA (Vol Dampening)"
+        texture_theme = "emerald"
+        narrative = (
+            f"Dealers are net long gamma (+₹{net_gex:.1f}L). Dealer delta-hedging dampens intraday volatility "
+            f"(selling into rallies, buying dips). Price tends to pin and mean-revert toward Max Pain (₹{mp_val:,.0f}). "
+            f"Range extremes offer high mean-reversion probability; breakout chasing has low follow-through."
+        )
+    elif gamma_regime == "NEGATIVE_GAMMA":
+        texture = "Volatile & Directional (Gamma Squeeze / Expansion)"
+        texture_badge = "⚡ NEGATIVE GAMMA (Vol Acceleration)"
+        texture_theme = "rose"
+        narrative = (
+            f"Dealers are net short gamma (-₹{abs(net_gex):.1f}L). Dealer hedging accelerates market moves "
+            f"(selling as price drops, buying as price rallies). Elevated velocity and breakout probability. "
+            f"Avoid counter-trend fading; strike walls can easily blow out."
+        )
+    else:
+        texture = "Balanced / Neutral (Consolidation Zone)"
+        texture_badge = "⚖️ NEUTRAL GAMMA"
+        texture_theme = "amber"
+        narrative = (
+            "Dealer gamma exposure is balanced near zero. Order flow and macro catalysts dictate direction "
+            f"within key derivatives barriers (Support ₹{range_support:,.0f} / Resistance ₹{range_resistance:,.0f})."
+        )
+
+    # 2. Tactical Action Directive: Buy, Sell, or Buy Support X and Sell Resistance Y
+    dist_to_support = (spot_price - range_support) / spot_price if spot_price > 0 else 0.0
+    dist_to_resistance = (range_resistance - spot_price) / spot_price if spot_price > 0 else 0.0
+
+    if gamma_regime == "POSITIVE_GAMMA":
+        # In positive gamma, mean-reversion is queen
+        if dist_to_support <= 0.004:
+            # Spot right at or below Put Wall Support
+            action_type = "TACTICAL_BUY"
+            action_badge = "TACTICAL BUY ZONE"
+            action_theme = "emerald"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"BUY AT SUPPORT ₹{range_support:,.0f} (PUT WALL)"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is testing high-conviction Put Wall support at ₹{range_support:,.0f}. "
+                f"Dealers long gamma will actively defend this zone. Accumulate with invalidation stop below ₹{range_support * 0.995:,.0f}, "
+                f"targeting Call Wall resistance at ₹{range_resistance:,.0f}."
+            )
+        elif dist_to_resistance <= 0.004:
+            # Spot right at or above Call Wall Resistance
+            action_type = "TACTICAL_SELL"
+            action_badge = "TACTICAL SELL / PROFIT ZONE"
+            action_theme = "rose"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"SELL / TAKE PROFIT AT RESISTANCE ₹{range_resistance:,.0f} (CALL WALL)"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is testing heavy Call Wall resistance at ₹{range_resistance:,.0f}. "
+                f"Dealers long gamma will aggressively sell into strength to hedge. Book profits or initiate fade shorts "
+                f"with stop above ₹{range_resistance * 1.005:,.0f}, targeting Put Wall at ₹{range_support:,.0f}."
+            )
+        else:
+            # Spot in middle: Play the range
+            action_type = "BUY_SUPPORT_SELL_RESISTANCE"
+            action_badge = "RANGE FADE"
+            action_theme = "indigo"
+            buy_level = range_support
+            sell_level = range_resistance
+            action_headline = f"BUY ON SUPPORT ₹{range_support:,.0f} & SELL AT RESISTANCE ₹{range_resistance:,.0f}"
+            action_details = (
+                f"Market is range-bound inside positive gamma boundaries. Do not chase breakouts. "
+                f"Buy dips near Put Wall support (₹{range_support:,.0f}) and sell / take profits on rallies near Call Wall resistance (₹{range_resistance:,.0f})."
+            )
+
+    elif gamma_regime == "NEGATIVE_GAMMA":
+        pivot_level = flip_strike if flip_strike else range_resistance
+        if spot_price >= (pivot_level * 0.998):
+            # Bullish trend expansion / short squeeze
+            action_type = "BUY_BREAKOUT_MOMENTUM"
+            action_badge = "MOMENTUM BUY"
+            action_theme = "emerald"
+            buy_level = spot_price
+            sell_level = em_upper or (range_resistance * 1.01)
+            action_headline = f"BUY MOMENTUM / BREAKOUT ABOVE ₹{range_resistance:,.0f}"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is in negative gamma acceleration zone above Gamma Flip (₹{pivot_level:,.0f}). "
+                f"Dealers must chase price by buying futures as index climbs. Ride bullish momentum with trailing stop below "
+                f"₹{spot_price * 0.994:,.0f}; do NOT short Call Wall at ₹{range_resistance:,.0f}."
+            )
+        else:
+            # Bearish trend acceleration / liquidation
+            action_type = "SELL_BREAKDOWN_MOMENTUM"
+            action_badge = "SELL RALLIES / SHORT"
+            action_theme = "rose"
+            buy_level = em_lower or (range_support * 0.99)
+            sell_level = range_resistance
+            action_headline = f"SELL RALLIES / BREAKDOWN BELOW ₹{range_support:,.0f}"
+            action_details = (
+                f"Spot (₹{spot_price:,.0f}) is in negative gamma territory below Gamma Flip (₹{pivot_level:,.0f}). "
+                f"Dealers are forced sellers into downticks. Sell pullbacks into resistance; Put Wall support at "
+                f"₹{range_support:,.0f} is vulnerable to cascading breakdown."
+            )
+
+    else:
+        # Neutral Gamma
+        action_type = "BUY_SUPPORT_SELL_RESISTANCE"
+        action_badge = "CONSOLIDATION FADE"
+        action_theme = "amber"
+        buy_level = range_support
+        sell_level = range_resistance
+        action_headline = f"BUY ON SUPPORT ₹{range_support:,.0f} & SELL AT RESISTANCE ₹{range_resistance:,.0f}"
+        action_details = (
+            f"Neutral gamma inventory indicates consolidation. Accumulate on pullbacks toward Put Wall support "
+            f"at ₹{range_support:,.0f} (SL: ₹{range_support * 0.994:,.0f}) and take profits at Call Wall resistance at ₹{range_resistance:,.0f}."
+        )
+
+    return {
+        "gamma_regime": gamma_regime,
+        "market_texture": texture,
+        "texture_badge": texture_badge,
+        "texture_theme": texture_theme,
+        "narrative": narrative,
+        "expected_range": {
+            "support": range_support,
+            "resistance": range_resistance,
+            "lower_1sigma": em_lower,
+            "upper_1sigma": em_upper,
+            "spread_points": spread_pts,
+            "spread_pct": spread_pct,
+            "range_display": f"₹{range_support:,.0f} – ₹{range_resistance:,.0f}",
+        },
+        "action_type": action_type,
+        "action_badge": action_badge,
+        "action_theme": action_theme,
+        "action_headline": action_headline,
+        "action_details": action_details,
+        "buy_level": buy_level,
+        "sell_level": sell_level,
+        "gamma_flip_strike": flip_strike,
+        "max_pain_strike": mp_val,
+    }
 
 
 def save_tracked_option_setups(

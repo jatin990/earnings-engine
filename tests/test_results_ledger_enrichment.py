@@ -193,3 +193,64 @@ def test_enrich_upcoming_results_return_uses_historical_close_not_live_price(mon
     assert row["seven_day_return_pct"] < 30.0
 
 
+@pytest.mark.parametrize(
+    "price,expected_label",
+    [
+        (None, "Neutral"),
+        (0.0, "Neutral"),
+        (-15.0, "Neutral"),
+    ],
+)
+def test_classify_technical_setup_null_and_negative_prices(price, expected_label):
+    """Ensure non-positive or null prices safely fall back to Neutral without exceptions."""
+    setup = classify_technical_setup(
+        current_price=price,
+        current_support=95.0,
+        next_resistance=105.0,
+        dist_to_support_pct=5.0,
+        dist_to_resistance_pct=5.0,
+        rel_vol_5d_vs_63d=1.0,
+        seven_day_return_pct=0.0,
+        thirty_day_return_pct=0.0,
+        three_day_return_pct=0.0,
+        channel_position_pct=50.0,
+        pct_from_52w_high=-10.0,
+    )
+    assert setup["label"] == expected_label
+    assert setup["badge_class"] == "badge-neutral"
+
+
+def test_classify_technical_setup_support_floor_and_bounce():
+    """Verify Support Floor vs Support Bounce conditions."""
+    floor_setup = classify_technical_setup(
+        current_price=100.0,
+        current_support=98.0,
+        next_resistance=115.0,
+        dist_to_support_pct=2.0,
+        dist_to_resistance_pct=15.0,
+        rel_vol_5d_vs_63d=1.0,
+        seven_day_return_pct=-2.0,
+        thirty_day_return_pct=-5.0,
+        three_day_return_pct=-1.5,
+        channel_position_pct=10.0,
+        pct_from_52w_high=-20.0,
+    )
+    assert floor_setup["label"] == "At Support Floor"
+
+    bounce_setup = classify_technical_setup(
+        current_price=101.0,
+        current_support=98.0,
+        next_resistance=115.0,
+        dist_to_support_pct=2.5,
+        dist_to_resistance_pct=14.0,
+        rel_vol_5d_vs_63d=1.2,
+        seven_day_return_pct=0.5,
+        thirty_day_return_pct=-4.0,
+        three_day_return_pct=1.0,
+        channel_position_pct=15.0,
+        pct_from_52w_high=-19.0,
+    )
+    assert bounce_setup["label"] == "Support Bounce"
+
+
+
