@@ -22,7 +22,7 @@ const API_BASE = window.location.origin;
                 'premarket': ['/static/js/modules/premarket.js'],
                 'morning-setups': ['/static/js/modules/morning_setups.js'],
                 'gainers': ['/static/js/modules/consensus.js', '/static/js/modules/gainers.js'],
-                'breakout': ['/static/js/modules/tier_pool.js', '/static/js/modules/consensus.js', '/static/js/modules/schedules.js', '/static/js/modules/swing_range.js', '/static/js/modules/breakout_audit.js', '/static/js/modules/tracked_breakouts.js', '/static/js/modules/stock_rating.js', '/static/js/modules/stock_note.js', '/static/js/modules/breakout_radar.js'],
+                'breakout': ['/static/js/modules/tier_pool.js', '/static/js/modules/consensus.js', '/static/js/modules/schedules.js', '/static/js/modules/swing_range.js', '/static/js/modules/breakout_audit.js', '/static/js/modules/tracked_breakouts.js', '/static/js/modules/results_breakout.js', '/static/js/modules/stock_rating.js', '/static/js/modules/stock_note.js', '/static/js/modules/breakout_radar.js'],
                 'institutional': ['/static/js/modules/institutional.js'],
                 'tri-confluence': ['/static/js/modules/tier_pool.js', '/static/js/modules/tri_confluence.js'],
                 'repeaters': ['/static/js/modules/repeaters.js'],

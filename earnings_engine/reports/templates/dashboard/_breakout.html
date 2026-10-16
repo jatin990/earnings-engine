@@ -14,7 +14,13 @@
                 <span id="breakoutScanningBadge" style="display:none; background:#18181b; color:#f8fafc; border:1px solid rgba(255,255,255,0.25); font-size:0.65rem; font-weight:700; padding:0.12rem 0.45rem; border-radius:4px; font-family:var(--font-mono);">● Scanning Universe</span>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 0.35rem; background: #09090b; padding: 0.2rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+                    <button type="button" id="btnBreakoutSubtabScanner" class="btn btn-sm bk-subtab-btn bk-subtab-active" onclick="app.switchBreakoutSubtab('scanner')" style="padding: 0.22rem 0.6rem; font-size: 0.70rem; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">⚡ Active Setups</button>
+                    <button type="button" id="btnBreakoutSubtabResults" class="btn btn-sm bk-subtab-btn" onclick="app.switchBreakoutSubtab('results')" style="padding: 0.22rem 0.6rem; font-size: 0.70rem; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📊 Results Radar</button>
+                    <button type="button" id="btnBreakoutSubtabBacktest" class="btn btn-sm bk-subtab-btn" onclick="app.switchBreakoutSubtab('backtest')" style="padding: 0.22rem 0.6rem; font-size: 0.70rem; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📅 Date Backtest</button>
+                    <button type="button" id="btnBreakoutSubtabTracked" class="btn btn-sm bk-subtab-btn" onclick="app.switchBreakoutSubtab('tracked')" style="padding: 0.22rem 0.6rem; font-size: 0.70rem; border-radius: 4px; font-family: var(--font-mono); cursor: pointer;">📜 Tracked History</button>
+                </div>
                 <span id="bkSubtabContextLabel" style="font-size: 0.72rem; color: #a1a1aa; font-family: var(--font-mono); background: #09090b; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">⚡ Active Setup Pool</span>
             </div>
         </div>
@@ -391,6 +397,193 @@
                 <span id="breakoutLastScanTime" style="color:#52525b;">Scanning…</span>
             </div>
         </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SUBTAB: 📊 RESULTS BREAKOUT RADAR (-3 to +7 Days)                         -->
+    <!-- ========================================================================= -->
+    <div id="breakoutResultsContainer" class="breakout-subview" style="display:none;">
+
+        <!-- Top Obsidian Control Toolbar -->
+        <div style="background: #09090b; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.65rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
+
+                <!-- Left: Window Inputs & Presets -->
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+
+                    <!-- Past Days Input Stepper -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
+                        <span style="font-size: 0.70rem; color: #a1a1aa; font-family: var(--font-mono);">Past Days:</span>
+                        <input
+                            type="number"
+                            id="resultsPastDaysInput"
+                            min="0"
+                            max="30"
+                            value="3"
+                            style="width: 42px; background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono); outline: none; text-align: center;"
+                            onchange="app.onResultsRadarWindowChange()"
+                        />
+                        <span style="font-size: 0.65rem; color: #71717a; font-family: var(--font-mono);">(-D)</span>
+                    </div>
+
+                    <!-- Future Days Input Stepper -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
+                        <span style="font-size: 0.70rem; color: #a1a1aa; font-family: var(--font-mono);">Future Days:</span>
+                        <input
+                            type="number"
+                            id="resultsFutureDaysInput"
+                            min="0"
+                            max="30"
+                            value="7"
+                            style="width: 42px; background: transparent; border: none; color: #f8fafc; font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono); outline: none; text-align: center;"
+                            onchange="app.onResultsRadarWindowChange()"
+                        />
+                        <span style="font-size: 0.65rem; color: #71717a; font-family: var(--font-mono);">(+D)</span>
+                    </div>
+
+                    <!-- Window Preset Buttons -->
+                    <div style="display: flex; align-items: center; gap: 0.25rem;">
+                        <button type="button" class="btn btn-sm bk-preset-btn active" id="btnResultsPresetDefault" onclick="app.setResultsRadarPreset(3, 7, this)" title="Standard -3 to +7 Days Window">-3D to +7D</button>
+                        <button type="button" class="btn btn-sm bk-preset-btn" id="btnResultsPresetImmediate" onclick="app.setResultsRadarPreset(1, 3, this)" title="Immediate Reaction -1 to +3 Days Window">-1D to +3D</button>
+                        <button type="button" class="btn btn-sm bk-preset-btn" id="btnResultsPresetBiweekly" onclick="app.setResultsRadarPreset(5, 10, this)" title="Bi-Weekly -5 to +10 Days Window">-5D to +10D</button>
+                        <button type="button" class="btn btn-sm bk-preset-btn" id="btnResultsPresetUpcoming" onclick="app.setResultsRadarPreset(0, 14, this)" title="Upcoming Anticipation 0 to +14 Days Window">0D to +14D</button>
+                    </div>
+
+                    <!-- Archetype Filter -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
+                        <span style="font-size: 0.70rem; color: #a1a1aa;">Archetype:</span>
+                        <select id="resultsArchetypeSelect" onchange="app.filterResultsRadar()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
+                            <option value="ALL" selected>All Archetypes</option>
+                            <option value="RDH_EXPANSION">🔥 RDH Expansion</option>
+                            <option value="PEAD_MOMENTUM">🚀 PEAD Drift</option>
+                            <option value="PRE_EARNINGS_COIL">⚡ Pre-Result Coil</option>
+                            <option value="POST_RESULT_RECOVERY">🛡️ Post-Dip Recovery</option>
+                        </select>
+                    </div>
+
+                    <!-- Min Score Filter -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
+                        <span style="font-size: 0.70rem; color: #a1a1aa;">Min Score:</span>
+                        <select id="resultsMinScoreSelect" onchange="app.onResultsRadarWindowChange()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
+                            <option value="0">All (≥0)</option>
+                            <option value="30" selected>Conviction (≥30)</option>
+                            <option value="50">Strong (≥50)</option>
+                            <option value="70">Elite Hot (≥70)</option>
+                        </select>
+                    </div>
+
+                    <!-- Universe Selector -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
+                        <span style="font-size: 0.70rem; color: #a1a1aa;">Universe:</span>
+                        <select id="resultsUniverseSelect" onchange="app.onResultsRadarWindowChange()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
+                            <option value="all" selected>All Equities</option>
+                            <option value="nifty_50">Nifty 50</option>
+                            <option value="nse_large_cap">Large Cap</option>
+                            <option value="nse_mid_cap">Mid Cap</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right: Quick Search & Scan Refresh Button -->
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    <input
+                        type="text"
+                        id="resultsSearchInput"
+                        placeholder="Filter ticker..."
+                        oninput="app.filterResultsRadar()"
+                        style="width: 125px; padding: 0.22rem 0.55rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; color: #f8fafc; font-size: 0.72rem; font-family: var(--font-mono); outline: none;"
+                    />
+                    <button
+                        type="button"
+                        id="btnRefreshResultsRadar"
+                        onclick="app.loadResultsRadar()"
+                        class="btn btn-sm"
+                        style="padding: 0.22rem 0.65rem; font-size: 0.72rem; background: #18181b; color: #f8fafc; border: 1px solid rgba(255,255,255,0.2); font-weight: 700; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 0.3rem;"
+                        title="Scan current results window"
+                    >
+                        <span id="resultsRefreshIcon">🔄</span>
+                        <span>Scan</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPI Metric Summary Strip -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-top: 0.65rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.55rem;">
+                <div class="card" style="padding: 0.4rem 0.6rem; background: #06060a; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;">
+                    <div style="font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Window Pool</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #f8fafc; font-family: var(--font-mono); margin-top: 0.1rem;"><span id="resultsStatTotal">—</span></div>
+                </div>
+                <div class="card" style="padding: 0.4rem 0.6rem; background: #06060a; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;">
+                    <div style="font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Declared Results</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.1rem;"><span id="resultsStatDeclared">—</span></div>
+                </div>
+                <div class="card" style="padding: 0.4rem 0.6rem; background: #06060a; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;">
+                    <div style="font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Upcoming Results</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #fbbf24; font-family: var(--font-mono); margin-top: 0.1rem;"><span id="resultsStatUpcoming">—</span></div>
+                </div>
+                <div class="card" style="padding: 0.4rem 0.6rem; background: #06060a; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;">
+                    <div style="font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Hot Setups (≥60)</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #4ade80; font-family: var(--font-mono); margin-top: 0.1rem;"><span id="resultsStatHot">—</span></div>
+                </div>
+                <div class="card" style="padding: 0.4rem 0.6rem; background: #06060a; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;">
+                    <div style="font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Top Score</div>
+                    <div style="font-size: 1.05rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono); margin-top: 0.1rem;"><span id="resultsStatTopScore">—</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 50-50 Responsive Split Grid Container -->
+        <div id="resultsBreakoutSplitGrid" style="display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 0.85rem; align-items: start;">
+
+            <!-- LEFT 50%: Results Breakout Table -->
+            <div id="resultsBreakoutTableContainer" style="min-width: 0;">
+                <div class="card" style="padding: 0; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #09090b; border-radius: 8px;">
+                    <div style="overflow-x: auto; max-height: calc(100vh - 240px); min-height: 420px;">
+                        <table id="resultsBreakoutTable" style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
+                            <thead>
+                                <tr style="background: #000000; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 10;">
+                                    <th style="padding: 0.5rem 0.6rem;">TICKER</th>
+                                    <th style="padding: 0.5rem 0.5rem;">TIMING</th>
+                                    <th style="padding: 0.5rem 0.5rem;">ARCHETYPE</th>
+                                    <th style="padding: 0.5rem 0.5rem;">CMP</th>
+                                    <th style="padding: 0.5rem 0.5rem;" title="Breakout Trigger: Result-Day High (RDH) for declared or 20D Resistance for upcoming">TRIGGER (RDH)</th>
+                                    <th style="padding: 0.5rem 0.5rem;" title="Distance to Trigger">DIST</th>
+                                    <th style="padding: 0.5rem 0.5rem;" title="Volume Ratio vs 20D Average">VOL SURGE</th>
+                                    <th style="padding: 0.5rem 0.5rem;" title="Composite Conviction Score">SCORE</th>
+                                    <th style="padding: 0.5rem 0.4rem; text-align: center;">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBreakoutTableBody">
+                                <tr>
+                                    <td colspan="9" style="padding: 2.5rem; text-align: center; color: #94a3b8; font-size: 0.75rem;">
+                                        <div style="display: inline-block; animation: spin 1s linear infinite; margin-right: 0.4rem;">⏳</div> Loading results breakout candidates...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Footer Bar with Count and Window Attribution -->
+                    <div style="padding: 0.45rem 0.75rem; background: #06060a; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
+                        <span id="resultsFooterCount" style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">0 candidates</span>
+                        <span style="font-size: 0.64rem; color: #64748b; font-family: var(--font-mono);">PIT Verified · No Future Leak</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT 50%: Sticky Result & Setup Anatomy Inspector Card -->
+            <div id="resultsBreakoutInspectorContainer" style="min-width: 0; position: sticky; top: 0.75rem; max-height: calc(100vh - 120px); overflow-y: auto; padding-right: 0.2rem;">
+                <div id="resultsInspectorContent">
+                    <!-- Placeholder state when no row selected -->
+                    <div class="card" style="padding: 2rem; text-align: center; background: #09090b; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #71717a;">
+                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📊</div>
+                        <div style="font-size: 0.82rem; font-weight: 700; color: #f8fafc;">Select a Candidate to Inspect</div>
+                        <div style="font-size: 0.68rem; margin-top: 0.25rem; color: #a1a1aa;">Click any row in the table to view its full Result Reaction Anatomy, Trade Levels, and Breakout Blueprint.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- ========================================================================= -->

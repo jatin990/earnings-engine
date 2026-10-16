@@ -25,31 +25,45 @@
         } catch (e) {}
 
         const scannerView = document.getElementById('breakoutLiveScannerContainer');
+        const resultsView = document.getElementById('breakoutResultsContainer');
         const backtestView = document.getElementById('breakoutBacktestContainer');
         const trackedView = document.getElementById('breakoutTrackedContainer');
 
         const btnScanner = document.getElementById('btnBreakoutSubtabScanner');
+        const btnResults = document.getElementById('btnBreakoutSubtabResults');
         const btnBacktest = document.getElementById('btnBreakoutSubtabBacktest');
         const btnTracked = document.getElementById('btnBreakoutSubtabTracked');
         const contextLabel = document.getElementById('bkSubtabContextLabel');
 
         const sideSubScanner = document.getElementById('sidebarSubBreakoutScanner');
+        const sideSubResults = document.getElementById('sidebarSubBreakoutResults');
         const sideSubBacktest = document.getElementById('sidebarSubBreakoutBacktest');
         const sideSubTracked = document.getElementById('sidebarSubBreakoutTracked');
 
         if (scannerView) scannerView.style.display = 'none';
+        if (resultsView) resultsView.style.display = 'none';
         if (backtestView) backtestView.style.display = 'none';
         if (trackedView) trackedView.style.display = 'none';
 
         if (btnScanner) btnScanner.classList.remove('bk-subtab-active');
+        if (btnResults) btnResults.classList.remove('bk-subtab-active');
         if (btnBacktest) btnBacktest.classList.remove('bk-subtab-active');
         if (btnTracked) btnTracked.classList.remove('bk-subtab-active');
 
         if (sideSubScanner) sideSubScanner.classList.remove('active');
+        if (sideSubResults) sideSubResults.classList.remove('active');
         if (sideSubBacktest) sideSubBacktest.classList.remove('active');
         if (sideSubTracked) sideSubTracked.classList.remove('active');
 
-        if (subtab === 'backtest') {
+        if (subtab === 'results') {
+            if (resultsView) resultsView.style.display = 'block';
+            if (btnResults) btnResults.classList.add('bk-subtab-active');
+            if (sideSubResults) sideSubResults.classList.add('active');
+            if (contextLabel) contextLabel.textContent = '📊 Results Breakout Radar (Recent & Upcoming Earnings Technical Setups)';
+            if (typeof app.loadResultsRadar === 'function') {
+                app.loadResultsRadar();
+            }
+        } else if (subtab === 'backtest') {
             if (backtestView) backtestView.style.display = 'block';
             if (btnBacktest) btnBacktest.classList.add('bk-subtab-active');
             if (sideSubBacktest) sideSubBacktest.classList.add('active');
