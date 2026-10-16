@@ -16,6 +16,11 @@ from earnings_engine.config import (
     BREAKOUT_MCAP_MID_MIN_CR,
 )
 from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+from earnings_engine.data.earnings_breakout_scanner import (
+    ARCHETYPE_METADATA,
+    VALID_ARCHETYPES,
+    get_results_breakout_candidates,
+)
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.api.routers.breakout")
@@ -536,6 +541,33 @@ async def get_breakout_audit_log_endpoint(
     except Exception as e:
         logger.exception("Error in get_breakout_audit_log: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")
+
+
+@router.get("/api/breakout/results-radar")
+@router.get("/api/v1/breakout/results-radar")
+@router.get("/api/v1/breakout-radar/results-radar")
+async def get_results_breakout_radar(
+    past_days: int = Query(3, ge=0, le=30, description="Past calendar days of declared results to scan"),
+    future_days: int = Query(7, ge=0, le=30, description="Future calendar days of upcoming results to scan"),
+    archetype: str = Query("ALL", description="Filter by archetype: ALL, RDH_EXPANSION, PEAD_MOMENTUM, PRE_EARNINGS_COIL, POST_RESULT_RECOVERY"),
+    min_score: int = Query(30, ge=0, le=100, description="Minimum composite breakout score cutoff"),
+    universe: str = Query("all", description="Universe filter (nse_large_cap, nse_mid_cap, nifty_50, all)"),
+) -> dict[str, Any]:
+    """Return dedicated results breakout radar setups for stocks reporting in [-past_days, +future_days]."""
+    try:
+        data = await asyncio.to_thread(
+            get_results_breakout_candidates,
+            settings=_settings,
+            past_days=past_days,
+            future_days=future_days,
+            archetype=archetype,
+            min_score=min_score,
+            universe=universe,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_results_breakout_radar: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error running results breakout radar: {str(e)}")
 
 
 @router.get("/api/v1/breakout-radar/history/{ticker}")
