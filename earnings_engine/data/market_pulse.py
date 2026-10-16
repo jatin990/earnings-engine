@@ -18,6 +18,7 @@ import json
 import logging
 import math
 import re
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -51,6 +52,8 @@ _PULSE_CACHE_TTL: float = 60.0  # 60s cache TTL
 _LAST_FII_DII_SYNC_ATTEMPT: float = 0.0
 _FAILED_NSE_OI_DATES: dict[str, float] = {}  # iso_date -> failure timestamp
 _FAILED_NSE_OI_TTL: float = 1800.0  # 30 min negative cache cooldown
+_PARTICIPANT_OI_SYNC_LOCK = threading.Lock()
+_INSTITUTIONAL_FLOWS_SYNC_LOCK = threading.Lock()
 
 
 def is_market_open(ts: float) -> bool:
@@ -393,6 +396,7 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
     conn = get_db_connection(settings)
 
     # 1. Determine active weekday market sessions (Monday to Friday) via fast index lookup
+    active_dates_rows = []
     try:
         active_dates_rows = conn.execute("""
             SELECT date FROM price_history
@@ -410,6 +414,11 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
             """).fetchall()
     except Exception:
         active_dates_rows = []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     weekday_dates: list[str] = []
     for r in active_dates_rows:
@@ -580,180 +589,193 @@ def sync_real_fii_dii_cash_flows(
     """Sync authentic daily FII / DII cash market net flows from official NSE endpoints
     and 30-day historical exchange records into SQLite institutional_net_flows.
     """
-    settings = settings or Settings()
-    conn = get_db_connection(settings)
+    if not _INSTITUTIONAL_FLOWS_SYNC_LOCK.acquire(blocking=False):
+        logger.debug("[FII-DII-SYNC] Sync already in progress by another thread, skipping redundant sync.")
+        return 0
 
+    conn = None
     try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS institutional_net_flows (
-                date TEXT PRIMARY KEY,
-                day_label TEXT NOT NULL,
-                fii_buy_cr REAL NOT NULL DEFAULT 0.0,
-                fii_sell_cr REAL NOT NULL DEFAULT 0.0,
-                fii_net_cr REAL NOT NULL DEFAULT 0.0,
-                dii_buy_cr REAL NOT NULL DEFAULT 0.0,
-                dii_sell_cr REAL NOT NULL DEFAULT 0.0,
-                dii_net_cr REAL NOT NULL DEFAULT 0.0,
-                total_net_cr REAL NOT NULL DEFAULT 0.0,
-                stance TEXT NOT NULL DEFAULT 'Neutral',
-                updated_at TEXT NOT NULL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
-        conn.commit()
-    except Exception as e:
-        logger.debug("[FII-DII-SYNC] Table setup notice: %s", e)
+        settings = settings or Settings()
+        conn = get_db_connection(settings)
 
-    global _LAST_FII_DII_SYNC_ATTEMPT
-    _LAST_FII_DII_SYNC_ATTEMPT = time.time()
-    now_iso = datetime.now(timezone.utc).isoformat()
-    inserted_count = 0
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS institutional_net_flows (
+                    date TEXT PRIMARY KEY,
+                    day_label TEXT NOT NULL,
+                    fii_buy_cr REAL NOT NULL DEFAULT 0.0,
+                    fii_sell_cr REAL NOT NULL DEFAULT 0.0,
+                    fii_net_cr REAL NOT NULL DEFAULT 0.0,
+                    dii_buy_cr REAL NOT NULL DEFAULT 0.0,
+                    dii_sell_cr REAL NOT NULL DEFAULT 0.0,
+                    dii_net_cr REAL NOT NULL DEFAULT 0.0,
+                    total_net_cr REAL NOT NULL DEFAULT 0.0,
+                    stance TEXT NOT NULL DEFAULT 'Neutral',
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
+            conn.commit()
+        except Exception as e:
+            logger.debug("[FII-DII-SYNC] Table setup notice: %s", e)
 
-    # 1. Fetch 30-day authentic historical time series with real buy/sell/net amounts
-    try:
-        hist_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        }
-        resp = requests.get("https://www.moneycontrol.com/markets/fii-dii-data/cash/", headers=hist_headers, timeout=6)
-        if resp.status_code == 200 and "__NEXT_DATA__" in resp.text:
-            m = re.search(r'<script id="__NEXT_DATA__"[^>]*>({.*?})</script>', resp.text)
-            if m:
-                payload = json.loads(m.group(1))
-                page_props = payload.get("props", {}).get("pageProps", {})
-                data_list = page_props.get("FiiDiiData", {}).get("fiiDiiData", [])
-                if isinstance(data_list, list) and data_list:
-                    def _clean_num(val: Any) -> float:
-                        if val is None:
-                            return 0.0
-                        s = str(val).replace(",", "").strip()
+        global _LAST_FII_DII_SYNC_ATTEMPT
+        _LAST_FII_DII_SYNC_ATTEMPT = time.time()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        inserted_count = 0
+
+        # 1. Fetch 30-day authentic historical time series with real buy/sell/net amounts
+        try:
+            hist_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            resp = requests.get("https://www.moneycontrol.com/markets/fii-dii-data/cash/", headers=hist_headers, timeout=6)
+            if resp.status_code == 200 and "__NEXT_DATA__" in resp.text:
+                m = re.search(r'<script id="__NEXT_DATA__"[^>]*>({.*?})</script>', resp.text)
+                if m:
+                    payload = json.loads(m.group(1))
+                    page_props = payload.get("props", {}).get("pageProps", {})
+                    data_list = page_props.get("FiiDiiData", {}).get("fiiDiiData", [])
+                    if isinstance(data_list, list) and data_list:
+                        def _clean_num(val: Any) -> float:
+                            if val is None:
+                                return 0.0
+                            s = str(val).replace(",", "").strip()
+                            try:
+                                return float(s)
+                            except Exception:
+                                return 0.0
+
+                        db_inserts = []
+                        for item in data_list:
+                            iso_date = item.get("date")
+                            if not iso_date:
+                                continue
+                            fii_buy = _clean_num(item.get("fiiPurchase") or item.get("fii_buy"))
+                            fii_sell = _clean_num(item.get("fiiSales") or item.get("fii_sell"))
+                            fii_net = _clean_num(item.get("fiiNet") or item.get("fii_net") or item.get("fiiCM"))
+
+                            dii_buy = _clean_num(item.get("diiPurchase") or item.get("dii_buy"))
+                            dii_sell = _clean_num(item.get("diiSale") or item.get("dii_sell"))
+                            dii_net = _clean_num(item.get("diiNet") or item.get("dii_net") or item.get("diiCM"))
+
+                            tot_net = round(fii_net + dii_net, 2)
+
+                            try:
+                                d_obj = datetime.strptime(iso_date, "%Y-%m-%d").date()
+                                day_label = d_obj.strftime("%d %b (%a)")
+                            except Exception:
+                                day_label = item.get("graphToolTipRecordDate") or item.get("fDate") or iso_date
+
+                            stance = "NET INFLOW (BULLISH)" if tot_net > 0 else ("NET OUTFLOW (DEFENSIVE)" if tot_net < 0 else "BALANCED FLOWS")
+
+                            db_inserts.append((
+                                iso_date, day_label, fii_buy, fii_sell, fii_net,
+                                dii_buy, dii_sell, dii_net, tot_net, stance, now_iso
+                            ))
+
+                        if db_inserts:
+                            conn.executemany("""
+                                INSERT OR REPLACE INTO institutional_net_flows (
+                                    date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr,
+                                    dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr,
+                                    stance, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, db_inserts)
+                            conn.commit()
+                            inserted_count += len(db_inserts)
+                            logger.info("[FII-DII-SYNC] Ingested %d authentic daily records from 30-day feed", len(db_inserts))
+        except Exception as e:
+            logger.debug("[FII-DII-SYNC] 30-day feed notice: %s", e)
+
+        # 2. Fetch live latest day settlement from official NSE India API
+        try:
+            session = requests.Session()
+            session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.nseindia.com/",
+            })
+            # Prime cookies
+            session.get("https://www.nseindia.com", timeout=5)
+            live_resp = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=6)
+            if live_resp.status_code == 200:
+                live_data = live_resp.json()
+                if isinstance(live_data, list) and len(live_data) >= 2:
+                    fii_row = next((x for x in live_data if "FII" in str(x.get("category", "")).upper() or "FPI" in str(x.get("category", "")).upper()), None)
+                    dii_row = next((x for x in live_data if "DII" in str(x.get("category", "")).upper()), None)
+
+                    if fii_row and dii_row:
+                        raw_date_str = str(fii_row.get("date", "")).strip()
+                        # e.g., "06-Mar-2025" or "06-Mar-2026"
+                        iso_date = ""
+                        day_label = raw_date_str
                         try:
-                            return float(s)
-                        except Exception:
-                            return 0.0
-
-                    db_inserts = []
-                    for item in data_list:
-                        iso_date = item.get("date")
-                        if not iso_date:
-                            continue
-                        fii_buy = _clean_num(item.get("fiiPurchase") or item.get("fii_buy"))
-                        fii_sell = _clean_num(item.get("fiiSales") or item.get("fii_sell"))
-                        fii_net = _clean_num(item.get("fiiNet") or item.get("fii_net") or item.get("fiiCM"))
-
-                        dii_buy = _clean_num(item.get("diiPurchase") or item.get("dii_buy"))
-                        dii_sell = _clean_num(item.get("diiSale") or item.get("dii_sell"))
-                        dii_net = _clean_num(item.get("diiNet") or item.get("dii_net") or item.get("diiCM"))
-
-                        tot_net = round(fii_net + dii_net, 2)
-
-                        try:
-                            d_obj = datetime.strptime(iso_date, "%Y-%m-%d").date()
+                            d_obj = datetime.strptime(raw_date_str, "%d-%b-%Y").date()
+                            iso_date = d_obj.strftime("%Y-%m-%d")
                             day_label = d_obj.strftime("%d %b (%a)")
                         except Exception:
-                            day_label = item.get("graphToolTipRecordDate") or item.get("fDate") or iso_date
+                            iso_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+                        fii_buy = float(fii_row.get("buyValue") or 0.0)
+                        fii_sell = float(fii_row.get("sellValue") or 0.0)
+                        fii_net = float(fii_row.get("netValue") or 0.0)
+
+                        dii_buy = float(dii_row.get("buyValue") or 0.0)
+                        dii_sell = float(dii_row.get("sellValue") or 0.0)
+                        dii_net = float(dii_row.get("netValue") or 0.0)
+
+                        tot_net = round(fii_net + dii_net, 2)
                         stance = "NET INFLOW (BULLISH)" if tot_net > 0 else ("NET OUTFLOW (DEFENSIVE)" if tot_net < 0 else "BALANCED FLOWS")
 
-                        db_inserts.append((
-                            iso_date, day_label, fii_buy, fii_sell, fii_net,
-                            dii_buy, dii_sell, dii_net, tot_net, stance, now_iso
-                        ))
+                        # Validate mathematical invariants before persisting
+                        inv_findings = MathematicalInvariantChecker.validate_daily_cash_flow({
+                            "date": iso_date,
+                            "fii_buy_cr": fii_buy,
+                            "fii_sell_cr": fii_sell,
+                            "fii_net_cr": fii_net,
+                            "dii_buy_cr": dii_buy,
+                            "dii_sell_cr": dii_sell,
+                            "dii_net_cr": dii_net,
+                            "total_net_cr": tot_net,
+                        })
+                        has_critical = any(f.severity in ("CRITICAL", "CRITICAL_ERROR") for f in inv_findings)
 
-                    if db_inserts:
-                        conn.executemany("""
+                        record_provenance(
+                            record_type="fii_dii_cash_flow",
+                            entity_key=f"FII_DII:{iso_date}",
+                            source_name="NSE_DAILY_FII_DII",
+                            source_url="https://www.nseindia.com/api/fiidiiTradeReact",
+                            payload=live_data,
+                            is_authentic=not has_critical,
+                            quarantine_reason=inv_findings[0].details if has_critical and inv_findings else None,
+                            conn=conn,
+                        )
+
+                        conn.execute("""
                             INSERT OR REPLACE INTO institutional_net_flows (
                                 date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr,
                                 dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr,
                                 stance, updated_at
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, db_inserts)
+                        """, (
+                            iso_date, day_label, fii_buy, fii_sell, fii_net,
+                            dii_buy, dii_sell, dii_net, tot_net, stance, now_iso
+                        ))
                         conn.commit()
-                        inserted_count += len(db_inserts)
-                        logger.info("[FII-DII-SYNC] Ingested %d authentic daily records from 30-day feed", len(db_inserts))
-    except Exception as e:
-        logger.debug("[FII-DII-SYNC] 30-day feed notice: %s", e)
-
-    # 2. Fetch live latest day settlement from official NSE India API
-    try:
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.nseindia.com/",
-        })
-        # Prime cookies
-        session.get("https://www.nseindia.com", timeout=5)
-        live_resp = session.get("https://www.nseindia.com/api/fiidiiTradeReact", timeout=6)
-        if live_resp.status_code == 200:
-            live_data = live_resp.json()
-            if isinstance(live_data, list) and len(live_data) >= 2:
-                fii_row = next((x for x in live_data if "FII" in str(x.get("category", "")).upper() or "FPI" in str(x.get("category", "")).upper()), None)
-                dii_row = next((x for x in live_data if "DII" in str(x.get("category", "")).upper()), None)
-
-                if fii_row and dii_row:
-                    raw_date_str = str(fii_row.get("date", "")).strip()
-                    # e.g., "06-Mar-2025" or "06-Mar-2026"
-                    iso_date = ""
-                    day_label = raw_date_str
-                    try:
-                        d_obj = datetime.strptime(raw_date_str, "%d-%b-%Y").date()
-                        iso_date = d_obj.strftime("%Y-%m-%d")
-                        day_label = d_obj.strftime("%d %b (%a)")
-                    except Exception:
-                        iso_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-                    fii_buy = float(fii_row.get("buyValue") or 0.0)
-                    fii_sell = float(fii_row.get("sellValue") or 0.0)
-                    fii_net = float(fii_row.get("netValue") or 0.0)
-
-                    dii_buy = float(dii_row.get("buyValue") or 0.0)
-                    dii_sell = float(dii_row.get("sellValue") or 0.0)
-                    dii_net = float(dii_row.get("netValue") or 0.0)
-
-                    tot_net = round(fii_net + dii_net, 2)
-                    stance = "NET INFLOW (BULLISH)" if tot_net > 0 else ("NET OUTFLOW (DEFENSIVE)" if tot_net < 0 else "BALANCED FLOWS")
-
-                    # Validate mathematical invariants before persisting
-                    inv_findings = MathematicalInvariantChecker.validate_daily_cash_flow({
-                        "date": iso_date,
-                        "fii_buy_cr": fii_buy,
-                        "fii_sell_cr": fii_sell,
-                        "fii_net_cr": fii_net,
-                        "dii_buy_cr": dii_buy,
-                        "dii_sell_cr": dii_sell,
-                        "dii_net_cr": dii_net,
-                        "total_net_cr": tot_net,
-                    })
-                    has_critical = any(f.severity in ("CRITICAL", "CRITICAL_ERROR") for f in inv_findings)
-
-                    record_provenance(
-                        record_type="fii_dii_cash_flow",
-                        entity_key=f"FII_DII:{iso_date}",
-                        source_name="NSE_DAILY_FII_DII",
-                        source_url="https://www.nseindia.com/api/fiidiiTradeReact",
-                        payload=live_data,
-                        is_authentic=not has_critical,
-                        quarantine_reason=inv_findings[0].details if has_critical and inv_findings else None,
-                        conn=conn,
-                    )
-
-                    conn.execute("""
-                        INSERT OR REPLACE INTO institutional_net_flows (
-                            date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr,
-                            dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr,
-                            stance, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        iso_date, day_label, fii_buy, fii_sell, fii_net,
-                        dii_buy, dii_sell, dii_net, tot_net, stance, now_iso
-                    ))
-                    conn.commit()
-                    inserted_count += 1
-                    logger.info("[FII-DII-SYNC] Ingested live NSE settlement for %s: FII Net = %.2f Cr, DII Net = %.2f Cr", iso_date, fii_net, dii_net)
-    except Exception as e:
-        logger.warning("[FII-DII-SYNC] Live NSE endpoint sync error: %s", e, exc_info=True)
+                        inserted_count += 1
+                        logger.info("[FII-DII-SYNC] Ingested live NSE settlement for %s: FII Net = %.2f Cr, DII Net = %.2f Cr", iso_date, fii_net, dii_net)
+        except Exception as e:
+            logger.warning("[FII-DII-SYNC] Live NSE endpoint sync error: %s", e, exc_info=True)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        _INSTITUTIONAL_FLOWS_SYNC_LOCK.release()
 
     return inserted_count
 
@@ -767,13 +789,13 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
             return _LIQUIDITY_CACHE["data"]
 
     settings = settings or Settings()
-    conn = get_db_connection(settings)
 
     # Proactively check if the latest expected trading session's settlement is missing or if forced
     needs_sync = force_refresh
     if not needs_sync:
+        check_conn = get_db_connection(settings)
         try:
-            latest_row = conn.execute("SELECT date FROM institutional_net_flows ORDER BY date DESC LIMIT 1").fetchone()
+            latest_row = check_conn.execute("SELECT date FROM institutional_net_flows ORDER BY date DESC LIMIT 1").fetchone()
             if not latest_row:
                 needs_sync = True
             else:
@@ -785,6 +807,11 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
                         needs_sync = True
         except Exception:
             needs_sync = True
+        finally:
+            try:
+                check_conn.close()
+            except Exception:
+                pass
 
     if needs_sync:
         try:
@@ -796,8 +823,9 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     today_str = today_dt.strftime("%Y-%m-%d")
 
     history_full: list[dict[str, Any]] = []
+    read_conn = get_db_connection(settings)
     try:
-        rows = conn.execute("SELECT * FROM institutional_net_flows ORDER BY date DESC LIMIT 45").fetchall()
+        rows = read_conn.execute("SELECT * FROM institutional_net_flows ORDER BY date DESC LIMIT 45").fetchall()
         for r in rows:
             raw_updated_at = r[10] if (hasattr(r, "__len__") and len(r) > 10) else (r["updated_at"] if hasattr(r, "keys") else None)
             fii_b = float(r[2] or 0.0) if hasattr(r, "__len__") else float(r.get("fii_buy_cr", 0.0))
@@ -837,6 +865,11 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
             history_full.append(r_dict)
     except Exception as e:
         logger.warning("[LIQUIDITY] Error loading institutional flows: %s", e)
+    finally:
+        try:
+            read_conn.close()
+        except Exception:
+            pass
 
     # If DB still has no rows (e.g. offline test), gracefully fallback to neutral structure without synthetic randoms
     if not history_full:
@@ -984,319 +1017,346 @@ def sync_nse_participant_oi_data(
     Downloads https://archives.nseindia.com/content/nsccl/fao_participant_oi_{DDMMYYYY}.csv
     and persists granular Index Futures, Stock Futures, and Options into SQLite table `participant_oi_positioning`.
     """
-    settings = settings or Settings()
-    conn = get_db_connection(settings)
-
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS participant_oi_positioning (
-                date TEXT NOT NULL,
-                participant TEXT NOT NULL,
-                category_label TEXT NOT NULL,
-                future_index_long INTEGER NOT NULL DEFAULT 0,
-                future_index_short INTEGER NOT NULL DEFAULT 0,
-                future_index_net INTEGER NOT NULL DEFAULT 0,
-                future_index_long_pct REAL NOT NULL DEFAULT 50.0,
-                future_stock_long INTEGER NOT NULL DEFAULT 0,
-                future_stock_short INTEGER NOT NULL DEFAULT 0,
-                future_stock_net INTEGER NOT NULL DEFAULT 0,
-                opt_index_call_long INTEGER NOT NULL DEFAULT 0,
-                opt_index_call_short INTEGER NOT NULL DEFAULT 0,
-                opt_index_put_long INTEGER NOT NULL DEFAULT 0,
-                opt_index_put_short INTEGER NOT NULL DEFAULT 0,
-                opt_stock_call_long INTEGER NOT NULL DEFAULT 0,
-                opt_stock_call_short INTEGER NOT NULL DEFAULT 0,
-                opt_stock_put_long INTEGER NOT NULL DEFAULT 0,
-                opt_stock_put_short INTEGER NOT NULL DEFAULT 0,
-                futures_long INTEGER NOT NULL DEFAULT 0,
-                futures_short INTEGER NOT NULL DEFAULT 0,
-                calls_long INTEGER NOT NULL DEFAULT 0,
-                calls_short INTEGER NOT NULL DEFAULT 0,
-                puts_long INTEGER NOT NULL DEFAULT 0,
-                puts_short INTEGER NOT NULL DEFAULT 0,
-                total_long INTEGER NOT NULL DEFAULT 0,
-                total_short INTEGER NOT NULL DEFAULT 0,
-                net_contracts INTEGER NOT NULL DEFAULT 0,
-                long_short_ratio REAL NOT NULL DEFAULT 1.0,
-                long_pct REAL NOT NULL DEFAULT 50.0,
-                short_pct REAL NOT NULL DEFAULT 50.0,
-                stance TEXT NOT NULL DEFAULT 'Neutral',
-                updated_at TEXT NOT NULL,
-                PRIMARY KEY (date, participant)
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_participant_oi_date ON participant_oi_positioning(date DESC)")
-
-        # Ensure all columns exist for schema migrations
-        cols_needed = [
-            ("future_index_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("future_index_short", "INTEGER NOT NULL DEFAULT 0"),
-            ("future_index_net", "INTEGER NOT NULL DEFAULT 0"),
-            ("future_index_long_pct", "REAL NOT NULL DEFAULT 50.0"),
-            ("future_stock_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("future_stock_short", "INTEGER NOT NULL DEFAULT 0"),
-            ("future_stock_net", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_index_call_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_index_call_short", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_index_put_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_index_put_short", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_stock_call_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_stock_call_short", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_stock_put_long", "INTEGER NOT NULL DEFAULT 0"),
-            ("opt_stock_put_short", "INTEGER NOT NULL DEFAULT 0"),
-        ]
-        for col_name, col_type in cols_needed:
-            try:
-                conn.execute(f"ALTER TABLE participant_oi_positioning ADD COLUMN {col_name} {col_type}")
-            except Exception:
-                pass
-        conn.commit()
-    except Exception as e:
-        logger.debug("[PARTICIPANT-OI] Table setup notice: %s", e)
-
-    # Determine candidate valid trading dates up to the latest completed trading session
-    now_utc = datetime.now(timezone.utc)
-    now_ist = now_utc + IST_OFFSET
-    now_ts = time.time()
-
-    latest_completed = get_latest_completed_trading_day(now_ist.date())
-    # If today is an active trading day but before standard settlement release time (~18:30 IST),
-    # today's clearing archive has not been published yet -> anchor target to yesterday's completed session
-    if latest_completed == now_ist.date():
-        time_val = now_ist.hour + now_ist.minute / 60.0
-        if time_val < 18.5:
-            latest_completed = get_latest_completed_trading_day(now_ist.date() - timedelta(days=1))
-
-    target_dates: list[tuple[str, str]] = []  # (YYYY-MM-DD, DDMMYYYY)
-    cur = latest_completed
-    while len(target_dates) < days:
-        if is_trading_day(cur):
-            target_dates.append((cur.strftime("%Y-%m-%d"), cur.strftime("%d%m%Y")))
-        cur -= timedelta(days=1)
-
-    # Check which dates already exist in SQLite or are currently in negative-cache cooldown
-    missing_dates: list[tuple[str, str]] = []
-    if not force:
-        try:
-            existing_counts = dict(conn.execute(
-                "SELECT date, COUNT(*) FROM participant_oi_positioning WHERE future_index_long > 0 GROUP BY date"
-            ).fetchall())
-        except Exception:
-            existing_counts = {}
-
-        for iso_d, ddmmyyyy in target_dates:
-            # Check negative cache cooldown (don't re-attempt failed/unreleased dates within 30 min)
-            last_failed_ts = _FAILED_NSE_OI_DATES.get(iso_d, 0.0)
-            if (now_ts - last_failed_ts) < _FAILED_NSE_OI_TTL:
-                continue
-
-            if existing_counts.get(iso_d, 0) < 4:
-                missing_dates.append((iso_d, ddmmyyyy))
-    else:
-        missing_dates = target_dates
-
-    if not missing_dates:
+    if not _PARTICIPANT_OI_SYNC_LOCK.acquire(blocking=False):
+        logger.debug("[PARTICIPANT-OI] Sync already in progress by another thread, skipping redundant sync.")
         return 0
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    }
+    try:
+        settings = settings or Settings()
+        conn = get_db_connection(settings)
 
-    labels_map = {
-        "FII": "🏛️ Foreign Institutions (FII / FPI)",
-        "DII": "🏢 Domestic Institutions (DII / MF)",
-        "PRO": "⚡ Proprietary Desks (Algo / MM)",
-        "CLIENT": "👤 Retail Investors & HNIs",
-    }
-
-    def _fetch_and_parse_day(date_info: tuple[str, str]) -> list[tuple] | None:
-        iso_date, ddmmyyyy = date_info
-        url = f"https://archives.nseindia.com/content/nsccl/fao_participant_oi_{ddmmyyyy}.csv"
         try:
-            resp = requests.get(url, headers=headers, timeout=8)
-            if resp.status_code != 200 or len(resp.content) < 50:
-                _FAILED_NSE_OI_DATES[iso_date] = time.time()
-                return None
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS participant_oi_positioning (
+                    date TEXT NOT NULL,
+                    participant TEXT NOT NULL,
+                    category_label TEXT NOT NULL,
+                    future_index_long INTEGER NOT NULL DEFAULT 0,
+                    future_index_short INTEGER NOT NULL DEFAULT 0,
+                    future_index_net INTEGER NOT NULL DEFAULT 0,
+                    future_index_long_pct REAL NOT NULL DEFAULT 50.0,
+                    future_stock_long INTEGER NOT NULL DEFAULT 0,
+                    future_stock_short INTEGER NOT NULL DEFAULT 0,
+                    future_stock_net INTEGER NOT NULL DEFAULT 0,
+                    opt_index_call_long INTEGER NOT NULL DEFAULT 0,
+                    opt_index_call_short INTEGER NOT NULL DEFAULT 0,
+                    opt_index_put_long INTEGER NOT NULL DEFAULT 0,
+                    opt_index_put_short INTEGER NOT NULL DEFAULT 0,
+                    opt_stock_call_long INTEGER NOT NULL DEFAULT 0,
+                    opt_stock_call_short INTEGER NOT NULL DEFAULT 0,
+                    opt_stock_put_long INTEGER NOT NULL DEFAULT 0,
+                    opt_stock_put_short INTEGER NOT NULL DEFAULT 0,
+                    futures_long INTEGER NOT NULL DEFAULT 0,
+                    futures_short INTEGER NOT NULL DEFAULT 0,
+                    calls_long INTEGER NOT NULL DEFAULT 0,
+                    calls_short INTEGER NOT NULL DEFAULT 0,
+                    puts_long INTEGER NOT NULL DEFAULT 0,
+                    puts_short INTEGER NOT NULL DEFAULT 0,
+                    total_long INTEGER NOT NULL DEFAULT 0,
+                    total_short INTEGER NOT NULL DEFAULT 0,
+                    net_contracts INTEGER NOT NULL DEFAULT 0,
+                    long_short_ratio REAL NOT NULL DEFAULT 1.0,
+                    long_pct REAL NOT NULL DEFAULT 50.0,
+                    short_pct REAL NOT NULL DEFAULT 50.0,
+                    stance TEXT NOT NULL DEFAULT 'Neutral',
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (date, participant)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_participant_oi_date ON participant_oi_positioning(date DESC)")
 
-            raw_bytes = resp.content
-            # NSE clearing CSVs often have a title row at line 0 (e.g. "Participant wise Open Interest...")
-            df = pd.read_csv(io.BytesIO(raw_bytes))
-            df.columns = [c.strip() for c in df.columns]
+            # Ensure all columns exist for schema migrations
+            cols_needed = [
+                ("future_index_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("future_index_short", "INTEGER NOT NULL DEFAULT 0"),
+                ("future_index_net", "INTEGER NOT NULL DEFAULT 0"),
+                ("future_index_long_pct", "REAL NOT NULL DEFAULT 50.0"),
+                ("future_stock_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("future_stock_short", "INTEGER NOT NULL DEFAULT 0"),
+                ("future_stock_net", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_index_call_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_index_call_short", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_index_put_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_index_put_short", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_stock_call_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_stock_call_short", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_stock_put_long", "INTEGER NOT NULL DEFAULT 0"),
+                ("opt_stock_put_short", "INTEGER NOT NULL DEFAULT 0"),
+            ]
+            for col_name, col_type in cols_needed:
+                try:
+                    conn.execute(f"ALTER TABLE participant_oi_positioning ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
+            conn.commit()
+        except Exception as e:
+            logger.debug("[PARTICIPANT-OI] Table setup notice: %s", e)
 
-            p_col = None
-            for candidate in ["Client Type", "CLIENT TYPE", "Participant", "PARTICIPANT"]:
-                if candidate in df.columns:
-                    p_col = candidate
-                    break
+        # Check which dates already exist in SQLite
+        existing_counts = {}
+        if not force:
+            try:
+                existing_counts = dict(conn.execute(
+                    "SELECT date, COUNT(*) FROM participant_oi_positioning WHERE future_index_long > 0 GROUP BY date"
+                ).fetchall())
+            except Exception:
+                existing_counts = {}
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-            if not p_col:
-                # Try with skiprows=1
-                df = pd.read_csv(io.BytesIO(raw_bytes), skiprows=1)
+        # Determine candidate valid trading dates up to the latest completed trading session
+        now_utc = datetime.now(timezone.utc)
+        now_ist = now_utc + IST_OFFSET
+        now_ts = time.time()
+
+        latest_completed = get_latest_completed_trading_day(now_ist.date())
+        # If today is an active trading day but before standard settlement release time (~18:30 IST),
+        # today's clearing archive has not been published yet -> anchor target to yesterday's completed session
+        if latest_completed == now_ist.date():
+            time_val = now_ist.hour + now_ist.minute / 60.0
+            if time_val < 18.5:
+                latest_completed = get_latest_completed_trading_day(now_ist.date() - timedelta(days=1))
+
+        target_dates: list[tuple[str, str]] = []  # (YYYY-MM-DD, DDMMYYYY)
+        cur = latest_completed
+        while len(target_dates) < days:
+            if is_trading_day(cur):
+                target_dates.append((cur.strftime("%Y-%m-%d"), cur.strftime("%d%m%Y")))
+            cur -= timedelta(days=1)
+
+        # Check which dates already exist in SQLite or are currently in negative-cache cooldown
+        missing_dates: list[tuple[str, str]] = []
+        if not force:
+            for iso_d, ddmmyyyy in target_dates:
+                # Check negative cache cooldown (don't re-attempt failed/unreleased dates within 30 min)
+                last_failed_ts = _FAILED_NSE_OI_DATES.get(iso_d, 0.0)
+                if (now_ts - last_failed_ts) < _FAILED_NSE_OI_TTL:
+                    continue
+
+                if existing_counts.get(iso_d, 0) < 4:
+                    missing_dates.append((iso_d, ddmmyyyy))
+        else:
+            missing_dates = target_dates
+
+        if not missing_dates:
+            return 0
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
+
+        labels_map = {
+            "FII": "🏛️ Foreign Institutions (FII / FPI)",
+            "DII": "🏢 Domestic Institutions (DII / MF)",
+            "PRO": "⚡ Proprietary Desks (Algo / MM)",
+            "CLIENT": "👤 Retail Investors & HNIs",
+        }
+
+        def _fetch_and_parse_day(date_info: tuple[str, str]) -> list[tuple] | None:
+            iso_date, ddmmyyyy = date_info
+            url = f"https://archives.nseindia.com/content/nsccl/fao_participant_oi_{ddmmyyyy}.csv"
+            try:
+                resp = requests.get(url, headers=headers, timeout=8)
+                if resp.status_code != 200 or len(resp.content) < 50:
+                    _FAILED_NSE_OI_DATES[iso_date] = time.time()
+                    return None
+
+                raw_bytes = resp.content
+                # NSE clearing CSVs often have a title row at line 0 (e.g. "Participant wise Open Interest...")
+                df = pd.read_csv(io.BytesIO(raw_bytes))
                 df.columns = [c.strip() for c in df.columns]
+
+                p_col = None
                 for candidate in ["Client Type", "CLIENT TYPE", "Participant", "PARTICIPANT"]:
                     if candidate in df.columns:
                         p_col = candidate
                         break
 
-            if not p_col:
+                if not p_col:
+                    # Try with skiprows=1
+                    df = pd.read_csv(io.BytesIO(raw_bytes), skiprows=1)
+                    df.columns = [c.strip() for c in df.columns]
+                    for candidate in ["Client Type", "CLIENT TYPE", "Participant", "PARTICIPANT"]:
+                        if candidate in df.columns:
+                            p_col = candidate
+                            break
+
+                if not p_col:
+                    return None
+
+                now_iso = datetime.now(timezone.utc).isoformat()
+                day_records: list[tuple] = []
+
+                for _, row in df.iterrows():
+                    raw_type = str(row.get(p_col, "")).strip().upper()
+                    p_key = None
+                    if "FII" in raw_type or "FOREIGN" in raw_type:
+                        p_key = "FII"
+                    elif "DII" in raw_type or "DOMESTIC" in raw_type:
+                        p_key = "DII"
+                    elif "PRO" in raw_type or "PROPRIETARY" in raw_type:
+                        p_key = "PRO"
+                    elif "CLIENT" in raw_type or "RETAIL" in raw_type or "INDIVIDUAL" in raw_type:
+                        p_key = "CLIENT"
+
+                    if not p_key:
+                        continue
+
+                    def _safe_int(k: str) -> int:
+                        val = row.get(k, 0)
+                        try:
+                            return int(float(str(val).replace(",", "").strip()))
+                        except Exception:
+                            return 0
+
+                    fi_long = _safe_int("Future Index Long")
+                    fi_short = _safe_int("Future Index Short")
+                    fi_net = fi_long - fi_short
+                    fi_total = fi_long + fi_short
+                    fi_long_pct = round((fi_long / max(1, fi_total)) * 100.0, 1)
+
+                    fs_long = _safe_int("Future Stock Long")
+                    fs_short = _safe_int("Future Stock Short")
+                    fs_net = fs_long - fs_short
+
+                    oic_long = _safe_int("Option Index Call Long")
+                    oic_short = _safe_int("Option Index Call Short")
+                    oip_long = _safe_int("Option Index Put Long")
+                    oip_short = _safe_int("Option Index Put Short")
+
+                    osc_long = _safe_int("Option Stock Call Long")
+                    osc_short = _safe_int("Option Stock Call Short")
+                    osp_long = _safe_int("Option Stock Put Long")
+                    osp_short = _safe_int("Option Stock Put Short")
+
+                    fut_long = fi_long + fs_long
+                    fut_short = fi_short + fs_short
+
+                    calls_long = oic_long + osc_long
+                    calls_short = oic_short + osc_short
+
+                    puts_long = oip_long + osp_long
+                    puts_short = oip_short + osp_short
+
+                    tot_long = _safe_int("Total Long Contracts") or (fut_long + calls_long + puts_long)
+                    tot_short = _safe_int("Total Short Contracts") or (fut_short + calls_short + puts_short)
+                    net_contracts = tot_long - tot_short
+                    ls_ratio = round(tot_long / max(1, tot_short), 2)
+                    sum_tot = tot_long + tot_short
+                    long_pct = round((tot_long / max(1, sum_tot)) * 100.0, 1)
+                    short_pct = round(100.0 - long_pct, 1)
+
+                    # Classify qualitative stance
+                    if p_key == "FII":
+                        if fi_long_pct >= 55.0 or (ls_ratio >= 1.15 and fi_net > 0):
+                            stance = "🟢 Net Long · Index Futures Momentum"
+                        elif fi_long_pct <= 40.0 or (ls_ratio <= 0.85 and fi_net < 0):
+                            stance = "🔴 Net Short · Index Futures Hedging"
+                        else:
+                            stance = "⚪ Neutral Delta · Hedged Positioning"
+                    elif p_key == "PRO":
+                        if oic_short > oic_long and oip_short > oip_long:
+                            stance = "⚪ Delta Neutral · Straddle Writing"
+                        elif fi_long_pct >= 55.0:
+                            stance = "🟢 Long Delta · Directional Algos"
+                        elif fi_long_pct <= 40.0:
+                            stance = "🔴 Short Delta · Resistance Writing"
+                        else:
+                            stance = "⚪ Neutral Delta · Options Writing / Arbitrage"
+                    elif p_key == "CLIENT":
+                        if fi_long_pct >= 60.0 or calls_long > (calls_short * 1.3):
+                            stance = "🟢 Net Long · Retail Call Momentum"
+                        elif fi_long_pct <= 40.0:
+                            stance = "🔴 Net Short · Retail Protective Puts"
+                        else:
+                            stance = "🟢 Net Long · Retail Float"
+                    else:  # DII
+                        if ls_ratio >= 1.15:
+                            stance = "🟢 Net Long · Equity Float Accumulation"
+                        else:
+                            stance = "🟢 Net Long · Systematic SIP Inflows"
+
+                    day_records.append((
+                        iso_date, p_key, labels_map.get(p_key, p_key),
+                        fi_long, fi_short, fi_net, fi_long_pct,
+                        fs_long, fs_short, fs_net,
+                        oic_long, oic_short, oip_long, oip_short,
+                        osc_long, osc_short, osp_long, osp_short,
+                        fut_long, fut_short,
+                        calls_long, calls_short,
+                        puts_long, puts_short,
+                        tot_long, tot_short,
+                        net_contracts, ls_ratio, long_pct, short_pct,
+                        stance, now_iso
+                    ))
+
+                return day_records if len(day_records) >= 4 else None
+            except Exception as e:
+                logger.debug("[PARTICIPANT-OI] Failed scraping archive %s: %s", url, e)
                 return None
 
-            now_iso = datetime.now(timezone.utc).isoformat()
-            day_records: list[tuple] = []
+        all_inserts: list[tuple] = []
+        # Scrape concurrently across candidate dates
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(missing_dates))) as executor:
+            results = executor.map(_fetch_and_parse_day, missing_dates)
+            for res in results:
+                if res:
+                    all_inserts.extend(res)
 
-            for _, row in df.iterrows():
-                raw_type = str(row.get(p_col, "")).strip().upper()
-                p_key = None
-                if "FII" in raw_type or "FOREIGN" in raw_type:
-                    p_key = "FII"
-                elif "DII" in raw_type or "DOMESTIC" in raw_type:
-                    p_key = "DII"
-                elif "PRO" in raw_type or "PROPRIETARY" in raw_type:
-                    p_key = "PRO"
-                elif "CLIENT" in raw_type or "RETAIL" in raw_type or "INDIVIDUAL" in raw_type:
-                    p_key = "CLIENT"
-
-                if not p_key:
-                    continue
-
-                def _safe_int(k: str) -> int:
-                    val = row.get(k, 0)
+        if all_inserts:
+            write_conn = get_db_connection(settings)
+            try:
+                for attempt in range(3):
                     try:
-                        return int(float(str(val).replace(",", "").strip()))
-                    except Exception:
-                        return 0
+                        with write_conn:
+                            write_conn.executemany("""
+                                INSERT OR REPLACE INTO participant_oi_positioning (
+                                    date, participant, category_label,
+                                    future_index_long, future_index_short, future_index_net, future_index_long_pct,
+                                    future_stock_long, future_stock_short, future_stock_net,
+                                    opt_index_call_long, opt_index_call_short, opt_index_put_long, opt_index_put_short,
+                                    opt_stock_call_long, opt_stock_call_short, opt_stock_put_long, opt_stock_put_short,
+                                    futures_long, futures_short,
+                                    calls_long, calls_short,
+                                    puts_long, puts_short,
+                                    total_long, total_short,
+                                    net_contracts, long_short_ratio, long_pct, short_pct,
+                                    stance, updated_at
+                                ) VALUES (
+                                    ?, ?, ?,
+                                    ?, ?, ?, ?,
+                                    ?, ?, ?,
+                                    ?, ?, ?, ?,
+                                    ?, ?, ?, ?,
+                                    ?, ?,
+                                    ?, ?,
+                                    ?, ?,
+                                    ?, ?,
+                                    ?, ?, ?, ?,
+                                    ?, ?
+                                )
+                            """, all_inserts)
+                        logger.info("[PARTICIPANT-OI] Successfully synced %d participant records from official NSE archives", len(all_inserts))
+                        break
+                    except Exception as e:
+                        if "locked" in str(e).lower() and attempt < 2:
+                            time.sleep(0.25 * (2 ** attempt))
+                            continue
+                        logger.warning("[PARTICIPANT-OI] Error persisting synced records: %s", e)
+                        break
+            finally:
+                try:
+                    write_conn.close()
+                except Exception:
+                    pass
 
-                fi_long = _safe_int("Future Index Long")
-                fi_short = _safe_int("Future Index Short")
-                fi_net = fi_long - fi_short
-                fi_total = fi_long + fi_short
-                fi_long_pct = round((fi_long / max(1, fi_total)) * 100.0, 1)
-
-                fs_long = _safe_int("Future Stock Long")
-                fs_short = _safe_int("Future Stock Short")
-                fs_net = fs_long - fs_short
-
-                oic_long = _safe_int("Option Index Call Long")
-                oic_short = _safe_int("Option Index Call Short")
-                oip_long = _safe_int("Option Index Put Long")
-                oip_short = _safe_int("Option Index Put Short")
-
-                osc_long = _safe_int("Option Stock Call Long")
-                osc_short = _safe_int("Option Stock Call Short")
-                osp_long = _safe_int("Option Stock Put Long")
-                osp_short = _safe_int("Option Stock Put Short")
-
-                fut_long = fi_long + fs_long
-                fut_short = fi_short + fs_short
-
-                calls_long = oic_long + osc_long
-                calls_short = oic_short + osc_short
-
-                puts_long = oip_long + osp_long
-                puts_short = oip_short + osp_short
-
-                tot_long = _safe_int("Total Long Contracts") or (fut_long + calls_long + puts_long)
-                tot_short = _safe_int("Total Short Contracts") or (fut_short + calls_short + puts_short)
-                net_contracts = tot_long - tot_short
-                ls_ratio = round(tot_long / max(1, tot_short), 2)
-                sum_tot = tot_long + tot_short
-                long_pct = round((tot_long / max(1, sum_tot)) * 100.0, 1)
-                short_pct = round(100.0 - long_pct, 1)
-
-                # Classify qualitative stance
-                if p_key == "FII":
-                    if fi_long_pct >= 55.0 or (ls_ratio >= 1.15 and fi_net > 0):
-                        stance = "🟢 Net Long · Index Futures Momentum"
-                    elif fi_long_pct <= 40.0 or (ls_ratio <= 0.85 and fi_net < 0):
-                        stance = "🔴 Net Short · Index Futures Hedging"
-                    else:
-                        stance = "⚪ Neutral Delta · Hedged Positioning"
-                elif p_key == "PRO":
-                    if oic_short > oic_long and oip_short > oip_long:
-                        stance = "⚪ Delta Neutral · Straddle Writing"
-                    elif fi_long_pct >= 55.0:
-                        stance = "🟢 Long Delta · Directional Algos"
-                    elif fi_long_pct <= 40.0:
-                        stance = "🔴 Short Delta · Resistance Writing"
-                    else:
-                        stance = "⚪ Neutral Delta · Options Writing / Arbitrage"
-                elif p_key == "CLIENT":
-                    if fi_long_pct >= 60.0 or calls_long > (calls_short * 1.3):
-                        stance = "🟢 Net Long · Retail Call Momentum"
-                    elif fi_long_pct <= 40.0:
-                        stance = "🔴 Net Short · Retail Protective Puts"
-                    else:
-                        stance = "🟢 Net Long · Retail Float"
-                else:  # DII
-                    if ls_ratio >= 1.15:
-                        stance = "🟢 Net Long · Equity Float Accumulation"
-                    else:
-                        stance = "🟢 Net Long · Systematic SIP Inflows"
-
-                day_records.append((
-                    iso_date, p_key, labels_map.get(p_key, p_key),
-                    fi_long, fi_short, fi_net, fi_long_pct,
-                    fs_long, fs_short, fs_net,
-                    oic_long, oic_short, oip_long, oip_short,
-                    osc_long, osc_short, osp_long, osp_short,
-                    fut_long, fut_short,
-                    calls_long, calls_short,
-                    puts_long, puts_short,
-                    tot_long, tot_short,
-                    net_contracts, ls_ratio, long_pct, short_pct,
-                    stance, now_iso
-                ))
-
-            return day_records if len(day_records) >= 4 else None
-        except Exception as e:
-            logger.debug("[PARTICIPANT-OI] Failed scraping archive %s: %s", url, e)
-            return None
-
-    all_inserts: list[tuple] = []
-    # Scrape concurrently across candidate dates
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(missing_dates))) as executor:
-        results = executor.map(_fetch_and_parse_day, missing_dates)
-        for res in results:
-            if res:
-                all_inserts.extend(res)
-
-    if all_inserts:
-        try:
-            conn.executemany("""
-                INSERT OR REPLACE INTO participant_oi_positioning (
-                    date, participant, category_label,
-                    future_index_long, future_index_short, future_index_net, future_index_long_pct,
-                    future_stock_long, future_stock_short, future_stock_net,
-                    opt_index_call_long, opt_index_call_short, opt_index_put_long, opt_index_put_short,
-                    opt_stock_call_long, opt_stock_call_short, opt_stock_put_long, opt_stock_put_short,
-                    futures_long, futures_short,
-                    calls_long, calls_short,
-                    puts_long, puts_short,
-                    total_long, total_short,
-                    net_contracts, long_short_ratio, long_pct, short_pct,
-                    stance, updated_at
-                ) VALUES (
-                    ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?,
-                    ?, ?,
-                    ?, ?,
-                    ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?
-                )
-            """, all_inserts)
-            conn.commit()
-            logger.info("[PARTICIPANT-OI] Successfully synced %d participant records from official NSE archives", len(all_inserts))
-        except Exception as e:
-            logger.warning("[PARTICIPANT-OI] Error persisting synced records: %s", e)
-
-    return len(all_inserts)
+        return len(all_inserts)
+    finally:
+        _PARTICIPANT_OI_SYNC_LOCK.release()
 
 
 def _classify_oi_regime(d_fi_net: int, d_fi_long: int, d_fi_short: int) -> tuple[str, str, str]:
@@ -1356,9 +1416,8 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             return _PARTICIPANT_OI_CACHE["data"]
 
     settings = settings or Settings()
-    conn = get_db_connection(settings)
 
-    # Automatically sync latest authentic participant OI files from official NSE clearing archives
+    # Automatically sync latest authentic participant OI files from official NSE clearing archives BEFORE opening query connection
     try:
         sync_nse_participant_oi_data(settings, days=30, force=force_refresh)
     except Exception as e:
@@ -1366,6 +1425,10 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
 
     # Retrieve all recorded distinct dates from SQLite
     trading_dates_raw: list[str] = []
+    target_dates_subset: list[str] = []
+    date_grouped: dict[str, dict[str, Any]] = {}
+
+    conn = get_db_connection(settings)
     try:
         dt_rows = conn.execute("""
             SELECT DISTINCT date
@@ -1376,27 +1439,10 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         for r in dt_rows:
             if r[0]:
                 trading_dates_raw.append(str(r[0]))
-    except Exception:
-        pass
 
-    now_utc = datetime.now(timezone.utc)
-    today_str = now_utc.strftime("%Y-%m-%d")
-
-    latest_date_str = trading_dates_raw[0] if trading_dates_raw else today_str
-    try:
-        dt_obj = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
-        session_label = dt_obj.strftime("%d %b (%a)")
-    except Exception:
-        session_label = latest_date_str
-
-    # Build 30-day, 10-day, and 7-day Participant OI History Matrix via a single batched SQL query
-    history_30d: list[dict[str, Any]] = []
-    target_dates_subset = trading_dates_raw[:30]
-
-    date_grouped: dict[str, dict[str, Any]] = {}
-    if target_dates_subset:
-        placeholders = ", ".join(["?"] * len(target_dates_subset))
-        try:
+        target_dates_subset = trading_dates_raw[:30]
+        if target_dates_subset:
+            placeholders = ", ".join(["?"] * len(target_dates_subset))
             batch_sql = f"""
                 SELECT * FROM participant_oi_positioning
                 WHERE date IN ({placeholders})
@@ -1420,8 +1466,26 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                     date_grouped[d_val] = {}
                 if p_code:
                     date_grouped[d_val][p_code] = row_map
-        except Exception as e:
-            logger.warning("[PARTICIPANT-OI] Batch history query error: %s", e)
+    except Exception as e:
+        logger.warning("[PARTICIPANT-OI] Batch history query error: %s", e)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    now_utc = datetime.now(timezone.utc)
+    today_str = now_utc.strftime("%Y-%m-%d")
+
+    latest_date_str = trading_dates_raw[0] if trading_dates_raw else today_str
+    try:
+        dt_obj = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
+        session_label = dt_obj.strftime("%d %b (%a)")
+    except Exception:
+        session_label = latest_date_str
+
+    # Build 30-day, 10-day, and 7-day Participant OI History Matrix
+    history_30d: list[dict[str, Any]] = []
 
     for d_str in target_dates_subset:
         try:
@@ -1794,23 +1858,23 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     history_7d = history_30d[:7]
     history_10d = history_30d[:10]
 
-    # Query latest snapshot and merge delta metrics
+    # Build latest snapshot from in-memory date_grouped and merge delta metrics
     participants_list: list[dict[str, Any]] = []
-    try:
-        cur = conn.execute(
-            "SELECT * FROM participant_oi_positioning WHERE date = ? ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'PRO' THEN 3 WHEN 'CLIENT' THEN 4 ELSE 5 END",
-            (latest_date_str,)
-        )
-        cols = [d[0] for d in cur.description] if cur.description else []
-        rows = cur.fetchall()
-        for r in rows:
-            p_dict = dict(zip(cols, r))
-            p_code = p_dict.get("participant", "")
+    latest_day_map = date_grouped.get(latest_date_str, {})
+    seen_participants = set()
+    for p_code in ["FII", "DII", "PRO", "CLIENT"]:
+        if p_code in latest_day_map:
+            p_dict = dict(latest_day_map[p_code])
             d_info = delta_metrics.get(p_code, {})
             p_dict.update(d_info)
             participants_list.append(p_dict)
-    except Exception:
-        pass
+            seen_participants.add(p_code)
+    for p_code, p_dict_raw in latest_day_map.items():
+        if p_code not in seen_participants:
+            p_dict = dict(p_dict_raw)
+            d_info = delta_metrics.get(p_code, {})
+            p_dict.update(d_info)
+            participants_list.append(p_dict)
 
     # Extract participant stats for contrarian prediction engine
     fii_p = next((p for p in participants_list if p.get("participant") == "FII"), {})
@@ -2114,94 +2178,100 @@ def compute_market_sentiment_matrix(
     pct_above_50dma = 58.2
 
     try:
-        rows = conn.execute("SELECT week_change, thirty_day_return_pct FROM ticker_metrics LIMIT 500").fetchall()
-        if rows and len(rows) > 20:
-            up_count = sum(1 for r in rows if r[0] and float(r[0]) > 0)
-            down_count = sum(1 for r in rows if r[0] and float(r[0]) < 0)
-            total = len(rows)
-            advances = int((up_count / total) * 2200)
-            declines = int((down_count / total) * 2200)
-            unchanged = max(50, 2200 - (advances + declines))
-            above_30d = sum(1 for r in rows if r[1] and float(r[1]) > 0)
-            pct_above_50dma = round((above_30d / total) * 100.0, 1)
-            pct_above_20dma = round(min(95.0, pct_above_50dma + 6.0), 1)
-    except Exception:
-        pass
+        try:
+            rows = conn.execute("SELECT week_change, thirty_day_return_pct FROM ticker_metrics LIMIT 500").fetchall()
+            if rows and len(rows) > 20:
+                up_count = sum(1 for r in rows if r[0] and float(r[0]) > 0)
+                down_count = sum(1 for r in rows if r[0] and float(r[0]) < 0)
+                total = len(rows)
+                advances = int((up_count / total) * 2200)
+                declines = int((down_count / total) * 2200)
+                unchanged = max(50, 2200 - (advances + declines))
+                above_30d = sum(1 for r in rows if r[1] and float(r[1]) > 0)
+                pct_above_50dma = round((above_30d / total) * 100.0, 1)
+                pct_above_20dma = round(min(95.0, pct_above_50dma + 6.0), 1)
+        except Exception:
+            pass
 
-    # Directional Prediction
-    if fear_greed_score >= 60.0 and vix_level < 16.0:
-        prediction_regime = "🟢 Bullish Momentum Expansion"
-        prediction_bias = "BULLISH"
-        conviction_pct = 84
-        support_level = "24,650"
-        resistance_level = "25,200"
-        commentary = (
-            "Broad market is operating in a high-liquidity expansion phase with India VIX calm below 15. "
-            "Institutional DII + FII cash participation remains positive, and high market breadth (>60% stocks above 50-DMA) "
-            "favors dip-buying in momentum earnings beaters and compression breakouts."
-        )
-    elif vix_level > 20.0 or fear_greed_score < 40.0:
-        prediction_regime = "🔴 Elevated Macro Volatility & Risk-Off"
-        prediction_bias = "BEARISH"
-        conviction_pct = 76
-        support_level = "24,100"
-        resistance_level = "24,750"
-        commentary = (
-            "Elevated volatility regime detected with VIX expanding. Institutional flows reflect tactical hedging and "
-            "sector rotation toward defensive FMCG and Pharma. Tighten swing stop losses and focus on strict earnings surprise strength."
-        )
-    else:
-        prediction_regime = "⚖️ Rangebound Consolidation & Rotation"
-        prediction_bias = "NEUTRAL"
-        conviction_pct = 68
-        support_level = "24,500"
-        resistance_level = "24,950"
-        commentary = (
-            "Market is oscillating inside a well-defined support/resistance channel. Index momentum is balanced, "
-            "making individual stock alpha and earnings surprise catalysts significantly more impactful than broad beta."
-        )
+        # Directional Prediction
+        if fear_greed_score >= 60.0 and vix_level < 16.0:
+            prediction_regime = "🟢 Bullish Momentum Expansion"
+            prediction_bias = "BULLISH"
+            conviction_pct = 84
+            support_level = "24,650"
+            resistance_level = "25,200"
+            commentary = (
+                "Broad market is operating in a high-liquidity expansion phase with India VIX calm below 15. "
+                "Institutional DII + FII cash participation remains positive, and high market breadth (>60% stocks above 50-DMA) "
+                "favors dip-buying in momentum earnings beaters and compression breakouts."
+            )
+        elif vix_level > 20.0 or fear_greed_score < 40.0:
+            prediction_regime = "🔴 Elevated Macro Volatility & Risk-Off"
+            prediction_bias = "BEARISH"
+            conviction_pct = 76
+            support_level = "24,100"
+            resistance_level = "24,750"
+            commentary = (
+                "Elevated volatility regime detected with VIX expanding. Institutional flows reflect tactical hedging and "
+                "sector rotation toward defensive FMCG and Pharma. Tighten swing stop losses and focus on strict earnings surprise strength."
+            )
+        else:
+            prediction_regime = "⚖️ Rangebound Consolidation & Rotation"
+            prediction_bias = "NEUTRAL"
+            conviction_pct = 68
+            support_level = "24,500"
+            resistance_level = "24,950"
+            commentary = (
+                "Market is oscillating inside a well-defined support/resistance channel. Index momentum is balanced, "
+                "making individual stock alpha and earnings surprise catalysts significantly more impactful than broad beta."
+            )
 
-    # 30-Day Historical Macro Charts
-    macro_charts: dict[str, Any] = {
-        "dates": [],
-        "fear_greed": [],
-        "vix": [],
-        "nifty": [],
-        "bank_nifty": [],
-    }
+        # 30-Day Historical Macro Charts
+        macro_charts: dict[str, Any] = {
+            "dates": [],
+            "fear_greed": [],
+            "vix": [],
+            "nifty": [],
+            "bank_nifty": [],
+        }
 
-    change_7d = 0.0
-    target_dates: list[str] = []
-    try:
-        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+        change_7d = 0.0
+        target_dates: list[str] = []
+        try:
+            nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+            vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+            bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
 
-        expected_date = get_expected_latest_trading_date()
-        latest_nifty_date = nifty_rows[0][0] if nifty_rows else ""
-        latest_vix_date = vix_rows[0][0] if vix_rows else ""
-        needs_sync = (
-            force_refresh
-            or len(nifty_rows) < 10
-            or len(vix_rows) < 10
-            or (expected_date and latest_nifty_date < expected_date)
-            or (expected_date and latest_vix_date < expected_date)
-        )
+            expected_date = get_expected_latest_trading_date()
+            latest_nifty_date = nifty_rows[0][0] if nifty_rows else ""
+            latest_vix_date = vix_rows[0][0] if vix_rows else ""
+            needs_sync = (
+                force_refresh
+                or len(nifty_rows) < 10
+                or len(vix_rows) < 10
+                or (expected_date and latest_nifty_date < expected_date)
+                or (expected_date and latest_vix_date < expected_date)
+            )
 
-        if needs_sync:
+            if needs_sync:
+                try:
+                    from earnings_engine.data.prices import fetch_prices
+                    if force_refresh or len(nifty_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                        fetch_prices("^NSEI", settings, force=True)
+                        nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                    if force_refresh or len(vix_rows) < 10 or (expected_date and latest_vix_date < expected_date):
+                        fetch_prices("^INDIAVIX", settings, force=True)
+                        vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                    if force_refresh or len(bank_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
+                        fetch_prices("^NSEBANK", settings, force=True)
+                        bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
+                except Exception as e_fetch:
+                    logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
+        finally:
             try:
-                from earnings_engine.data.prices import fetch_prices
-                if force_refresh or len(nifty_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
-                    fetch_prices("^NSEI", settings, force=True)
-                    nifty_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEI' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if force_refresh or len(vix_rows) < 10 or (expected_date and latest_vix_date < expected_date):
-                    fetch_prices("^INDIAVIX", settings, force=True)
-                    vix_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^INDIAVIX' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-                if force_refresh or len(bank_rows) < 10 or (expected_date and latest_nifty_date < expected_date):
-                    fetch_prices("^NSEBANK", settings, force=True)
-                    bank_rows = conn.execute("SELECT date, close FROM price_history WHERE ticker = '^NSEBANK' AND close > 0 ORDER BY date DESC LIMIT 45").fetchall()
-            except Exception as e_fetch:
-                logger.debug("[MARKET_PULSE] Auto-fetch index history warning: %s", e_fetch)
+                conn.close()
+            except Exception:
+                pass
 
         nifty_chrono = list(reversed(nifty_rows))
         vix_chrono = list(reversed(vix_rows))

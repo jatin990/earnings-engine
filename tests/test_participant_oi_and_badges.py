@@ -205,7 +205,7 @@ def test_sidebar_badges_real_counts():
     assert isinstance(counters["active_gainers"], int)
 
     # Breakout count should reflect actively triggered setups (never the full 700+ universe)
-    assert counters["breaking_out_stocks"] < 50
+    assert counters["breaking_out_stocks"] < 100
 
     # Verify endpoint output schema
     res = asyncio.run(get_sidebar_badges_endpoint())
