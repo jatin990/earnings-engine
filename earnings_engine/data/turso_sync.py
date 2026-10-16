@@ -136,6 +136,11 @@ SYNC_TABLES = [
     "options_tracked_setups",
     # Corporate Business Updates Radar & Seasonality Schedules
     "business_update_schedules",
+    # Transmission Lead-Lag Radar DAG & Telemetry Snapshots
+    "transmission_baskets",
+    "transmission_nodes",
+    "transmission_edges",
+    "transmission_snapshots",
 ]
 
 

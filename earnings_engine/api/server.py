@@ -43,6 +43,7 @@ from earnings_engine.api.routers import (
     swing,
     system,
     trading_agents,
+    transmission,
     tri_confluence,
     trips,
     watchlists,
@@ -523,6 +524,7 @@ app.include_router(deals.router)
 app.include_router(morning_setups.router)
 app.include_router(routes_reg30.router)
 app.include_router(tri_confluence.router)
+app.include_router(transmission.router, prefix="/api")
 app.include_router(options.router)
 app.include_router(commodities.router)
 app.include_router(swing.router)

@@ -997,7 +997,7 @@ const API_BASE = window.location.origin;
 
             async switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'morning-setups', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'morning-setups', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'transmission', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -1063,6 +1063,7 @@ const API_BASE = window.location.origin;
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
                         'tri-confluence': '🔗 Inst-Earnings Synergy',
+                        'transmission': '🕸️ Transmission Lead-Lag Radar',
                         'repeaters': '🔁 Quarter Repeaters',
                         'new-additions': '🆕 Recent Additions & IPOs',
                         'swing': 'Swing Ranges',
@@ -1231,6 +1232,14 @@ const API_BASE = window.location.origin;
                         if (typeof app.loadTriConfluence === 'function') {
                             this._triConfluenceLoaded = true;
                             app.loadTriConfluence();
+                        }
+                    }
+                }
+                if (name === 'transmission') {
+                    if (!this._transmissionLoaded) {
+                        this._transmissionLoaded = true;
+                        if (typeof window.initTransmissionRadar === 'function') {
+                            window.initTransmissionRadar();
                         }
                     }
                 }
