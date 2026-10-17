@@ -29,6 +29,40 @@ def test_api_baskets():
     basket_ids = {b["basket_id"] for b in data["baskets"]}
     assert "AI_INFRA_HARDWARE" in basket_ids
     assert "GLOBAL_CDMO_PEPTIDE_CASCADE" in basket_ids
+    assert "DEFENSE_AERO_SUPPLY_CHAIN" in basket_ids
+    assert "SEMI_OSAT_ADVANCED_PACKAGING" in basket_ids
+
+
+def test_api_graph_defense_basket():
+    res = client.get("/api/transmission/graph?basket_id=DEFENSE_AERO_SUPPLY_CHAIN")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert len(data["nodes"]) == 14
+    assert len(data["edges"]) == 13
+    assert "reentry_gates" in data
+
+
+def test_api_graph_semi_basket():
+    res = client.get("/api/transmission/graph?basket_id=SEMI_OSAT_ADVANCED_PACKAGING")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert len(data["nodes"]) == 12
+    assert len(data["edges"]) == 11
+    assert "reentry_gates" in data
+
+
+def test_api_shockwave_defense():
+    res = client.post("/api/transmission/simulate-shockwave", json={
+        "basket_id": "DEFENSE_AERO_SUPPLY_CHAIN",
+        "origin_node_id": "LMT",
+        "anchor_shock_pct": 5.0,
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data["propagation"], list)
+    assert any(n["node_id"] == "BEL.NS" for n in data["propagation"])
 
 
 def test_api_graph_cdmo_basket():

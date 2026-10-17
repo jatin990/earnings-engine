@@ -283,11 +283,11 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "Custom Synthesis Titan & Complex Peptide Building Blocks", None, None, None, None, 0, 2),
         ("SYNGENE.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SYNGENE.NS", "Syngene International", "NSE", "PRIMARY_LEADER",
          "Full-Lifecycle Biologics & Discovery CRDMO (WuXi Decoupling Target)", None, None, None, None, 0, 2),
-        ("SUVENPHAR.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SUVENPHAR.NS", "Suven Pharma", "NSE", "PRIMARY_LEADER",
-         "High-Margin Innovator Commercial CDMO & Global PE Platform", 20.0, None, None, None, 0, 2),
+        ("COHANCE.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "COHANCE.NS", "Cohance Lifesciences", "NSE", "PRIMARY_LEADER",
+         "High-Margin Innovator Commercial CDMO & Global PE Platform (Suven Pharma)", 20.0, None, None, None, 0, 2),
         ("LAURUSLABS.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LAURUSLABS.NS", "Laurus Labs", "NSE", "PRIMARY_LEADER",
          "Large-Scale Chemical CDMO & Precision Microbial Fermentation", None, None, None, None, 0, 2),
-        ("PIRAMALPHI.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "PIRAMALPHI.NS", "Piramal Pharma", "NSE", "PRIMARY_LEADER",
+        ("PPLPHARMA.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "PPLPHARMA.NS", "Piramal Pharma", "NSE", "PRIMARY_LEADER",
          "Sterile Injectables, ADCs & US/UK CDMO Facilities", None, None, None, None, 0, 2),
 
         # Tier 3: Specialized High-Beta Proxies & Pure-Plays (NSE)
@@ -297,17 +297,28 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "Precision Microbial Fermentation APIs & Immunosuppressants", 20.0, None, None, None, 0, 3),
         ("BLUEJET.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "BLUEJET.NS", "Blue Jet Healthcare", "NSE", "HIGH_BETA_FOLLOWER",
          "Contrast Media Intermediates & High-Intensity Sweetener CDMO", 20.0, None, None, None, 0, 3),
-        ("AMIORG.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "AMIORG.NS", "Ami Organics", "NSE", "HIGH_BETA_FOLLOWER",
+        ("ACUTAAS.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "ACUTAAS.NS", "Acutaas Chemicals (Ami)", "NSE", "HIGH_BETA_FOLLOWER",
          "Advanced Regulatory Intermediates & Multi-Step Organic Synthesis", 10.0, None, None, None, 0, 3),
         ("JUBLPHARMA.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "JUBLPHARMA.NS", "Jubilant Pharmova", "NSE", "HIGH_BETA_FOLLOWER",
          "Radiopharma, Sterile Injectables & Allergy Immunotherapy CDMO", 20.0, None, None, None, 0, 3),
-        ("ANUPAM.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "ANUPAM.NS", "Anupam Rasayan", "NSE", "HIGH_BETA_FOLLOWER",
+        ("ANURAS.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "ANURAS.NS", "Anupam Rasayan", "NSE", "HIGH_BETA_FOLLOWER",
          "Custom Chemical Synthesis & High-Barrier Fluorination Chemistries", 20.0, None, None, None, 0, 3),
     ]
 
+    # Purge old obsolete symbols from database if previously seeded
+    cur.execute("""
+    DELETE FROM transmission_nodes
+    WHERE node_id IN ('SUVENPHAR.NS', 'PIRAMALPHI.NS', 'AMIORG.NS', 'ANUPAM.NS');
+    """)
+    cur.execute("""
+    DELETE FROM transmission_edges
+    WHERE source_node_id IN ('SUVENPHAR.NS', 'PIRAMALPHI.NS', 'AMIORG.NS', 'ANUPAM.NS')
+       OR target_node_id IN ('SUVENPHAR.NS', 'PIRAMALPHI.NS', 'AMIORG.NS', 'ANUPAM.NS');
+    """)
+
     for n in cdmo_nodes:
         cur.execute("""
-        INSERT OR IGNORE INTO transmission_nodes (
+        INSERT OR REPLACE INTO transmission_nodes (
             node_id, basket_id, symbol, name, market, role, product_lineage,
             circuit_band_pct, trailing_pe, forward_pe, price_to_sales,
             is_turnaround, tier_column
@@ -332,7 +343,7 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "BIOSECURE Act WuXi Displacement", "Western Pharma RFP Rotation into Western-Compliant Discovery CRDMO",
          "Thermo Fisher biopharma backlog signals increased RFP rotation out of China into Syngene.",
          "CRITICAL", 24, 1.75),
-        ("TMO_SUVEN", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "SUVENPHAR.NS",
+        ("TMO_SUVEN", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "COHANCE.NS",
          "Western Innovator Outsourcing", "Innovator Phase II/III Molecule Synthesis & Dedicated Blocks",
          "Global biopharma development funding recovery fuels Suven innovator CDMO commercial pipeline.",
          "HIGH", 24, 1.65),
@@ -348,11 +359,11 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "Fermentation Capacity Reservation", "Precision Microbial Fermentation Scale-up",
          "Bioprocess consumable demand expansion validates Laurus Bio precision fermentation commercialization.",
          "HIGH", 24, 1.60),
-        ("NVO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NVO", "PIRAMALPHI.NS",
+        ("NVO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NVO", "PPLPHARMA.NS",
          "Sterile Fill-Finish & Injectable Deficit", "Sterile Injectable Vials, Prefilled Syringes & ADC Manufacturing",
          "Novo Nordisk fill-finish supply crunch directs sterile injectable contracts to Piramal Pharma.",
          "CRITICAL", 0, 1.90),
-        ("DIVIS_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "AMIORG.NS",
+        ("DIVIS_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "ACUTAAS.NS",
          "Commercial Block Intermediate Sourcing", "Advanced Regulatory Intermediates & Multi-Step Chemistry",
          "Divi's commercial block expansions cascade raw intermediate synthesis demand into Ami Organics.",
          "HIGH", 24, 1.45),
@@ -364,15 +375,15 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "Sterile Facility Spillover", "US/EU Injectable & Radiopharma Contract Manufacturing",
          "CRDMO capacity tightness across Indian leaders spills over into Jubilant sterile injectables.",
          "MODERATE", 24, 1.30),
-        ("LAURUS_ANUPAM", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LAURUSLABS.NS", "ANUPAM.NS",
+        ("LAURUS_ANUPAM", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LAURUSLABS.NS", "ANURAS.NS",
          "Complex Fluorination Reagent Demands", "High-Hazard Fluorination & Niche Agro/Pharma Synthesis",
          "Commercial chemical scaling requires specialized high-barrier fluorination chemistries from Anupam.",
          "MODERATE", 24, 1.40),
-        ("SUVEN_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SUVENPHAR.NS", "AMIORG.NS",
+        ("SUVEN_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "COHANCE.NS", "ACUTAAS.NS",
          "NCE Intermediate Outsourcing", "New Chemical Entity (NCE) Multi-Step Process Chemistry",
          "Suven innovator pipeline commercialization expands advanced intermediate procurement from Ami Organics.",
          "MODERATE", 24, 1.50),
-        ("TMO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "PIRAMALPHI.NS",
+        ("TMO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "PPLPHARMA.NS",
          "Western Biopharma Services Recovery", "Sterile Fill-Finish & UK/US Clinical Trial Batch Logistics",
          "Thermo Fisher clinical services growth mirrors Piramal Pharma sterile injectables and ADC demand.",
          "HIGH", 24, 1.50),
@@ -384,7 +395,241 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
 
     for e in cdmo_edges:
         cur.execute("""
-        INSERT OR IGNORE INTO transmission_edges (
+        INSERT OR REPLACE INTO transmission_edges (
+            edge_id, basket_id, source_node_id, target_node_id, catalyst_event,
+            physical_bottleneck, transmission_mechanism, impact_level,
+            lag_window_hours, elasticity_multiplier
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, e)
+
+    # ------------------------------------------------------------------------
+    # 7. Basket 3: DEFENSE_AERO_SUPPLY_CHAIN
+    # ------------------------------------------------------------------------
+    cur.execute("""
+    INSERT OR IGNORE INTO transmission_baskets (
+        basket_id, name, description, macro_theme
+    ) VALUES (
+        'DEFENSE_AERO_SUPPLY_CHAIN',
+        'Defense & Aerospace Electronics / Radar & Drones',
+        'Cross-border lead-lag transmission from US defense primes (Lockheed, RTX, Kratos, L3Harris) into Indian defense electronics PSUs, airborne radar systems, and counter-drone specialists.',
+        'Indigenization (IDDM), Electronic Warfare, Airborne Radars & Global Defense Replenishment'
+    );
+    """)
+
+    defense_nodes = [
+        # Tier 1: Global Defense Primes & Sensor Titans (US)
+        ("LMT", "DEFENSE_AERO_SUPPLY_CHAIN", "LMT", "Lockheed Martin", "US", "GLOBAL_ANCHOR",
+         "Fifth-Gen Fighters (F-35), Missile Defense Systems & Global Defense Procurement Bellwether", None, None, None, None, 0, 1),
+        ("RTX", "DEFENSE_AERO_SUPPLY_CHAIN", "RTX", "RTX Corp (Raytheon)", "US", "GLOBAL_ANCHOR",
+         "Radar Systems, Missile Guidance & Airborne Sensor Payloads", None, None, None, None, 0, 1),
+        ("KTOS", "DEFENSE_AERO_SUPPLY_CHAIN", "KTOS", "Kratos Defense", "US", "GLOBAL_ANCHOR",
+         "Jet Target Drones, Unmanned Aerial Systems & Counter-UAS Architecture", None, None, None, None, 0, 1),
+        ("LHX", "DEFENSE_AERO_SUPPLY_CHAIN", "LHX", "L3Harris Technologies", "US", "GLOBAL_ANCHOR",
+         "C4ISR Tactical Radios, Secure Comms & Electronic Warfare", None, None, None, None, 0, 1),
+
+        # Tier 2: Indian Defense Frontline PSUs & System Integrators (NSE)
+        ("BEL.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "BEL.NS", "Bharat Electronics", "NSE", "PRIMARY_LEADER",
+         "Defense Electronics, Naval Sonar, EW Systems & Akash Missile Radars", None, None, None, None, 0, 2),
+        ("HAL.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "HAL.NS", "Hindustan Aeronautics", "NSE", "PRIMARY_LEADER",
+         "Tejas Fighter Jets, Light Combat Helicopters (LCH) & Aero Engines", None, None, None, None, 0, 2),
+        ("BDL.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "BDL.NS", "Bharat Dynamics", "NSE", "PRIMARY_LEADER",
+         "Surface-to-Air / Anti-Tank Guided Missiles (Akash, Astra)", None, None, None, None, 0, 2),
+        ("MAZDOCK.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "MAZDOCK.NS", "Mazagon Dock Shipbuilders", "NSE", "PRIMARY_LEADER",
+         "Submarines, Stealth Frigates & Heavy Naval Defense Platforms", None, None, None, None, 0, 2),
+
+        # Tier 3: Specialized Indian Satellite Proxies & Drone Pure-Plays (NSE)
+        ("DATAPATTNS.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "DATAPATTNS.NS", "Data Patterns", "NSE", "HIGH_BETA_FOLLOWER",
+         "Airborne Radars, Electronic Warfare Receivers & Satellite Payloads", 5.0, None, None, None, 0, 3),
+        ("PARAS.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "PARAS.NS", "Paras Defence", "NSE", "HIGH_BETA_FOLLOWER",
+         "Optics & Optronics for Missiles/Tanks, EMP Racks & Drone Systems", 5.0, None, None, None, 0, 3),
+        ("ASTRAMICRO.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "ASTRAMICRO.NS", "Astra Microwave", "NSE", "HIGH_BETA_FOLLOWER",
+         "Active Electronically Scanned Array (AESA) Radar Modules & Sub-systems", 5.0, None, None, None, 0, 3),
+        ("ZENTEC.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "ZENTEC.NS", "Zen Technologies", "NSE", "HIGH_BETA_FOLLOWER",
+         "Combat Simulation Trainers & Anti-Drone / Counter-UAS Systems", 5.0, None, None, None, 0, 3),
+        ("DCXINDIA.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "DCXINDIA.NS", "DCX Systems", "NSE", "HIGH_BETA_FOLLOWER",
+         "Electronic Sub-systems & Cable Harnesses for Defense Primes", 5.0, None, None, None, 0, 3),
+        ("APOLLO.NS", "DEFENSE_AERO_SUPPLY_CHAIN", "APOLLO.NS", "Apollo Micro Systems", "NSE", "HIGH_BETA_FOLLOWER",
+         "Ruggedized Weapon Control Systems, Torpedo Tracking & Missile Avionics", 5.0, None, None, None, 0, 3),
+    ]
+
+    for n in defense_nodes:
+        cur.execute("""
+        INSERT OR REPLACE INTO transmission_nodes (
+            node_id, basket_id, symbol, name, market, role, product_lineage,
+            circuit_band_pct, trailing_pe, forward_pe, price_to_sales,
+            is_turnaround, tier_column
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, n)
+
+    defense_edges = [
+        ("LMT_BEL", "DEFENSE_AERO_SUPPLY_CHAIN", "LMT", "BEL.NS",
+         "Global Defense Procurement", "Tactical Radars & Avionics Offsets",
+         "US defense prime order books expand offset obligations to Bharat Electronics.",
+         "CRITICAL", 0, 1.65),
+        ("RTX_ASTRAMICRO", "DEFENSE_AERO_SUPPLY_CHAIN", "RTX", "ASTRAMICRO.NS",
+         "AESA Radar Demand Surge", "Active Phased Array Modules",
+         "Raytheon radar backlogs validate high-frequency microwave module volumes at Astra Microwave.",
+         "HIGH", 0, 1.95),
+        ("RTX_DATAPATTNS", "DEFENSE_AERO_SUPPLY_CHAIN", "RTX", "DATAPATTNS.NS",
+         "Airborne EW Suite Demand", "Digital Receiver Units & Radar Processors",
+         "Global airborne sensor replenishment drives high-beta multiple expansion in Data Patterns.",
+         "CRITICAL", 0, 2.10),
+        ("KTOS_ZENTEC", "DEFENSE_AERO_SUPPLY_CHAIN", "KTOS", "ZENTEC.NS",
+         "Unmanned Warfare Inflection", "Anti-Drone & Counter-UAS Defense Surge",
+         "Kratos unmanned combat momentum reflects drone defense imperative benefiting Zen Technologies.",
+         "CRITICAL", 0, 2.25),
+        ("LHX_BEL", "DEFENSE_AERO_SUPPLY_CHAIN", "LHX", "BEL.NS",
+         "C4ISR Tactical Radios", "Software Defined Radios & Battle Grid",
+         "L3Harris tactical radio backlogs spill over into Indian defense communication overhauls.",
+         "HIGH", 24, 1.50),
+        ("LMT_HAL", "DEFENSE_AERO_SUPPLY_CHAIN", "LMT", "HAL.NS",
+         "Fighter Fleet Modernization", "Combat Aircraft Fabrication & Engine Overhaul",
+         "Global combat jet procurement cycles re-rate HAL Tejas Mk1A delivery backlog.",
+         "HIGH", 0, 1.55),
+        ("HAL_DATAPATTNS", "DEFENSE_AERO_SUPPLY_CHAIN", "HAL.NS", "DATAPATTNS.NS",
+         "Tejas Mk1A Avionics Integration", "Airborne Radar Processing Subsystems",
+         "HAL aircraft execution cascades cockpit display and radar signal processing contracts to Data Patterns.",
+         "CRITICAL", 24, 1.85),
+        ("BEL_ASTRAMICRO", "DEFENSE_AERO_SUPPLY_CHAIN", "BEL.NS", "ASTRAMICRO.NS",
+         "Missile Radar Module Sourcing", "Akash & QRSAM Phased Array Subsystems",
+         "BEL order book expansion directly converts into sub-tier RF module orders for Astra Microwave.",
+         "HIGH", 24, 1.50),
+        ("BDL_APOLLO", "DEFENSE_AERO_SUPPLY_CHAIN", "BDL.NS", "APOLLO.NS",
+         "Guided Weapon Control Systems", "Missile Avionics & Actuation Hardware",
+         "Bharat Dynamics Akash/Astra missile ramp drives weapon control hardware orders to Apollo Micro.",
+         "HIGH", 24, 1.60),
+        ("BEL_PARAS", "DEFENSE_AERO_SUPPLY_CHAIN", "BEL.NS", "PARAS.NS",
+         "Optronics Subcontracting", "Periscope Assemblies & Armored Vehicle Optronics",
+         "BEL naval and land systems integration cascades periscope and optical component contracts to Paras.",
+         "MODERATE", 24, 1.45),
+        ("LMT_DCX", "DEFENSE_AERO_SUPPLY_CHAIN", "LMT", "DCXINDIA.NS",
+         "Foreign Military Sales Offset", "Defense Cable Harness & System Integration",
+         "Lockheed FMS export offset commitments generate dedicated sub-assembly awards for DCX.",
+         "MODERATE", 24, 1.40),
+        ("MAZDOCK_PARAS", "DEFENSE_AERO_SUPPLY_CHAIN", "MAZDOCK.NS", "PARAS.NS",
+         "Naval Submarine Optronics", "Periscope Glass & Heavy Naval Optics",
+         "Mazagon Dock submarine overhauls require specialized submarine periscope optics from Paras.",
+         "MODERATE", 24, 1.35),
+        ("BEL_DATAPATTNS", "DEFENSE_AERO_SUPPLY_CHAIN", "BEL.NS", "DATAPATTNS.NS",
+         "Radar Collaboration Spillover", "Tactical Radar Signal Processing",
+         "BEL radar prime contracts trigger sub-tier processing architecture integration at Data Patterns.",
+         "HIGH", 24, 1.60),
+    ]
+
+    for e in defense_edges:
+        cur.execute("""
+        INSERT OR REPLACE INTO transmission_edges (
+            edge_id, basket_id, source_node_id, target_node_id, catalyst_event,
+            physical_bottleneck, transmission_mechanism, impact_level,
+            lag_window_hours, elasticity_multiplier
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, e)
+
+    # ------------------------------------------------------------------------
+    # 8. Basket 4: SEMI_OSAT_ADVANCED_PACKAGING
+    # ------------------------------------------------------------------------
+    cur.execute("""
+    INSERT OR IGNORE INTO transmission_baskets (
+        basket_id, name, description, macro_theme
+    ) VALUES (
+        'SEMI_OSAT_ADVANCED_PACKAGING',
+        'Semiconductor Packaging (OSAT) & Compound Silicon Carbide',
+        'Cross-border lead-lag transmission from global semiconductor equipment and wafer titans (Applied Materials, ASML, Micron, KLA, ON Semi) into Indian OSAT assembly, testing, chip packaging, and compound SiC fabs.',
+        'Semiconductor Mission (ISM), OSAT Assembly-Test Packaging & SiC/GaN Power Chips'
+    );
+    """)
+
+    semi_nodes = [
+        # Tier 1: Global Semiconductor Equipment & Memory Anchors (US/Europe)
+        ("AMAT", "SEMI_OSAT_ADVANCED_PACKAGING", "AMAT", "Applied Materials", "US", "GLOBAL_ANCHOR",
+         "Semiconductor Wafer Fab & Advanced Packaging Equipment Leader", None, None, None, None, 0, 1),
+        ("ASML", "SEMI_OSAT_ADVANCED_PACKAGING", "ASML", "ASML Holding", "US", "GLOBAL_ANCHOR",
+         "EUV/DUV Photolithography Monopoly & Silicon Expansion Barometer", None, None, None, None, 0, 1),
+        ("MU", "SEMI_OSAT_ADVANCED_PACKAGING", "MU", "Micron Technology", "US", "GLOBAL_ANCHOR",
+         "Memory Packaging Pioneer & Sanand OSAT Unit Anchor", None, None, None, None, 0, 1),
+        ("KLAC", "SEMI_OSAT_ADVANCED_PACKAGING", "KLAC", "KLA Corp", "US", "GLOBAL_ANCHOR",
+         "Process Control & Advanced Packaging Yield Inspection Systems", None, None, None, None, 0, 1),
+        ("ON", "SEMI_OSAT_ADVANCED_PACKAGING", "ON", "ON Semiconductor", "US", "GLOBAL_ANCHOR",
+         "Automotive Silicon Carbide (SiC) & GaN Power Modules", None, None, None, None, 0, 1),
+
+        # Tier 2: Indian Frontline OSAT Titans & Chip Infrastructure (NSE)
+        ("CGPOWER.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "CGPOWER.NS", "CG Power", "NSE", "PRIMARY_LEADER",
+         "Sanand OSAT Unit Joint Venture with Renesas Electronics & Stars Micro", None, None, None, None, 0, 2),
+        ("KAYNES.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "KAYNES.NS", "Kaynes Technology", "NSE", "PRIMARY_LEADER",
+         "Sanand OSAT Facility (Kaynes Semicon) & High-Density Multi-Chip Modules", None, None, None, None, 0, 2),
+        ("TATAELXSI.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "TATAELXSI.NS", "Tata Elxsi", "NSE", "PRIMARY_LEADER",
+         "Semiconductor Chip Design, Verification & Tata Electronics Fab Partner", None, None, None, None, 0, 2),
+        ("NETWEB.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "NETWEB.NS", "Netweb Technologies", "NSE", "PRIMARY_LEADER",
+         "High-End Computing Solutions, Supercomputing & AI High-Density System Integration", None, None, None, None, 0, 2),
+
+        # Tier 3: Specialized High-Beta Semi Design & Compound SiC Proxies (NSE)
+        ("MOSCHIP.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "MOSCHIP.NS", "MosChip Technologies", "NSE", "HIGH_BETA_FOLLOWER",
+         "Turnkey ASIC Design, Embedded Systems & Silicon Verification", 5.0, None, None, None, 0, 3),
+        ("RIR.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "RIR.NS", "RIR Power Electronics", "NSE", "HIGH_BETA_FOLLOWER",
+         "First Commercial Silicon Carbide (SiC) Power Semiconductor Fab in Odisha", 5.0, None, None, None, 0, 3),
+        ("TATAINVEST.NS", "SEMI_OSAT_ADVANCED_PACKAGING", "TATAINVEST.NS", "Tata Investment", "NSE", "HIGH_BETA_FOLLOWER",
+         "Strategic Holding Company with Direct Equity Exposure to Tata Electronics Fabs", 5.0, None, None, None, 0, 3),
+    ]
+
+    for n in semi_nodes:
+        cur.execute("""
+        INSERT OR REPLACE INTO transmission_nodes (
+            node_id, basket_id, symbol, name, market, role, product_lineage,
+            circuit_band_pct, trailing_pe, forward_pe, price_to_sales,
+            is_turnaround, tier_column
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, n)
+
+    semi_edges = [
+        ("MU_KAYNES", "SEMI_OSAT_ADVANCED_PACKAGING", "MU", "KAYNES.NS",
+         "Micron Sanand Spillover", "OSAT Multi-Chip Packaging Backlog",
+         "Micron Sanand packaging expansion accelerates commercial traction for Kaynes Semicon OSAT unit.",
+         "CRITICAL", 0, 2.15),
+        ("AMAT_CGPOWER", "SEMI_OSAT_ADVANCED_PACKAGING", "AMAT", "CGPOWER.NS",
+         "OSAT Packaging Tool Delivery", "Advanced Assembly & Test Tooling",
+         "Applied Materials advanced packaging equipment delivery confirms progress on CG Power-Renesas OSAT.",
+         "CRITICAL", 24, 1.85),
+        ("ON_RIR", "SEMI_OSAT_ADVANCED_PACKAGING", "ON", "RIR.NS",
+         "Automotive SiC Power Deficit", "Commercial Silicon Carbide Power Fab",
+         "ON Semi SiC demand surges spill over into institutional re-rating for RIR Power Electronics SiC fab.",
+         "CRITICAL", 0, 2.40),
+        ("KLAC_MOSCHIP", "SEMI_OSAT_ADVANCED_PACKAGING", "KLAC", "MOSCHIP.NS",
+         "Silicon Yield Verification", "Turnkey ASIC Layout & Test Services",
+         "KLA process diagnostic momentum validates surging custom ASIC design and verification at MosChip.",
+         "HIGH", 24, 1.70),
+        ("ASML_TATAELXSI", "SEMI_OSAT_ADVANCED_PACKAGING", "ASML", "TATAELXSI.NS",
+         "Global Fab Expansion Capex", "Chip Design & Physical Layout Services",
+         "ASML lithography backlog expansion validates upstream engineering design pipelines at Tata Elxsi.",
+         "HIGH", 24, 1.50),
+        ("MU_CGPOWER", "SEMI_OSAT_ADVANCED_PACKAGING", "MU", "CGPOWER.NS",
+         "Sanand Cluster Milestone", "Semiconductor Ecosystem Sentiment",
+         "Micron operational milestones validate the Sanand semiconductor cluster, boosting CG Power.",
+         "HIGH", 0, 1.75),
+        ("KAYNES_MOSCHIP", "SEMI_OSAT_ADVANCED_PACKAGING", "KAYNES.NS", "MOSCHIP.NS",
+         "Design-to-Packaging Synergy", "Turnkey Semiconductor Delivery",
+         "Kaynes OSAT packaging orders cascade design verification and RTL-to-GDSII work to MosChip.",
+         "HIGH", 24, 1.60),
+        ("CGPOWER_KAYNES", "SEMI_OSAT_ADVANCED_PACKAGING", "CGPOWER.NS", "KAYNES.NS",
+         "Domestic OSAT Multiple Expansion", "Packaging Capacity Scarcity Rebalancing",
+         "Institutional momentum in CG Power OSAT re-rates Kaynes Semicon packaging valuation.",
+         "HIGH", 0, 1.45),
+        ("ASML_TATAINVEST", "SEMI_OSAT_ADVANCED_PACKAGING", "ASML", "TATAINVEST.NS",
+         "Tata Dholera Fab Valuation", "Tata Electronics Direct Equity Spillover",
+         "Global wafer fab re-rating directly lifts asset value of Tata Investment's equity portfolio.",
+         "HIGH", 24, 1.55),
+        ("AMAT_KAYNES", "SEMI_OSAT_ADVANCED_PACKAGING", "AMAT", "KAYNES.NS",
+         "Substrate & Packaging Equipment", "OSAT Line Installation Capex",
+         "Applied Materials tooling confirms Kaynes Semicon equipment delivery timeline.",
+         "MODERATE", 24, 1.50),
+        ("ON_CGPOWER", "SEMI_OSAT_ADVANCED_PACKAGING", "ON", "CGPOWER.NS",
+         "Power Module Packaging", "Automotive Power Semiconductor Assembly",
+         "Global automotive power semi demand directs multi-chip module packaging to CG Power Renesas JV.",
+         "HIGH", 24, 1.50),
+    ]
+
+    for e in semi_edges:
+        cur.execute("""
+        INSERT OR REPLACE INTO transmission_edges (
             edge_id, basket_id, source_node_id, target_node_id, catalyst_event,
             physical_bottleneck, transmission_mechanism, impact_level,
             lag_window_hours, elasticity_multiplier

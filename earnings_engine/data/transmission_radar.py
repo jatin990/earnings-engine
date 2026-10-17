@@ -419,7 +419,9 @@ def sync_transmission_fundamentals(
     directly from authoritative live market fundamentals (yfinance) and update transmission_nodes.
     Zero mock fallback.
     """
+    import concurrent.futures
     import yfinance as yf
+
     cur = conn.cursor()
     cur.execute(
         """
@@ -430,37 +432,53 @@ def sync_transmission_fundamentals(
         (basket_id,),
     )
     nodes = cur.fetchall()
-    updated_count = 0
-    for node_id, symbol, tpe in nodes:
-        if not force and tpe is not None and tpe > 0:
-            continue
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info or {}
-            real_tpe = info.get("trailingPE")
-            real_fpe = info.get("forwardPE")
-            real_ps = info.get("priceToSalesTrailing12Months")
-            inst = info.get("heldPercentInstitutions")
-            inst_pct = round(inst * 100.0, 2) if inst is not None else None
-            tpe_val = round(real_tpe, 2) if real_tpe is not None and real_tpe > 0 else None
-            fpe_val = round(real_fpe, 2) if real_fpe is not None and real_fpe > 0 else None
-            ps_val = round(real_ps, 2) if real_ps is not None and real_ps > 0 else None
+    nodes_to_fetch = [
+        (node_id, symbol)
+        for node_id, symbol, tpe in nodes
+        if force or tpe is None or tpe <= 0
+    ]
+    if not nodes_to_fetch:
+        return 0
 
-            cur.execute(
-                """
-                UPDATE transmission_nodes
-                SET trailing_pe = ?,
-                    forward_pe = ?,
-                    price_to_sales = ?,
-                    institutional_holding_pct = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE node_id = ?;
-                """,
-                (tpe_val, fpe_val, ps_val, inst_pct, node_id),
-            )
-            updated_count += 1
+    def _fetch_node_fundamentals(item: tuple[str, str]) -> tuple[str, str, dict[str, Any]]:
+        nid, sym = item
+        try:
+            ticker = yf.Ticker(sym)
+            info = ticker.info or {}
+            return nid, sym, info
         except Exception as exc:
-            logger.warning("[TRANSMISSION] Failed to fetch fundamentals for %s (%s): %s", node_id, symbol, exc)
+            logger.warning("[TRANSMISSION] Failed to fetch fundamentals for %s (%s): %s", nid, sym, exc)
+            return nid, sym, {}
+
+    max_workers = min(len(nodes_to_fetch), 8)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(_fetch_node_fundamentals, nodes_to_fetch))
+
+    updated_count = 0
+    for node_id, symbol, info in results:
+        real_tpe = info.get("trailingPE")
+        real_fpe = info.get("forwardPE")
+        real_ps = info.get("priceToSalesTrailing12Months")
+        inst = info.get("heldPercentInstitutions")
+        inst_pct = round(inst * 100.0, 2) if inst is not None else None
+        tpe_val = round(real_tpe, 2) if real_tpe is not None and real_tpe > 0 else None
+        fpe_val = round(real_fpe, 2) if real_fpe is not None and real_fpe > 0 else None
+        ps_val = round(real_ps, 2) if real_ps is not None and real_ps > 0 else None
+
+        cur.execute(
+            """
+            UPDATE transmission_nodes
+            SET trailing_pe = ?,
+                forward_pe = ?,
+                price_to_sales = ?,
+                institutional_holding_pct = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE node_id = ?;
+            """,
+            (tpe_val, fpe_val, ps_val, inst_pct, node_id),
+        )
+        updated_count += 1
+
     conn.commit()
     return updated_count
 
@@ -517,14 +535,31 @@ def sync_transmission_snapshots(
         if target_id not in edge_anchor_map and source_pe:
             edge_anchor_map[target_id] = float(source_pe)
 
-    synced_count = 0
-    for node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround in nodes:
-        try:
-            quote = fetch_live_quote(symbol, settings=settings, force=force)
-            df = load_prices(symbol, settings=settings)
-            if df is None or df.empty:
-                df = fetch_prices(symbol, settings=settings, force=False)
+    import concurrent.futures
 
+    def _fetch_node_market_data(item: tuple) -> tuple:
+        nid, sym, role, c_band, tpe, turnaround = item
+        quote = None
+        df = None
+        try:
+            quote = fetch_live_quote(sym, settings=settings, force=force)
+        except Exception as exc:
+            logger.warning("[TRANSMISSION] Failed quote for %s: %s", sym, exc)
+        try:
+            df = load_prices(sym, settings=settings)
+            if df is None or df.empty:
+                df = fetch_prices(sym, settings=settings, force=False)
+        except Exception as exc:
+            logger.warning("[TRANSMISSION] Failed prices for %s: %s", sym, exc)
+        return nid, sym, role, c_band, tpe, turnaround, quote, df
+
+    max_workers = min(len(nodes), 8)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        fetched_nodes = list(executor.map(_fetch_node_market_data, nodes))
+
+    synced_count = 0
+    for node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround, quote, df in fetched_nodes:
+        try:
             current_price = quote.get("current_price") if quote else None
             closes = df["close"].dropna() if df is not None and not df.empty and "close" in df.columns else []
 
@@ -885,6 +920,8 @@ def get_transmission_graph_payload(
     primary_anchor_ids = {
         "AI_INFRA_HARDWARE": "BE",
         "GLOBAL_CDMO_PEPTIDE_CASCADE": "LLY",
+        "DEFENSE_AERO_SUPPLY_CHAIN": "LMT",
+        "SEMI_OSAT_ADVANCED_PACKAGING": "AMAT",
     }
     target_anchor_id = primary_anchor_ids.get(basket_id)
     anchor_node = next((n for n in enriched_nodes if n["node_id"] == target_anchor_id), None)

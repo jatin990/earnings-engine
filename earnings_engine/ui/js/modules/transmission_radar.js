@@ -28,7 +28,7 @@
     // Animation constants
     const MAX_PARTICLES = 40;
     const PARTICLE_SPEED = 0.014;  // speed along Bezier t [0,1] per frame at 60fps
-    const PARTICLE_RADIUS = 3.5;
+    const PARTICLE_RADIUS = 5.0;
 
     // ---------------------------------------------------------------------------
     // Helpers
@@ -109,47 +109,49 @@
         const c1d = Number(node.change_1d_pct ?? 0);
         const pctColor = c1d > 0 ? '#34d399' : c1d < 0 ? '#f87171' : '#a1a1aa';
         const freshBadge = node.is_stale
-            ? `<span style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:3px;font-family:var(--font-mono);">STALE·${node.snapshot_age_minutes}m</span>`
-            : `<span style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:3px;font-family:var(--font-mono);">LIVE·${node.snapshot_age_minutes}m</span>`;
+            ? `<span style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">STALE·${node.snapshot_age_minutes}m</span>`
+            : `<span style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">LIVE·${node.snapshot_age_minutes}m</span>`;
         const circuitColor = _circuitColors(node.circuit_status);
         const circuitBadge = (node.circuit_status && node.circuit_status !== 'STABLE')
-            ? `<span style="background:rgba(239,68,68,0.12);color:${circuitColor};border:1px solid ${circuitColor}33;font-size:0.6rem;padding:0.08rem 0.38rem;border-radius:3px;font-family:var(--font-mono);" title="Circuit Status">${node.circuit_status}</span>`
+            ? `<span style="background:rgba(239,68,68,0.12);color:${circuitColor};border:1px solid ${circuitColor}33;font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);" title="Circuit Status">${node.circuit_status}</span>`
             : '';
         const anomBadge = anom
-            ? `<span style="background:${anom.bg};color:${anom.color};border:1px solid ${anom.border};font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:3px;" title="${_esc(node.anomaly_flag)}">${anom.label}</span>`
+            ? `<span style="background:${anom.bg};color:${anom.color};border:1px solid ${anom.border};font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;" title="${_esc(node.anomaly_flag)}">${anom.label}</span>`
             : '';
 
         const elastLabel = (node.elasticity_label && node.elasticity_label !== 'N/A (Anchor)' && node.elasticity_label !== 'N/A')
-            ? `<span style="color:#a1a1aa;font-size:0.68rem;">${_esc(node.elasticity_label)}</span>`
+            ? `<span style="color:#a1a1aa;font-size:0.62rem;font-family:var(--font-mono);">${_esc(node.elasticity_label)}</span>`
             : '';
 
         const actionBadge = (node.trade_action && node.trade_action.action)
-            ? `<span style="font-size:0.62rem;font-weight:800;color:${node.trade_action.action_color};background:${node.trade_action.action_color}18;border:1px solid ${node.trade_action.action_color}35;padding:0.1rem 0.35rem;border-radius:3px;">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
+            ? `<span style="font-size:0.58rem;font-weight:800;color:${node.trade_action.action_color};background:${node.trade_action.action_color}18;border:1px solid ${node.trade_action.action_color}35;padding:0.08rem 0.32rem;border-radius:3px;font-family:var(--font-mono);">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
             : '';
 
         return `<div class="tm-node-card" id="tm-card-${_esc(node.node_id)}"
                      data-node-id="${_esc(node.node_id)}"
                      onclick="window.transmissionRadar.openDrawer('${_esc(node.node_id)}')"
                      style="border-left: 3px solid ${sc.border};">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-                <div style="display:flex;align-items:center;gap:0.4rem;">
-                    <span style="font-size:0.95rem;font-weight:800;color:#f8fafc;">${_esc(node.symbol)}</span>
-                    <span style="font-size:0.68rem;color:#71717a;">${_esc(node.market || '')}</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                <div style="display:flex;align-items:center;gap:0.35rem;">
+                    <span style="font-size:0.85rem;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">${_esc(node.symbol)}</span>
+                    <span style="font-size:0.6rem;color:#71717a;font-family:var(--font-mono);">${_esc(node.market || '')}</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:0.3rem;">
-                    ${freshBadge}
+                <div style="display:flex;align-items:center;gap:0.35rem;">
+                    <span style="font-size:0.82rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—'}</span>
+                    <span style="font-size:0.72rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}</span>
+                </div>
+            </div>
+            <div style="font-size:0.65rem;color:#a1a1aa;margin-bottom:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_esc(node.product_lineage || node.name)}">${_esc(node.product_lineage || node.name)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.2rem;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:0.25rem;">
+                    ${actionBadge}
+                    ${elastLabel}
+                </div>
+                <div style="display:flex;align-items:center;gap:0.25rem;">
+                    ${anomBadge}
                     ${circuitBadge}
+                    ${freshBadge}
                 </div>
-            </div>
-            <div style="font-size:0.72rem;color:#a1a1aa;margin-bottom:0.45rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(node.name)}</div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
-                <span style="font-size:1.0rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—'}</span>
-                <span style="font-size:0.8rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}<span style="font-size:0.62rem;color:#71717a;font-weight:400;"> 1D</span></span>
-            </div>
-            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
-                ${actionBadge}
-                ${elastLabel}
-                ${anomBadge}
             </div>
         </div>`;
     }
@@ -400,51 +402,63 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cw, ch);
 
-        // Draw static Bezier curve links
+        // Draw static Bezier curve links with glowing double-pass
         for (const edge of _state.edges) {
             const src = _state.nodePositions[edge.source_node_id || edge.source];
             const tgt = _state.nodePositions[edge.target_node_id || edge.target];
             if (!src || !tgt) continue;
 
-            const impactAlpha = { CRITICAL: 0.65, HIGH: 0.5, MODERATE: 0.35, LOW: 0.2 };
-            const alpha = impactAlpha[edge.impact_level] || 0.35;
+            const edgeColor = edge.pulse_color || (edge.impact_level === 'CRITICAL' ? '#ef4444' : edge.impact_level === 'HIGH' ? '#f97316' : '#38bdf8');
+            const cpx = src.x + (tgt.x - src.x) * 0.45;
 
+            // Pass 1: Illuminated atmospheric outer glow
             ctx.beginPath();
             ctx.moveTo(src.x, src.y);
-            // Cubic Bezier with horizontal control points creating natural S-curve
-            const cpx = src.x + (tgt.x - src.x) * 0.45;
             ctx.bezierCurveTo(cpx, src.y, cpx, tgt.y, tgt.x, tgt.y);
-            ctx.strokeStyle = edge.pulse_color || '#38bdf8';
-            ctx.globalAlpha = alpha;
-            ctx.lineWidth = 1.2;
-            ctx.setLineDash([4, 8]);
+            ctx.strokeStyle = edgeColor;
+            ctx.globalAlpha = edge.impact_level === 'CRITICAL' ? 0.35 : 0.22;
+            ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 7.0 : 5.0;
             ctx.stroke();
-            ctx.setLineDash([]);
+
+            // Pass 2: Sharp, bold laser transmission conduit
+            ctx.beginPath();
+            ctx.moveTo(src.x, src.y);
+            ctx.bezierCurveTo(cpx, src.y, cpx, tgt.y, tgt.x, tgt.y);
+            ctx.strokeStyle = edgeColor;
+            ctx.globalAlpha = 0.88;
+            ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 3.0 : (edge.impact_level === 'HIGH' ? 2.4 : 1.8);
+            ctx.stroke();
         }
 
-        // Draw & advance particles
-        ctx.globalAlpha = 1;
+        // Draw & advance energetic traveling particles
         for (const p of _state.activeParticles) {
             const src = p.src;
             const tgt = p.tgt;
             const cpx = src.x + (tgt.x - src.x) * 0.45;
 
-            // Control points matching the curve above
             const cp1 = { x: cpx, y: src.y };
             const cp2 = { x: cpx, y: tgt.y };
             const pos = _bezierPoint(src, cp1, cp2, tgt, p.t);
 
+            // Wide energetic glow halo
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, PARTICLE_RADIUS, 0, Math.PI * 2);
+            ctx.arc(pos.x, pos.y, 11.0, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
-            ctx.globalAlpha = p.alpha;
+            ctx.globalAlpha = p.alpha * 0.35;
             ctx.fill();
 
-            // Outer glow
+            // Saturated particle core
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, PARTICLE_RADIUS * 2.2, 0, Math.PI * 2);
+            ctx.arc(pos.x, pos.y, 5.0, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
-            ctx.globalAlpha = p.alpha * 0.25;
+            ctx.globalAlpha = 0.95;
+            ctx.fill();
+
+            // White laser focal point
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 1.0;
             ctx.fill();
 
             p.t += p.speed;

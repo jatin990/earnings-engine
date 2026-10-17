@@ -404,10 +404,46 @@ def test_cdmo_topology():
     node_ids = {n["node_id"] for n in nodes}
     expected_nodes = {
         "LLY", "NVO", "TMO", "DHR", "CRL",
-        "DIVISLAB.NS", "SYNGENE.NS", "SUVENPHAR.NS", "LAURUSLABS.NS", "PIRAMALPHI.NS",
-        "NEULANDLAB.NS", "CONCORDBIO.NS", "BLUEJET.NS", "AMIORG.NS", "JUBLPHARMA.NS", "ANUPAM.NS"
+        "DIVISLAB.NS", "SYNGENE.NS", "COHANCE.NS", "LAURUSLABS.NS", "PPLPHARMA.NS",
+        "NEULANDLAB.NS", "CONCORDBIO.NS", "BLUEJET.NS", "ACUTAAS.NS", "JUBLPHARMA.NS", "ANURAS.NS"
     }
     assert expected_nodes == node_ids
+
+
+def test_defense_topology():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    nodes, edges = get_basket_graph_raw("DEFENSE_AERO_SUPPLY_CHAIN", conn)
+    assert len(nodes) == 14
+    assert len(edges) == 13
+
+    node_ids = {n["node_id"] for n in nodes}
+    assert "LMT" in node_ids
+    assert "BEL.NS" in node_ids
+    assert "HAL.NS" in node_ids
+    assert "ZENTEC.NS" in node_ids
+    assert "DATAPATTNS.NS" in node_ids
+
+
+def test_semi_topology():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    nodes, edges = get_basket_graph_raw("SEMI_OSAT_ADVANCED_PACKAGING", conn)
+    assert len(nodes) == 12
+    assert len(edges) == 11
+
+    node_ids = {n["node_id"] for n in nodes}
+    assert "AMAT" in node_ids
+    assert "CGPOWER.NS" in node_ids
+    assert "KAYNES.NS" in node_ids
+    assert "NETWEB.NS" in node_ids
+    assert "RIR.NS" in node_ids
 
 
 def test_cdmo_gate1_evaluation():
