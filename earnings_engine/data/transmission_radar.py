@@ -599,6 +599,7 @@ def get_transmission_graph_payload(
     conn: sqlite3.Connection,
     settings: Any | None = None,
     refresh: bool = False,
+    auto_sync: bool = True,
 ) -> dict[str, Any]:
     """Build full transmission graph response payload for a basket.
 
@@ -613,23 +614,24 @@ def get_transmission_graph_payload(
     cur = conn.cursor()
 
     # If refresh is requested or active nodes have no snapshots, sync real market data first
-    if refresh:
-        sync_transmission_snapshots(conn, basket_id=basket_id, force=True, settings=settings)
-    else:
-        cur.execute(
-            """
-            SELECT COUNT(DISTINCT s.node_id)
-            FROM transmission_snapshots s
-            JOIN transmission_nodes n ON s.node_id = n.node_id
-            WHERE n.basket_id = ?;
-            """,
-            (basket_id,),
-        )
-        existing_nodes = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM transmission_nodes WHERE basket_id = ? AND is_active = 1;", (basket_id,))
-        total_active_nodes = cur.fetchone()[0]
-        if total_active_nodes > 0 and existing_nodes < total_active_nodes:
-            sync_transmission_snapshots(conn, basket_id=basket_id, force=False, settings=settings)
+    if auto_sync:
+        if refresh:
+            sync_transmission_snapshots(conn, basket_id=basket_id, force=True, settings=settings)
+        else:
+            cur.execute(
+                """
+                SELECT COUNT(DISTINCT s.node_id)
+                FROM transmission_snapshots s
+                JOIN transmission_nodes n ON s.node_id = n.node_id
+                WHERE n.basket_id = ?;
+                """,
+                (basket_id,),
+            )
+            existing_nodes = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM transmission_nodes WHERE basket_id = ? AND is_active = 1;", (basket_id,))
+            total_active_nodes = cur.fetchone()[0]
+            if total_active_nodes > 0 and existing_nodes < total_active_nodes:
+                sync_transmission_snapshots(conn, basket_id=basket_id, force=False, settings=settings)
 
     # 1. Basket Info
     cur.execute("""
@@ -879,15 +881,39 @@ def get_transmission_graph_payload(
             })
 
     # 6. Re-entry Gates
-    # Gate 1: US Anchor Stabilization
-    be_node = next((n for n in enriched_nodes if n["node_id"] == "BE"), None)
-    if be_node and be_node["change_5d_pct"] is not None and be_node["change_20d_pct"] is not None:
-        if be_node["change_5d_pct"] > -2.0 and be_node["change_20d_pct"] > -5.0:
+    # Gate 1: US Anchor Stabilization (Dynamic multi-basket anchor selection)
+    primary_anchor_ids = {
+        "AI_INFRA_HARDWARE": "BE",
+        "GLOBAL_CDMO_PEPTIDE_CASCADE": "LLY",
+    }
+    target_anchor_id = primary_anchor_ids.get(basket_id)
+    anchor_node = next((n for n in enriched_nodes if n["node_id"] == target_anchor_id), None)
+    if not anchor_node:
+        anchor_node = next((n for n in enriched_nodes if n.get("tier_column") == 1 and n.get("market") == "US"), None)
+
+    tier1_nodes = [n for n in enriched_nodes if n.get("tier_column") == 1 and n.get("market") == "US"]
+
+    if anchor_node and anchor_node.get("change_5d_pct") is not None and anchor_node.get("change_20d_pct") is not None:
+        c5d_val = float(anchor_node["change_5d_pct"])
+        c20d_val = float(anchor_node["change_20d_pct"])
+        symbol_name = anchor_node.get("symbol", target_anchor_id or "Anchor")
+
+        stable_t1_count = sum(
+            1 for n in tier1_nodes
+            if n.get("change_20d_pct") is not None and float(n["change_20d_pct"]) > -5.0
+        )
+        t1_total = len(tier1_nodes) or 1
+        is_majority_t1_stable = stable_t1_count >= (t1_total + 1) // 2
+
+        if c5d_val > -2.0 and c20d_val > -5.0 and is_majority_t1_stable:
             gate1_status = "PASS"
-            gate1_detail = f"Anchor BE stabilized (5D: {be_node['change_5d_pct']:+.1f}%, 20D: {be_node['change_20d_pct']:+.1f}%)."
+            gate1_detail = f"Anchor {symbol_name} stabilized (5D: {c5d_val:+.1f}%, 20D: {c20d_val:+.1f}%). {stable_t1_count}/{t1_total} Tier-1 anchors stabilized."
+        elif c5d_val > -2.0 and c20d_val > -5.0:
+            gate1_status = "WARNING"
+            gate1_detail = f"Anchor {symbol_name} stabilized but only {stable_t1_count}/{t1_total} Tier-1 anchors stabilized."
         else:
             gate1_status = "FAIL"
-            gate1_detail = f"BE down {be_node['change_5d_pct']:+.1f}% 5D; {be_node['change_20d_pct']:+.1f}% 20D."
+            gate1_detail = f"Anchor {symbol_name} down {c5d_val:+.1f}% 5D; {c20d_val:+.1f}% 20D."
     else:
         gate1_status = "PENDING"
         gate1_detail = "Anchor telemetry awaiting stabilization print."

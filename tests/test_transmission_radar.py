@@ -237,7 +237,7 @@ def test_graph_data_freshness_fields():
     init_transmission_db(conn)
     seed_default_transmission_baskets(conn)
 
-    payload = get_transmission_graph_payload("AI_INFRA_HARDWARE", conn)
+    payload = get_transmission_graph_payload("AI_INFRA_HARDWARE", conn, auto_sync=False)
     assert payload["status"] == "ok"
     assert "data_freshness" in payload
     df = payload["data_freshness"]
@@ -408,6 +408,36 @@ def test_cdmo_topology():
         "NEULANDLAB.NS", "CONCORDBIO.NS", "BLUEJET.NS", "AMIORG.NS", "JUBLPHARMA.NS", "ANUPAM.NS"
     }
     assert expected_nodes == node_ids
+
+
+def test_cdmo_gate1_evaluation():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    # Insert snapshots for LLY and Tier 1 anchors
+    conn.execute(
+        "INSERT INTO transmission_snapshots (node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct) "
+        "VALUES ('LLY', 900.0, 1.5, 2.0, 4.2)"
+    )
+    conn.execute(
+        "INSERT INTO transmission_snapshots (node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct) "
+        "VALUES ('NVO', 120.0, 0.5, 1.0, 2.1)"
+    )
+    conn.execute(
+        "INSERT INTO transmission_snapshots (node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct) "
+        "VALUES ('TMO', 550.0, -0.2, 0.5, 1.0)"
+    )
+    conn.commit()
+
+    payload = get_transmission_graph_payload("GLOBAL_CDMO_PEPTIDE_CASCADE", conn, auto_sync=False)
+    assert payload["status"] == "ok"
+    gates = payload["reentry_gates"]
+    gate1 = gates["us_anchor_stabilization"]
+    assert gate1["status"] == "PASS"
+    assert "LLY" in gate1["detail"]
+
 
 
 
