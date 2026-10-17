@@ -137,19 +137,28 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
     );
     """)
 
-    # 2. Nodes (10 nodes per spec §4) — Valuations start NULL and are dynamically hydrated from live market fundamentals
+    # 2. Nodes (18 nodes across AI Hardware, Power Deficit, Grid Electrification, & Liquid Cooling)
+    # Valuations start NULL and are dynamically hydrated from live market fundamentals
     nodes = [
         # (node_id, basket_id, symbol, name, market, role, product_lineage, circuit_band_pct, trailing_pe, forward_pe, price_to_sales, is_turnaround, tier_column)
         ("BE", "AI_INFRA_HARDWARE", "BE", "Bloom Energy", "US", "GLOBAL_ANCHOR", "Solid Oxide Fuel Cell Hot Boxes & Manifolds", None, None, None, None, 0, 1),
         ("NVDA_CLUSTER", "AI_INFRA_HARDWARE", "NVDA", "Nvidia / CoreWeave Capex", "US", "GLOBAL_ANCHOR", "GPU Parallel Compute & Intra-cluster 64x Optical Density", None, None, None, None, 0, 1),
         ("CIEN", "AI_INFRA_HARDWARE", "CIEN", "Ciena Corp", "US", "GLOBAL_ANCHOR", "Optical Transceiver & Data Center Interconnect Comps", None, None, None, None, 0, 1),
         ("GLW", "AI_INFRA_HARDWARE", "GLW", "Corning Inc", "US", "GLOBAL_ANCHOR", "Global Optical Fiber Glass & Pricing Power", None, None, None, None, 0, 1),
-        ("DIXON.NS", "AI_INFRA_HARDWARE", "DIXON.NS", "Dixon Technologies", "NSE", "ORBIT_PEER", "Electronics Manufacturing Services (EMS) Sector Leader", None, None, None, None, 0, 2),
-        ("STLTECH.NS", "AI_INFRA_HARDWARE", "STLTECH.NS", "Sterlite Technologies", "NSE", "PRIMARY_LEADER", "Ultra-density Optical Ribbons & Hyperscaler Fiber Exports", None, None, None, None, 1, 2),
+        ("VRT", "AI_INFRA_HARDWARE", "VRT", "Vertiv Holdings", "US", "GLOBAL_ANCHOR", "Direct-to-Chip (D2C) Liquid Cooling & Thermal Management", None, None, None, None, 0, 1),
+        ("ETN", "AI_INFRA_HARDWARE", "ETN", "Eaton Corp", "US", "GLOBAL_ANCHOR", "Intelligent Power Management & High Voltage Switchgear", None, None, None, None, 0, 1),
+        ("GEV", "AI_INFRA_HARDWARE", "GEV", "GE Vernova", "US", "GLOBAL_ANCHOR", "Grid Electrification, Gas Turbines & Transformer Backbone", None, None, None, None, 0, 1),
+        ("DIXON.NS", "AI_INFRA_HARDWARE", "DIXON.NS", "Dixon Technologies", "NSE", "ORBIT_PEER", "Electronics Manufacturing Services (EMS) Sector Leader", 20.0, None, None, None, 0, 2),
+        ("STLTECH.NS", "AI_INFRA_HARDWARE", "STLTECH.NS", "Sterlite Technologies", "NSE", "PRIMARY_LEADER", "Ultra-density Optical Ribbons & Hyperscaler Fiber Exports", 20.0, None, None, None, 1, 2),
+        ("APARINDS.NS", "AI_INFRA_HARDWARE", "APARINDS.NS", "Apar Industries", "NSE", "PRIMARY_LEADER", "World's Largest HTLS Conductor & Heavy Power Cable Exporter", 20.0, None, None, None, 0, 2),
+        ("POWERINDIA.NS", "AI_INFRA_HARDWARE", "POWERINDIA.NS", "Hitachi Energy India", "NSE", "PRIMARY_LEADER", "Extra High Voltage (EHV) Transformers & GIS Substations", 20.0, None, None, None, 0, 2),
         ("HFCL.NS", "AI_INFRA_HARDWARE", "HFCL.NS", "HFCL Ltd", "NSE", "HIGH_BETA_FOLLOWER", "Domestic Telecom Hardware, BharatNet & Optical Sympathy", 10.0, None, None, None, 0, 3),
         ("MTARTECH.NS", "AI_INFRA_HARDWARE", "MTARTECH.NS", "MTAR Technologies", "NSE", "INDEPENDENT", "SOFC Power Hot Boxes, Hydrogen Manifolds & Aerospace Precision", 5.0, None, None, None, 0, 3),
         ("SYRMA.NS", "AI_INFRA_HARDWARE", "SYRMA.NS", "Syrma SGS Technology", "NSE", "ORBIT_PEER", "EMS Box-builds, PCBA Assemblies & Industrial Electronics", 10.0, None, None, None, 0, 3),
         ("AEROFLEX.NS", "AI_INFRA_HARDWARE", "AEROFLEX.NS", "Aeroflex Industries", "NSE", "HIGH_BETA_FOLLOWER", "Secondary Fluid Network (SFN) Stainless Liquid Cooling Hoses", 10.0, None, None, None, 0, 3),
+        ("VOLTAMP.NS", "AI_INFRA_HARDWARE", "VOLTAMP.NS", "Voltamp Transformers", "NSE", "ORBIT_PEER", "Industrial & Data Center Substation Transformers", 5.0, None, None, None, 0, 3),
+        ("TARIL.NS", "AI_INFRA_HARDWARE", "TARIL.NS", "Transformers and Rectifiers (India)", "NSE", "HIGH_BETA_FOLLOWER", "High-Capacity Power & Distribution Transformers", 5.0, None, None, None, 0, 3),
+        ("SCHNEIDER.NS", "AI_INFRA_HARDWARE", "SCHNEIDER.NS", "Schneider Electric Infrastructure", "NSE", "HIGH_BETA_FOLLOWER", "Medium Voltage Data Center Distribution & Switchgear", 5.0, None, None, None, 0, 3),
     ]
 
     for n in nodes:
@@ -161,7 +170,7 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, n)
 
-    # 3. Directed Edges (8 edges per spec §4)
+    # 3. Directed Edges (17 edges mapping physical bottlenecks and transmission mechanisms)
     edges = [
         # (edge_id, basket_id, src, target, catalyst, bottleneck, mechanism, impact_level, lag_hours, elasticity)
         ("BE_MTAR", "AI_INFRA_HARDWARE", "BE", "MTARTECH.NS",
@@ -176,6 +185,14 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "GPU Thermal Dissipation Demand", "SFN Stainless Liquid Cooling Lines",
          "40kW-100kW+ rack liquid cooling shifts procurement toward specialized stainless hose assemblies.",
          "HIGH", 0, 1.80),
+        ("NVDA_VRT", "AI_INFRA_HARDWARE", "NVDA_CLUSTER", "VRT",
+         "Rack Power Density >100kW", "Direct-to-Chip Thermal Management",
+         "Next-gen Blackwell/Rubin GPU clusters require 100% liquid cooling, locking Vertiv into data center architectures.",
+         "CRITICAL", 0, 2.20),
+        ("VRT_AEROFLEX", "AI_INFRA_HARDWARE", "VRT", "AEROFLEX.NS",
+         "Thermal Rack Liquid Cooling", "Secondary Fluid Lines",
+         "40kW-100kW+ rack D2C cooling shifts procurement to specialized stainless hose assemblies.",
+         "HIGH", 0, 2.10),
         ("CIEN_STLTECH", "AI_INFRA_HARDWARE", "CIEN", "STLTECH.NS",
          "Optical Transceiver Earnings Beat", "Data Center Optical Links",
          "Ciena hardware beats serve as direct leading demand confirmation for fiber suppliers.",
@@ -196,6 +213,34 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
          "EMS Peer Institutional Bid", "EMS / PCBA Sector Multiple Spillover",
          "Institutional momentum in Dixon triggers afternoon sympathy bids in Syrma SGS.",
          "HIGH", 0, 1.20),
+        ("ETN_POWERINDIA", "AI_INFRA_HARDWARE", "ETN", "POWERINDIA.NS",
+         "High-Voltage Grid Architecture", "EHV Substations & Transformers",
+         "Eaton power distribution orders reflect global substation capacity shortages, driving Hitachi Energy India backlog.",
+         "CRITICAL", 0, 1.75),
+        ("GEV_APARINDS", "AI_INFRA_HARDWARE", "GEV", "APARINDS.NS",
+         "Grid Electrification Capex", "HTLS Heavy Transmission Conductors",
+         "GE Vernova turbine and grid demand drives heavy export volumes for Apar HTLS reconductoring.",
+         "HIGH", 0, 1.60),
+        ("ETN_SCHNEIDER", "AI_INFRA_HARDWARE", "ETN", "SCHNEIDER.NS",
+         "Switchgear & Substation Demand", "Domestic Switchgear Proxies",
+         "Global switchgear backlogs lift domestic medium-voltage infrastructure valuation multiples.",
+         "MODERATE", 24, 1.45),
+        ("POWERINDIA_VOLTAMP", "AI_INFRA_HARDWARE", "POWERINDIA.NS", "VOLTAMP.NS",
+         "Transformer Capacity Spillover", "Industrial Substation Transformers",
+         "Lead-time elongation at Tier 1 transformer OEMs diverts industrial buyers to Voltamp.",
+         "HIGH", 24, 1.35),
+        ("POWERINDIA_TARIL", "AI_INFRA_HARDWARE", "POWERINDIA.NS", "TARIL.NS",
+         "EHV Transformer Supply Deficit", "High-Beta Transformer Backlog",
+         "Hitachi Energy order book expansion spills over into retail and institutional momentum for Transformers & Rectifiers.",
+         "CRITICAL", 24, 1.85),
+        ("GEV_POWERINDIA", "AI_INFRA_HARDWARE", "GEV", "POWERINDIA.NS",
+         "Global Grid Electrification", "EHV Power Transmission Equipment",
+         "Vernova electrification guide raises directly validate Hitachi Energy high-voltage equipment pipeline.",
+         "HIGH", 0, 1.50),
+        ("BE_POWERINDIA", "AI_INFRA_HARDWARE", "BE", "POWERINDIA.NS",
+         "Behind-the-Meter Substation Interconnect", "Substation Interconnect Transformers",
+         "Bloom fuel cell microgrids require dedicated step-up transformers and switchgear interconnects.",
+         "HIGH", 24, 1.30),
     ]
 
     for e in edges:

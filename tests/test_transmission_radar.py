@@ -30,6 +30,34 @@ from earnings_engine.data.transmission_schema import (
 # Task 1 Tests: Schema, Seed Data, Snapshot Retention & Turso Sync
 # ============================================================================
 
+def test_expanded_topology():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    nodes, edges = get_basket_graph_raw("AI_INFRA_HARDWARE", conn)
+    node_ids = {n["node_id"] for n in nodes}
+    edge_ids = {e["edge_id"] for e in edges}
+
+    # Verify all 18 nodes are present
+    expected_new_nodes = {
+        "VRT", "ETN", "GEV", "APARINDS.NS", "POWERINDIA.NS",
+        "VOLTAMP.NS", "TARIL.NS", "SCHNEIDER.NS"
+    }
+    assert expected_new_nodes.issubset(node_ids), f"Missing nodes: {expected_new_nodes - node_ids}"
+    assert len(nodes) == 18
+
+    # Verify new key edges are present
+    expected_new_edges = {
+        "VRT_AEROFLEX", "ETN_POWERINDIA", "GEV_APARINDS",
+        "ETN_SCHNEIDER", "POWERINDIA_VOLTAMP", "POWERINDIA_TARIL",
+        "GEV_POWERINDIA", "NVDA_VRT", "BE_POWERINDIA"
+    }
+    assert expected_new_edges.issubset(edge_ids), f"Missing edges: {expected_new_edges - edge_ids}"
+    assert len(edges) == 17
+
+
 def test_schema_init_and_seed():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -213,7 +241,7 @@ def test_graph_data_freshness_fields():
     df = payload["data_freshness"]
     assert "oldest_snapshot_minutes" in df
     assert "has_stale_nodes" in df
-    assert len(payload["nodes"]) == 10
-    assert len(payload["edges"]) == 8
+    assert len(payload["nodes"]) == 18
+    assert len(payload["edges"]) == 17
     assert "reentry_gates" in payload
 
