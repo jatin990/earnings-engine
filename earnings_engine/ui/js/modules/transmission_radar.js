@@ -138,8 +138,8 @@
             </div>
             <div style="font-size:0.72rem;color:#a1a1aa;margin-bottom:0.45rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_esc(node.name)}</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
-                <span style="font-size:1.0rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.market === 'NSE' ? '₹' : '$'}${_fmtPrice(node.price)}</span>
-                <span style="font-size:0.8rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${_fmt(c1d)}%<span style="font-size:0.62rem;color:#71717a;font-weight:400;"> 1D</span></span>
+                <span style="font-size:1.0rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—'}</span>
+                <span style="font-size:0.8rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}<span style="font-size:0.62rem;color:#71717a;font-weight:400;"> 1D</span></span>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                 ${elastLabel}
@@ -477,13 +477,14 @@
                 <span style="font-size:0.7rem;color:#71717a;">${_esc(node.role || '')} · ${_esc(node.market || '')}</span>
             </div>
             ${prodLineage}
-            ${_row('Price', (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price), true)}
-            ${_row('1D Change', `<span style="color:${pctColor};">${_fmt(c1d)}%</span>`, true)}
+            ${_row('Price', node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—', true)}
+            ${_row('1D Change', c1d != null ? `<span style="color:${pctColor};">${_fmt(c1d)}%</span>` : '—', true)}
             ${_row('5D Change', node.change_5d_pct != null ? `${_fmt(node.change_5d_pct)}%` : '—', true)}
             ${_row('20D Change', node.change_20d_pct != null ? `${_fmt(node.change_20d_pct)}%` : '—', true)}
             ${_row('Trailing P/E', node.trailing_pe != null ? Number(node.trailing_pe).toFixed(1) + '×' : '—', true)}
             ${_row('Forward P/E', node.forward_pe != null ? Number(node.forward_pe).toFixed(1) + '×' : '—', true)}
             ${_row('Price/Sales', node.price_to_sales != null ? Number(node.price_to_sales).toFixed(1) + '×' : '—', true)}
+            ${_row('Institutional Holding', node.institutional_holding_pct != null ? Number(node.institutional_holding_pct).toFixed(1) + '%' : '—', true)}
             ${_row('Elasticity Ratio', elast, true)}
             ${_row('Circuit Status', circuit)}
             ${_row('Delivery %', node.delivery_pct != null ? Number(node.delivery_pct).toFixed(1) + '%' : '—', true)}

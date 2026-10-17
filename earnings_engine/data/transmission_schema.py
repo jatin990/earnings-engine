@@ -137,19 +137,19 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
     );
     """)
 
-    # 2. Nodes (10 nodes per spec §4)
+    # 2. Nodes (10 nodes per spec §4) — Valuations start NULL and are dynamically hydrated from live market fundamentals
     nodes = [
         # (node_id, basket_id, symbol, name, market, role, product_lineage, circuit_band_pct, trailing_pe, forward_pe, price_to_sales, is_turnaround, tier_column)
-        ("BE", "AI_INFRA_HARDWARE", "BE", "Bloom Energy", "US", "GLOBAL_ANCHOR", "Solid Oxide Fuel Cell Hot Boxes & Manifolds", None, 45.0, 32.0, 4.5, 0, 1),
-        ("NVDA_CLUSTER", "AI_INFRA_HARDWARE", "NVDA", "Nvidia / CoreWeave Capex", "US", "GLOBAL_ANCHOR", "GPU Parallel Compute & Intra-cluster 64x Optical Density", None, 55.0, 35.0, 22.0, 0, 1),
-        ("CIEN", "AI_INFRA_HARDWARE", "CIEN", "Ciena Corp", "US", "GLOBAL_ANCHOR", "Optical Transceiver & Data Center Interconnect Comps", None, 32.0, 24.0, 2.8, 0, 1),
-        ("GLW", "AI_INFRA_HARDWARE", "GLW", "Corning Inc", "US", "GLOBAL_ANCHOR", "Global Optical Fiber Glass & Pricing Power", None, 28.0, 20.0, 2.4, 0, 1),
-        ("DIXON.NS", "AI_INFRA_HARDWARE", "DIXON.NS", "Dixon Technologies", "NSE", "ORBIT_PEER", "Electronics Manufacturing Services (EMS) Sector Leader", None, 95.0, 65.0, 5.2, 0, 2),
-        ("STLTECH.NS", "AI_INFRA_HARDWARE", "STLTECH.NS", "Sterlite Technologies", "NSE", "PRIMARY_LEADER", "Ultra-density Optical Ribbons & Hyperscaler Fiber Exports", None, 112.0, 28.0, 1.2, 1, 2),
-        ("HFCL.NS", "AI_INFRA_HARDWARE", "HFCL.NS", "HFCL Ltd", "NSE", "HIGH_BETA_FOLLOWER", "Domestic Telecom Hardware, BharatNet & Optical Sympathy", 10.0, 58.0, 38.0, 2.1, 0, 3),
-        ("MTARTECH.NS", "AI_INFRA_HARDWARE", "MTARTECH.NS", "MTAR Technologies", "NSE", "INDEPENDENT", "SOFC Power Hot Boxes, Hydrogen Manifolds & Aerospace Precision", 5.0, 168.0, 72.0, 9.8, 0, 3),
-        ("SYRMA.NS", "AI_INFRA_HARDWARE", "SYRMA.NS", "Syrma SGS Technology", "NSE", "ORBIT_PEER", "EMS Box-builds, PCBA Assemblies & Industrial Electronics", 10.0, 88.0, 46.0, 4.2, 0, 3),
-        ("AEROFLEX.NS", "AI_INFRA_HARDWARE", "AEROFLEX.NS", "Aeroflex Industries", "NSE", "HIGH_BETA_FOLLOWER", "Secondary Fluid Network (SFN) Stainless Liquid Cooling Hoses", 10.0, 62.0, 40.0, 7.5, 0, 3),
+        ("BE", "AI_INFRA_HARDWARE", "BE", "Bloom Energy", "US", "GLOBAL_ANCHOR", "Solid Oxide Fuel Cell Hot Boxes & Manifolds", None, None, None, None, 0, 1),
+        ("NVDA_CLUSTER", "AI_INFRA_HARDWARE", "NVDA", "Nvidia / CoreWeave Capex", "US", "GLOBAL_ANCHOR", "GPU Parallel Compute & Intra-cluster 64x Optical Density", None, None, None, None, 0, 1),
+        ("CIEN", "AI_INFRA_HARDWARE", "CIEN", "Ciena Corp", "US", "GLOBAL_ANCHOR", "Optical Transceiver & Data Center Interconnect Comps", None, None, None, None, 0, 1),
+        ("GLW", "AI_INFRA_HARDWARE", "GLW", "Corning Inc", "US", "GLOBAL_ANCHOR", "Global Optical Fiber Glass & Pricing Power", None, None, None, None, 0, 1),
+        ("DIXON.NS", "AI_INFRA_HARDWARE", "DIXON.NS", "Dixon Technologies", "NSE", "ORBIT_PEER", "Electronics Manufacturing Services (EMS) Sector Leader", None, None, None, None, 0, 2),
+        ("STLTECH.NS", "AI_INFRA_HARDWARE", "STLTECH.NS", "Sterlite Technologies", "NSE", "PRIMARY_LEADER", "Ultra-density Optical Ribbons & Hyperscaler Fiber Exports", None, None, None, None, 1, 2),
+        ("HFCL.NS", "AI_INFRA_HARDWARE", "HFCL.NS", "HFCL Ltd", "NSE", "HIGH_BETA_FOLLOWER", "Domestic Telecom Hardware, BharatNet & Optical Sympathy", 10.0, None, None, None, 0, 3),
+        ("MTARTECH.NS", "AI_INFRA_HARDWARE", "MTARTECH.NS", "MTAR Technologies", "NSE", "INDEPENDENT", "SOFC Power Hot Boxes, Hydrogen Manifolds & Aerospace Precision", 5.0, None, None, None, 0, 3),
+        ("SYRMA.NS", "AI_INFRA_HARDWARE", "SYRMA.NS", "Syrma SGS Technology", "NSE", "ORBIT_PEER", "EMS Box-builds, PCBA Assemblies & Industrial Electronics", 10.0, None, None, None, 0, 3),
+        ("AEROFLEX.NS", "AI_INFRA_HARDWARE", "AEROFLEX.NS", "Aeroflex Industries", "NSE", "HIGH_BETA_FOLLOWER", "Secondary Fluid Network (SFN) Stainless Liquid Cooling Hoses", 10.0, None, None, None, 0, 3),
     ]
 
     for n in nodes:
@@ -206,33 +206,6 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
             lag_window_hours, elasticity_multiplier
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, e)
-
-    # 4. Seed initial baseline snapshots ONLY if table is empty
-    cur.execute("SELECT COUNT(*) FROM transmission_snapshots;")
-    snap_count = cur.fetchone()[0]
-    if snap_count == 0:
-        initial_snapshots = [
-            ("BE", 221.76, -5.23, -15.82, -19.81, None, None, 1.15, 1.15, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-            ("NVDA_CLUSTER", 214.88, -0.85, -5.97, -6.11, None, None, 1.05, 1.05, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-            ("CIEN", 334.87, -5.64, -16.37, -9.14, None, None, 0.95, 0.95, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-            ("GLW", 133.03, -3.04, -10.44, -16.69, None, None, 0.90, 0.90, 0, None, "NORMAL", None, "N/A (Anchor)", "NONE", "EOD"),
-            ("DIXON.NS", 12322.0, -2.72, -2.67, -7.62, 38.5, 25000, 1.85, 1.85, 0, 18.5, "NORMAL", 1.73, "NORMAL", "NONE", "EOD"),
-            ("STLTECH.NS", 868.85, -1.09, -13.98, 0.47, 22.1, 45000, 1.25, 1.25, 0, 12.4, "NORMAL", None, "N/A (Turnaround)", "NONE", "EOD"),
-            ("HFCL.NS", 256.01, 5.00, -3.57, 14.36, 18.4, 65000, 2.45, 2.45, 0, 14.8, "NORMAL", 1.05, "NORMAL", "LEADER_DUMP_FOLLOWER_PUMP", "EOD"),
-            ("MTARTECH.NS", 7065.0, -3.07, -8.37, 1.70, 45.2, 0, 0.85, 0.85, 0, 3.2, "NORMAL", 3.05, "EXTREME", "VALUATION_ELASTICITY_TRAP", "EOD"),
-            ("SYRMA.NS", 1596.6, -5.47, -7.27, 5.90, 32.0, 38000, 1.35, 1.35, 0, 15.2, "NORMAL", 1.60, "NORMAL", "NONE", "EOD"),
-            ("AEROFLEX.NS", 526.0, 3.51, -8.46, 3.62, 26.5, 22000, 1.10, 1.10, 0, 12.0, "NORMAL", 1.13, "NORMAL", "NONE", "EOD"),
-        ]
-
-        for s in initial_snapshots:
-            cur.execute("""
-            INSERT INTO transmission_snapshots (
-                node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct,
-                delivery_pct, bid_qty_total, volume_multiple_20d, volume_velocity_ratio,
-                intraday_volume_velocity_flag, distance_to_lower_circuit_pct,
-                circuit_status, elasticity_ratio, elasticity_label, anomaly_flag, data_mode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """, s)
 
     conn.commit()
 

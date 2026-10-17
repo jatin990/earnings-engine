@@ -73,7 +73,7 @@ def compute_circuit_proximity(
     lower_circuit = 100.0 / (1.0 + circuit_band_pct / 100.0) when reference_close is 100.0.
     If price is near lower circuit (e.g. 95.24), distance = (price - 95.238) / price ~ 0%.
     """
-    if circuit_band_pct is None or circuit_band_pct <= 0 or price <= 0:
+    if circuit_band_pct is None or circuit_band_pct <= 0 or price is None or price <= 0:
         return None, "NORMAL"
 
     ref = reference_close if reference_close is not None and reference_close > 0 else 100.0
@@ -188,6 +188,61 @@ def compute_shockwave_bfs(
     return results
 
 
+def sync_transmission_fundamentals(
+    conn: sqlite3.Connection,
+    basket_id: str = "AI_INFRA_HARDWARE",
+    force: bool = False,
+) -> int:
+    """Fetch authentic valuation metrics (trailing P/E, forward P/E, P/S, institutional holding %)
+    directly from authoritative live market fundamentals (yfinance) and update transmission_nodes.
+    Zero mock fallback.
+    """
+    import yfinance as yf
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT node_id, symbol, trailing_pe
+        FROM transmission_nodes
+        WHERE basket_id = ? AND is_active = 1
+        """,
+        (basket_id,),
+    )
+    nodes = cur.fetchall()
+    updated_count = 0
+    for node_id, symbol, tpe in nodes:
+        if not force and tpe is not None and tpe > 0:
+            continue
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info or {}
+            real_tpe = info.get("trailingPE")
+            real_fpe = info.get("forwardPE")
+            real_ps = info.get("priceToSalesTrailing12Months")
+            inst = info.get("heldPercentInstitutions")
+            inst_pct = round(inst * 100.0, 2) if inst is not None else None
+            tpe_val = round(real_tpe, 2) if real_tpe is not None and real_tpe > 0 else None
+            fpe_val = round(real_fpe, 2) if real_fpe is not None and real_fpe > 0 else None
+            ps_val = round(real_ps, 2) if real_ps is not None and real_ps > 0 else None
+
+            cur.execute(
+                """
+                UPDATE transmission_nodes
+                SET trailing_pe = ?,
+                    forward_pe = ?,
+                    price_to_sales = ?,
+                    institutional_holding_pct = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE node_id = ?;
+                """,
+                (tpe_val, fpe_val, ps_val, inst_pct, node_id),
+            )
+            updated_count += 1
+        except Exception as exc:
+            logger.warning("[TRANSMISSION] Failed to fetch fundamentals for %s (%s): %s", node_id, symbol, exc)
+    conn.commit()
+    return updated_count
+
+
 def sync_transmission_snapshots(
     conn: sqlite3.Connection,
     basket_id: str = "AI_INFRA_HARDWARE",
@@ -205,6 +260,9 @@ def sync_transmission_snapshots(
     if settings is None:
         settings = Settings()
 
+    # 1. Sync live fundamentals into nodes if missing or forced
+    sync_transmission_fundamentals(conn, basket_id=basket_id, force=force)
+
     cur = conn.cursor()
     cur.execute(
         """
@@ -220,6 +278,22 @@ def sync_transmission_snapshots(
 
     anchor_pes = [r[4] for r in nodes if r[2] == "GLOBAL_ANCHOR" and r[4] and r[4] > 0]
     default_anchor_pe = anchor_pes[0] if anchor_pes else 55.0
+
+    # Build pairwise anchor map from incoming edges
+    cur.execute(
+        """
+        SELECT e.target_node_id, n.trailing_pe
+        FROM transmission_edges e
+        JOIN transmission_nodes n ON e.source_node_id = n.node_id
+        WHERE e.basket_id = ? AND n.trailing_pe IS NOT NULL AND n.trailing_pe > 0
+        ORDER BY e.elasticity_multiplier DESC
+        """,
+        (basket_id,),
+    )
+    edge_anchor_map: dict[str, float] = {}
+    for target_id, source_pe in cur.fetchall():
+        if target_id not in edge_anchor_map and source_pe:
+            edge_anchor_map[target_id] = float(source_pe)
 
     synced_count = 0
     for node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround in nodes:
@@ -256,11 +330,12 @@ def sync_transmission_snapshots(
             ref_close = float(closes.iloc[-2]) if len(closes) >= 2 else None
             dist_lc, c_status = compute_circuit_proximity(current_price, circuit_band_pct, reference_close=ref_close)
 
+            target_anchor_pe = edge_anchor_map.get(node_id, default_anchor_pe)
             if role == "GLOBAL_ANCHOR":
                 e_ratio, e_label = None, "N/A (Anchor)"
             else:
                 e_ratio, e_label = compute_valuation_elasticity(
-                    trailing_pe, default_anchor_pe, is_turnaround=bool(is_turnaround)
+                    trailing_pe, target_anchor_pe, is_turnaround=bool(is_turnaround)
                 )
 
             anom_flag = detect_delivery_divergence(None, vol_mult, None, data_mode="EOD")
@@ -373,6 +448,14 @@ def get_transmission_graph_payload(
 
     default_anchor_pe = anchor_pe_map.get("BE") or (list(anchor_pe_map.values())[0] if anchor_pe_map else 45.0)
 
+    # Build incoming anchor mapping from raw_edges for direct pairwise elasticity
+    incoming_anchor_map: dict[str, str] = {}
+    for e in raw_edges:
+        src = e.get("source_node_id")
+        tgt = e.get("target_node_id")
+        if src in anchor_pe_map and tgt not in incoming_anchor_map:
+            incoming_anchor_map[tgt] = src
+
     for n in raw_nodes:
         node_id = n["node_id"]
         # Fetch latest snapshot
@@ -396,13 +479,13 @@ def get_transmission_graph_payload(
                 e_ratio, e_label, anom_flag, d_mode, created_at_val
             ) = snap
         else:
-            price = 100.0
-            c1d = 0.0
+            price = None
+            c1d = None
             c5d = None
             c20d = None
             deliv = None
             bid_qty = None
-            vol_mult = 1.0
+            vol_mult = None
             vol_vel = None
             intraday_vel_flag = 0
             dist_lc = None
@@ -411,33 +494,40 @@ def get_transmission_graph_payload(
             e_label = "N/A"
             anom_flag = "NONE"
             d_mode = "EOD"
-            created_at_val = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+            created_at_val = None
 
         # Parse timestamp & calculate age
-        try:
-            if isinstance(created_at_val, str):
-                # SQLite CURRENT_TIMESTAMP is UTC 'YYYY-MM-DD HH:MM:SS'
-                ts = datetime.fromisoformat(created_at_val.replace("Z", "")).replace(tzinfo=timezone.utc)
-                age_mins = max(0, int((now_utc - ts).total_seconds() / 60))
-                snapshot_as_of_utc = ts.isoformat()
-            else:
+        if created_at_val:
+            try:
+                if isinstance(created_at_val, str):
+                    # SQLite CURRENT_TIMESTAMP is UTC 'YYYY-MM-DD HH:MM:SS'
+                    ts = datetime.fromisoformat(created_at_val.replace("Z", "")).replace(tzinfo=timezone.utc)
+                    age_mins = max(0, int((now_utc - ts).total_seconds() / 60))
+                    snapshot_as_of_utc = ts.isoformat()
+                else:
+                    age_mins = 0
+                    snapshot_as_of_utc = now_utc.isoformat()
+            except Exception:
                 age_mins = 0
                 snapshot_as_of_utc = now_utc.isoformat()
-        except Exception:
-            age_mins = 0
-            snapshot_as_of_utc = now_utc.isoformat()
-
-        node_ages.append(age_mins)
-        is_node_stale = age_mins > stale_limit_minutes
+            node_ages.append(age_mins)
+            is_node_stale = age_mins > stale_limit_minutes
+        else:
+            age_mins = None
+            snapshot_as_of_utc = None
+            is_node_stale = True
 
         # Compute dynamic values if not already populated or refresh them
         is_turnaround = bool(n.get("is_turnaround"))
         trailing_pe = n.get("trailing_pe")
+        target_anchor_id = incoming_anchor_map.get(node_id)
+        anchor_pe_for_node = anchor_pe_map.get(target_anchor_id, default_anchor_pe)
+
         if n.get("role") == "GLOBAL_ANCHOR":
             computed_ratio, computed_label = None, "N/A (Anchor)"
         else:
             computed_ratio, computed_label = compute_valuation_elasticity(
-                trailing_pe, default_anchor_pe, is_turnaround=is_turnaround
+                trailing_pe, anchor_pe_for_node, is_turnaround=is_turnaround
             )
 
         # Circuit calculation
@@ -472,6 +562,7 @@ def get_transmission_graph_payload(
             "trailing_pe": trailing_pe,
             "forward_pe": n.get("forward_pe"),
             "price_to_sales": n.get("price_to_sales"),
+            "institutional_holding_pct": n.get("institutional_holding_pct"),
             "is_turnaround": is_turnaround,
             "circuit_band_pct": circuit_band,
             "bid_qty_total": bid_qty,
@@ -487,7 +578,7 @@ def get_transmission_graph_payload(
             "snapshot_as_of_utc": snapshot_as_of_utc,
             "snapshot_age_minutes": age_mins,
             "is_stale": is_node_stale,
-            "status": "BEARISH_PULLBACK" if c1d < -2.0 else ("BULLISH_EXPANSION" if c1d > 2.0 else "NEUTRAL"),
+            "status": ("BEARISH_PULLBACK" if c1d < -2.0 else ("BULLISH_EXPANSION" if c1d > 2.0 else "NEUTRAL")) if c1d is not None else "NEUTRAL",
         }
         enriched_nodes.append(node_data)
 
@@ -594,7 +685,7 @@ def get_transmission_graph_payload(
     )
 
     oldest_age = max(node_ages) if node_ages else 0
-    has_stale = any(age > stale_limit_minutes for age in node_ages)
+    has_stale = any(age > stale_limit_minutes for age in node_ages) if node_ages else True
 
     return {
         "status": "ok",
