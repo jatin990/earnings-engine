@@ -252,6 +252,145 @@ def seed_default_transmission_baskets(conn: sqlite3.Connection) -> None:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, e)
 
+    # 4. Basket 2: GLOBAL_CDMO_PEPTIDE_CASCADE
+    cur.execute("""
+    INSERT OR IGNORE INTO transmission_baskets (
+        basket_id, name, description, macro_theme
+    ) VALUES (
+        'GLOBAL_CDMO_PEPTIDE_CASCADE',
+        'Global CDMO, Peptide & Biosecure Cascade',
+        'Cross-border transmission from US innovator and tools anchors downstream into Indian frontline CDMO leaders and high-beta peptide/fermentation proxies.',
+        'GLP-1 Capacity Deficit & US BIOSECURE Act Decoupling'
+    );
+    """)
+
+    # 5. Nodes for GLOBAL_CDMO_PEPTIDE_CASCADE (16 nodes)
+    cdmo_nodes = [
+        # Tier 1: Global Innovator Anchors & Tools Titans (US)
+        ("LLY", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LLY", "Eli Lilly", "US", "GLOBAL_ANCHOR",
+         "Tirzepatide (Mounjaro/Zepbound) GLP-1/GIP Innovator Capex", None, None, None, None, 0, 1),
+        ("NVO", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NVO", "Novo Nordisk", "US", "GLOBAL_ANCHOR",
+         "Semaglutide (Ozempic/Wegovy) GLP-1 Innovator & Fill-Finish Outsourcing", None, None, None, None, 0, 1),
+        ("TMO", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "Thermo Fisher Scientific", "US", "GLOBAL_ANCHOR",
+         "Global Biopharma R&D Funding & Bioprocessing Services Bellwether", None, None, None, None, 0, 1),
+        ("DHR", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DHR", "Danaher Corp", "US", "GLOBAL_ANCHOR",
+         "Upstream Bioprocess Filtration & Single-Use Chromatography Consumables", None, None, None, None, 0, 1),
+        ("CRL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "CRL", "Charles River Laboratories", "US", "GLOBAL_ANCHOR",
+         "Early-Stage Drug Discovery & Pre-clinical CRO Pipeline Barometer", None, None, None, None, 0, 1),
+
+        # Tier 2: Indian Frontline CDMO Leaders (NSE)
+        ("DIVISLAB.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "Divi's Laboratories", "NSE", "PRIMARY_LEADER",
+         "Custom Synthesis Titan & Complex Peptide Building Blocks", None, None, None, None, 0, 2),
+        ("SYNGENE.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SYNGENE.NS", "Syngene International", "NSE", "PRIMARY_LEADER",
+         "Full-Lifecycle Biologics & Discovery CRDMO (WuXi Decoupling Target)", None, None, None, None, 0, 2),
+        ("SUVENPHAR.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SUVENPHAR.NS", "Suven Pharma", "NSE", "PRIMARY_LEADER",
+         "High-Margin Innovator Commercial CDMO & Global PE Platform", 20.0, None, None, None, 0, 2),
+        ("LAURUSLABS.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LAURUSLABS.NS", "Laurus Labs", "NSE", "PRIMARY_LEADER",
+         "Large-Scale Chemical CDMO & Precision Microbial Fermentation", None, None, None, None, 0, 2),
+        ("PIRAMALPHI.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "PIRAMALPHI.NS", "Piramal Pharma", "NSE", "PRIMARY_LEADER",
+         "Sterile Injectables, ADCs & US/UK CDMO Facilities", None, None, None, None, 0, 2),
+
+        # Tier 3: Specialized High-Beta Proxies & Pure-Plays (NSE)
+        ("NEULANDLAB.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NEULANDLAB.NS", "Neuland Laboratories", "NSE", "HIGH_BETA_FOLLOWER",
+         "Pure-Play Commercial Peptide Custom Manufacturing (CMS)", 5.0, None, None, None, 0, 3),
+        ("CONCORDBIO.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "CONCORDBIO.NS", "Concord Biotech", "NSE", "HIGH_BETA_FOLLOWER",
+         "Precision Microbial Fermentation APIs & Immunosuppressants", 20.0, None, None, None, 0, 3),
+        ("BLUEJET.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "BLUEJET.NS", "Blue Jet Healthcare", "NSE", "HIGH_BETA_FOLLOWER",
+         "Contrast Media Intermediates & High-Intensity Sweetener CDMO", 20.0, None, None, None, 0, 3),
+        ("AMIORG.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "AMIORG.NS", "Ami Organics", "NSE", "HIGH_BETA_FOLLOWER",
+         "Advanced Regulatory Intermediates & Multi-Step Organic Synthesis", 10.0, None, None, None, 0, 3),
+        ("JUBLPHARMA.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "JUBLPHARMA.NS", "Jubilant Pharmova", "NSE", "HIGH_BETA_FOLLOWER",
+         "Radiopharma, Sterile Injectables & Allergy Immunotherapy CDMO", 20.0, None, None, None, 0, 3),
+        ("ANUPAM.NS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "ANUPAM.NS", "Anupam Rasayan", "NSE", "HIGH_BETA_FOLLOWER",
+         "Custom Chemical Synthesis & High-Barrier Fluorination Chemistries", 20.0, None, None, None, 0, 3),
+    ]
+
+    for n in cdmo_nodes:
+        cur.execute("""
+        INSERT OR IGNORE INTO transmission_nodes (
+            node_id, basket_id, symbol, name, market, role, product_lineage,
+            circuit_band_pct, trailing_pe, forward_pe, price_to_sales,
+            is_turnaround, tier_column
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, n)
+
+    # 6. Directed Edges for GLOBAL_CDMO_PEPTIDE_CASCADE (16 edges)
+    cdmo_edges = [
+        ("LLY_DIVIS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LLY", "DIVISLAB.NS",
+         "GLP-1 Commercial Ramp", "Peptide Building Blocks & Protected Amino Acids Supply",
+         "Eli Lilly commercial ramp requires massive peptide building block synthesis and custom flow chemistry from Divi's.",
+         "CRITICAL", 0, 1.85),
+        ("NVO_NEULAND", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NVO", "NEULANDLAB.NS",
+         "Peptide Outsourcing Surge", "Commercial Peptide CMS Production Backlog",
+         "Novo Nordisk API capacity deficits drive direct peptide CMS contract allocation to Neuland.",
+         "CRITICAL", 0, 2.40),
+        ("LLY_NEULAND", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LLY", "NEULANDLAB.NS",
+         "GLP-1 High-Beta Pass-Through", "Innovator Custom Manufacturing Spillovers",
+         "Lilly demand surges create industry-wide peptide supply deficit, lifting Neuland CMS valuation.",
+         "HIGH", 0, 2.10),
+        ("TMO_SYNGENE", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "SYNGENE.NS",
+         "BIOSECURE Act WuXi Displacement", "Western Pharma RFP Rotation into Western-Compliant Discovery CRDMO",
+         "Thermo Fisher biopharma backlog signals increased RFP rotation out of China into Syngene.",
+         "CRITICAL", 24, 1.75),
+        ("TMO_SUVEN", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "SUVENPHAR.NS",
+         "Western Innovator Outsourcing", "Innovator Phase II/III Molecule Synthesis & Dedicated Blocks",
+         "Global biopharma development funding recovery fuels Suven innovator CDMO commercial pipeline.",
+         "HIGH", 24, 1.65),
+        ("CRL_SYNGENE", "GLOBAL_CDMO_PEPTIDE_CASCADE", "CRL", "SYNGENE.NS",
+         "Early-Stage Biotech R&D Rebound", "Pre-clinical Pipeline Expansion & Dedicated R&D Center Capex",
+         "Charles River discovery recovery confirms inflection in early-stage biopharma research spend at Syngene.",
+         "MODERATE", 24, 1.40),
+        ("DHR_CONCORD", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DHR", "CONCORDBIO.NS",
+         "Bioprocess & Fermentation Deficit", "Large-Scale Microbial Fermentation & Downstream Purification",
+         "Danaher bioprocess equipment demand reflects global fermentation capacity constraints benefiting Concord.",
+         "HIGH", 24, 1.55),
+        ("DHR_LAURUS", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DHR", "LAURUSLABS.NS",
+         "Fermentation Capacity Reservation", "Precision Microbial Fermentation Scale-up",
+         "Bioprocess consumable demand expansion validates Laurus Bio precision fermentation commercialization.",
+         "HIGH", 24, 1.60),
+        ("NVO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "NVO", "PIRAMALPHI.NS",
+         "Sterile Fill-Finish & Injectable Deficit", "Sterile Injectable Vials, Prefilled Syringes & ADC Manufacturing",
+         "Novo Nordisk fill-finish supply crunch directs sterile injectable contracts to Piramal Pharma.",
+         "CRITICAL", 0, 1.90),
+        ("DIVIS_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "AMIORG.NS",
+         "Commercial Block Intermediate Sourcing", "Advanced Regulatory Intermediates & Multi-Step Chemistry",
+         "Divi's commercial block expansions cascade raw intermediate synthesis demand into Ami Organics.",
+         "HIGH", 24, 1.45),
+        ("DIVIS_BLUEJET", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "BLUEJET.NS",
+         "Global Innovator Intermediates", "High-Purity Contrast Media Intermediates & Niche Chemical Blocks",
+         "Custom synthesis capacity utilization at leaders directs niche intermediate contracts to Blue Jet.",
+         "MODERATE", 24, 1.35),
+        ("SYNGENE_JUBL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SYNGENE.NS", "JUBLPHARMA.NS",
+         "Sterile Facility Spillover", "US/EU Injectable & Radiopharma Contract Manufacturing",
+         "CRDMO capacity tightness across Indian leaders spills over into Jubilant sterile injectables.",
+         "MODERATE", 24, 1.30),
+        ("LAURUS_ANUPAM", "GLOBAL_CDMO_PEPTIDE_CASCADE", "LAURUSLABS.NS", "ANUPAM.NS",
+         "Complex Fluorination Reagent Demands", "High-Hazard Fluorination & Niche Agro/Pharma Synthesis",
+         "Commercial chemical scaling requires specialized high-barrier fluorination chemistries from Anupam.",
+         "MODERATE", 24, 1.40),
+        ("SUVEN_AMIORG", "GLOBAL_CDMO_PEPTIDE_CASCADE", "SUVENPHAR.NS", "AMIORG.NS",
+         "NCE Intermediate Outsourcing", "New Chemical Entity (NCE) Multi-Step Process Chemistry",
+         "Suven innovator pipeline commercialization expands advanced intermediate procurement from Ami Organics.",
+         "MODERATE", 24, 1.50),
+        ("TMO_PIRAMAL", "GLOBAL_CDMO_PEPTIDE_CASCADE", "TMO", "PIRAMALPHI.NS",
+         "Western Biopharma Services Recovery", "Sterile Fill-Finish & UK/US Clinical Trial Batch Logistics",
+         "Thermo Fisher clinical services growth mirrors Piramal Pharma sterile injectables and ADC demand.",
+         "HIGH", 24, 1.50),
+        ("DIVIS_SYNGENE", "GLOBAL_CDMO_PEPTIDE_CASCADE", "DIVISLAB.NS", "SYNGENE.NS",
+         "Indian CDMO Institutional Allocation", "FII/DII Peer Flow Rebalancing across Frontline Pharma Leaders",
+         "Institutional inflows into Divi's trigger sympathy reallocation into Syngene discovery platform.",
+         "MODERATE", 0, 1.20),
+    ]
+
+    for e in cdmo_edges:
+        cur.execute("""
+        INSERT OR IGNORE INTO transmission_edges (
+            edge_id, basket_id, source_node_id, target_node_id, catalyst_event,
+            physical_bottleneck, transmission_mechanism, impact_level,
+            lag_window_hours, elasticity_multiplier
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, e)
+
     conn.commit()
 
 

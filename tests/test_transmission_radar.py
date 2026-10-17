@@ -387,3 +387,27 @@ def test_trade_recommendation_accumulate_breakout():
     assert rec["action_color"] == "#059669"
 
 
+# ============================================================================
+# CDMO Basket Tests: GLOBAL_CDMO_PEPTIDE_CASCADE
+# ============================================================================
+
+def test_cdmo_topology():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    nodes, edges = get_basket_graph_raw("GLOBAL_CDMO_PEPTIDE_CASCADE", conn)
+    assert len(nodes) == 16
+    assert len(edges) == 16
+
+    node_ids = {n["node_id"] for n in nodes}
+    expected_nodes = {
+        "LLY", "NVO", "TMO", "DHR", "CRL",
+        "DIVISLAB.NS", "SYNGENE.NS", "SUVENPHAR.NS", "LAURUSLABS.NS", "PIRAMALPHI.NS",
+        "NEULANDLAB.NS", "CONCORDBIO.NS", "BLUEJET.NS", "AMIORG.NS", "JUBLPHARMA.NS", "ANUPAM.NS"
+    }
+    assert expected_nodes == node_ids
+
+
+
