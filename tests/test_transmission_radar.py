@@ -439,5 +439,36 @@ def test_cdmo_gate1_evaluation():
     assert "LLY" in gate1["detail"]
 
 
+def test_sync_transmission_fundamentals_cdmo(monkeypatch):
+    from unittest.mock import MagicMock
+    import yfinance as yf
+    from earnings_engine.data.transmission_radar import sync_transmission_fundamentals
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    mock_ticker = MagicMock()
+    mock_ticker.info = {
+        "trailingPE": 45.2,
+        "forwardPE": 38.0,
+        "priceToSalesTrailing12Months": 12.5,
+        "heldPercentInstitutions": 0.42,
+    }
+    monkeypatch.setattr(yf, "Ticker", lambda sym: mock_ticker)
+
+    count = sync_transmission_fundamentals(conn, basket_id="GLOBAL_CDMO_PEPTIDE_CASCADE", force=True)
+    assert count == 16
+
+    cur = conn.cursor()
+    cur.execute("SELECT trailing_pe, forward_pe, institutional_holding_pct FROM transmission_nodes WHERE node_id = 'LLY'")
+    row = cur.fetchone()
+    assert row[0] == 45.2
+    assert row[1] == 38.0
+    assert row[2] == 42.0
+
+
+
 
 
