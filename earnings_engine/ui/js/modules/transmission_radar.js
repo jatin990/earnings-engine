@@ -497,7 +497,11 @@
             _state.nodes     = data.nodes || [];
             _state.edges     = data.edges || [];
 
-            // Theme label
+            // Theme label & select sync
+            const selectEl = document.getElementById('transmissionBasketSelect');
+            if (selectEl && selectEl.value !== basketId) {
+                selectEl.value = basketId;
+            }
             const themeEl = document.getElementById('transmissionThemeLabel');
             if (themeEl && data.basket) themeEl.textContent = data.basket.macro_theme || '';
 
