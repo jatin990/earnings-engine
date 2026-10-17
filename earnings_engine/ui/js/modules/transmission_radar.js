@@ -22,6 +22,7 @@
         animationFrameId: null,
         selectedNodeId: null,
         isLoading: false,
+        tradeMatrixFilter: 'ALL',
     };
 
     // Animation constants
@@ -122,6 +123,10 @@
             ? `<span style="color:#a1a1aa;font-size:0.68rem;">${_esc(node.elasticity_label)}</span>`
             : '';
 
+        const actionBadge = (node.trade_action && node.trade_action.action)
+            ? `<span style="font-size:0.62rem;font-weight:800;color:${node.trade_action.action_color};background:${node.trade_action.action_color}18;border:1px solid ${node.trade_action.action_color}35;padding:0.1rem 0.35rem;border-radius:3px;">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
+            : '';
+
         return `<div class="tm-node-card" id="tm-card-${_esc(node.node_id)}"
                      data-node-id="${_esc(node.node_id)}"
                      onclick="window.transmissionRadar.openDrawer('${_esc(node.node_id)}')"
@@ -141,7 +146,8 @@
                 <span style="font-size:1.0rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—'}</span>
                 <span style="font-size:0.8rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}<span style="font-size:0.62rem;color:#71717a;font-weight:400;"> 1D</span></span>
             </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                ${actionBadge}
                 ${elastLabel}
                 ${anomBadge}
             </div>
@@ -223,6 +229,99 @@
             opt.textContent = `${n.symbol} (${n.node_id}) — ${n.role}`;
             sel.appendChild(opt);
         }
+    }
+
+    function _renderTradeActionMatrix(nodes) {
+        const tbody = document.getElementById('transmissionTradeActionBody');
+        if (!tbody) return;
+
+        let filtered = nodes || [];
+        const f = _state.tradeMatrixFilter || 'ALL';
+        if (f === 'BUYS') {
+            filtered = filtered.filter(n => ['STRONG_BUY_DIP', 'ACCUMULATE_BREAKOUT', 'HOLD_MOMENTUM'].includes(n.trade_action?.action));
+        } else if (f === 'RISK') {
+            filtered = filtered.filter(n => ['TRIM_CIRCUIT_RISK', 'FADE_VALUATION_TRAP'].includes(n.trade_action?.action));
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:#71717a;">No assets match filter: ${_esc(f)}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(node => {
+            const act = node.trade_action || { action: 'NEUTRAL_WATCH', action_color: '#a1a1aa', rationale: 'Consolidation', key_risk: 'None' };
+            const c1d = Number(node.change_1d_pct ?? 0);
+            const pctColor = c1d > 0 ? '#34d399' : c1d < 0 ? '#f87171' : '#a1a1aa';
+            const priceStr = node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—';
+
+            // Elasticity badge
+            const elastLabel = node.elasticity_label || '—';
+            const elastRatio = node.elasticity_ratio != null ? `${Number(node.elasticity_ratio).toFixed(2)}×` : '—';
+            const elastColor = (elastLabel === 'EXTREME') ? '#ef4444' : (elastLabel === 'ELEVATED') ? '#f59e0b' : (elastLabel === 'DISCOUNTED') ? '#10b981' : '#a1a1aa';
+
+            // Circuit & Inst
+            const circuitText = (node.circuit_status && node.circuit_status !== 'STABLE')
+                ? `<span style="color:${_circuitColors(node.circuit_status)};font-weight:700;">${_esc(node.circuit_status)}</span>`
+                : `<span style="color:#34d399;">STABLE</span>`;
+            const distText = node.distance_to_lower_circuit_pct != null ? `${Number(node.distance_to_lower_circuit_pct).toFixed(1)}% to band` : '';
+            const instHolding = node.institutional_holding_pct != null
+                ? `<span style="${node.institutional_holding_pct < 10 ? 'color:#f59e0b;font-weight:700;' : 'color:#d4d4d8;'}">${Number(node.institutional_holding_pct).toFixed(1)}% Inst</span>`
+                : '—';
+
+            // Top catalyst
+            const topCat = (node.catalysts && node.catalysts.length > 0) ? node.catalysts[0] : null;
+            let catHtml = `<span style="color:#52525b;font-style:italic;">No filings on record</span>`;
+            if (topCat) {
+                const catBadgeBg = topCat.category === 'ORDER_WIN' ? 'rgba(16,185,129,0.15)' : topCat.category === 'EARNINGS_BEAT' ? 'rgba(59,130,246,0.15)' : 'rgba(234,179,8,0.15)';
+                const catBadgeColor = topCat.category === 'ORDER_WIN' ? '#34d399' : topCat.category === 'EARNINGS_BEAT' ? '#60a5fa' : '#facc15';
+                const extraVal = topCat.order_value_cr ? ` · ₹${topCat.order_value_cr} Cr` : (topCat.details ? ` · ${topCat.details}` : '');
+                catHtml = `
+                    <div style="display:flex;flex-direction:column;gap:0.15rem;">
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="background:${catBadgeBg};color:${catBadgeColor};border:1px solid ${catBadgeColor}33;padding:0.05rem 0.35rem;border-radius:3px;font-size:0.62rem;font-weight:700;">${_esc(topCat.category)}</span>
+                            <span style="color:#71717a;font-size:0.65rem;">${_esc(topCat.published_at || '')}${extraVal}</span>
+                        </div>
+                        <div style="color:#e4e4e7;font-size:0.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_esc(topCat.title)}">${_esc(topCat.title)}</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;" onclick="window.transmissionRadar.openDrawer('${_esc(node.node_id)}')">
+                    <td style="padding: 0.65rem 0.8rem;">
+                        <div style="display:flex;align-items:center;gap:0.4rem;">
+                            <span style="font-weight:800;color:#f8fafc;font-size:0.85rem;">${_esc(node.symbol)}</span>
+                            <span style="color:#71717a;font-size:0.65rem;">${_esc(node.market || '')}</span>
+                        </div>
+                        <div style="font-size:0.68rem;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;" title="${_esc(node.product_lineage || node.name)}">${_esc(node.product_lineage || node.name)}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem;">
+                        <span style="background:${act.action_color}18;color:${act.action_color};border:1px solid ${act.action_color}44;padding:0.18rem 0.5rem;border-radius:4px;font-size:0.68rem;font-weight:800;font-family:var(--font-mono);letter-spacing:0.02em;">
+                            ${_esc(act.action.replace(/_/g, ' '))}
+                        </span>
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem; font-family:var(--font-mono);">
+                        <div style="font-weight:700;color:#f8fafc;">${priceStr}</div>
+                        <div style="color:${pctColor};font-size:0.7rem;font-weight:700;">${c1d != null ? _fmt(c1d) + '%' : '—'}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem; font-family:var(--font-mono);">
+                        <div style="color:${elastColor};font-weight:700;">${elastRatio}</div>
+                        <div style="color:#71717a;font-size:0.65rem;">${_esc(elastLabel)}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem; font-size:0.7rem;">
+                        <div>${circuitText} ${distText ? `<span style="color:#71717a;font-size:0.65rem;">(${distText})</span>` : ''}</div>
+                        <div style="margin-top:0.1rem;">${instHolding}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem;">
+                        ${catHtml}
+                    </td>
+                    <td style="padding: 0.65rem 0.8rem;">
+                        <div style="color:#d4d4d8;font-size:0.72rem;line-height:1.25;">${_esc(act.rationale)}</div>
+                        ${act.key_risk ? `<div style="color:#f87171;font-size:0.65rem;margin-top:0.2rem;display:flex;align-items:center;gap:0.25rem;"><span>⚠️</span><span>${_esc(act.key_risk)}</span></div>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     // ---------------------------------------------------------------------------
@@ -404,6 +503,7 @@
 
             // Render
             _renderNodeGrid(_state.nodes);
+            _renderTradeActionMatrix(_state.nodes);
             _renderAnomalyStrip(data.anomalies || []);
             _renderGates(data.reentry_gates);
             _renderStaleBanner(data.data_freshness);
@@ -471,12 +571,57 @@
 
         const prodLineage = node.product_lineage ? `<div style="font-size:0.7rem;color:#71717a;margin-bottom:0.6rem;font-style:italic;">${_esc(node.product_lineage)}</div>` : '';
 
+        // Tactical Trade Action Box
+        const act = node.trade_action || { action: 'NEUTRAL_WATCH', action_color: '#a1a1aa', rationale: 'Consolidation', key_risk: 'None' };
+        const tradeActionCard = `
+            <div style="background:rgba(0,0,0,0.6);border:1px solid ${act.action_color}44;border-left:4px solid ${act.action_color};border-radius:6px;padding:0.75rem 0.85rem;margin:0.6rem 0;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
+                    <span style="font-size:0.68rem;text-transform:uppercase;color:#71717a;font-weight:700;letter-spacing:0.04em;">TACTICAL TRADE ACTION</span>
+                    <span style="background:${act.action_color}22;color:${act.action_color};border:1px solid ${act.action_color}55;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.7rem;font-weight:800;font-family:var(--font-mono);">
+                        ${_esc(act.action.replace(/_/g, ' '))}
+                    </span>
+                </div>
+                <div style="font-size:0.75rem;color:#f8fafc;font-weight:600;line-height:1.3;margin-bottom:0.35rem;">${_esc(act.rationale)}</div>
+                ${act.key_risk ? `<div style="font-size:0.68rem;color:#fca5a5;background:rgba(239,68,68,0.1);padding:0.25rem 0.45rem;border-radius:4px;display:flex;align-items:center;gap:0.3rem;"><span>⚠️ Risk:</span><span>${_esc(act.key_risk)}</span></div>` : ''}
+            </div>
+        `;
+
+        // Catalysts Section
+        const catalysts = node.catalysts || [];
+        let catalystsSect = '';
+        if (catalysts.length > 0) {
+            catalystsSect = `
+                <div style="margin-top:0.75rem;">
+                    <div style="font-size:0.68rem;font-weight:700;color:#a1a1aa;text-transform:uppercase;margin-bottom:0.4rem;letter-spacing:0.04em;">
+                        Recent Corporate Catalysts (${catalysts.length})
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                        ${catalysts.map(c => {
+                            const badgeBg = c.category === 'ORDER_WIN' ? 'rgba(16,185,129,0.15)' : c.category === 'EARNINGS_BEAT' ? 'rgba(59,130,246,0.15)' : 'rgba(234,179,8,0.15)';
+                            const badgeColor = c.category === 'ORDER_WIN' ? '#34d399' : c.category === 'EARNINGS_BEAT' ? '#60a5fa' : '#facc15';
+                            const extraVal = c.order_value_cr ? ` · ₹${c.order_value_cr} Cr Order` : (c.details ? ` · ${c.details}` : '');
+                            return `
+                                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:5px;padding:0.45rem 0.6rem;">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                        <span style="background:${badgeBg};color:${badgeColor};border:1px solid ${badgeColor}33;padding:0.05rem 0.35rem;border-radius:3px;font-size:0.6rem;font-weight:700;">${_esc(c.category)}</span>
+                                        <span style="color:#71717a;font-size:0.65rem;">${_esc(c.published_at || '')}${extraVal}</span>
+                                    </div>
+                                    <div style="font-size:0.72rem;color:#e4e4e7;line-height:1.25;">${_esc(c.title)}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
         return `
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
                 <span style="font-size:0.7rem;background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};padding:0.1rem 0.45rem;border-radius:4px;">${_esc(node.status || '—')}</span>
                 <span style="font-size:0.7rem;color:#71717a;">${_esc(node.role || '')} · ${_esc(node.market || '')}</span>
             </div>
             ${prodLineage}
+            ${tradeActionCard}
             ${_row('Price', node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—', true)}
             ${_row('1D Change', c1d != null ? `<span style="color:${pctColor};">${_fmt(c1d)}%</span>` : '—', true)}
             ${_row('5D Change', node.change_5d_pct != null ? `${_fmt(node.change_5d_pct)}%` : '—', true)}
@@ -493,6 +638,7 @@
             ${_row('Data Mode', dataModeBadge)}
             ${_row('Snapshot As Of', node.snapshot_as_of_utc ? node.snapshot_as_of_utc.replace('T', ' ').slice(0, 16) + ' UTC' : '—')}
             ${anomSection}
+            ${catalystsSect}
             ${edgesSect}
         `;
     }
@@ -653,6 +799,22 @@
             } finally {
                 if (saveBtn) saveBtn.textContent = 'Save Status';
             }
+        },
+
+        filterTradeMatrix(type) {
+            _state.tradeMatrixFilter = type;
+            const btnAll = document.getElementById('tmFilterAll');
+            const btnBuys = document.getElementById('tmFilterBuys');
+            const btnRisk = document.getElementById('tmFilterRisk');
+
+            const activeStyle = 'background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);padding:0.25rem 0.65rem;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;';
+            const inactiveStyle = 'background:rgba(255,255,255,0.05);color:#a1a1aa;border:1px solid rgba(255,255,255,0.1);padding:0.25rem 0.65rem;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;';
+
+            if (btnAll) btnAll.style.cssText = type === 'ALL' ? activeStyle : inactiveStyle;
+            if (btnBuys) btnBuys.style.cssText = type === 'BUYS' ? activeStyle : inactiveStyle;
+            if (btnRisk) btnRisk.style.cssText = type === 'RISK' ? activeStyle : inactiveStyle;
+
+            _renderTradeActionMatrix(_state.nodes);
         },
 
         destroy() {

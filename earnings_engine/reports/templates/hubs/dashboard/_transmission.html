@@ -172,6 +172,42 @@
         </div>
     </div>
 
+    <!-- Actionable Institutional Trade Matrix & Catalyst Ledger -->
+    <div id="transmissionTradeActionSection" style="margin-top: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <div style="font-size: 0.95rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 0.4rem;">
+                    🎯 Institutional Transmission Feed & Trade Action Matrix
+                </div>
+                <span style="font-size: 0.68rem; color: #71717a; font-family: var(--font-mono);">MICROSTRUCTURE & CATALYST CONFLUENCE</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: #a1a1aa;">
+                <span>Filter:</span>
+                <button type="button" onclick="window.transmissionRadar && window.transmissionRadar.filterTradeMatrix('ALL')" class="btn btn-xs tm-filter-btn active" id="tmFilterAll" style="background:#27272a;color:#fff;border:1px solid #3f3f46;padding:0.2rem 0.55rem;border-radius:4px;cursor:pointer;">All</button>
+                <button type="button" onclick="window.transmissionRadar && window.transmissionRadar.filterTradeMatrix('BUYS')" class="btn btn-xs tm-filter-btn" id="tmFilterBuys" style="background:#18181b;color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.2rem 0.55rem;border-radius:4px;cursor:pointer;">Buys / Accumulate</button>
+                <button type="button" onclick="window.transmissionRadar && window.transmissionRadar.filterTradeMatrix('RISK')" class="btn btn-xs tm-filter-btn" id="tmFilterRisk" style="background:#18181b;color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:0.2rem 0.55rem;border-radius:4px;cursor:pointer;">Circuit / Traps</button>
+            </div>
+        </div>
+        <div style="background: #09090b; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; overflow-x: auto;">
+            <table class="table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.75rem; margin-bottom: 0;">
+                <thead style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.68rem; text-transform: uppercase; color: #71717a; letter-spacing: 0.04em;">
+                    <tr>
+                        <th style="padding: 0.6rem 0.8rem;">Asset & Lineage</th>
+                        <th style="padding: 0.6rem 0.8rem;">Live Action</th>
+                        <th style="padding: 0.6rem 0.8rem;">Price & 1D Move</th>
+                        <th style="padding: 0.6rem 0.8rem;">Elasticity vs Anchor</th>
+                        <th style="padding: 0.6rem 0.8rem;">Circuit & Institutional</th>
+                        <th style="padding: 0.6rem 0.8rem; width: 26%;">Latest Catalyst / Corporate Filing</th>
+                        <th style="padding: 0.6rem 0.8rem; width: 22%;">Tactical Rationale</th>
+                    </tr>
+                </thead>
+                <tbody id="transmissionTradeActionBody">
+                    <!-- Populated dynamically by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Node Detail Drawer / Inspector -->
     <div id="transmissionNodeDrawer" style="display: none; position: fixed; top: 0; right: 0; width: 420px; height: 100vh; background: #0a0a0a; border-left: 1px solid rgba(255, 255, 255, 0.12); z-index: 9999; box-shadow: -10px 0 30px rgba(0,0,0,0.8); overflow-y: auto; padding: 1.25rem;">
         <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1rem;">
