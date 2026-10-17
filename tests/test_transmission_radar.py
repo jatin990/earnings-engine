@@ -122,6 +122,8 @@ from earnings_engine.data.transmission_radar import (
     detect_delivery_divergence,
     compute_shockwave_bfs,
     get_transmission_graph_payload,
+    get_node_recent_catalysts,
+    compute_node_trade_recommendation,
 )
 
 
@@ -244,4 +246,144 @@ def test_graph_data_freshness_fields():
     assert len(payload["nodes"]) == 18
     assert len(payload["edges"]) == 17
     assert "reentry_gates" in payload
+    # Check that nodes now have catalysts and trade_action fields
+    for node in payload["nodes"]:
+        assert "catalysts" in node
+        assert isinstance(node["catalysts"], list)
+        assert "trade_action" in node
+        assert "action" in node["trade_action"]
+
+
+def test_get_node_recent_catalysts_empty():
+    conn = sqlite3.connect(":memory:")
+    catalysts = get_node_recent_catalysts("NONEXISTENT", conn)
+    assert catalysts == []
+
+
+def test_get_node_recent_catalysts_with_data():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("""
+    CREATE TABLE news_catalysts (
+        id INTEGER PRIMARY KEY,
+        ticker TEXT,
+        title TEXT,
+        category TEXT,
+        impact_score INTEGER,
+        published_at TEXT,
+        summary TEXT
+    )
+    """)
+    conn.execute("""
+    CREATE TABLE earnings_history (
+        ticker TEXT,
+        earnings_date TEXT,
+        eps_estimate REAL,
+        eps_reported REAL,
+        surprise_pct REAL,
+        source TEXT,
+        PRIMARY KEY (ticker, earnings_date, source)
+    )
+    """)
+    conn.execute("""
+    INSERT INTO news_catalysts (ticker, title, category, impact_score, published_at, summary)
+    VALUES ('POWERINDIA.NS', 'Hitachi Energy bags ₹1,200 Cr substation order', 'Order Wins & Contracts', 85, '2026-10-15', 'Mega order from PGCIL')
+    """)
+    conn.execute("""
+    INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+    VALUES ('POWERINDIA.NS', '2026-08-07', 45.0, 58.5, 30.0, 'nse')
+    """)
+    conn.commit()
+
+    catalysts = get_node_recent_catalysts("POWERINDIA.NS", conn, limit=3)
+    assert len(catalysts) == 2
+    # Verify order win details
+    order_cat = next(c for c in catalysts if c["category"] == "ORDER_WIN")
+    assert "₹1,200 Cr" in order_cat["title"]
+    assert order_cat["impact_score"] == 85
+    assert order_cat["order_value_cr"] == 1200.0
+
+    # Verify earnings surprise details
+    earn_cat = next(c for c in catalysts if c["category"] == "EARNINGS_BEAT")
+    assert earn_cat["impact_score"] >= 80
+    assert "30.0%" in earn_cat["title"]
+
+
+def test_trade_recommendation_trim_circuit_risk():
+    node = {
+        "node_id": "TARIL.NS",
+        "symbol": "TARIL.NS",
+        "circuit_status": "HIGH_FREEZE_RISK",
+        "distance_to_lower_circuit_pct": 1.2,
+        "elasticity_label": "NORMAL",
+        "elasticity_ratio": 1.2,
+        "institutional_holding_pct": 6.6,
+        "change_1d_pct": -4.0,
+        "role": "HIGH_BETA_FOLLOWER",
+        "anomaly_flag": "NONE",
+        "catalysts": [],
+    }
+    rec = compute_node_trade_recommendation(node)
+    assert rec["action"] == "TRIM_CIRCUIT_RISK"
+    assert rec["action_color"] == "#ef4444"
+    assert "circuit" in rec["rationale"].lower()
+
+
+def test_trade_recommendation_fade_valuation_trap():
+    node = {
+        "node_id": "AEROFLEX.NS",
+        "symbol": "AEROFLEX.NS",
+        "circuit_status": "STABLE",
+        "distance_to_lower_circuit_pct": 8.5,
+        "elasticity_label": "EXTREME",
+        "elasticity_ratio": 3.76,
+        "institutional_holding_pct": 1.35,
+        "change_1d_pct": 2.0,
+        "role": "HIGH_BETA_FOLLOWER",
+        "anomaly_flag": "VALUATION_ELASTICITY_TRAP",
+        "catalysts": [],
+    }
+    rec = compute_node_trade_recommendation(node)
+    assert rec["action"] == "FADE_VALUATION_TRAP"
+    assert rec["action_color"] == "#f59e0b"
+    assert "float trap" in rec["key_risk"].lower() or "valuation" in rec["rationale"].lower()
+
+
+def test_trade_recommendation_strong_buy_dip():
+    node = {
+        "node_id": "MTARTECH.NS",
+        "symbol": "MTARTECH.NS",
+        "circuit_status": "STABLE",
+        "distance_to_lower_circuit_pct": 4.8,
+        "elasticity_label": "DISCOUNTED",
+        "elasticity_ratio": 0.56,
+        "institutional_holding_pct": 33.7,
+        "change_1d_pct": -3.1,
+        "role": "INDEPENDENT",
+        "anomaly_flag": "NONE",
+        "catalysts": [{"category": "ORDER_WIN", "title": "Bags ₹250 Cr SOFC Manifold Order"}],
+    }
+    rec = compute_node_trade_recommendation(node)
+    assert rec["action"] == "STRONG_BUY_DIP"
+    assert rec["action_color"] == "#10b981"
+
+
+def test_trade_recommendation_accumulate_breakout():
+    node = {
+        "node_id": "POWERINDIA.NS",
+        "symbol": "POWERINDIA.NS",
+        "circuit_status": "STABLE",
+        "distance_to_lower_circuit_pct": 15.0,
+        "elasticity_label": "NORMAL",
+        "elasticity_ratio": 1.5,
+        "institutional_holding_pct": 38.0,
+        "change_1d_pct": 4.5,
+        "volume_multiple_20d": 2.8,
+        "role": "PRIMARY_LEADER",
+        "anomaly_flag": "NONE",
+        "catalysts": [{"category": "ORDER_WIN", "title": "Mega ₹1,200 Cr Order"}],
+    }
+    rec = compute_node_trade_recommendation(node)
+    assert rec["action"] == "ACCUMULATE_BREAKOUT"
+    assert rec["action_color"] == "#059669"
+
 
