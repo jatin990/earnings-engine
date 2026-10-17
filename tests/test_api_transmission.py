@@ -26,7 +26,32 @@ def test_api_baskets():
     assert res.status_code == 200
     data = res.json()
     assert "baskets" in data
-    assert any(b["basket_id"] == "AI_INFRA_HARDWARE" for b in data["baskets"])
+    basket_ids = {b["basket_id"] for b in data["baskets"]}
+    assert "AI_INFRA_HARDWARE" in basket_ids
+    assert "GLOBAL_CDMO_PEPTIDE_CASCADE" in basket_ids
+
+
+def test_api_graph_cdmo_basket():
+    res = client.get("/api/transmission/graph?basket_id=GLOBAL_CDMO_PEPTIDE_CASCADE")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert len(data["nodes"]) == 16
+    assert len(data["edges"]) == 16
+    assert "reentry_gates" in data
+    assert "us_anchor_stabilization" in data["reentry_gates"]
+
+
+def test_api_shockwave_cdmo():
+    res = client.post("/api/transmission/simulate-shockwave", json={
+        "basket_id": "GLOBAL_CDMO_PEPTIDE_CASCADE",
+        "origin_node_id": "LLY",
+        "anchor_shock_pct": 5.0,
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data["propagation"], list)
+    assert any(n["node_id"] == "DIVISLAB.NS" for n in data["propagation"])
 
 
 def test_api_graph_shape():
