@@ -3,55 +3,56 @@
 
   <!-- === INLINE STYLES FOR DUAL-THUMB SLIDER & MODULE CSS CLASSES === -->
   <style>
-    .rl-preset-chip { background:#09090b; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; font-weight:600; padding:0.22rem 0.55rem; border-radius:4px; cursor:pointer; font-family:var(--font-mono); transition:all 0.12s; }
-    .rl-preset-chip.active, .rl-preset-chip:hover { background:#1a1a1a; border-color:rgba(255,255,255,0.35); color:#f8fafc; }
+    .rl-preset-chip { background:var(--bg-surface, #0d1117); border:1px solid var(--border-subtle, rgba(255,255,255,0.12)); color:var(--text-secondary, #94a3b8); font-size:0.68rem; font-weight:600; padding:0.22rem 0.55rem; border-radius:4px; cursor:pointer; font-family:var(--font-mono); transition:all 0.12s; }
+    .rl-preset-chip.active, .rl-preset-chip:hover { background:var(--bg-card-hover, rgba(255,255,255,0.06)); border-color:var(--border-accent, rgba(255,255,255,0.35)); color:var(--text-primary, #f8fafc); }
     .rl-range-slider { position:relative; height:20px; display:flex; align-items:center; }
     .rl-range-slider input[type=range] { position:absolute; width:100%; height:4px; appearance:none; -webkit-appearance:none; background:transparent; pointer-events:none; }
-    .rl-range-slider input[type=range]::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#f8fafc; border:2px solid #000; pointer-events:all; cursor:pointer; }
-    .rl-range-slider input[type=range]::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#f8fafc; border:2px solid #000; pointer-events:all; cursor:pointer; }
-    .rl-range-track { position:absolute; width:100%; height:4px; background:rgba(255,255,255,0.12); border-radius:2px; }
-    .rl-month-strip { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; border:1px solid rgba(255,255,255,0.08); border-radius:6px; overflow:hidden; margin-bottom:0.5rem; background:#09090b; }
-    .rl-month-cell { padding:0.55rem 0.75rem; cursor:pointer; transition:background 0.12s; border-right:1px solid rgba(255,255,255,0.07); }
+    .rl-range-slider input[type=range]::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--text-primary, #f8fafc); border:2px solid var(--bg-main, #0a0c14); pointer-events:all; cursor:pointer; }
+    .rl-range-slider input[type=range]::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--text-primary, #f8fafc); border:2px solid var(--bg-main, #0a0c14); pointer-events:all; cursor:pointer; }
+    .rl-range-track { position:absolute; width:100%; height:4px; background:var(--border-subtle, rgba(255,255,255,0.12)); border-radius:2px; }
+    .rl-month-strip { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; border:1px solid var(--border-subtle, rgba(255,255,255,0.08)); border-radius:6px; overflow:hidden; margin-bottom:0.5rem; background:var(--bg-surface, #0d1117); }
+    .rl-month-cell { padding:0.55rem 0.75rem; cursor:pointer; transition:background 0.12s; border-right:1px solid var(--border-subtle, rgba(255,255,255,0.07)); }
     .rl-month-cell:last-child { border-right:none; }
-    .rl-month-cell:hover, .rl-month-cell.active { background:rgba(255,255,255,0.04); }
-    .rl-day-divider td { background:#000; padding:0.3rem 0.6rem; border-top:1px solid rgba(255,255,255,0.07); }
-    .results-row:hover td { background:rgba(255,255,255,0.03); }
-    .results-row:nth-child(even) td { background:rgba(255,255,255,0.018); }
-    .rl-surprise-pos { color:#34d399; }
-    .rl-surprise-neg { color:#fb7185; }
-    .rl-edge-hi { color:#34d399; font-weight:700; }
-    .rl-edge-mid { color:#94a3b8; }
-    .rl-edge-lo { color:#fb7185; }
+    .rl-month-cell:hover, .rl-month-cell.active { background:var(--bg-card-hover, rgba(255,255,255,0.04)); }
+    .rl-day-divider td { background:var(--bg-surface, #0d1117); padding:0.35rem 0.65rem; border-top:1px solid var(--border-subtle, rgba(255,255,255,0.07)); position:sticky; top:28px; z-index:15; }
+    .results-row:hover td { background:var(--bg-card-hover, rgba(255,255,255,0.03)); }
+    .results-row:nth-child(even) td { background:rgba(255,255,255,0.015); }
+    .rl-surprise-pos { color:var(--color-bullish, #34d399); }
+    .rl-surprise-neg { color:var(--color-bearish, #fb7185); }
+    .rl-edge-hi { color:var(--color-bullish, #34d399); font-weight:700; }
+    .rl-edge-mid { color:var(--text-secondary, #94a3b8); }
+    .rl-edge-lo { color:var(--color-bearish, #fb7185); }
     .signal-badge { transition: transform 0.15s ease, filter 0.15s ease; }
     .signal-badge:hover { filter: brightness(1.15); transform: translateY(-1px); }
     .signal-strong-buy { box-shadow: 0 0 6px rgba(16, 185, 129, 0.25); }
     .signal-buy { box-shadow: 0 0 4px rgba(52, 211, 153, 0.2); }
     .signal-avoid { box-shadow: 0 0 4px rgba(239, 68, 68, 0.2); }
-    .rl-toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem; padding:0.35rem 0; border-bottom:1px solid rgba(255,255,255,0.07); margin-bottom:0.4rem; }
+    .rl-toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.35rem; padding:0.35rem 0; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.07)); margin-bottom:0.4rem; }
     .results-row.density-standard td { padding-top:0.55rem; padding-bottom:0.55rem; }
+    .results-terminal-table thead th { position:sticky; top:0; z-index:25; }
   </style>
 
   <!-- === SECTION HEADER === -->
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.5rem;margin-bottom:0.65rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.07));padding-bottom:0.5rem;margin-bottom:0.65rem;">
     <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span style="font-size:1.05rem;font-weight:800;color:#f8fafc;font-family:var(--font-heading);letter-spacing:-0.02em;">Results Ledger</span>
-      <span id="resultsCount" style="display:none;background:#09090b;color:#94a3b8;border:1px solid rgba(255,255,255,0.12);font-size:0.62rem;font-family:var(--font-mono);padding:0.1rem 0.45rem;border-radius:4px;font-weight:600;"></span>
+      <span style="font-size:1.05rem;font-weight:800;color:var(--text-primary, #f8fafc);font-family:var(--font-heading);letter-spacing:-0.02em;">Results Ledger</span>
+      <span id="resultsCount" style="display:none;background:var(--bg-surface, #0d1117);color:var(--text-secondary, #94a3b8);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));font-size:0.62rem;font-family:var(--font-mono);padding:0.1rem 0.45rem;border-radius:4px;font-weight:600;"></span>
     </div>
     <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;">
       <button type="button" id="resultsSyncBtn" onclick="window.resultsLedger && window.resultsLedger.syncCalendar(this)"
-        style="height:26px;padding:0 0.55rem;background:#09090b;color:#94a3b8;border:1px solid rgba(255,255,255,0.12);font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
+        style="height:26px;padding:0 0.55rem;background:var(--bg-surface, #0d1117);color:var(--text-secondary, #94a3b8);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
         title="Sync results calendar from NSE &amp; data feeds">📅 Sync</button>
       <button type="button" id="resultsRecalcAllBtn" onclick="window.resultsLedger && window.resultsLedger.recalcPrices(this)"
-        style="height:26px;padding:0 0.55rem;background:#09090b;color:#94a3b8;border:1px solid rgba(255,255,255,0.12);font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
+        style="height:26px;padding:0 0.55rem;background:var(--bg-surface, #0d1117);color:var(--text-secondary, #94a3b8);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
         title="Recalculate live prices &amp; S/R for all window stocks">⚡ Recalc</button>
       <button type="button" id="resultsSummarizeBtn" onclick="window.resultsLedger && window.resultsLedger.summarize(this)"
-        style="height:26px;padding:0 0.55rem;background:#09090b;color:#94a3b8;border:1px solid rgba(255,255,255,0.12);font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
+        style="height:26px;padding:0 0.55rem;background:var(--bg-surface, #0d1117);color:var(--text-secondary, #94a3b8);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
         title="AI summary of visible results">✦ AI Summary</button>
     </div>
   </div>
 
   <!-- === RANGE CONTROL STRIP === -->
-  <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);">
+  <div style="background:var(--bg-surface, #0d1117);border:1px solid var(--border-subtle, rgba(255,255,255,0.08));border-radius:6px;padding:0.5rem 0.75rem;margin-bottom:0.5rem;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);">
     <!-- Preset chips row -->
     <div id="rl-preset-chips" style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:0.45rem;">
       <button type="button" class="rl-preset-chip active" data-preset="next3" onclick="window.resultsLedger && window.resultsLedger.setPreset('next3')">Upcoming 3D</button>
@@ -123,17 +124,17 @@
   </div>
 
   <!-- === MAIN TABLE CONTAINER === -->
-  <div style="border:1px solid rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;background:#000;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);">
+  <div style="border:1px solid var(--border-subtle, rgba(255,255,255,0.08));border-radius:6px;overflow:hidden;background:var(--bg-main, #0a0c14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);">
 
     <!-- TOOLBAR (inside container, flush) -->
-    <div class="rl-toolbar" style="padding:0.35rem 0.6rem;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="rl-toolbar" style="padding:0.35rem 0.6rem;border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.06));background:var(--bg-surface, #0d1117);">
       <!-- Search -->
       <div style="display:flex;align-items:center;gap:0.3rem;flex:1;min-width:180px;max-width:360px;">
-        <span style="font-size:0.68rem;color:#525a6b;">⌕</span>
+        <span style="font-size:0.68rem;color:var(--text-muted, #525a6b);">⌕</span>
         <input type="text" id="resultsLiveSearch"
           oninput="window.resultsLedger && window.resultsLedger.onSearchInput(this.value)"
           placeholder="Filter by ticker, company, industry, setup…"
-          style="width:100%;height:24px;padding:0 0.4rem;background:#000;border:1px solid rgba(255,255,255,0.1);border-radius:3px;color:#f8fafc;font-size:0.7rem;font-family:var(--font-mono);outline:none;">
+          style="width:100%;height:24px;padding:0 0.4rem;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;color:var(--text-primary, #f8fafc);font-size:0.7rem;font-family:var(--font-mono);outline:none;">
       </div>
       <!-- Right controls -->
       <div style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;font-size:0.68rem;">
@@ -141,25 +142,25 @@
         <div id="resultsIndustryDropdownWrapper" style="position:relative;display:inline-block;">
           <button type="button" id="resultsIndustryDropdownBtn"
             onclick="window.resultsLedger && window.resultsLedger.toggleIndustryDropdown(event)"
-            style="height:24px;padding:0 0.4rem;background:#000;border:1px solid rgba(255,255,255,0.12);border-radius:3px;color:#94a3b8;font-size:0.66rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:0.25rem;font-family:var(--font-mono);"
+            style="height:24px;padding:0 0.4rem;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));border-radius:3px;color:var(--text-secondary, #94a3b8);font-size:0.66rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:0.25rem;font-family:var(--font-mono);"
             title="Filter by industry">
             <span id="resultsIndustryBtnLabel">Industries (All)</span>
-            <span style="font-size:0.5rem;color:#525a6b;">▼</span>
+            <span style="font-size:0.5rem;color:var(--text-muted, #525a6b);">▼</span>
           </button>
           <div id="resultsIndustryDropdownPanel" onclick="event.stopPropagation()"
-            style="display:none;position:absolute;top:calc(100% + 3px);right:0;min-width:260px;max-width:320px;background:#09090b;border:1px solid rgba(255,255,255,0.15);border-radius:5px;box-shadow:0 12px 28px rgba(0,0,0,0.9);z-index:120;padding:0.4rem;">
+            style="display:none;position:absolute;top:calc(100% + 3px);right:0;min-width:260px;max-width:320px;background:var(--bg-surface, #0d1117);border:1px solid var(--border-subtle, rgba(255,255,255,0.15));border-radius:5px;box-shadow:0 12px 28px rgba(0,0,0,0.9);z-index:120;padding:0.4rem;">
             <div style="margin-bottom:0.3rem;display:flex;flex-direction:column;gap:0.25rem;">
               <input type="text" id="resultsIndustrySearchInput"
                 oninput="window.resultsLedger && window.resultsLedger.filterIndustryList(this.value)"
                 placeholder="Search industries…"
-                style="width:100%;height:22px;padding:0 0.35rem;background:#000;border:1px solid rgba(255,255,255,0.1);border-radius:3px;color:#f8fafc;font-size:0.66rem;font-family:var(--font-mono);outline:none;">
+                style="width:100%;height:22px;padding:0 0.35rem;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;color:var(--text-primary, #f8fafc);font-size:0.66rem;font-family:var(--font-mono);outline:none;">
               <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.6rem;padding:0 0.1rem;">
                 <div style="display:flex;gap:0.3rem;">
                   <button type="button" onclick="window.resultsLedger && window.resultsLedger.selectAllIndustries()"
-                    style="background:transparent;border:none;color:#f8fafc;cursor:pointer;padding:0;font-size:0.6rem;font-weight:600;">Select All</button>
-                  <span style="color:#525a6b;">|</span>
+                    style="background:transparent;border:none;color:var(--text-primary, #f8fafc);cursor:pointer;padding:0;font-size:0.6rem;font-weight:600;">Select All</button>
+                  <span style="color:var(--text-muted, #525a6b);">|</span>
                   <button type="button" onclick="window.resultsLedger && window.resultsLedger.clearAllIndustries()"
-                    style="background:transparent;border:none;color:#fb7185;cursor:pointer;padding:0;font-size:0.6rem;font-weight:600;">Clear All</button>
+                    style="background:transparent;border:none;color:var(--color-bearish, #fb7185);cursor:pointer;padding:0;font-size:0.6rem;font-weight:600;">Clear All</button>
                 </div>
                 <span id="resultsIndustrySelectedCount" style="color:#6b7485;font-variant-numeric:tabular-nums;">All selected</span>
               </div>
@@ -173,53 +174,53 @@
         <span id="resultsFilterMatchCount" style="color:#f8fafc;font-family:var(--font-mono);font-weight:700;min-width:32px;"></span>
 
         <!-- Cap filter -->
-        <div style="display:flex;align-items:center;background:#000;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:1px;">
+        <div style="display:flex;align-items:center;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;padding:1px;">
           <button type="button" id="rl-cap-all" onclick="window.resultsLedger && window.resultsLedger.setCapFilter('all')"
-            style="background:rgba(255,255,255,0.12);color:#f8fafc;font-size:0.6rem;padding:0.08rem 0.3rem;border:none;border-radius:2px;cursor:pointer;font-weight:700;">All</button>
+            style="background:rgba(255,255,255,0.12);color:var(--text-primary, #f8fafc);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;border-radius:2px;cursor:pointer;font-weight:700;">All</button>
           <button type="button" id="rl-cap-large" onclick="window.resultsLedger && window.resultsLedger.setCapFilter('large')"
-            style="background:transparent;color:#6b7485;font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Large</button>
+            style="background:transparent;color:var(--text-muted, #64748b);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Large</button>
           <button type="button" id="rl-cap-small" onclick="window.resultsLedger && window.resultsLedger.setCapFilter('small')"
-            style="background:transparent;color:#6b7485;font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Small</button>
+            style="background:transparent;color:var(--text-muted, #64748b);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Small</button>
         </div>
 
         <!-- Density toggle -->
-        <div style="display:flex;align-items:center;background:#000;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:1px;">
+        <div style="display:flex;align-items:center;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;padding:1px;">
           <button type="button" id="rl-density-compact" onclick="window.resultsLedger && window.resultsLedger.setDensity('compact')"
-            style="background:rgba(255,255,255,0.12);color:#f8fafc;font-size:0.6rem;padding:0.08rem 0.3rem;border:none;border-radius:2px;cursor:pointer;font-weight:700;">Dense</button>
+            style="background:rgba(255,255,255,0.12);color:var(--text-primary, #f8fafc);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;border-radius:2px;cursor:pointer;font-weight:700;">Dense</button>
           <button type="button" id="rl-density-standard" onclick="window.resultsLedger && window.resultsLedger.setDensity('standard')"
-            style="background:transparent;color:#6b7485;font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Comfort</button>
+            style="background:transparent;color:var(--text-muted, #64748b);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Comfort</button>
         </div>
 
         <!-- Export -->
         <button type="button" onclick="window.resultsLedger && window.resultsLedger.exportCsv()"
-          style="height:22px;padding:0 0.35rem;background:#000;color:#6b7485;border:1px solid rgba(255,255,255,0.1);border-radius:3px;font-size:0.6rem;cursor:pointer;font-family:var(--font-mono);">⤓ CSV</button>
+          style="height:22px;padding:0 0.35rem;background:var(--bg-main, #0a0c14);color:var(--text-muted, #64748b);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;font-size:0.6rem;cursor:pointer;font-family:var(--font-mono);">⤓ CSV</button>
         <button type="button" onclick="window.resultsLedger && window.resultsLedger.exportJson()"
-          style="height:22px;padding:0 0.35rem;background:#000;color:#6b7485;border:1px solid rgba(255,255,255,0.1);border-radius:3px;font-size:0.6rem;cursor:pointer;font-family:var(--font-mono);">⤓ JSON</button>
+          style="height:22px;padding:0 0.35rem;background:var(--bg-main, #0a0c14);color:var(--text-muted, #64748b);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;font-size:0.6rem;cursor:pointer;font-family:var(--font-mono);">⤓ JSON</button>
       </div>
     </div>
 
     <!-- DATE CHIP RAIL -->
     <div id="rl-date-chip-rail"
-      style="display:none;padding:0.3rem 0.6rem;border-bottom:1px solid rgba(255,255,255,0.05);overflow-x:auto;white-space:nowrap;gap:0.25rem;">
+      style="display:none;padding:0.3rem 0.6rem;border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.05));overflow-x:auto;white-space:nowrap;gap:0.25rem;">
     </div>
 
     <!-- TABLE AREA -->
     <div id="resultsReportSections" style="overflow-x:auto;">
       <!-- Empty state (replaced on load) -->
-      <div style="text-align:center;padding:2.5rem 1rem;color:#525a6b;">
+      <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted, #64748b);">
         <div style="font-size:1.5rem;margin-bottom:0.4rem;">📅</div>
-        <h4 style="margin:0 0 0.3rem;color:#94a3b8;font-size:0.92rem;font-family:var(--font-heading);">Corporate Earnings Ready to Load</h4>
-        <p style="max-width:400px;margin:0 auto 0.75rem;font-size:0.72rem;line-height:1.5;color:#525a6b;">
-          Results are served from local cache. Click <strong style="color:#94a3b8;">Load</strong> to view upcoming earnings catalysts, technical setups, and S/R structures.
+        <h4 style="margin:0 0 0.3rem;color:var(--text-secondary, #94a3b8);font-size:0.92rem;font-family:var(--font-heading);">Corporate Earnings Ready to Load</h4>
+        <p style="max-width:400px;margin:0 auto 0.75rem;font-size:0.72rem;line-height:1.5;color:var(--text-muted, #64748b);">
+          Results are served from local cache. Click <strong style="color:var(--text-secondary, #94a3b8);">Load</strong> to view upcoming earnings catalysts, technical setups, and S/R structures.
         </p>
         <button type="button" onclick="window.resultsLedger && window.resultsLedger.loadReport()"
-          style="height:30px;padding:0 1rem;background:#f8fafc;color:#000;font-size:0.75rem;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-family:var(--font-heading);">▶ Load Results Report</button>
+          style="height:30px;padding:0 1rem;background:var(--text-primary, #f8fafc);color:var(--bg-main, #000);font-size:0.75rem;font-weight:700;border:none;border-radius:4px;cursor:pointer;font-family:var(--font-heading);">▶ Load Results Report</button>
       </div>
     </div>
 
     <!-- STATUS BAR -->
     <div id="resultsReportStatus"
-      style="padding:0.25rem 0.6rem;font-size:0.64rem;color:#525a6b;font-family:var(--font-mono);border-top:1px solid rgba(255,255,255,0.05);">
+      style="padding:0.25rem 0.6rem;font-size:0.64rem;color:var(--text-muted, #64748b);font-family:var(--font-mono);border-top:1px solid var(--border-subtle, rgba(255,255,255,0.05));">
     </div>
   </div>
 

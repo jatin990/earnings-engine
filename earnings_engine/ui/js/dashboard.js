@@ -1406,7 +1406,11 @@ const API_BASE = window.location.origin;
             updateResultsSummaryCards()     { return window.resultsLedger?.renderMonthStrip(); },
             updateResultsMonthSummaryCards(){ return window.resultsLedger?.renderMonthStrip(); },
             renderResultsDays()             { /* table rendered by resultsLedger */ },
-            sortResultsTable(th, col, type) { /* sort handled */ },
+            sortResultsTable(th, col, type) {
+                if (window.resultsLedger && window.resultsLedger.sortTable) {
+                    return window.resultsLedger.sortTable(th, col, type);
+                }
+            },
             selectResultsStock(ticker)      { return window.resultsLedger?.openDrawer(ticker); },
             toggleRowDrawer(rowId, ticker)  { return window.resultsLedger?.openDrawer(ticker); },
             showStockNewsDrawer(rowId, ticker, ev) { if (ev) ev.stopPropagation(); return window.resultsLedger?.openDrawer(ticker); },

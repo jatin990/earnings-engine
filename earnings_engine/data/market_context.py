@@ -828,8 +828,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
         conn = get_db_connection(settings)
         e_by_ticker = defaultdict(list)
         p_by_ticker = defaultdict(list)
+        news_by_ticker = defaultdict(list)
+        breakout_by_ticker = {}
         cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")
         cutoff_p_date = (pd.Timestamp.now() - pd.Timedelta(days=450)).strftime("%Y-%m-%d")
+        cutoff_news_date = (pd.Timestamp.now() - pd.Timedelta(days=14)).strftime("%Y-%m-%d")
         chunk_size = 200
 
         for i in range(0, len(tickers), chunk_size):
@@ -905,6 +908,38 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         "cycles": r[4],
                         "avg_cycle_days": r[5],
                         "last_updated": r[6],
+                    }
+            except Exception:
+                pass
+
+            # 6. Active News Catalysts (last 14 days)
+            try:
+                news_rows = conn.execute(
+                    f"SELECT ticker, title, category, impact_level, direction, published_at FROM news_catalysts WHERE ticker IN ({placeholders}) AND published_at >= ? ORDER BY published_at DESC",
+                    chunk + [cutoff_news_date],
+                ).fetchall()
+                for r in news_rows:
+                    news_by_ticker[r[0]].append({
+                        "title": r[1],
+                        "category": r[2],
+                        "impact_level": r[3],
+                        "direction": r[4],
+                        "published_at": r[5],
+                    })
+            except Exception:
+                pass
+
+            # 7. Active Breakout Radar
+            try:
+                br_rows = conn.execute(
+                    f"SELECT ticker, composite_score, tier, outcome FROM breakout_radar WHERE ticker IN ({placeholders}) AND outcome = 'ACTIVE'",
+                    chunk,
+                ).fetchall()
+                for r in br_rows:
+                    breakout_by_ticker[r[0]] = {
+                        "is_breakout_active": True,
+                        "breakout_score": float(r[1]) if r[1] is not None else 0.0,
+                        "tier": r[2],
                     }
             except Exception:
                 pass
@@ -1030,9 +1065,17 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     if current_price is None:
                         current_price = float(closes_s.iloc[-1])
                     if week_high is None:
-                        week_high = float(closes_s.tail(252).max())
+                        if "high" in prices.columns:
+                            highs_s = pd.to_numeric(prices["high"], errors="coerce").dropna()
+                            week_high = float(highs_s.tail(252).max()) if not highs_s.empty else float(closes_s.tail(252).max())
+                        else:
+                            week_high = float(closes_s.tail(252).max())
                     if week_low is None:
-                        week_low = float(closes_s.tail(252).min())
+                        if "low" in prices.columns:
+                            lows_s = pd.to_numeric(prices["low"], errors="coerce").dropna()
+                            week_low = float(lows_s.tail(252).min()) if not lows_s.empty else float(closes_s.tail(252).min())
+                        else:
+                            week_low = float(closes_s.tail(252).min())
                     if week_change is None and len(closes_s) >= 2:
                         prev_c = float(closes_s.iloc[-2])
                         if prev_c > 0:
@@ -1326,7 +1369,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 if week_high is None or week_high <= 0 or current_price is None:
                     pct_from_high = None
                 else:
-                    pct_from_high = ((week_high - current_price) / week_high) * 100
+                    pct_from_high = round(((current_price / week_high) - 1.0) * 100.0, 2)
             else:
                 pct_from_high = pct_from_52w_high
 
@@ -1334,7 +1377,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 if week_low is None or week_low <= 0 or current_price is None:
                     pct_from_low = None
                 else:
-                    pct_from_low = ((current_price - week_low) / week_low) * 100
+                    pct_from_low = round(((current_price / week_low) - 1.0) * 100.0, 2)
             else:
                 pct_from_low = pct_from_52w_low
 
@@ -1453,6 +1496,10 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "beat_count": beat_count,
                 "total_historical_quarters": total_historical_quarters,
                 "historical_quarters": historical_quarters_list,
+                "news_items": news_by_ticker.get(ticker, []),
+                "is_breakout_active": ticker in breakout_by_ticker,
+                "breakout_score": breakout_by_ticker.get(ticker, {}).get("breakout_score"),
+                "breakout_tier": breakout_by_ticker.get(ticker, {}).get("tier"),
                 "channel_position_pct": channel_position_pct,
                 "earnings_week_move_pct": earnings_week_move_pct,
                 "earnings_week_high_pct": earnings_week_high_pct,

@@ -1,28 +1,31 @@
 <tr class="results-row {day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}" data-date="{date}" data-cap="{cap_tier}" data-industry="{industry}" data-setup="{technical_setup_label}" data-price="{raw_price}" data-mcap="{raw_mcap}" data-3d-ret="{raw_3d}" data-7d-ret="{raw_7d}" data-30d-ret="{raw_30d}" data-rel-vol="{rel_vol_plain}" data-beat-rate="{beat_rate_plain}" data-quality="{quality_scores_plain}" data-buy-score="{raw_buy_score}" data-buy-signal="{buy_signal}" onclick="window.resultsLedger && window.resultsLedger.openDrawer('{ticker}')" style="cursor:pointer;" title="Click to inspect {ticker} in slide-over drawer">
   <td class="stock-cell">
     <div class="stock-cell-wrap">
-      <div style="display:flex;align-items:center;gap:0.35rem;">
-        <span class="stock-ticker-main" style="font-weight:700;color:#f8fafc;font-size:0.82rem;">{ticker}</span>
-        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); window.resultsLedger && window.resultsLedger.refreshSinglePrice('{ticker}', this);" style="background:transparent;border:none;color:#64748b;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;line-height:1;transition:color 0.15s;" onmouseenter="this.style.color='#f8fafc';" onmouseleave="this.style.color='#64748b';" title="Refresh live price & S/R for {ticker}">↻</button>
-        <a href="/stock/{ticker}" target="_blank" style="color:#64748b;text-decoration:none;font-size:0.72rem;" onclick="event.stopPropagation();" onmouseenter="this.style.color='#f8fafc';" onmouseleave="this.style.color='#64748b';" title="Open full profile in new tab">↗</a>
+      <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+        <span class="stock-ticker-main" style="font-weight:700;color:var(--text-primary, #f8fafc);font-size:0.82rem;">{ticker}</span>
+        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); window.resultsLedger && window.resultsLedger.refreshSinglePrice('{ticker}', this);" style="background:transparent;border:none;color:var(--text-muted, #64748b);cursor:pointer;font-size:0.75rem;padding:0 0.15rem;line-height:1;transition:color 0.15s;" onmouseenter="this.style.color='var(--text-primary, #f8fafc)';" onmouseleave="this.style.color='var(--text-muted, #64748b)';" title="Refresh live price & S/R for {ticker}">↻</button>
+        <a href="/stock/{ticker}" target="_blank" style="color:var(--text-muted, #64748b);text-decoration:none;font-size:0.72rem;" onclick="event.stopPropagation();" onmouseenter="this.style.color='var(--text-primary, #f8fafc)';" onmouseleave="this.style.color='var(--text-muted, #64748b)';" title="Open full profile in new tab">↗</a>
         {result_sequence_badge_html}
       </div>
-      <span class="stock-company-sub" style="color:#94a3b8;font-size:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;" title="{company_name} · {industry}">{company_name}</span>
+      <span class="stock-company-sub" style="color:var(--text-secondary, #94a3b8);font-size:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;" title="{company_name} · {industry}">{company_name}</span>
+      <div class="institutional-tags-strip" style="display:flex;align-items:center;gap:0.25rem;flex-wrap:wrap;margin-top:0.18rem;">
+        {institutional_tags_html}
+      </div>
     </div>
   </td>
-  <td class="cell-earnings-date mono" style="color:#cbd5e1;font-size:0.75rem;white-space:nowrap;">
+  <td class="cell-earnings-date mono" style="color:var(--text-secondary, #cbd5e1);font-size:0.75rem;white-space:nowrap;font-variant-numeric:tabular-nums;">
     <div style="display:flex;flex-direction:column;gap:0.1rem;">
       <span>{earnings_date}</span>
       {relative_date_badge_html}
     </div>
   </td>
-  <td class="cell-action-signal mono" style="font-size:0.75rem;white-space:nowrap;text-align:center;">
+  <td class="cell-action-signal mono" style="font-size:0.75rem;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;">
     {buy_indicator_html}
   </td>
-  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.8rem;white-space:nowrap;">
+  <td class="cell-current-price mono" style="color:var(--text-primary, #ffffff);font-weight:700;font-size:0.8rem;white-space:nowrap;font-variant-numeric:tabular-nums;">
     <div style="display:flex;flex-direction:column;gap:0.1rem;">
       <div style="display:flex;align-items:center;">{live_dot_html}<span class="price-val">{current_price}</span></div>
-      <span class="mcap-val" style="font-size:0.68rem;color:#94a3b8;font-weight:500;">{market_cap}</span>
+      <span class="mcap-val" style="font-size:0.68rem;color:var(--text-muted, #94a3b8);font-weight:500;">{market_cap}</span>
     </div>
   </td>
   <td class="cell-eps-estimates mono" style="font-size:0.75rem;white-space:nowrap;">

@@ -16,6 +16,8 @@ const ResultsLedger = (() => {
   /* State */
   let _app = null;
   let _abortCtrl = null;
+  let _sortCol = null;
+  let _sortDir = 'asc';
   let _state = {
     daySectionsMeta: [], months: [], activeMonth: 'ALL',
     selectedDates: new Set(), capFilter: 'all', densityMode: 'compact',
@@ -219,10 +221,22 @@ const ResultsLedger = (() => {
     let totalStocks = 0;
     let rowRangeCursor = 0;
     const rows = [];
-    rows.push(`<table class="results-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
+    rows.push(`<table class="results-table results-terminal-table" style="width:100%;border-collapse:collapse;table-layout:auto;">
       <thead>
-        <tr style="background:#000;position:sticky;top:0;z-index:10;">
-          <th style="${_thStyle()}text-align:left;min-width:140px;">TICKER</th><th style="${_thStyle()}">DATE</th><th style="${_thStyle()}text-align:center;">SIGNAL</th><th style="${_thStyle()}">PRICE / CAP</th><th style="${_thStyle()}">EPS EST</th><th style="${_thStyle()}">BEAT RATE</th><th style="${_thStyle()}text-align:center;">SURPRISE %</th><th style="${_thStyle()}">RETURNS</th><th style="${_thStyle()}text-align:center;">AI EDGE</th><th style="${_thStyle()}">SETUP</th><th style="${_thStyle()}">S/R RANGE</th><th style="${_thStyle()}">52W</th><th style="${_thStyle()}text-align:center;">REL VOL</th>
+        <tr style="background:var(--bg-surface, #0d1117);position:sticky;top:0;z-index:25;">
+          <th style="${_thStyle()}text-align:left;min-width:140px;cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 0, 'text')" title="Sort by Stock Symbol">TICKER<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 1, 'date')" title="Sort by Result Date">DATE<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}text-align:center;cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 2, 'num')" title="Sort by Quantitative Action Signal">SIGNAL<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 3, 'num')" title="Sort by Current Price">PRICE / CAP<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 4, 'num')" title="Sort by Consensus EPS Estimate">EPS EST<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 5, 'num')" title="Sort by Historical Beat Rate">BEAT RATE<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}text-align:center;cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 6, 'num')" title="Sort by EPS Surprise %">SURPRISE %<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 7, 'num')" title="Sort by 7-Day & 30-Day Returns">RETURNS<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}text-align:center;cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 8, 'text')" title="Sort by Multi-Model AI Consensus">AI EDGE<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 9, 'text')" title="Actionable Technical Setup Classifier">SETUP<span class="sort-arrow"></span></th>
+          <th style="${_thStyle()}">S/R RANGE</th>
+          <th style="${_thStyle()}">52W</th>
+          <th style="${_thStyle()}text-align:center;cursor:pointer;" onclick="window.resultsLedger && window.resultsLedger.sortTable(this, 12, 'num')" title="Relative Volume (5D vs 63D Surge)">REL VOL<span class="sort-arrow"></span></th>
         </tr>
       </thead>
       <tbody id="rl-tbody">`);
@@ -234,7 +248,7 @@ const ResultsLedger = (() => {
       const stocks    = sec.stocks || [];
       const startRow  = rowRangeCursor;
       rows.push(`<tr class="rl-day-divider results-day-divider" data-date="${_esc(dateKey)}" data-month="${_esc(monthKey)}" data-row-start="${startRow}" data-count="${stocks.length}">
-        <td colspan="13" class="rl-day-divider" style="padding:0.3rem 0.65rem;background:#000;border-top:1px solid rgba(255,255,255,0.07);">
+        <td colspan="13" class="rl-day-divider" style="padding:0.3rem 0.65rem;background:var(--bg-surface, #0d1117);position:sticky;top:28px;z-index:15;border-top:1px solid var(--border-subtle, rgba(255,255,255,0.07));">
           <div style="display:flex;align-items:center;gap:0.4rem;">
             <span style="font-size:0.66rem;font-weight:700;color:#94a3b8;font-family:var(--font-mono);">${_esc(dayLabel)}</span>
             ${dayRel ? `<span style="font-size:0.58rem;background:rgba(255,255,255,0.06);color:#f8fafc;padding:0.04rem 0.3rem;border-radius:3px;font-weight:600;">${_esc(dayRel)}</span>` : ''}
@@ -338,6 +352,7 @@ const ResultsLedger = (() => {
       const indOk   = !excl.size || !excl.has(row.dataset.industry || '');
       const searchOk= !q || ticker.includes(q) || industry.includes(q)
         || (row.querySelector('.stock-company-sub')?.textContent || '').toLowerCase().includes(q)
+        || (row.querySelector('.institutional-tags-strip')?.textContent || '').toLowerCase().includes(q)
         || (row.dataset.setup || '').toLowerCase().includes(q)
         || (row.dataset.buySignal || '').toLowerCase().includes(q);
       const show = monthOk && dateOk && capOk && indOk && searchOk;
@@ -641,6 +656,81 @@ const ResultsLedger = (() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
+  function sortTable(th, colIdx, type) {
+    if (_sortCol === colIdx) {
+      _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      _sortCol = colIdx;
+      _sortDir = (type === 'num') ? 'desc' : 'asc';
+    }
+
+    document.querySelectorAll('.results-terminal-table th, .results-table th').forEach((header, idx) => {
+      header.classList.remove('sort-asc', 'sort-desc');
+      const arrow = header.querySelector('.sort-arrow');
+      if (arrow) arrow.textContent = '';
+      if (idx === colIdx) {
+        header.classList.add(_sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+        if (arrow) arrow.textContent = _sortDir === 'asc' ? ' ▲' : ' ▼';
+      }
+    });
+
+    const tbody = _el('rl-tbody') || document.querySelector('.results-terminal-table tbody');
+    if (!tbody) return;
+
+    const dayGroups = [];
+    let currentGroup = null;
+
+    Array.from(tbody.children).forEach(node => {
+      if (node.classList.contains('results-day-divider') || node.classList.contains('rl-day-divider')) {
+        currentGroup = { divider: node, rows: [] };
+        dayGroups.push(currentGroup);
+      } else if (node.classList.contains('results-row')) {
+        if (!currentGroup) {
+          currentGroup = { divider: null, rows: [] };
+          dayGroups.push(currentGroup);
+        }
+        currentGroup.rows.push(node);
+      }
+    });
+
+    const getVal = (row, col) => {
+      switch (col) {
+        case 0: return (row.dataset.ticker || '').toLowerCase();
+        case 1: return row.dataset.date || '';
+        case 2: return parseFloat(row.dataset.buyScore) || 0;
+        case 3: return parseFloat(row.dataset.price) || 0;
+        case 4: return parseFloat(row.dataset.beatRate) || 0;
+        case 5: return parseFloat(row.dataset.beatRate) || 0;
+        case 6: return parseFloat(row.dataset.beatRate) || 0;
+        case 7: return parseFloat(row.dataset['7dRet']) || 0;
+        case 8: return (row.querySelector('.cell-ai-edge')?.textContent || '').trim();
+        case 9: return (row.dataset.setup || '').toLowerCase();
+        case 11: return parseFloat(row.dataset.price) || 0;
+        case 12: return parseFloat(row.dataset.relVol) || 0;
+        default: return (row.children[col]?.textContent || '').trim().toLowerCase();
+      }
+    };
+
+    dayGroups.forEach(group => {
+      group.rows.sort((a, b) => {
+        const vA = getVal(a, colIdx);
+        const vB = getVal(b, colIdx);
+        if (type === 'num') {
+          return _sortDir === 'asc' ? vA - vB : vB - vA;
+        } else {
+          return _sortDir === 'asc' ? String(vA).localeCompare(String(vB)) : String(vB).localeCompare(String(vA));
+        }
+      });
+    });
+
+    const fragment = document.createDocumentFragment();
+    dayGroups.forEach(group => {
+      if (group.divider) fragment.appendChild(group.divider);
+      group.rows.forEach(r => fragment.appendChild(r));
+    });
+    tbody.appendChild(fragment);
+  }
+
   function _setStatus(msg) {
     const el = _el('resultsReportStatus');
     if (el) el.textContent = msg;
@@ -663,7 +753,7 @@ const ResultsLedger = (() => {
     onIndustryCheckboxChange, selectAllIndustries, clearAllIndustries, syncCalendar,
     recalcPrices, summarize, openDrawer, openMonthModal, refreshSinglePrice,
     onMonthCellClick: setMonth,
-    updateDomRowWithMetrics, exportCsv, exportJson,
+    updateDomRowWithMetrics, exportCsv, exportJson, sortTable,
   };
 })();
 
