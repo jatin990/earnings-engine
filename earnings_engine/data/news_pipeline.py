@@ -99,6 +99,9 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
             ("is_republication", "INTEGER DEFAULT 0"),
             ("originality_rationale", "TEXT DEFAULT ''"),
             ("affected_tickers", "TEXT DEFAULT '[]'"),
+            ("source_tier", "TEXT DEFAULT 'TIER_3'"),
+            ("corroborating_sources", "TEXT DEFAULT '[]'"),
+            ("story_cluster_id", "TEXT"),
         ]
 
         for col_name, col_type in new_columns:
@@ -109,9 +112,10 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
                 except Exception as e:
                     logger.debug("Failed adding column %s: %s", col_name, e)
 
-        # Create index on canonical_hash
+        # Create index on canonical_hash and story_cluster_id
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_news_catalysts_canonical ON news_catalysts (canonical_hash)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_news_catalysts_cluster ON news_catalysts (story_cluster_id)")
         except Exception:
             pass
 
@@ -369,6 +373,32 @@ def process_and_verify_news_items(
             scored["impact_score"] = int(ai_res["impact_score"])
             scored["impact_level"] = ai_res.get("impact_level", scored["impact_level"])
 
+        from earnings_engine.data.news_sources import get_source_tier
+        from earnings_engine.data.catalysts_news import (
+            cross_reference_exchange_disclosure,
+            determine_catalyst_verification_status,
+        )
+
+        s_tier = get_source_tier(item.get("publisher"), item.get("source"), item.get("feed_id"))
+        matching_filings = []
+        if s_tier != "TIER_1":
+            try:
+                matching_filings = cross_reference_exchange_disclosure(
+                    ticker=ticker,
+                    headline=title,
+                    published_at=v_res["published_at_utc"],
+                    settings=settings,
+                )
+            except Exception:
+                pass
+
+        v_status, status_flags = determine_catalyst_verification_status(
+            item,
+            matching_filings=matching_filings,
+            corroborating_sources=item.get("corroborating_sources"),
+        )
+        combined_flags = list(v_res.get("verification_flags", [])) + status_flags
+
         record = {
             "ticker": ticker,
             "stock_name": v_res["official_name"],
@@ -390,11 +420,14 @@ def process_and_verify_news_items(
             "feed_id": item.get("feed_id", ""),
             "feed_name": item.get("feed_name", ""),
             "created_at": now_str,
-            "verification_status": "VERIFIED",
-            "verification_flags": json.dumps(v_res.get("verification_flags", [])),
+            "source_tier": s_tier,
+            "verification_status": v_status,
+            "verification_flags": json.dumps(combined_flags),
             "verified_numbers": json.dumps(v_res.get("verified_numbers", {})),
             "entity_confidence": v_res.get("confidence_score", 0.85),
             "canonical_hash": c_hash,
+            "story_cluster_id": item.get("story_cluster_id"),
+            "corroborating_sources": json.dumps(item.get("corroborating_sources", [])),
             "signal_price": signal_price,
             "signal_date": signal_date,
             "current_price": current_price,
@@ -604,8 +637,9 @@ def save_verified_news_records(
                         entity_confidence, canonical_hash, signal_price, signal_date,
                         current_price, price_change_pct, ai_analysis, ai_takeaway,
                         ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at,
-                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers,
+                        source_tier, corroborating_sources, story_cluster_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -624,6 +658,9 @@ def save_verified_news_records(
                         verified_numbers = excluded.verified_numbers,
                         entity_confidence = excluded.entity_confidence,
                         canonical_hash = excluded.canonical_hash,
+                        source_tier = COALESCE(excluded.source_tier, news_catalysts.source_tier),
+                        corroborating_sources = COALESCE(excluded.corroborating_sources, news_catalysts.corroborating_sources),
+                        story_cluster_id = COALESCE(excluded.story_cluster_id, news_catalysts.story_cluster_id),
                         signal_price = COALESCE(excluded.signal_price, news_catalysts.signal_price),
                         signal_date = COALESCE(excluded.signal_date, news_catalysts.signal_date),
                         current_price = COALESCE(excluded.current_price, news_catalysts.current_price),
@@ -662,6 +699,9 @@ def save_verified_news_records(
                         r.get("is_republication", 0),
                         r.get("originality_rationale", ""),
                         aff_tickers_json,
+                        r.get("source_tier", "TIER_3"),
+                        r.get("corroborating_sources", "[]"),
+                        r.get("story_cluster_id"),
                     ),
                 )
                 inserted_count += 1
@@ -752,8 +792,9 @@ def save_verified_news_records_with_feed_breakdown(
                         entity_confidence, canonical_hash, signal_price, signal_date,
                         current_price, price_change_pct, ai_analysis, ai_takeaway,
                         ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at,
-                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers,
+                        source_tier, corroborating_sources, story_cluster_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -772,6 +813,9 @@ def save_verified_news_records_with_feed_breakdown(
                         verified_numbers = excluded.verified_numbers,
                         entity_confidence = excluded.entity_confidence,
                         canonical_hash = excluded.canonical_hash,
+                        source_tier = COALESCE(excluded.source_tier, news_catalysts.source_tier),
+                        corroborating_sources = COALESCE(excluded.corroborating_sources, news_catalysts.corroborating_sources),
+                        story_cluster_id = COALESCE(excluded.story_cluster_id, news_catalysts.story_cluster_id),
                         signal_price = COALESCE(excluded.signal_price, news_catalysts.signal_price),
                         signal_date = COALESCE(excluded.signal_date, news_catalysts.signal_date),
                         current_price = COALESCE(excluded.current_price, news_catalysts.current_price),
@@ -810,6 +854,9 @@ def save_verified_news_records_with_feed_breakdown(
                         r.get("is_republication", 0),
                         r.get("originality_rationale", ""),
                         aff_tickers_json,
+                        r.get("source_tier", "TIER_3"),
+                        r.get("corroborating_sources", "[]"),
+                        r.get("story_cluster_id"),
                     ),
                 )
 

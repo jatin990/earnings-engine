@@ -17,7 +17,7 @@ import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -262,6 +262,9 @@ def _connect(settings: Settings) -> Any:
                 is_republication INTEGER DEFAULT 0,
                 originality_rationale TEXT DEFAULT '',
                 affected_tickers TEXT DEFAULT '[]',
+                source_tier TEXT DEFAULT 'TIER_3',
+                corroborating_sources TEXT DEFAULT '[]',
+                story_cluster_id TEXT,
                 UNIQUE(ticker, title)
             )
             """
@@ -371,12 +374,24 @@ def _connect(settings: Settings) -> Any:
                 ("is_republication", "INTEGER DEFAULT 0"),
                 ("originality_rationale", "TEXT DEFAULT ''"),
                 ("affected_tickers", "TEXT DEFAULT '[]'"),
+                ("source_tier", "TEXT DEFAULT 'TIER_3'"),
+                ("corroborating_sources", "TEXT DEFAULT '[]'"),
+                ("story_cluster_id", "TEXT"),
             ]:
                 if not existing_cols or col_name not in existing_cols:
                     try:
                         conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
                     except Exception:
                         pass
+            try:
+                conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_news_catalysts_cluster
+                    ON news_catalysts (story_cluster_id)
+                    """
+                )
+            except Exception:
+                pass
         except Exception:
             pass
         # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
@@ -426,6 +441,177 @@ def _connect(settings: Settings) -> Any:
         conn.commit()
         _INITIALIZED_DBS.add(db_key)
     return conn
+
+
+def cross_reference_exchange_disclosure(
+    ticker: str,
+    headline: str,
+    published_at: str | None = None,
+    settings: Settings | None = None,
+    window_hours: int = 48,
+) -> list[dict[str, Any]]:
+    """Cross-reference a news headline against official exchange filings (NSE/BSE/Reg30).
+
+    Searches for official disclosures for the same ticker within `window_hours` (default 48h)
+    and verifies lexical/numeric overlap (e.g. order amount, project type, key tokens).
+    Returns a list of matching official exchange disclosures.
+    """
+    settings = settings or Settings()
+    ticker = ticker.strip().upper()
+    matches: list[dict[str, Any]] = []
+
+    # Clean headline tokens for comparison
+    clean_headline = re.sub(r"[^\w\s]", " ", headline.lower())
+    stop_words = {
+        "shares", "share", "stock", "stocks", "rally", "rallies", "plunge", "plunges",
+        "jumps", "jump", "today", "yesterday", "market", "markets", "after", "before",
+        "ltd", "limited", "company", "says", "report", "reports", "quarter", "worth",
+        "news", "corp", "india", "indian", "firm", "firms", "crore", "cr", "rs", "inr",
+    }
+    headline_tokens = {w for w in clean_headline.split() if len(w) >= 3 and w not in stop_words}
+    headline_nums = set(re.findall(r"\b\d+(?:[\.,]\d+)?\b", clean_headline.replace(",", "")))
+
+    try:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+
+            tier1_sources = (
+                "nse_announcements", "bse_announcements", "nse_rss", "rbi_rss",
+                "exchange_filing", "exchange_filings", "corporate_disclosure"
+            )
+            placeholders = ",".join("?" for _ in tier1_sources)
+            time_filter = ""
+            params: list[Any] = [ticker]
+            params.extend(tier1_sources)
+
+            if published_at:
+                try:
+                    dt = datetime.fromisoformat(str(published_at)[:19].replace(" ", "T"))
+                    dt_start = (dt - timedelta(hours=window_hours)).strftime("%Y-%m-%d %H:%M:%S")
+                    dt_end = (dt + timedelta(hours=window_hours)).strftime("%Y-%m-%d %H:%M:%S")
+                    time_filter = "AND published_at BETWEEN ? AND ?"
+                    params.extend([dt_start, dt_end])
+                except Exception:
+                    pass
+
+            query = f"""
+                SELECT * FROM news_catalysts
+                WHERE ticker = ?
+                  AND (source_tier = 'TIER_1' OR source IN ({placeholders}) OR publisher LIKE '%NSE%' OR publisher LIKE '%BSE%')
+                  {time_filter}
+                ORDER BY published_at DESC
+                LIMIT 50
+            """
+            rows = conn.execute(query, params).fetchall()
+            for r in rows:
+                filing_dict = dict(r)
+                filing_title = (filing_dict.get("title") or "").lower()
+                clean_f_title = re.sub(r"[^\w\s]", " ", filing_title)
+                filing_tokens = {w for w in clean_f_title.split() if len(w) >= 3 and w not in stop_words}
+                filing_nums = set(re.findall(r"\b\d+(?:[\.,]\d+)?\b", clean_f_title.replace(",", "")))
+
+                common_nums = headline_nums.intersection(filing_nums)
+                num_matched = bool(common_nums and any(float(n) > 1 for n in common_nums))
+
+                overlap = headline_tokens.intersection(filing_tokens)
+                jaccard = len(overlap) / max(1, len(headline_tokens.union(filing_tokens)))
+
+                if (num_matched and len(overlap) >= 1) or len(overlap) >= 3 or jaccard >= 0.20:
+                    filing_dict["match_rationale"] = f"Token overlap={len(overlap)}, num_matched={num_matched}"
+                    matches.append(filing_dict)
+
+            # Also check reg30_disclosures if table exists
+            try:
+                r30_check = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reg30_disclosures'").fetchone()
+                if r30_check:
+                    clean_sym = ticker.replace(".NS", "").replace(".BO", "").strip().upper()
+                    r30_rows = conn.execute(
+                        "SELECT * FROM reg30_disclosures WHERE symbol = ? ORDER BY timestamp DESC LIMIT 30",
+                        (clean_sym,),
+                    ).fetchall()
+                    for r in r30_rows:
+                        rd = dict(r)
+                        r_title = (rd.get("headline") or rd.get("description") or "").lower()
+                        clean_r_title = re.sub(r"[^\w\s]", " ", r_title)
+                        r_tokens = {w for w in clean_r_title.split() if len(w) >= 3 and w not in stop_words}
+                        r_nums = set(re.findall(r"\b\d+(?:[\.,]\d+)?\b", clean_r_title.replace(",", "")))
+
+                        common_nums = headline_nums.intersection(r_nums)
+                        num_matched = bool(common_nums and any(float(n) > 1 for n in common_nums))
+                        overlap = headline_tokens.intersection(r_tokens)
+                        jaccard = len(overlap) / max(1, len(headline_tokens.union(r_tokens)))
+
+                        if (num_matched and len(overlap) >= 1) or len(overlap) >= 3 or jaccard >= 0.20:
+                            matches.append({
+                                "ticker": ticker,
+                                "title": rd.get("headline"),
+                                "publisher": rd.get("source", "BSE"),
+                                "source": "reg30_disclosures",
+                                "published_at": rd.get("timestamp"),
+                                "match_rationale": "Matched reg30_disclosures table",
+                            })
+            except Exception:
+                pass
+
+    except Exception as e:
+        logger.debug("[CATALYSTS] cross_reference_exchange_disclosure error: %s", e)
+
+    return matches
+
+
+def determine_catalyst_verification_status(
+    item: dict[str, Any],
+    matching_filings: list[dict[str, Any]] | None = None,
+    corroborating_sources: list[str] | None = None,
+) -> tuple[str, list[str]]:
+    """Assign deterministic verification status based on source tier, exchange filings, and multi-source corroboration.
+
+    Returns:
+        (status, flags) where status is one of:
+        - 'EXCHANGE_VERIFIED': Originates directly from Tier 1 exchange feed or matched official exchange disclosure.
+        - 'CORROBORATED': Multiple independent Tier 2 major press sources corroborate the story.
+        - 'UNVERIFIED_SINGLE_SOURCE': Only a single source reports the catalyst without official exchange corroboration.
+    """
+    from earnings_engine.data.news_sources import (
+        get_source_tier,
+        TIER_1_OFFICIAL,
+        TIER_2_MAJOR_FINANCIAL_PRESS,
+        TIER_3_AGGREGATORS,
+    )
+
+    publisher = str(item.get("publisher") or "")
+    source = str(item.get("source") or "")
+    feed_id = str(item.get("feed_id") or "")
+    flags: list[str] = []
+
+    source_tier = get_source_tier(publisher, source, feed_id)
+
+    # 1. Direct Tier 1 source
+    if source_tier == TIER_1_OFFICIAL:
+        flags.append("TIER_1_PRIMARY_DISCLOSURE")
+        return "EXCHANGE_VERIFIED", flags
+
+    # 2. Corroborated by official exchange disclosure
+    if matching_filings and len(matching_filings) > 0:
+        flags.append("EXCHANGE_DISCLOSURE_CORROBORATED")
+        return "EXCHANGE_VERIFIED", flags
+
+    # 3. Multi-source corroboration across independent press feeds
+    unique_sources = set()
+    if publisher:
+        unique_sources.add(publisher.strip().lower())
+    if corroborating_sources:
+        for s in corroborating_sources:
+            if s and s.strip():
+                unique_sources.add(s.strip().lower())
+
+    if len(unique_sources) >= 2:
+        flags.append("MULTI_SOURCE_CORROBORATED")
+        return "CORROBORATED", flags
+
+    # 4. Single unconfirmed source
+    flags.append("SINGLE_SOURCE_UNCONFIRMED")
+    return "UNVERIFIED_SINGLE_SOURCE", flags
 
 
 def disambiguate_ticker_for_headline(ticker: str, title: str, summary: str = "") -> str:

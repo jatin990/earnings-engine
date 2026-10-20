@@ -39,6 +39,78 @@ DEFAULT_HEADERS = {
     "Cache-Control": "no-cache",
 }
 
+# --- Source Tiering & Credibility Tiers ---
+TIER_1_OFFICIAL = "TIER_1"
+TIER_2_MAJOR_FINANCIAL_PRESS = "TIER_2"
+TIER_3_AGGREGATORS = "TIER_3"
+
+TIER_1_PUBLISHERS = {
+    "nse", "bse", "nse corporate disclosures", "bse corporate filings",
+    "nse announcements", "nse corporate actions", "nse insider trading",
+    "nse daily buyback", "nse financial results", "nse board meetings",
+    "neaps", "bse online", "rbi press releases", "rbi", "sebi",
+    "sebi enforcement", "nclt", "exchange filing", "exchange disclosure",
+}
+
+TIER_1_SOURCES = {
+    "nse_announcements", "bse_announcements", "nse_rss", "rbi_rss",
+    "exchange_filing", "exchange_filings", "reg30", "corporate_disclosure",
+}
+
+TIER_2_KEYWORDS = [
+    "economic times", "et markets", "et earnings", "et corporate",
+    "business standard", "livemint", "mint", "reuters", "bloomberg",
+    "ndtv profit", "hindu businessline", "the hindu businessline",
+    "business today", "financial express", "cnbc",
+]
+
+
+def get_source_tier(
+    publisher: str | None = None,
+    source: str | None = None,
+    feed_id: str | None = None,
+) -> str:
+    """Determine the source credibility tier (TIER_1, TIER_2, or TIER_3)."""
+    pub_lower = (publisher or "").strip().lower()
+    src_lower = (source or "").strip().lower()
+    fid_lower = (feed_id or "").strip().lower()
+
+    # Check Tier 1 (Official Exchange & Regulatory Disclosures)
+    if src_lower in TIER_1_SOURCES:
+        return TIER_1_OFFICIAL
+    if any(fid_lower.startswith(p) for p in ("nse_", "bse_", "rbi_")):
+        return TIER_1_OFFICIAL
+    if pub_lower in TIER_1_PUBLISHERS:
+        return TIER_1_OFFICIAL
+    if any(t in pub_lower for t in ("nse", "bse", "neaps", "rbi press", "corporate disclosure")):
+        # Ensure it's not a secondary article merely mentioning NSE (e.g. 'ET Markets NSE')
+        if not any(k in pub_lower for k in TIER_2_KEYWORDS) and "google" not in pub_lower:
+            return TIER_1_OFFICIAL
+
+    # Check Tier 2 (Major Financial Press)
+    if any(kw in pub_lower for kw in TIER_2_KEYWORDS):
+        return TIER_2_MAJOR_FINANCIAL_PRESS
+    if any(fid_lower.startswith(f"media_{kw.replace(' ', '_')}") for kw in ("et", "livemint", "business_standard", "ndtv", "hindu", "business_today")):
+        return TIER_2_MAJOR_FINANCIAL_PRESS
+
+    # Tier 3 (Aggregators, Syndicates, Blogs, Google News, MoneyControl, Unverified)
+    return TIER_3_AGGREGATORS
+
+
+def get_source_credibility_score(
+    publisher: str | None = None,
+    source: str | None = None,
+    feed_id: str | None = None,
+) -> float:
+    """Return normalized credibility score between 0.0 and 1.0 based on source tier."""
+    tier = get_source_tier(publisher, source, feed_id)
+    if tier == TIER_1_OFFICIAL:
+        return 1.0
+    elif tier == TIER_2_MAJOR_FINANCIAL_PRESS:
+        return 0.85
+    return 0.50
+
+
 MONEYCONTROL_FEEDS = [
     ("https://www.moneycontrol.com/rss/latestnews.xml", "MoneyControl"),
     ("https://www.moneycontrol.com/rss/marketreports.xml", "MoneyControl Markets"),
