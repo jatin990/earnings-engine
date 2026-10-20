@@ -40,6 +40,7 @@
     app._currentDrawerTicker = null;
     app._drawerChartTimeframe = '1Y';
     app._stockDrawerContext = { list: [], currentIndex: -1 };
+    app._drawerHydratedTabs = new Set();
 
     // Native Chart State
     app._drawerChartInstance = null;
@@ -90,6 +91,7 @@
         if (!ticker) return;
         const sym = String(ticker).trim().toUpperCase();
         app._currentDrawerTicker = sym;
+        app._drawerHydratedTabs.clear();
 
         // Context List & Stepper Setup
         if (options.list && Array.isArray(options.list) && options.list.length > 0) {
@@ -157,12 +159,7 @@
             window.history.replaceState(null, '', `#stock/${encodeURIComponent(sym)}`);
         }
 
-        // Hydrate Tiered Async Data
-        app._hydrateTier1(sym, signal);
-        app._hydrateTier2(sym, signal);
-        app._hydrateTier3Consensus(sym, signal);
-
-        // Tab or Section Jump
+        // Hydrate only active tab on-demand (lazy loading)
         const initialTab = options.initialTab || options.initialSection || app._currentDrawerTab || 'quote';
         app.switchDrawerTab(initialTab);
     };
@@ -308,6 +305,11 @@
             });
         }
 
+        // Trigger on-demand lazy hydration for active tab
+        if (app._currentDrawerTicker) {
+            app._hydrateDrawerTab(tabKey, app._currentDrawerTicker);
+        }
+
         // If chart tab is active, trigger resize to ensure proper canvas layout
         if ((tabKey === 'chart' || tabKey === 'all') && app._drawerChartInstance) {
             setTimeout(() => {
@@ -330,7 +332,7 @@
     };
 
     // =========================================================================
-    // 2. TIERED ASYNC HYDRATION
+    // 2. ON-DEMAND LAZY SUBTAB HYDRATION DISPATCHER
     // =========================================================================
 
     app._resetDrawerCardShimmers = function () {
@@ -359,181 +361,200 @@
         });
     };
 
-    // Tier 1: Quote, Technicals, Native Chart Engine
-    app._hydrateTier1 = async function (sym, signal) {
-        // 1. Initialize & populate Native LightweightCharts Canvas
-        app._initOrUpdateDrawerChart(sym, signal);
+    // Unified On-Demand Tab Loader
+    app._hydrateDrawerTab = async function (tabKey, sym, force = false) {
+        if (!sym || app._currentDrawerTicker !== sym) return;
+        const signal = _drawerAbortCtrl ? _drawerAbortCtrl.signal : undefined;
 
-        // 2. Quote API
-        try {
-            const cacheKey = `quote_${sym}`;
-            let data = getCached(cacheKey);
-            if (!data) {
-                const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/quote`, { signal });
-                if (res.ok) {
-                    data = await res.json();
-                    setCached(cacheKey, data);
-                }
-            }
-
-            if (data && app._currentDrawerTicker === sym) {
-                app._renderQuoteCard(data);
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Quote error:', e);
+        // If 'all', load all tabs concurrently
+        if (tabKey === 'all') {
+            const allTabs = ['quote', 'chart', 'structure', 'eps', 'consensus', 'institutional', 'factors', 'news', 'notes'];
+            allTabs.forEach(t => app._hydrateDrawerTab(t, sym, force));
+            return;
         }
 
-        // 3. Technicals / Structure API
-        try {
-            const cacheKey = `tech_${sym}`;
-            let data = getCached(cacheKey);
-            if (!data) {
-                const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/technicals`, { signal });
-                if (res.ok) {
-                    data = await res.json();
-                    setCached(cacheKey, data);
-                }
-            }
-
-            if (data && app._currentDrawerTicker === sym) {
-                app._renderStructureCard(data);
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Technicals error:', e);
+        // Avoid re-fetching already hydrated tabs unless forced
+        if (!force && app._drawerHydratedTabs.has(tabKey)) {
+            return;
         }
-    };
+        app._drawerHydratedTabs.add(tabKey);
 
-    // Tier 2: EPS, Institutional, Factors/Rating, News, Notes
-    app._hydrateTier2 = async function (sym, signal) {
-        // EPS History
-        (async () => {
-            try {
-                const cacheKey = `eps_${sym}`;
-                let data = getCached(cacheKey);
-                if (!data) {
-                    const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/earnings`, { signal });
-                    if (res.ok) {
-                        data = await res.json();
-                        setCached(cacheKey, data);
+        switch (tabKey) {
+            case 'quote': {
+                try {
+                    const cacheKey = `quote_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/quote`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
                     }
-                }
-                if (data && app._currentDrawerTicker === sym) {
-                    app._renderEPSCard(data);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] EPS error:', e);
-            }
-        })();
-
-        // Institutional Forensics
-        (async () => {
-            try {
-                const cacheKey = `inst_${sym}`;
-                let data = getCached(cacheKey);
-                if (!data) {
-                    const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/institutional`, { signal });
-                    if (res.ok) {
-                        data = await res.json();
-                        setCached(cacheKey, data);
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderQuoteCard(data);
                     }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Quote error:', e);
                 }
-                if (data && app._currentDrawerTicker === sym) {
-                    app._renderInstitutionalCard(data);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Institutional error:', e);
+                break;
             }
-        })();
 
-        // Factors & Rating
-        (async () => {
-            try {
-                const cacheKey = `rating_${sym}`;
-                let data = getCached(cacheKey);
-                if (!data) {
-                    const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/rating`, { signal });
-                    if (res.ok) {
-                        data = await res.json();
-                        setCached(cacheKey, data);
+            case 'chart': {
+                // Initialize or update Native LightweightCharts Canvas
+                app._initOrUpdateDrawerChart(sym, signal);
+                break;
+            }
+
+            case 'structure': {
+                try {
+                    const cacheKey = `tech_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/technicals`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
                     }
-                }
-                if (data && app._currentDrawerTicker === sym) {
-                    app._renderFactorsCard(data);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Rating error:', e);
-            }
-        })();
-
-        // News Catalysts
-        (async () => {
-            try {
-                const cacheKey = `news_${sym}`;
-                let data = getCached(cacheKey);
-                if (!data) {
-                    const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/catalysts`, { signal });
-                    if (res.ok) {
-                        data = await res.json();
-                        setCached(cacheKey, data);
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderStructureCard(data);
                     }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Technicals error:', e);
                 }
-                if (data && app._currentDrawerTicker === sym) {
-                    app._renderNewsCard(data);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] News error:', e);
+                break;
             }
-        })();
 
-        // Notes & Qualitative Thesis
-        (async () => {
-            try {
-                const cacheKey = `notes_${sym}`;
-                let data = getCached(cacheKey);
-                if (!data) {
-                    const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/notes`, { signal });
-                    if (res.ok) {
-                        data = await res.json();
-                        setCached(cacheKey, data);
+            case 'eps': {
+                try {
+                    const cacheKey = `eps_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/earnings`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
                     }
-                }
-                if (data && app._currentDrawerTicker === sym) {
-                    app._renderNotesCard(data);
-                }
-            } catch (e) {
-                if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Notes error:', e);
-            }
-        })();
-    };
-
-    // Tier 3: AI Consensus (Zero-Token Default Check)
-    app._hydrateTier3Consensus = async function (sym, signal) {
-        try {
-            const cacheKey = `consensus_${sym}`;
-            let data = getCached(cacheKey);
-            if (!data) {
-                const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/consensus`, { signal });
-                if (res.ok) {
-                    data = await res.json();
-                    if (data && (data.consensus_direction || data.models_breakdown || data.structured)) {
-                        setCached(cacheKey, data);
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderEPSCard(data);
                     }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] EPS error:', e);
                 }
+                break;
             }
 
-            if (data && (data.consensus_direction || data.models_breakdown) && app._currentDrawerTicker === sym) {
-                app._renderConsensusCard(data);
-            } else {
-                // Keep zero-token trigger state visible
-                const consZero = document.getElementById('drawerConsensusZeroToken');
-                const consLoad = document.getElementById('drawerConsensusLoading');
-                const consContent = document.getElementById('drawerConsensusContent');
-                if (consZero) consZero.style.display = 'flex';
-                if (consLoad) consLoad.style.display = 'none';
-                if (consContent) consContent.style.display = 'none';
+            case 'consensus': {
+                try {
+                    const cacheKey = `consensus_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/consensus`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            if (data && (data.consensus_direction || data.models_breakdown || data.structured)) {
+                                setCached(cacheKey, data);
+                            }
+                        }
+                    }
+                    if (data && (data.consensus_direction || data.models_breakdown) && app._currentDrawerTicker === sym) {
+                        app._renderConsensusCard(data);
+                    } else {
+                        // Keep zero-token trigger state visible
+                        const consZero = document.getElementById('drawerConsensusZeroToken');
+                        const consLoad = document.getElementById('drawerConsensusLoading');
+                        const consContent = document.getElementById('drawerConsensusContent');
+                        if (consZero) consZero.style.display = 'flex';
+                        if (consLoad) consLoad.style.display = 'none';
+                        if (consContent) consContent.style.display = 'none';
+                    }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Consensus check error:', e);
+                }
+                break;
             }
-        } catch (e) {
-            if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Consensus check error:', e);
+
+            case 'institutional': {
+                try {
+                    const cacheKey = `inst_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/institutional`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
+                    }
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderInstitutionalCard(data);
+                    }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Institutional error:', e);
+                }
+                break;
+            }
+
+            case 'factors': {
+                try {
+                    const cacheKey = `rating_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/rating`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
+                    }
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderFactorsCard(data);
+                    }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Rating error:', e);
+                }
+                break;
+            }
+
+            case 'news': {
+                try {
+                    const cacheKey = `news_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/catalysts`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
+                    }
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderNewsCard(data);
+                    }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] News error:', e);
+                }
+                break;
+            }
+
+            case 'notes': {
+                try {
+                    const cacheKey = `notes_${sym}`;
+                    let data = getCached(cacheKey);
+                    if (!data) {
+                        const res = await fetch(`${API_BASE}/api/v1/stock/${encodeURIComponent(sym)}/notes`, { signal });
+                        if (res.ok) {
+                            data = await res.json();
+                            setCached(cacheKey, data);
+                        }
+                    }
+                    if (data && app._currentDrawerTicker === sym) {
+                        app._renderNotesCard(data);
+                    }
+                } catch (e) {
+                    if (e.name !== 'AbortError') console.error('[STOCK-DRAWER] Notes error:', e);
+                }
+                break;
+            }
         }
     };
 
