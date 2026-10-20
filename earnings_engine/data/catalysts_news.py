@@ -881,7 +881,36 @@ def disambiguate_ticker_for_headline(ticker: str, title: str, summary: str = "")
         if re.search(r"\b(adani\s+enterprises?|flagship)\b", full_text):
             return "ADANIENT.NS"
 
+    # 6. Vodafone Idea disambiguation (prevent generic 'idea' word collision)
+    if clean_sym in ("IDEA", "VODAFONEIDEA"):
+        if re.search(r"\b(vodafone(?:\s+idea)?|vi\b|telecom|spectrum|agr\s+dues|arpu|subscribers?|dot\b|trai\b|5g\s+rollout|mobile\s+network)\b", full_text):
+            return "IDEA.NS" if ticker.endswith(".NS") else ("IDEA.BO" if ticker.endswith(".BO") else "IDEA.NS")
+        return None
+
     return ticker
+
+
+ANALYST_SPECULATION_PATTERNS = [
+    r"\b(?:analyst|brokerage|expert|nomura|jefferies|clsa|morgan stanley|goldman sachs|kotak|motilal|macquarie|investec|nirmal bang|geojit|sharekhan|icici direct)\s+(?:predicts?|sees?|expects?|views?|notes?|says?|estimates?)\b",
+    r"\b(?:could|may|likely to|seen|expected to|poised to|predicted to|eyeing|eyes|in race for|in talks to|set to)\s+(?:win|bag|secure|sign|clinch|receive|order|contract|deal)\b",
+    r"\b(?:potential|possible|probable|likely|eyeing|eyes|in race for|in talks for)\s+(?:order win|contract|deal|order|mandate|tender)\b",
+    r"\b(?:here(?:'s|\s+is)\s+what\s+(?:brokerages?|analysts?)\s+say)\b",
+    r"\b(?:brokerage\s+view|analyst\s+view|brokerage\s+take)\b",
+]
+
+ORDER_WIN_PATTERNS = [
+    r"\b(?:wins?|bags?|secures?|awarded|receives?|clinches?)\b.*?\b(?:order|contract|deal|mandate|project|tender|licen[sc]e)\b",
+    r"\b(?:order|contract|deal|project)\s+worth\s+(?:rs|inr|₹|\$)\b",
+    r"\b(?:letter of award|loi\b|purchase order|epc contract|turnkey project|solar project)\b",
+    r"\b(?:transmission orders?|exports? order|repeat order|secures? new)\b",
+]
+
+ADVERSE_REGULATORY_PATTERNS = [
+    r"\b(?:form\s*483|warning\s+letter|import\s+alert|oai\s+classification|observations?|deficiency\s+letter)\b",
+    r"\b(?:show[- ]cause\s+notice|penalty\s+of|imposes?\s+penalty|fine\s+of|penalised|penalized)\b",
+    r"\b(?:closure\s+notice|raids?|searches?|probe|investigation|sebi\s+action|cbi|ed\s+raids?)\b",
+    r"\b(?:ban\s+on|blacklists?|cancels?\s+licen[sc]e|suspends?\s+licen[sc]e)\b",
+]
 
 
 def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
@@ -894,8 +923,18 @@ def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
     horizon = "📅 1-3 Days"
     volatility_est = "±1% to ±4%"
 
+    # 1. Speculative analyst commentary guard
+    is_speculative_analyst_call = any(re.search(pat, full_text) for pat in ANALYST_SPECULATION_PATTERNS) or title.strip().endswith("?")
+
+    # 2. Adverse regulatory action guard
+    is_adverse_regulatory = any(re.search(pat, full_text) for pat in ADVERSE_REGULATORY_PATTERNS)
+
     # Match catalyst rules
     for cat_name, rule in CATALYST_RULES.items():
+        # Negative guard: Disallow Order Wins if speculative analyst commentary
+        if cat_name == "Order Wins & Contracts" and is_speculative_analyst_call:
+            continue
+
         matches = [kw for kw in rule["keywords"] if kw in full_text]
         if matches:
             score = rule["base_impact"] + (len(matches) - 1) * 3
@@ -906,17 +945,40 @@ def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
                 volatility_est = rule["volatility_est"]
                 direction = rule["default_direction"]
 
+    # Match confirmed Order Wins regex patterns if not a speculative analyst call
+    if not is_speculative_analyst_call:
+        order_win_matched = any(re.search(pat, full_text) for pat in ORDER_WIN_PATTERNS)
+        if order_win_matched and best_category in ("General Financial News", "Analyst Ratings & Targets"):
+            rule = CATALYST_RULES["Order Wins & Contracts"]
+            best_category = "Order Wins & Contracts"
+            best_impact = max(best_impact, rule["base_impact"])
+            horizon = rule["horizon"]
+            volatility_est = rule["volatility_est"]
+            direction = rule["default_direction"]
+
+    # If it was a speculative analyst call, ensure it's categorized as Analyst Ratings & Targets
+    if is_speculative_analyst_call and best_category in ("General Financial News", "Order Wins & Contracts"):
+        rule = CATALYST_RULES["Analyst Ratings & Targets"]
+        best_category = "Analyst Ratings & Targets"
+        best_impact = max(best_impact, 65)
+        horizon = rule["horizon"]
+        volatility_est = rule["volatility_est"]
+        direction = "BULLISH" if "buy" in full_text or "upgrade" in full_text or "positive" in full_text or "surge" in full_text else "NEUTRAL"
+
     # Sentiment adjustment
     sentiment_score, sentiment_label = calculate_headline_sentiment(title, summary)
-    
+
     bearish_earnings_patterns = [
         "profit plunges", "net loss", "loss widens", "profit falls", "profit declines",
         "profit drops", "guidance slashed", "revenue misses", "misses estimates",
         "weak q1", "weak q2", "weak q3", "weak q4", "margin contracts", "plunges",
         "plunges 60%", "downgraded to sell", "cuts price target"
     ]
-    if best_category == "Litigation, Risk & Probes":
+    if is_adverse_regulatory or best_category == "Litigation, Risk & Probes":
         direction = "BEARISH"
+        if is_adverse_regulatory and best_category in ("General Financial News", "Regulatory, Approvals & Policy"):
+            best_category = "Litigation, Risk & Probes" if ("probe" in full_text or "sebi" in full_text or "penalty" in full_text) else "Regulatory, Approvals & Policy"
+            best_impact = max(best_impact, 80)
     elif any(bp in full_text for bp in bearish_earnings_patterns):
         direction = "BEARISH"
     elif sentiment_label == "Bearish":
