@@ -10,7 +10,9 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import threading
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -145,69 +147,85 @@ def consume_error_stream(
                 grouped[sig]["line_no"] = event.get("line_no")
 
     newly_recorded = 0
-    conn = get_db_connection(settings)
-    with conn:
-        for sig, data in grouped.items():
-            existing = conn.execute(
-                "SELECT id, occurrences, status FROM error_ledger WHERE signature = ?",
-                (sig,),
-            ).fetchone()
+    max_retries = 5
+    backoff = 0.5
+    for attempt in range(max_retries):
+        conn = get_db_connection(settings)
+        try:
+            with conn:
+                for sig, data in grouped.items():
+                    existing = conn.execute(
+                        "SELECT id, occurrences, status FROM error_ledger WHERE signature = ?",
+                        (sig,),
+                    ).fetchone()
 
-            ctx_json = json.dumps(data["context_data"]) if data.get("context_data") else None
+                    ctx_json = json.dumps(data["context_data"]) if data.get("context_data") else None
 
-            if existing:
-                _, _, status = existing
-                new_status = "OPEN" if status == "RESOLVED" else status
-                conn.execute(
-                    """
-                    UPDATE error_ledger
-                    SET occurrences = occurrences + ?,
-                        last_seen_at = ?,
-                        message = ?,
-                        stack_trace = COALESCE(?, stack_trace),
-                        source_file = COALESCE(?, source_file),
-                        line_no = COALESCE(?, line_no),
-                        context_data = COALESCE(?, context_data),
-                        status = ?
-                    WHERE signature = ?
-                    """,
-                    (
-                        data["count"],
-                        now_str,
-                        data["message"],
-                        data["stack_trace"],
-                        data["source_file"],
-                        data["line_no"],
-                        ctx_json,
-                        new_status,
-                        sig,
-                    ),
-                )
-            else:
-                err_id = f"err_{sig[:10]}"
-                conn.execute(
-                    """
-                    INSERT INTO error_ledger (
-                        id, signature, error_type, message, stack_trace, source_file,
-                        line_no, context_data, status, occurrences, first_seen_at, last_seen_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)
-                    """,
-                    (
-                        err_id,
-                        sig,
-                        data["error_type"],
-                        data["message"],
-                        data["stack_trace"],
-                        data["source_file"],
-                        data["line_no"],
-                        ctx_json,
-                        data["count"],
-                        now_str,
-                        now_str,
-                    ),
-                )
-                newly_recorded += 1
+                    if existing:
+                        _, _, status = existing
+                        new_status = "OPEN" if status == "RESOLVED" else status
+                        conn.execute(
+                            """
+                            UPDATE error_ledger
+                            SET occurrences = occurrences + ?,
+                                last_seen_at = ?,
+                                message = ?,
+                                stack_trace = COALESCE(?, stack_trace),
+                                source_file = COALESCE(?, source_file),
+                                line_no = COALESCE(?, line_no),
+                                context_data = COALESCE(?, context_data),
+                                status = ?
+                            WHERE signature = ?
+                            """,
+                            (
+                                data["count"],
+                                now_str,
+                                data["message"],
+                                data["stack_trace"],
+                                data["source_file"],
+                                data["line_no"],
+                                ctx_json,
+                                new_status,
+                                sig,
+                            ),
+                        )
+                    else:
+                        err_id = f"err_{sig[:10]}"
+                        conn.execute(
+                            """
+                            INSERT INTO error_ledger (
+                                id, signature, error_type, message, stack_trace, source_file,
+                                line_no, context_data, status, occurrences, first_seen_at, last_seen_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)
+                            """,
+                            (
+                                err_id,
+                                sig,
+                                data["error_type"],
+                                data["message"],
+                                data["stack_trace"],
+                                data["source_file"],
+                                data["line_no"],
+                                ctx_json,
+                                data["count"],
+                                now_str,
+                                now_str,
+                            ),
+                        )
+                        newly_recorded += 1
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < max_retries - 1:
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     _export_json_snapshot(settings)
 

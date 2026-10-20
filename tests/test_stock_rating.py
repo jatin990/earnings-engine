@@ -141,3 +141,51 @@ def test_api_stock_rating_endpoints():
     resp = client.post("/api/v1/stock/MAXHEALTH.NS/live-week-hl?earnings_date=2026-08-20")
     assert resp.status_code in (200, 404)  # 200 if yfinance network succeeds
 
+
+def test_recalculate_stock_rating_db_lock_retry(tmp_path, monkeypatch):
+    import sqlite3
+    from earnings_engine.data import stock_rating
+    settings = Settings()
+    settings.data_dirs["prices"] = tmp_path
+    settings.data_dirs["earnings"] = tmp_path
+    settings.ensure_dirs()
+    stock_rating.ensure_stock_rating_schema(settings)
+
+    real_get_conn = stock_rating.get_db_connection
+    attempts = [0]
+
+    class LockedThenSuccessConnection:
+        def __init__(self, real_conn):
+            self._real_conn = real_conn
+
+        def execute(self, *args, **kwargs):
+            if args and "INSERT INTO stock_ratings" in args[0]:
+                attempts[0] += 1
+                if attempts[0] == 1:
+                    raise sqlite3.OperationalError("database is locked")
+            return self._real_conn.execute(*args, **kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return self._real_conn.__exit__(exc_type, exc_val, exc_tb)
+
+        def close(self):
+            return self._real_conn.close()
+
+    def mock_get_conn(s):
+        conn = real_get_conn(s)
+        return LockedThenSuccessConnection(conn)
+
+    sleep_calls = []
+    monkeypatch.setattr(stock_rating, "get_db_connection", mock_get_conn)
+    monkeypatch.setattr(stock_rating.time, "sleep", lambda s: sleep_calls.append(s))
+
+    res = recalculate_stock_rating("TCS.NS", settings, source="test_retry")
+    assert res["ticker"] == "TCS.NS"
+    assert attempts[0] == 2
+    assert len(sleep_calls) == 1
+    assert sleep_calls[0] == 0.5
+
+

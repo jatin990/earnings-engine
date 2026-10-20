@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from typing import Any
 
 import numpy as np
@@ -161,13 +162,13 @@ def match_industry_benchmark(industry_str: str | None) -> tuple[str, dict[str, f
 # ---------------------------------------------------------------------------
 # Database Tables Initialization
 # ---------------------------------------------------------------------------
-_STOCK_RATING_SCHEMA_INITIALIZED: bool = False
+_INITIALIZED_RATING_DBS: set[str] = set()
 
 
 def ensure_stock_rating_schema(settings: Settings) -> None:
     """Ensure tables exist for stock ratings, snapshots, and recalculation logs."""
-    global _STOCK_RATING_SCHEMA_INITIALIZED
-    if _STOCK_RATING_SCHEMA_INITIALIZED:
+    db_key = str(settings.data_dirs.get("prices", ""))
+    if db_key in _INITIALIZED_RATING_DBS:
         return
     conn = get_db_connection(settings)
     try:
@@ -207,7 +208,7 @@ def ensure_stock_rating_schema(settings: Settings) -> None:
                 )
                 """
             )
-        _STOCK_RATING_SCHEMA_INITIALIZED = True
+        _INITIALIZED_RATING_DBS.add(db_key)
     finally:
         try:
             conn.close()
