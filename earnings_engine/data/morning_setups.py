@@ -95,6 +95,190 @@ def clean_nse_deal_symbol(sym: str) -> str:
     return s
 
 
+def clean_client_name(name: str | None) -> str:
+    """Normalize client/institution name for deduplication and consistent matching.
+
+    Strips trailing periods, quotes, extra whitespace, parentheses artifacts,
+    and standardizes common corporate suffixes without destroying identity.
+    """
+    if not name:
+        return "Market Participant"
+    s = str(name).strip().upper()
+    # Replace multiple spaces with single space
+    s = re.sub(r"\s+", " ", s)
+    # Remove leading/trailing quotes and punctuation
+    s = s.strip("\"'.,;:-")
+    # Normalize internal parentheses artifacts, e.g., "(SINGAPORE)" -> "SINGAPORE"
+    s = re.sub(r"\s*\(\s*([^)]+)\s*\)\s*", r" \1 ", s)
+    # Remove trailing periods after abbreviations (e.g. "SA." -> "SA", "PTE." -> "PTE", "LLP." -> "LLP")
+    s = re.sub(r"\b([A-Z]+)\.", r"\1", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s or "Market Participant"
+
+
+def pair_bilateral_deals(deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Match opposing BUY and SELL legs executed at identical price/quantity on same date.
+
+    Identifies institutional cross trades where one institution buys from another
+    in the exchange block or bulk window.
+
+    Annotates each record with:
+    - is_matched_cross: bool
+    - counterparty_name: str | None
+    - deal_nature: "MATCHED_CROSS" | "OPEN_MARKET_ACCUMULATION" | "INSTITUTIONAL_EXIT"
+    """
+    if not deals:
+        return []
+
+    # Group by (deal_date, ticker, quantity, round(trade_price, 2))
+    groups: dict[tuple[str, str, int, float], list[dict[str, Any]]] = {}
+    for d in deals:
+        dt = str(d.get("deal_date") or "")
+        tk = str(d.get("ticker") or "")
+        qty = int(d.get("quantity") or 0)
+        pr = round(float(d.get("trade_price") or 0.0), 2)
+        key = (dt, tk, qty, pr)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(d)
+
+    for key, items in groups.items():
+        buys = [item for item in items if (item.get("transaction_type") or "").upper() == "BUY"]
+        sells = [item for item in items if (item.get("transaction_type") or "").upper() == "SELL"]
+
+        # If both buy and sell exist with different client names, pair them up
+        paired_count = min(len(buys), len(sells))
+        for i in range(paired_count):
+            b = buys[i]
+            s = sells[i]
+            if b.get("client_name") != s.get("client_name"):
+                b["is_matched_cross"] = True
+                b["counterparty_name"] = s.get("client_name")
+                b["deal_nature"] = "MATCHED_CROSS"
+
+                s["is_matched_cross"] = True
+                s["counterparty_name"] = b.get("client_name")
+                s["deal_nature"] = "MATCHED_CROSS"
+
+        # Any un-paired buys
+        for b in buys[paired_count:]:
+            if "is_matched_cross" not in b:
+                b["is_matched_cross"] = False
+                b["counterparty_name"] = None
+                b["deal_nature"] = "OPEN_MARKET_ACCUMULATION"
+
+        # Any un-paired sells
+        for s in sells[paired_count:]:
+            if "is_matched_cross" not in s:
+                s["is_matched_cross"] = False
+                s["counterparty_name"] = None
+                s["deal_nature"] = "INSTITUTIONAL_EXIT"
+
+    # Default fallback for any deal not processed
+    for d in deals:
+        if "is_matched_cross" not in d:
+            d["is_matched_cross"] = False
+            d["counterparty_name"] = None
+            tx = (d.get("transaction_type") or "").upper()
+            d["deal_nature"] = "OPEN_MARKET_ACCUMULATION" if tx == "BUY" else "INSTITUTIONAL_EXIT"
+
+    return deals
+
+
+def build_institutional_tags(
+    ticker: str,
+    deal: dict[str, Any] | None = None,
+    technical_info: dict[str, Any] | None = None,
+    flow_posture: str | None = None,
+    is_pure_cross: bool | None = None,
+) -> list[dict[str, Any]]:
+    """Generate high-density, multi-dimensional institutional tags.
+
+    Tags generated:
+    1. Cross Trade / Flow Nature:
+       - ⚡ Matched Block Cross (deal-level is_matched_cross or symbol-level is_pure_cross)
+       - 🎯 Open Market Accumulation (single BUY print or net accumulation)
+       - 🔻 Institutional Exit (single SELL print or net distribution)
+    2. Technical Synergy:
+       - 🔥 Breakout Active (active in Breakout Radar)
+       - 🎯 Testing 52W High (drawdown_52w_pct >= -3.5%)
+    3. Catalyst Synergy:
+       - 🏛 Result in {N}D (corporate earnings/board meeting within 10 days)
+    """
+    tags: list[dict[str, Any]] = []
+
+    # 1. Cross Trade / Flow Nature
+    if (deal and deal.get("is_matched_cross")) or is_pure_cross or (flow_posture == "MATCHED_CROSS"):
+        tags.append({
+            "id": "MATCHED_CROSS",
+            "label": "Matched Block Cross",
+            "type": "flow",
+            "badge_class": "badge-purple",
+            "icon": "⚡",
+            "tooltip": "Bilateral institutional trade matched across buyer and seller at identical price and quantity.",
+        })
+    elif deal and deal.get("deal_nature") == "OPEN_MARKET_ACCUMULATION":
+        tags.append({
+            "id": "OPEN_ACCUMULATION",
+            "label": "Open Market Accumulation",
+            "type": "flow",
+            "badge_class": "badge-emerald",
+            "icon": "🎯",
+            "tooltip": "Institutional buyer absorbing liquidity without complementary crossed seller leg.",
+        })
+    elif deal and deal.get("deal_nature") == "INSTITUTIONAL_EXIT":
+        tags.append({
+            "id": "INSTITUTIONAL_EXIT",
+            "label": "Institutional Exit",
+            "type": "flow",
+            "badge_class": "badge-rose",
+            "icon": "🔻",
+            "tooltip": "Institutional seller distributing shares into the market.",
+        })
+
+    # 2. Technical and Radar Synergy
+    tech = technical_info or {}
+    breakout = tech.get("breakout") or {}
+    if breakout.get("is_breakout_active"):
+        tier_label = f" ({breakout.get('tier')})" if breakout.get("tier") else ""
+        tags.append({
+            "id": "BREAKOUT_ACTIVE",
+            "label": f"Breakout Active{tier_label}",
+            "type": "technical",
+            "badge_class": "badge-amber",
+            "icon": "🔥",
+            "tooltip": f"Detected by Breakout Radar. Pattern: {breakout.get('pattern', 'Active')}",
+        })
+
+    dd_52w = tech.get("drawdown_52w_pct")
+    if dd_52w is not None and dd_52w >= -3.5:
+        tags.append({
+            "id": "TESTING_52W_HIGH",
+            "label": "Testing 52W High",
+            "type": "technical",
+            "badge_class": "badge-cyan",
+            "icon": "🎯",
+            "tooltip": f"Trading within {abs(dd_52w):.1f}% of 52-week high.",
+        })
+
+    # 3. Catalyst Synergy (Corporate results / meetings)
+    res = tech.get("upcoming_result") or {}
+    if res.get("has_upcoming_result"):
+        days = res.get("days_until")
+        label = f"Result in {days}D" if days is not None else "Upcoming Result"
+        tags.append({
+            "id": "UPCOMING_RESULT",
+            "label": label,
+            "type": "catalyst",
+            "badge_class": "badge-blue",
+            "icon": "🏛",
+            "tooltip": f"Board meeting on {res.get('meeting_date')}: {res.get('purpose') or 'Financial Results'}",
+        })
+
+    return tags
+
+
+
 def get_upcoming_results_for_tickers(
     tickers: list[str],
     days_ahead: int = 10,
@@ -218,6 +402,33 @@ def enrich_tickers_with_technicals(
         logger.error("[MORNING-SETUPS] Failed to query upcoming results for tickers: %s", e)
         upcoming_results_map = {}
 
+    # Query active Breakout Radar candidates in last 14 days
+    breakout_radar_map: dict[str, dict[str, Any]] = {}
+    try:
+        conn = get_db_connection(settings)
+        q_marks = ",".join("?" for _ in clean_tickers)
+        rows = conn.execute(
+            f"""
+            SELECT ticker, tier, pattern, detected_at
+            FROM breakout_radar
+            WHERE ticker IN ({q_marks})
+              AND detected_at >= datetime('now', '-14 days')
+            ORDER BY detected_at DESC
+            """,
+            clean_tickers,
+        ).fetchall()
+        for r in rows:
+            tk = r[0]
+            if tk not in breakout_radar_map:
+                breakout_radar_map[tk] = {
+                    "is_breakout_active": True,
+                    "tier": r[1],
+                    "pattern": r[2],
+                    "detected_at": r[3],
+                }
+    except Exception as e:
+        logger.debug("[MORNING-SETUPS] Failed to query breakout_radar for tickers: %s", e)
+
     results: dict[str, dict[str, Any]] = {}
     for t in clean_tickers:
         clean_t = clean_nse_deal_symbol(t)
@@ -228,11 +439,19 @@ def enrich_tickers_with_technicals(
             "purpose": None,
             "impact_tier": None,
         }
+        breakout_info = breakout_radar_map.get(t) or breakout_radar_map.get(clean_t) or {
+            "is_breakout_active": False,
+            "tier": None,
+            "pattern": None,
+        }
 
         df = price_dfs.get(t)
         base_record = {
             "latest_close": None,
             "effective_price": None,
+            "high_52w": None,
+            "drawdown_52w_pct": None,
+            "breakout": breakout_info,
             "return_1d": None,
             "return_7d": None,
             "return_30d": None,
@@ -243,6 +462,10 @@ def enrich_tickers_with_technicals(
             "is_live_price": False,
             "structure": None,
             "upcoming_result": upcoming_res,
+            "tags": build_institutional_tags(
+                ticker=t,
+                technical_info={"breakout": breakout_info, "upcoming_result": upcoming_res},
+            ),
         }
         if df is None or df.empty or "close" not in df.columns:
             results[t] = base_record
@@ -349,9 +572,33 @@ def enrich_tickers_with_technicals(
                     "posture": posture,
                 }
 
+            # 52-Week High Calculation and Drawdown
+            high_52w = None
+            drawdown_52w = None
+            if len(closes) >= 5:
+                tail_52w = df.tail(min(252, len(df)))
+                if "high" in tail_52w.columns and not tail_52w["high"].isna().all():
+                    high_52w = float(tail_52w["high"].dropna().max())
+                else:
+                    high_52w = float(tail_52w["close"].dropna().max())
+                if high_52w > 0:
+                    drawdown_52w = round(((eff_price / high_52w) - 1.0) * 100.0, 2)
+
+            tags = build_institutional_tags(
+                ticker=t,
+                technical_info={
+                    "drawdown_52w_pct": drawdown_52w,
+                    "breakout": breakout_info,
+                    "upcoming_result": upcoming_res,
+                },
+            )
+
             results[t] = {
                 "latest_close": round(latest_c, 2),
                 "effective_price": round(eff_price, 2),
+                "high_52w": round(high_52w, 2) if high_52w else None,
+                "drawdown_52w_pct": drawdown_52w,
+                "breakout": breakout_info,
                 "return_1d": r1,
                 "return_7d": r7,
                 "return_30d": r30,
@@ -362,6 +609,7 @@ def enrich_tickers_with_technicals(
                 "is_live_price": is_live_price,
                 "structure": structure,
                 "upcoming_result": upcoming_res,
+                "tags": tags,
             }
         except Exception as err:
             logger.debug("[MORNING-SETUPS] Error computing technicals for %s: %s", t, err)
@@ -503,7 +751,7 @@ def fetch_and_parse_deals_csv(url: str, deal_type: str, session: requests.Sessio
                 if not sym or sym in ("SYMBOL", "DATE"):
                     continue
                 sec_name = row[sec_idx].strip() if len(row) > sec_idx else ""
-                client = row[client_idx].strip() if len(row) > client_idx else "Market Participant"
+                client = clean_client_name(row[client_idx]) if len(row) > client_idx else "Market Participant"
                 bs = row[bs_idx].strip().upper() if len(row) > bs_idx else "BUY"
                 tx_type = "SELL" if "SELL" in bs or bs == "S" else "BUY"
 
@@ -616,7 +864,8 @@ def fetch_live_bulk_deals_api(session: requests.Session | None = None) -> list[d
                 continue
 
             val_cr = round((qty * price) / 10000000.0, 2)
-            cname = it.get("client") or it.get("clientName") or "Exchange Bulk Client"
+            raw_cname = it.get("client") or it.get("clientName") or "Exchange Bulk Client"
+            cname = clean_client_name(raw_cname)
             dtype = (it.get("buySell") or it.get("deal_type") or "BUY").upper()
             tx_type = "SELL" if "SELL" in dtype or dtype == "S" else "BUY"
             raw_dt = it.get("date")
@@ -646,15 +895,31 @@ def sync_all_morning_deals(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or Settings()
     sess = _get_session()
 
-    # 1. Fetch from CSV archives
+    # 1. Fetch from CSV archives (official settled records with verified counterparties)
     bulk_csv = fetch_and_parse_deals_csv(NSE_BULK_CSV_URL, "BULK", session=sess)
     block_csv = fetch_and_parse_deals_csv(NSE_BLOCK_CSV_URL, "BLOCK", session=sess)
+    official_csv_deals = bulk_csv + block_csv
 
-    # 2. Fetch from Live APIs
+    # 2. Fetch from Live APIs (provisional intraday records)
     block_live = fetch_live_block_deals_api(session=sess)
     bulk_live = fetch_live_bulk_deals_api(session=sess)
 
-    all_deals = bulk_csv + block_csv + block_live + bulk_live
+    # 3. Suppress live placeholder records if official CSV records already exist for the deal
+    official_keys = {
+        (d["deal_date"], d["ticker"], d["quantity"], round(float(d["trade_price"]), 2))
+        for d in official_csv_deals
+    }
+
+    filtered_live_deals: list[dict[str, Any]] = []
+    for d in (block_live + bulk_live):
+        cname = str(d.get("client_name") or "")
+        key = (d["deal_date"], d["ticker"], d["quantity"], round(float(d["trade_price"]), 2))
+        # If generic placeholder and official trade exists, skip placeholder
+        if key in official_keys and ("NSE Block Window" in cname or cname == "Market Participant"):
+            continue
+        filtered_live_deals.append(d)
+
+    all_deals = official_csv_deals + filtered_live_deals
     if not all_deals:
         logger.info("[MORNING-SETUPS] No block/bulk deals retrieved from NSE endpoints.")
         return {"status": "ok", "inserted": 0, "total_scanned": 0, "source": "NSE"}
@@ -666,6 +931,7 @@ def sync_all_morning_deals(settings: Settings | None = None) -> dict[str, Any]:
     try:
         with conn:
             for d in all_deals:
+                client_cleaned = clean_client_name(d.get("client_name"))
                 cur = conn.execute(
                     """
                     INSERT OR IGNORE INTO morning_block_deals (
@@ -678,7 +944,7 @@ def sync_all_morning_deals(settings: Settings | None = None) -> dict[str, Any]:
                         d["deal_date"],
                         d["ticker"],
                         d.get("security_name"),
-                        d["client_name"],
+                        client_cleaned,
                         d["deal_type"],
                         d["transaction_type"],
                         d["quantity"],
@@ -691,6 +957,21 @@ def sync_all_morning_deals(settings: Settings | None = None) -> dict[str, Any]:
                 )
                 if cur.rowcount > 0:
                     inserted_count += 1
+
+            # Purge legacy/orphan placeholders that are now superseded by official counterparty records
+            conn.execute("""
+                DELETE FROM morning_block_deals
+                WHERE (client_name LIKE 'NSE Block Window%' OR client_name = 'Market Participant')
+                  AND EXISTS (
+                      SELECT 1 FROM morning_block_deals official
+                      WHERE official.deal_date = morning_block_deals.deal_date
+                        AND official.ticker = morning_block_deals.ticker
+                        AND official.quantity = morning_block_deals.quantity
+                        AND ABS(official.trade_price - morning_block_deals.trade_price) < 0.05
+                        AND official.client_name NOT LIKE 'NSE Block Window%'
+                        AND official.client_name != 'Market Participant'
+                  )
+            """)
             conn.commit()
     except Exception as e:
         logger.error("[MORNING-SETUPS] Database error inserting block deals: %s", e)
@@ -992,7 +1273,7 @@ def get_morning_block_deals(
     except Exception as e:
         logger.error("[MORNING-SETUPS] Query deals error: %s", e)
 
-    return deals
+    return pair_bilateral_deals(deals)
 
 
 def group_deals_by_symbol(deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1069,6 +1350,23 @@ def group_deals_by_symbol(deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
         g["net_value_cr"] = round(g["gross_buy_cr"] - g["gross_sell_cr"], 2)
         g["total_value_cr"] = round(g["gross_buy_cr"] + g["gross_sell_cr"], 2)
         del g["total_turnover_rs"]
+
+        # Bilateral / Cross Trade Assessment
+        is_cross = (
+            g["gross_buy_cr"] > 0
+            and g["gross_sell_cr"] > 0
+            and abs(g["net_value_cr"]) <= 0.05
+        )
+        g["is_pure_cross"] = is_cross
+        if is_cross:
+            g["flow_posture"] = "MATCHED_CROSS"
+        elif g["net_value_cr"] > 0.05:
+            g["flow_posture"] = "NET_ACCUMULATION"
+        elif g["net_value_cr"] < -0.05:
+            g["flow_posture"] = "NET_DISTRIBUTION"
+        else:
+            g["flow_posture"] = "NEUTRAL"
+
         result_list.append(g)
 
     # Sort descending by cumulative total value in Cr

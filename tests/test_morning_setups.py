@@ -218,11 +218,12 @@ def test_morning_setups_api_endpoints(test_settings):
                 "value_cr": 225.0,
             }
         ])
+        meeting_d5 = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
         store_upcoming_board_meetings(test_settings, [
             {
                 "ticker": "TRENT.NS",
                 "company_name": "Trent Limited",
-                "meeting_date": "2026-10-15",
+                "meeting_date": meeting_d5,
                 "purpose": "Financial Results",
                 "impact_tier": "HIGH",
             }

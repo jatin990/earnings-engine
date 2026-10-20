@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from earnings_engine.config import Settings
 from earnings_engine.data.morning_setups import (
+    build_institutional_tags,
     clean_nse_deal_symbol,
     enrich_grouped_deals_with_live_quotes,
     enrich_tickers_with_technicals,
@@ -125,6 +126,16 @@ def list_morning_deals_endpoint(
             grouped = group_deals_by_symbol(deals)
             if include_live_quotes:
                 grouped = enrich_grouped_deals_with_live_quotes(grouped, settings=_settings, quotes=quotes)
+            for g in grouped:
+                g_sym = g.get("ticker", "")
+                t_info = technicals.get(clean_nse_deal_symbol(g_sym)) or technicals.get(g_sym) or {}
+                g["institutional_tags"] = build_institutional_tags(
+                    ticker=g_sym,
+                    deal=None,
+                    technical_info=t_info,
+                    flow_posture=g.get("flow_posture"),
+                    is_pure_cross=g.get("is_pure_cross"),
+                )
             return {
                 "status": "success",
                 "count": len(grouped),
@@ -133,6 +144,15 @@ def list_morning_deals_endpoint(
                 "technicals": technicals,
                 "live_quotes": include_live_quotes,
             }
+
+        for d in deals:
+            d_sym = d.get("ticker", "")
+            t_info = technicals.get(clean_nse_deal_symbol(d_sym)) or technicals.get(d_sym) or {}
+            d["institutional_tags"] = build_institutional_tags(
+                ticker=d_sym,
+                deal=d,
+                technical_info=t_info,
+            )
 
         return {
             "status": "success",

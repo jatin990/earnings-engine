@@ -261,6 +261,39 @@
             </div>`;
         },
 
+        renderInstitutionalBadges(tags, excludeUpcoming = true) {
+            if (!tags || !tags.length) return '';
+            const filtered = excludeUpcoming ? tags.filter(t => t.id !== 'UPCOMING_RESULT') : tags;
+            if (!filtered.length) return '';
+            return `
+            <div style="display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; margin-top: 0.15rem;">
+                ${filtered.map(t => {
+                    let bg = 'rgba(148, 163, 184, 0.15)';
+                    let color = '#cbd5e1';
+                    let border = 'rgba(148, 163, 184, 0.3)';
+
+                    if (t.id === 'MATCHED_CROSS') {
+                        bg = 'rgba(168, 85, 247, 0.18)';
+                        color = '#c084fc';
+                        border = 'rgba(168, 85, 247, 0.4)';
+                    } else if (t.id === 'BREAKOUT_ACTIVE') {
+                        bg = 'rgba(16, 185, 129, 0.2)';
+                        color = '#34d399';
+                        border = 'rgba(16, 185, 129, 0.45)';
+                    } else if (t.id === 'TESTING_52W_HIGH') {
+                        bg = 'rgba(245, 158, 11, 0.18)';
+                        color = '#fbbf24';
+                        border = 'rgba(245, 158, 11, 0.35)';
+                    }
+                    const iconStr = t.icon ? `<span style="font-size: 0.65rem;">${t.icon}</span>` : '';
+                    return `
+                        <span style="background: ${bg}; color: ${color}; border: 1px solid ${border}; padding: 0.06rem 0.35rem; border-radius: 4px; font-size: 0.61rem; font-family: var(--font-mono); font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.2rem;" title="${this.escapeHtml(t.label || '')}">
+                            ${iconStr}<span>${this.escapeHtml(t.label || '')}</span>
+                        </span>`;
+                }).join('')}
+            </div>`;
+        },
+
         // ---------------------------------------------------------------------
         // Block & Bulk Deals Handlers
         // ---------------------------------------------------------------------
@@ -457,9 +490,18 @@
                             </a>
                             ${this.renderUpcomingResultBadge(tech)}
                         </div>
+                        ${this.renderInstitutionalBadges(d.institutional_tags, true)}
                     </td>
-                    <td style="padding: 0.55rem 0.75rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0;" title="${clientName}">
-                        ${clientName}
+                    <td style="padding: 0.55rem 0.75rem; max-width: 250px;">
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0;" title="${clientName}">
+                            ${clientName}
+                        </div>
+                        ${d.is_matched_cross && d.counterparty_name ? `
+                        <div style="margin-top: 0.2rem; display: inline-flex; align-items: center; gap: 0.25rem; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; padding: 0.08rem 0.35rem; font-size: 0.62rem; color: #d8b4fe; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Matched bilateral cross with ${this.escapeHtml(d.counterparty_name)}">
+                            <span>⇄</span>
+                            <span style="color: #c084fc; font-weight: 600;">Matched:</span>
+                            <span style="color: #f1f5f9; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(d.counterparty_name)}</span>
+                        </div>` : ''}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
                         <span style="background: ${typeBg}; color: ${typeColor}; border: 1px solid ${typeColor}40; padding: 0.12rem 0.45rem; border-radius: 4px; font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700;">
@@ -539,7 +581,15 @@
                     return `
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.71rem;">
                         <td style="padding: 0.35rem 0.6rem; color: #94a3b8; font-family: var(--font-mono);">${this.escapeHtml(p.deal_date || '—')}</td>
-                        <td style="padding: 0.35rem 0.6rem; color: #e2e8f0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(p.client_name || '—')}</td>
+                        <td style="padding: 0.35rem 0.6rem; color: #e2e8f0; max-width: 250px;">
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(p.client_name || '—')}">
+                                ${this.escapeHtml(p.client_name || '—')}
+                            </div>
+                            ${p.is_matched_cross && p.counterparty_name ? `
+                            <div style="font-size: 0.61rem; color: #c084fc; margin-top: 0.1rem; display: inline-flex; align-items: center; gap: 0.2rem;" title="Matched with ${this.escapeHtml(p.counterparty_name)}">
+                                <span>⇄</span><span>Matched: ${this.escapeHtml(p.counterparty_name)}</span>
+                            </div>` : ''}
+                        </td>
                         <td style="padding: 0.35rem 0.6rem; color: ${pTypeColor}; font-weight: 700; font-family: var(--font-mono);">${this.escapeHtml(p.deal_type || 'DEAL')}</td>
                         <td style="padding: 0.35rem 0.6rem; color: ${pSideColor}; font-weight: 800; font-family: var(--font-mono);">${this.escapeHtml(p.transaction_type || '—')}</td>
                         <td style="padding: 0.35rem 0.6rem; text-align: right; color: #94a3b8; font-family: var(--font-mono);">${Number(p.quantity || 0).toLocaleString()}</td>
@@ -565,6 +615,7 @@
                         <div style="font-size: 0.65rem; color: #64748b; font-weight: 400; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             ${this.escapeHtml(g.security_name || cleanSym)}
                         </div>
+                        ${this.renderInstitutionalBadges(g.institutional_tags, true)}
                     </td>
                     <td style="padding: 0.55rem 0.75rem;">
                         <div style="font-size: 0.72rem; font-weight: 600; color: #f8fafc;">
@@ -576,8 +627,16 @@
                             ${bulkCount > 0 ? `<span style="color: #fbbf24;">${bulkCount} Bulk</span>` : ''}
                         </div>
                     </td>
-                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-weight: 800; color: ${netColor};">
-                        ${netFmt}
+                    <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono);">
+                        ${g.is_pure_cross ? `
+                        <div style="display: inline-flex; flex-direction: column; align-items: flex-end; gap: 0.15rem;">
+                            <span style="background: rgba(168, 85, 247, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); padding: 0.08rem 0.35rem; border-radius: 4px; font-size: 0.62rem; font-weight: 800; white-space: nowrap;" title="Pure Bilateral Cross: Buyer & Seller matched exactly">
+                                ⚡ Matched Cross
+                            </span>
+                            <span style="font-size: 0.64rem; color: #94a3b8; font-weight: 700;">₹0.00 Cr Net</span>
+                        </div>` : `
+                        <div style="font-weight: 800; color: ${netColor};">${netFmt}</div>
+                        `}
                     </td>
                     <td style="padding: 0.55rem 0.75rem; text-align: right; font-family: var(--font-mono); font-size: 0.69rem;">
                         <div style="color: #34d399;">+₹${grossBuyFmt} Cr</div>
