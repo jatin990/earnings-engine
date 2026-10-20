@@ -17,6 +17,7 @@ import re
 import sqlite3
 from typing import Any
 
+from earnings_engine.data.trading_calendar import is_indian_market_open
 from earnings_engine.data.transmission_schema import get_basket_graph_raw
 
 logger = logging.getLogger("earnings_engine.data.transmission_radar")
@@ -649,24 +650,53 @@ def get_transmission_graph_payload(
     cur = conn.cursor()
 
     # If refresh is requested or active nodes have no snapshots, sync real market data first
+    # Live market freshness guarantee: During live trading hours (09:15-15:30 IST), if snapshots are >= 15 seconds old,
+    # auto-sync real-time quotes immediately so the trader never views stale day-old prices.
     if auto_sync:
         if refresh:
             sync_transmission_snapshots(conn, basket_id=basket_id, force=True, settings=settings)
         else:
             cur.execute(
                 """
-                SELECT COUNT(DISTINCT s.node_id)
+                SELECT MAX(s.created_at), COUNT(DISTINCT s.node_id)
                 FROM transmission_snapshots s
                 JOIN transmission_nodes n ON s.node_id = n.node_id
                 WHERE n.basket_id = ?;
                 """,
                 (basket_id,),
             )
-            existing_nodes = cur.fetchone()[0]
+            max_created_at_str, existing_nodes = cur.fetchone()
             cur.execute("SELECT COUNT(*) FROM transmission_nodes WHERE basket_id = ? AND is_active = 1;", (basket_id,))
             total_active_nodes = cur.fetchone()[0]
+
+            is_open = is_indian_market_open()
+            should_sync = False
+            force_sync = False
+
             if total_active_nodes > 0 and existing_nodes < total_active_nodes:
-                sync_transmission_snapshots(conn, basket_id=basket_id, force=False, settings=settings)
+                should_sync = True
+                force_sync = False
+            elif max_created_at_str:
+                try:
+                    snap_dt = datetime.fromisoformat(str(max_created_at_str).replace("Z", "+00:00"))
+                    if snap_dt.tzinfo is None:
+                        snap_dt = snap_dt.replace(tzinfo=timezone.utc)
+                    now_dt = datetime.now(timezone.utc)
+                    age_seconds = (now_dt - snap_dt).total_seconds()
+
+                    if is_open and age_seconds >= 15:
+                        should_sync = True
+                        force_sync = True
+                    elif not is_open and age_seconds >= 1800:
+                        should_sync = True
+                        force_sync = False
+                except Exception:
+                    should_sync = True
+            else:
+                should_sync = True
+
+            if should_sync:
+                sync_transmission_snapshots(conn, basket_id=basket_id, force=force_sync, settings=settings)
 
     # 1. Basket Info
     cur.execute("""

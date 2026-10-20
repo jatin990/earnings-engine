@@ -51,6 +51,19 @@
             50% { box-shadow: 0 0 25px 4px rgba(239, 68, 68, 0.6); border-color: #ef4444; }
             100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
         }
+        @keyframes tmPulse {
+            0% { transform: scale(0.95); opacity: 0.6; }
+            50% { transform: scale(1.25); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.6; }
+        }
+        .tm-live-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            animation: tmPulse 2s infinite ease-in-out;
+        }
         .tm-gate-pill {
             display: inline-flex;
             align-items: center;
@@ -91,6 +104,11 @@
                 <button type="button" id="btnTriggerShockwave" onclick="window.transmissionRadar && window.transmissionRadar.openShockwaveModal()" class="btn btn-sm" style="background: rgba(239, 68, 68, 0.18); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 700; font-size: 0.72rem; padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer;">
                     ⚡ Trigger Shockwave
                 </button>
+
+                <span id="transmissionLiveBadge" class="badge" style="background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.68rem; padding: 0.25rem 0.6rem; border-radius: 6px; font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 0.35rem;" title="Automatic 15-second market telemetry polling loop">
+                    <span id="transmissionLiveDot" class="tm-live-dot"></span>
+                    <span id="transmissionLiveBadgeText">15s Live Polling</span>
+                </span>
 
                 <button type="button" id="btnRefreshTransmission" onclick="window.transmissionRadar && window.transmissionRadar.refreshGraph()" class="btn btn-sm" style="background: #18181b; color: #e4e4e7; border: 1px solid rgba(255,255,255,0.15); font-size: 0.72rem; padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer;" title="Refresh Graph Data">
                     ⟳ Refresh

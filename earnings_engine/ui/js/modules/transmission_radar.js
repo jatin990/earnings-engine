@@ -23,7 +23,12 @@
         selectedNodeId: null,
         isLoading: false,
         tradeMatrixFilter: 'ALL',
+        isTabActive: false,
+        autoRefreshTimer: null,
     };
+
+    // Auto-refresh interval (15 seconds live market loop)
+    const AUTO_REFRESH_INTERVAL_MS = 15000;
 
     // Animation constants
     const MAX_PARTICLES = 40;
@@ -493,13 +498,13 @@
     // Data Fetch & Render
     // ---------------------------------------------------------------------------
 
-    async function _fetchAndRender(basketId, forceRefresh = false) {
+    async function _fetchAndRender(basketId, forceRefresh = false, silent = false) {
         if (_state.isLoading) return;
         _state.isLoading = true;
         _state.currentBasketId = basketId;
 
         const btn = document.getElementById('btnRefreshTransmission');
-        if (btn) btn.textContent = '⟳ Refreshing…';
+        if (btn && !silent) btn.textContent = '⟳ Refreshing…';
 
         try {
             const refreshParam = forceRefresh ? '&refresh=true' : '';
@@ -527,16 +532,32 @@
             _renderStaleBanner(data.data_freshness);
             _updateShockwaveOriginOptions(_state.nodes);
 
-            // Restart animation
-            _stopAnimation();
-            _startAnimation();
+            // Re-sync open drawer if node is currently selected
+            if (_state.selectedNodeId) {
+                const refreshedNode = _state.nodes.find(n => n.node_id === _state.selectedNodeId);
+                const cont = document.getElementById('drawerNodeContent');
+                if (refreshedNode && cont) {
+                    cont.innerHTML = _buildDrawerContent(refreshedNode);
+                }
+            }
+
+            // On silent background refresh, only re-capture node positions without interrupting canvas loop
+            if (silent) {
+                setTimeout(() => {
+                    _captureNodePositions();
+                }, 100);
+            } else {
+                // Restart animation
+                _stopAnimation();
+                _startAnimation();
+            }
         } catch (err) {
             console.error('[TransmissionRadar] fetch error:', err);
             const t1 = document.getElementById('tmNodeListTier1');
-            if (t1) t1.innerHTML = `<span style="color:#f87171;font-size:0.75rem;">Failed to load graph: ${_esc(String(err))}</span>`;
+            if (t1 && !silent) t1.innerHTML = `<span style="color:#f87171;font-size:0.75rem;">Failed to load graph: ${_esc(String(err))}</span>`;
         } finally {
             _state.isLoading = false;
-            if (btn) btn.textContent = '⟳ Refresh';
+            if (btn && !silent) btn.textContent = '⟳ Refresh';
         }
     }
 
@@ -684,7 +705,9 @@
     window.transmissionRadar = {
 
         init() {
+            _state.isTabActive = true;
             _fetchAndRender(_state.currentBasketId);
+            this.startAutoRefresh();
 
             // Re-capture positions on window resize (debounced)
             let _resizeTimer;
@@ -695,6 +718,46 @@
                     _spawnParticlesForEdges();
                 }, 250);
             });
+
+            // Pause polling when tab is hidden, resume when visible
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.stopAutoRefresh();
+                } else if (_state.isTabActive) {
+                    // Page became visible and transmission tab is active -> refresh immediately & resume polling
+                    _fetchAndRender(_state.currentBasketId, false, true);
+                    this.startAutoRefresh();
+                }
+            });
+        },
+
+        startAutoRefresh() {
+            this.stopAutoRefresh();
+            _state.autoRefreshTimer = setInterval(() => {
+                if (_state.isTabActive && !document.hidden && !_state.isLoading) {
+                    _fetchAndRender(_state.currentBasketId, false, true);
+                }
+            }, AUTO_REFRESH_INTERVAL_MS);
+        },
+
+        stopAutoRefresh() {
+            if (_state.autoRefreshTimer) {
+                clearInterval(_state.autoRefreshTimer);
+                _state.autoRefreshTimer = null;
+            }
+        },
+
+        onTabActivated() {
+            _state.isTabActive = true;
+            _fetchAndRender(_state.currentBasketId, false, true);
+            this.startAutoRefresh();
+            _startAnimation();
+        },
+
+        onTabDeactivated() {
+            _state.isTabActive = false;
+            this.stopAutoRefresh();
+            _stopAnimation();
         },
 
         onBasketChange(basketId) {

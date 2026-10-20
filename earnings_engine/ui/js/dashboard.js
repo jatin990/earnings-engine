@@ -1000,6 +1000,13 @@ const API_BASE = window.location.origin;
                 const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'morning-setups', 'options', 'commodities', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'transmission', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
+                const previousTab = this.currentTab;
+                if (previousTab === 'transmission' && name !== 'transmission') {
+                    if (window.transmissionRadar && typeof window.transmissionRadar.onTabDeactivated === 'function') {
+                        window.transmissionRadar.onTabDeactivated();
+                    }
+                }
+
                 this.currentTab = name;
                 if (window.app) window.app.currentTab = name;
 
@@ -1241,6 +1248,8 @@ const API_BASE = window.location.origin;
                         if (typeof window.initTransmissionRadar === 'function') {
                             window.initTransmissionRadar();
                         }
+                    } else if (window.transmissionRadar && typeof window.transmissionRadar.onTabActivated === 'function') {
+                        window.transmissionRadar.onTabActivated();
                     }
                 }
                 if (name === 'repeaters') {
