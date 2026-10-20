@@ -1655,6 +1655,10 @@ def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
     """
     import json
 
+    table_check = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='breakout_radar'").fetchone()
+    if not table_check:
+        return
+
     chunk_size = 500
     updated_total = 0
     offset = 0
@@ -2485,6 +2489,19 @@ def _migration_049_purge_unconfirmed_indian_yfinance_earnings(conn: Any) -> None
         logger.warning("Migration 049 purge warning: %s", e)
 
 
+def _migration_050_earnings_provenance_schema(conn: Any) -> None:
+    """Add exchange provenance columns to earnings_history."""
+    _add_column_if_missing(conn, "earnings_history", "exchange_source", "TEXT")
+    _add_column_if_missing(conn, "earnings_history", "confirmation_status", "TEXT DEFAULT 'CONFIRMED'")
+    _add_column_if_missing(conn, "earnings_history", "board_meeting_purpose", "TEXT")
+    _add_column_if_missing(conn, "earnings_history", "filing_id", "TEXT")
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_exchange ON earnings_history (exchange_source)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_status ON earnings_history (confirmation_status)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2536,6 +2553,7 @@ MIGRATIONS: list[Migration] = [
     Migration(47, "047_options_tracked_setups", _migration_047_options_tracked_setups),
     Migration(48, "048_business_update_schedules", _migration_048_business_update_schedules),
     Migration(49, "049_purge_unconfirmed_indian_yfinance_earnings", _migration_049_purge_unconfirmed_indian_yfinance_earnings),
+    Migration(50, "050_earnings_provenance_schema", _migration_050_earnings_provenance_schema),
 ]
 
 

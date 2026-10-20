@@ -50,10 +50,10 @@ def test_migrations_apply_all_in_order(test_settings):
         assert "trips" in tables
         assert "credit_cards" in tables
         assert "net_worth_snapshots" in tables
+        assert "ticker_metrics" in tables
         # Verify legacy tables are dropped
         assert "ticker_names" not in tables
         assert "ticker_market_cap" not in tables
-        assert "ticker_metrics" not in tables
         assert "earnings_freshness" not in tables
         assert "price_fetch_log" not in tables
 

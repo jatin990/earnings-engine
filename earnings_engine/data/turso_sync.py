@@ -93,6 +93,7 @@ SYNC_TABLES = [
     "universe_freshness",
     "earnings_fetch_log",
     "earnings_month_cache",
+    "earnings_history",
     # Institutional Intelligence Integrity, Provenance & Quarantine
     "institutional_radar_signals",
     "quarterly_financials",
@@ -214,6 +215,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "record_date",
     "util_date",
     "meeting_date",
+    "earnings_date",
     "last_update_date",
     "next_expected_window_start",
     "next_expected_window_end",
@@ -229,6 +231,7 @@ DATE_ONLY_COLUMNS = {
     "last_seen_date",
     "deal_date",
     "meeting_date",
+    "earnings_date",
     "last_update_date",
     "next_expected_window_start",
     "next_expected_window_end",

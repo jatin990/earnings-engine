@@ -19,6 +19,40 @@ from earnings_engine.logging_utils import get_logger
 logger = get_logger("earnings_engine.data.earnings")
 
 COLUMNS = ["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"]
+EARNINGS_PROVENANCE_COLUMNS = [
+    "exchange_source",
+    "confirmation_status",
+    "board_meeting_purpose",
+    "filing_id",
+]
+
+
+def ensure_earnings_history_schema(connection: Any) -> None:
+    """Ensure earnings_history table has filing provenance and verification columns."""
+    try:
+        cur = connection.execute("PRAGMA table_info(earnings_history)")
+        existing_cols = {row[1] for row in cur.fetchall()}
+        if not existing_cols:
+            return
+
+        col_defs = [
+            ("exchange_source", "TEXT"),
+            ("confirmation_status", "TEXT DEFAULT 'CONFIRMED'"),
+            ("board_meeting_purpose", "TEXT"),
+            ("filing_id", "TEXT"),
+        ]
+        for col_name, col_type in col_defs:
+            if col_name not in existing_cols:
+                connection.execute(f"ALTER TABLE earnings_history ADD COLUMN {col_name} {col_type}")
+
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_earnings_history_exchange ON earnings_history (exchange_source)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_earnings_history_status ON earnings_history (confirmation_status)"
+        )
+    except Exception as e:
+        logger.debug("Failed to verify/alter earnings_history schema: %s", e)
 
 
 def _db_path(settings: Settings) -> Path:
@@ -31,6 +65,7 @@ def _connect(settings: Settings) -> Iterator[Any]:
     """Connect to the shared database with automated lifecycle management."""
     settings.ensure_dirs()
     connection = get_db_connection(settings)
+    ensure_earnings_history_schema(connection)
     try:
         yield connection
     except Exception:
@@ -297,19 +332,25 @@ def load_earnings(ticker: str, settings: Settings, source: str | None = None) ->
 
 def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
                       source: str | None = None,
-                      start_date: str | None = None) -> pd.DataFrame:
+                      start_date: str | None = None,
+                      confirmed_only: bool = False) -> pd.DataFrame:
     """List upcoming earnings events in the next N days.
 
-    If ``source`` is given (``"yfinance"``, ``"nse"``), only rows from that
-    source are returned.  ``None`` means all sources (default).
+    If ``source`` is given (``"yfinance"``, ``"nse"``, ``"bse"``), only rows from that
+    source are returned. ``None`` means all sources (default).
 
-    When all sources are loaded, a ``source`` column is included so the report
-    can show which calendar each date came from.  For each ticker, if an NSE
-    row exists it is treated as the authoritative date and any conflicting
-    rows from other sources are dropped.  Tickers that only appear in
-    non-NSE sources are kept as-is.
+    Includes regulatory filing provenance columns:
+    - ``exchange_source`` ('NSE', 'BSE', etc.)
+    - ``confirmation_status`` ('CONFIRMED', 'TENTATIVE', 'UNCONFIRMED_ESTIMATE')
+    - ``board_meeting_purpose``
+    - ``filing_id``
 
-    The window is ``[start_date, start_date + days)``.  ``start_date`` defaults
+    For each ticker:
+    - Official exchange filings (CONFIRMED) take absolute precedence over third-party estimates.
+    - If an official NSE filing exists, it is prioritized over BSE for dual-listed stocks.
+    - If ``confirmed_only=True``, only verified exchange board meeting notices are returned.
+
+    The window is ``[start_date, start_date + days)``. ``start_date`` defaults
     to today, so the default behaviour is unchanged (next ``days`` days).
     """
     if start_date is not None:
@@ -320,6 +361,16 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
     start_str = start.strftime("%Y-%m-%d")
     end_str = end.strftime("%Y-%m-%d")
 
+    cols = [
+        "ticker",
+        "earnings_date",
+        "source",
+        "exchange_source",
+        "confirmation_status",
+        "board_meeting_purpose",
+        "filing_id",
+    ]
+
     # Build a placeholder list for tickers that appear in overlapping universes.
     seen = set()
     unique_tickers = []
@@ -329,40 +380,133 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
             unique_tickers.append(t)
 
     if not unique_tickers:
-        return pd.DataFrame(columns=["ticker", "earnings_date", "source"])
+        return pd.DataFrame(columns=cols)
 
     placeholders = ", ".join(["?"] * len(unique_tickers))
     with _connect(settings) as connection:
         if source is None:
-            sql = f"SELECT ticker, earnings_date, source FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date"
+            sql = f"""
+                SELECT ticker, earnings_date, source, exchange_source,
+                       confirmation_status, board_meeting_purpose, filing_id
+                FROM earnings_history
+                WHERE ticker IN ({placeholders})
+                  AND earnings_date >= ?
+                  AND earnings_date <= ?
+                ORDER BY earnings_date
+            """
             params = unique_tickers + [start_str, end_str]
         else:
-            sql = f"SELECT ticker, earnings_date, source FROM earnings_history WHERE ticker IN ({placeholders}) AND source = ? AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date"
-            params = unique_tickers + [source, start_str, end_str]
+            sql = f"""
+                SELECT ticker, earnings_date, source, exchange_source,
+                       confirmation_status, board_meeting_purpose, filing_id
+                FROM earnings_history
+                WHERE ticker IN ({placeholders})
+                  AND (source = ? OR exchange_source = ?)
+                  AND earnings_date >= ?
+                  AND earnings_date <= ?
+                ORDER BY earnings_date
+            """
+            params = unique_tickers + [source, source.upper(), start_str, end_str]
         rows = connection.execute(sql, params).fetchall()
 
     if not rows:
-        return pd.DataFrame(columns=["ticker", "earnings_date", "source"])
+        return pd.DataFrame(columns=cols)
 
-    df = pd.DataFrame(rows, columns=["ticker", "earnings_date", "source"])
+    df = pd.DataFrame(rows, columns=cols)
     df["earnings_date"] = pd.to_datetime(df["earnings_date"])
 
-    # ── NSE-as-truth deduplication ──
-    # For each ticker, if an NSE row exists, prefer it over other sources.
-    # This ensures the official NSE board meeting date is the authoritative
-    # earnings date shown in the Results Ledger.
-    if source is None and "source" in df.columns:
-        nse_tickers = set(df.loc[df["source"] == "nse", "ticker"].unique())
-        if nse_tickers:
-            # Keep: all NSE rows + non-NSE rows whose ticker has NO NSE entry
+    # ── Provenance Normalization ──
+    def _normalize_row_provenance(r):
+        exch = r["exchange_source"]
+        status = r["confirmation_status"]
+        src = str(r["source"] or "").lower()
+
+        if pd.isna(exch) or not exch:
+            if "nse" in src:
+                exch = "NSE"
+            elif "bse" in src:
+                exch = "BSE"
+            else:
+                exch = None
+
+        if pd.isna(status) or not status:
+            if exch in ("NSE", "BSE") or "nse" in src or "bse" in src:
+                status = "CONFIRMED"
+            else:
+                status = "TENTATIVE"
+        elif "yfinance" in src and (exch is None or exch == "") and status == "CONFIRMED":
+            # Default schema may give 'CONFIRMED' to legacy yfinance rows without exchange_source
+            status = "TENTATIVE"
+
+        return exch, status
+
+    norm = [_normalize_row_provenance(row) for _, row in df.iterrows()]
+    df["exchange_source"] = [n[0] for n in norm]
+    df["confirmation_status"] = [n[1] for n in norm]
+
+    # ── Multi-Exchange and Official Precedence Deduplication ──
+    if source is None and not df.empty:
+        # 1. Official confirmed filings supersede unconfirmed/tentative estimates
+        confirmed_tickers = set(df.loc[df["confirmation_status"] == "CONFIRMED", "ticker"].unique())
+        if confirmed_tickers:
             df = df[
-                (df["source"] == "nse") | (~df["ticker"].isin(nse_tickers))
+                (df["confirmation_status"] == "CONFIRMED") | (~df["ticker"].isin(confirmed_tickers))
             ].reset_index(drop=True)
+
+        # 2. NSE precedence over BSE for dual-listed stocks
+        nse_tickers = set(df.loc[df["exchange_source"] == "NSE", "ticker"].unique())
+        if nse_tickers:
+            df = df[
+                (df["exchange_source"] == "NSE") | (~df["ticker"].isin(nse_tickers))
+            ].reset_index(drop=True)
+
+    if confirmed_only and not df.empty:
+        df = df[df["confirmation_status"] == "CONFIRMED"].reset_index(drop=True)
 
     loaded_tickers = df["ticker"].nunique()
     source_label = source if source is not None else "ALL_SOURCES"
     logger.info("[EARNINGS-CACHE] Loaded cached earnings dates for %s/%s tickers (source=%s, window: %s to %s)", loaded_tickers, len(unique_tickers), source_label, start_str, end_str)
     return df.sort_values("earnings_date").reset_index(drop=True)
+
+
+def purge_unconfirmed_future_dates(settings: Settings, ticker: str | None = None) -> int:
+    """Purge unconfirmed/speculative future earnings dates from SQLite.
+
+    Guarantees that third-party algorithmic projections (yfinance) or unconfirmed
+    estimates for future dates (>= today) do not persist in earnings_history when
+    an official exchange filing is required or already exists.
+    """
+    today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
+    with _connect(settings) as connection:
+        if ticker:
+            sql = """
+                DELETE FROM earnings_history
+                WHERE ticker = ?
+                  AND earnings_date >= ?
+                  AND (
+                      source LIKE '%yfinance%'
+                      OR confirmation_status IN ('UNCONFIRMED_ESTIMATE', 'TENTATIVE')
+                      OR exchange_source IS NULL
+                  )
+                  AND confirmation_status != 'CONFIRMED'
+            """
+            cur = connection.execute(sql, (ticker, today_str))
+        else:
+            sql = """
+                DELETE FROM earnings_history
+                WHERE earnings_date >= ?
+                  AND (
+                      source LIKE '%yfinance%'
+                      OR confirmation_status IN ('UNCONFIRMED_ESTIMATE', 'TENTATIVE')
+                      OR exchange_source IS NULL
+                  )
+                  AND confirmation_status != 'CONFIRMED'
+            """
+            cur = connection.execute(sql, (today_str,))
+        purged = cur.rowcount
+        connection.commit()
+    logger.info("Purged %d unconfirmed future earnings date estimates (ticker=%s)", purged, ticker or "ALL")
+    return purged
 
 
 def _fetch_earnings_for_ticker(args: tuple[str, Settings, bool]) -> tuple[str, int]:
@@ -375,13 +519,105 @@ def _fetch_earnings_for_ticker(args: tuple[str, Settings, bool]) -> tuple[str, i
         return (ticker, 0)
 
 
+def classify_board_meeting_purpose(purpose: str, time_str: str = "") -> dict[str, Any]:
+    """Strictly classify board meeting agenda and extract session timing.
+
+    Filters out corporate actions (dividends, AGMs, warrants, fund raising) that
+    do not include financial results. Distinguishes session timing (BM: Pre, BM: During, BM: Post).
+
+    Returns:
+        {
+            "is_results": bool,
+            "session_timing": "BM: Pre" | "BM: During" | "BM: Post" | None,
+            "normalized_purpose": str,
+        }
+    """
+    raw_purpose = str(purpose or "").strip()
+    p_lower = raw_purpose.lower()
+
+    # Financial results positive indicators
+    results_keywords = [
+        "financial result",
+        "financial results",
+        "quarterly result",
+        "quarterly results",
+        "audited result",
+        "audited results",
+        "unaudited result",
+        "unaudited results",
+        "accounts and results",
+        "financial performance",
+        "interim financial",
+    ]
+    has_results = any(kw in p_lower for kw in results_keywords)
+
+    # Excluded keywords (when results keywords are absent)
+    excluded_keywords = [
+        "agm",
+        "annual general meeting",
+        "egm",
+        "extraordinary general meeting",
+        "postal ballot",
+        "dividend only",
+        "interim dividend only",
+        "fund raising",
+        "fundraising",
+        "warrants",
+        "preferential basis",
+        "employee stock",
+        "esop",
+        "allotment of",
+        "qip",
+    ]
+    is_purely_excluded = any(kw in p_lower for kw in excluded_keywords) and not has_results
+
+    is_valid = has_results and not is_purely_excluded
+
+    # Session timing extraction
+    session_timing = None
+    t_clean = str(time_str or "").strip().lower()
+
+    # 1. From explicit time_str (e.g., "08:30", "16:00", "12:00")
+    if t_clean:
+        import re
+        m = re.search(r"(\d{1,2}):(\d{2})", t_clean)
+        if m:
+            hh, mm = int(m.group(1)), int(m.group(2))
+            minutes = hh * 60 + mm
+            # Market hours: 09:15 (555 min) to 15:30 (930 min)
+            if minutes < 555:
+                session_timing = "BM: Pre"
+            elif minutes > 930:
+                session_timing = "BM: Post"
+            else:
+                session_timing = "BM: During"
+
+    # 2. From purpose string text
+    if not session_timing:
+        if any(kw in p_lower for kw in ["pre-market", "pre market", "before market"]):
+            session_timing = "BM: Pre"
+        elif any(kw in p_lower for kw in ["post-market", "post market", "after market", "after market hours"]):
+            session_timing = "BM: Post"
+        elif any(kw in p_lower for kw in ["during market", "market hours"]):
+            session_timing = "BM: During"
+
+    norm_purpose = raw_purpose
+    if session_timing and f"({session_timing})" not in norm_purpose and f"[{session_timing}]" not in norm_purpose:
+        norm_purpose = f"{raw_purpose} [{session_timing}]" if norm_purpose else session_timing
+
+    return {
+        "is_results": is_valid,
+        "session_timing": session_timing,
+        "normalized_purpose": norm_purpose,
+    }
+
+
 def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, int]:
     """Ingest upcoming result dates from the official NSE event-calendar API.
 
-    One API call covers all NSE stocks.  Result dates are written into the
-    shared SQLite ``earnings_history`` table using INSERT OR IGNORE so existing
-    historical EPS data from yfinance is preserved — only new result dates are
-    added.
+    One API call covers all NSE stocks. Result dates are written into the
+    shared SQLite ``earnings_history`` table with full exchange provenance metadata
+    (exchange_source='NSE', confirmation_status='CONFIRMED', filing_id, purpose).
 
     Returns ``{"total": ..., "inserted": ..., "errors": ...}``.
     """
@@ -398,31 +634,24 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
         logger.warning("nse event-calendar returned unexpected payload type=%s", type(raw).__name__)
         return {"total": 0, "inserted": 0, "errors": 1}
 
-    rows: list[tuple[str, str]] = []
+    rows: list[dict[str, Any]] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        # Strict validation: Only keep genuine quarterly financial-results events.
-        # Exclude AGMs, EGMs, postal ballots, warrants, or general corporate board meetings.
-        purpose = str(entry.get("purpose", "")).lower()
-        has_results_keyword = any(kw in purpose for kw in [
-            "financial result", "financial results", "quarterly result", "quarterly results",
-            "audited result", "audited results", "unaudited result", "unaudited results",
-            "accounts and results", "financial performance"
-        ])
-        is_excluded_event = any(kw in purpose for kw in [
-            "agm", "annual general meeting", "egm", "extraordinary general meeting",
-            "postal ballot", "dividend only", "fund raising only", "warrants allotment", "employee stock"
-        ]) and not ("financial result" in purpose or "quarterly result" in purpose)
 
-        if not has_results_keyword or is_excluded_event:
+        purpose_str = entry.get("purpose") or entry.get("desc") or ""
+        time_str = entry.get("time") or entry.get("bmTime") or entry.get("session") or ""
+        classification = classify_board_meeting_purpose(purpose_str, time_str)
+        if not classification["is_results"]:
             continue
+
         sym = str(entry.get("symbol", "")).strip().upper()
         if not sym:
             continue
-        # NSE returns bare codes; yfinance needs the .NS suffix.
+        # NSE returns bare codes; yfinance/Nexus needs the .NS suffix.
         if not sym.endswith(".NS"):
             sym = sym + ".NS"
+
         result_date = entry.get("date") or entry.get("resultDate") or entry.get("bmDate")
         if not result_date:
             continue
@@ -430,7 +659,14 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
             edate = pd.Timestamp(result_date).strftime("%Y-%m-%d")
         except Exception:
             continue
-        rows.append((sym, edate))
+
+        filing_id = str(entry.get("id") or entry.get("broadcastId") or f"NSE-BM-{sym}-{edate}")
+        rows.append({
+            "ticker": sym,
+            "earnings_date": edate,
+            "purpose": classification["normalized_purpose"],
+            "filing_id": filing_id,
+        })
 
     if not rows:
         logger.info("nse result-calendar returned no rows")
@@ -440,11 +676,24 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
     backoff = 0.5
     inserted = 0
     today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
-    sym_list = list({r[0] for r in rows})
+    sym_list = list({r["ticker"] for r in rows})
+    db_tuples = [
+        (
+            r["ticker"],
+            r["earnings_date"],
+            "nse",
+            "NSE",
+            "CONFIRMED",
+            r["purpose"],
+            r["filing_id"],
+        )
+        for r in rows
+    ]
+
     for attempt in range(max_retries):
         try:
             with _connect(settings) as connection:
-                # Purge any unconfirmed yfinance future dates for these tickers
+                # 1. Purge any unconfirmed yfinance future dates for these tickers
                 for i in range(0, len(sym_list), 500):
                     chunk = sym_list[i : i + 500]
                     ph = ", ".join(["?"] * len(chunk))
@@ -457,13 +706,36 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
                         """,
                         chunk + [today_str],
                     )
+
+                # 2. Rescheduling / Postponement: purge older upcoming official dates superseded by new filings
+                for r in rows:
+                    connection.execute(
+                        """
+                        DELETE FROM earnings_history
+                        WHERE ticker = ?
+                          AND earnings_date >= ?
+                          AND earnings_date != ?
+                          AND exchange_source = 'NSE'
+                        """,
+                        (r["ticker"], today_str, r["earnings_date"]),
+                    )
+
+                # 3. Insert or update verified NSE records with full provenance
                 inserted = connection.executemany(
                     """
-                    INSERT INTO earnings_history (ticker, earnings_date, source)
-                    VALUES (?, ?, 'nse')
-                    ON CONFLICT(ticker, earnings_date) DO NOTHING
+                    INSERT INTO earnings_history (
+                        ticker, earnings_date, source, exchange_source,
+                        confirmation_status, board_meeting_purpose, filing_id
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                        source = excluded.source,
+                        exchange_source = excluded.exchange_source,
+                        confirmation_status = excluded.confirmation_status,
+                        board_meeting_purpose = excluded.board_meeting_purpose,
+                        filing_id = excluded.filing_id
                     """,
-                    rows,
+                    db_tuples,
                 ).rowcount
                 connection.commit()
             break
@@ -548,18 +820,15 @@ def fetch_bse_result_calendar(
     if not all_raw_items:
         return []
 
-    # Filter out non-result board meetings if purpose is explicitly specified
+    # Filter out non-result board meetings using strict purpose classification
     filtered_items = []
     for item in all_raw_items:
         if not isinstance(item, dict):
             continue
-        purpose = str(item.get("purpose", "")).lower()
+        purpose = str(item.get("purpose", "")).strip()
         if purpose:
-            is_excluded = any(kw in purpose for kw in [
-                "agm", "annual general meeting", "egm", "extraordinary general meeting",
-                "postal ballot", "dividend only", "fund raising only", "warrants allotment", "employee stock"
-            ]) and not ("result" in purpose or "financial" in purpose)
-            if is_excluded:
+            classification = classify_board_meeting_purpose(purpose)
+            if not classification["is_results"]:
                 continue
         filtered_items.append(item)
 
@@ -676,21 +945,55 @@ def ingest_bse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
     eh_rows = []
     ticker_rows = []
     now_str = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    for ev in events:
-        ticker = ev["ticker"]
-        edate = ev["earnings_date"]
-        source = ev.get("source", "bse")
-        cname = ev.get("company_name")
-        mcap = ev.get("market_cap")
-
-        eh_rows.append((ticker, edate, source))
-        if cname:
-            ticker_rows.append((ticker, cname, mcap, now_str))
+    today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
 
     with _connect(settings) as connection:
+        # Check existing confirmed upcoming NSE dates to enforce NSE precedence for dual-listed stocks
+        existing_nse_upcoming = {}
+        for row in connection.execute(
+            "SELECT ticker, earnings_date FROM earnings_history WHERE exchange_source = 'NSE' AND earnings_date >= ?",
+            (today_str,),
+        ).fetchall():
+            existing_nse_upcoming[row[0]] = row[1]
+
+        for ev in events:
+            ticker = ev["ticker"]
+            edate = ev["earnings_date"]
+            cname = ev.get("company_name")
+            mcap = ev.get("market_cap")
+            purpose_raw = ev.get("purpose", "Financial Results")
+            classification = classify_board_meeting_purpose(purpose_raw)
+            if not classification["is_results"]:
+                continue
+
+            # Multi-Exchange conflict resolution:
+            # If ticker already has an authoritative upcoming NSE date, do NOT overwrite it!
+            if ticker in existing_nse_upcoming:
+                continue
+
+            source = "bse"
+            exchange_source = "BSE"
+            confirmation_status = "CONFIRMED"
+            filing_id = f"BSE-BM-{ticker}-{edate}"
+            purpose = classification["normalized_purpose"]
+
+            eh_rows.append((
+                ticker,
+                edate,
+                source,
+                exchange_source,
+                confirmation_status,
+                purpose,
+                filing_id,
+            ))
+            if cname:
+                ticker_rows.append((ticker, cname, mcap, now_str))
+
+        if not eh_rows:
+            logger.info("bse/multi-exchange result-calendar returned no actionable rows after filtering/conflict resolution")
+            return {"total": 0, "inserted": 0, "errors": 0}
+
         # Purge any unconfirmed yfinance future dates for incoming symbols before merging verified BSE dates
-        today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
         sym_list = list({r[0] for r in eh_rows})
         for i in range(0, len(sym_list), 500):
             chunk = sym_list[i : i + 500]
@@ -704,16 +1007,33 @@ def ingest_bse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
                 """,
                 chunk + [today_str],
             )
+
+        # Rescheduling for BSE records: purge older upcoming BSE dates superseded by new filing
+        for r in eh_rows:
+            connection.execute(
+                """
+                DELETE FROM earnings_history
+                WHERE ticker = ?
+                  AND earnings_date >= ?
+                  AND earnings_date != ?
+                  AND exchange_source = 'BSE'
+                """,
+                (r[0], today_str, r[1]),
+            )
+
         inserted = connection.executemany(
             """
-            INSERT INTO earnings_history (ticker, earnings_date, source)
-            VALUES (?, ?, ?)
+            INSERT INTO earnings_history (
+                ticker, earnings_date, source, exchange_source,
+                confirmation_status, board_meeting_purpose, filing_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ticker, earnings_date) DO UPDATE SET
-                source = CASE
-                    WHEN earnings_history.source != excluded.source AND INSTR(earnings_history.source, excluded.source) = 0
-                    THEN earnings_history.source || '+' || excluded.source
-                    ELSE earnings_history.source
-                END
+                source = excluded.source,
+                exchange_source = excluded.exchange_source,
+                confirmation_status = excluded.confirmation_status,
+                board_meeting_purpose = excluded.board_meeting_purpose,
+                filing_id = excluded.filing_id
             """,
             eh_rows,
         ).rowcount
