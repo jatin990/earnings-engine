@@ -9,6 +9,7 @@ and estimates price impact horizons (1-5 trading days).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -614,6 +615,206 @@ def determine_catalyst_verification_status(
     return "UNVERIFIED_SINGLE_SOURCE", flags
 
 
+def _parse_catalyst_dt(pub: Any) -> datetime | None:
+    """Parse catalyst timestamp string or datetime into UTC datetime."""
+    if not pub:
+        return None
+    if isinstance(pub, datetime):
+        return pub if pub.tzinfo else pub.replace(tzinfo=timezone.utc)
+    s = str(pub).strip()
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%d",
+    ):
+        try:
+            dt = datetime.strptime(s[:19], fmt[: len(s[:19])])
+            return dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+    try:
+        from earnings_engine.data.news_sentiment import _parse_iso_pubdate
+        iso = _parse_iso_pubdate(s)
+        return datetime.strptime(iso, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def compute_title_similarity(title1: str, title2: str) -> float:
+    """Compute normalized semantic token similarity between two headlines.
+
+    Uses n-gram / token Jaccard similarity after removing noise words, publisher tags,
+    ticker prefixes, and punctuation, with entity and numeric anchor matching.
+    """
+    if not title1 or not title2:
+        return 0.0
+
+    def _normalize_title_tokens(t: str) -> tuple[set[str], set[str]]:
+        text = t.lower()
+        # Remove publisher signature after hyphen or pipe (e.g. " - Economic Times", " | LiveMint")
+        text = re.sub(r"[\-|–]\s*[a-z0-9\.\s]+$", "", text)
+        # Normalize common financial abbreviations
+        text = re.sub(r"₹", "rs ", text)
+        text = re.sub(r"\bcrores?\b", "cr", text)
+        text = re.sub(r"\bbillions?\b", "bn", text)
+        text = re.sub(r"\bmillions?\b", "m", text)
+        text = re.sub(r"[^\w\s]", " ", text)
+
+        stop_words = {
+            "the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "by", "from",
+            "at", "as", "is", "be", "shares", "stock", "stocks", "says", "report", "reports",
+            "outcome", "meeting", "board", "intimation", "reg", "regulation", "announcement",
+            "ltd", "limited", "corp", "corporation", "company", "co", "its", "it", "after",
+            "wins", "bag", "bags", "surges", "surge", "surged", "rally", "rallies", "gain", "gains",
+        }
+        words = text.split()
+        tokens = {w for w in words if len(w) >= 2 and w not in stop_words}
+        numbers = set(re.findall(r"\b\d+\b", text))
+        return tokens, numbers
+
+    tokens1, nums1 = _normalize_title_tokens(title1)
+    tokens2, nums2 = _normalize_title_tokens(title2)
+
+    if not tokens1 or not tokens2:
+        return 0.0
+
+    union_tokens = tokens1.union(tokens2)
+    inter_tokens = tokens1.intersection(tokens2)
+    jaccard = len(inter_tokens) / len(union_tokens)
+
+    # Check shared significant numeric anchors (e.g., deal size '2500' or '500')
+    shared_nums = {n for n in nums1.intersection(nums2) if int(n) > 1}
+    if shared_nums:
+        # If they share non-trivial numbers and have some word overlap, boost similarity
+        if jaccard >= 0.20 or len(inter_tokens) >= 1:
+            jaccard = min(1.0, jaccard + 0.30)
+
+    return round(jaccard, 3)
+
+
+def cluster_and_deduplicate_news_events(
+    items: list[dict[str, Any]],
+    window_hours: int = 48,
+    similarity_threshold: float = 0.38,
+) -> list[dict[str, Any]]:
+    """Cluster news articles into deduplicated events with multi-source corroboration attribution.
+
+    Groups articles by (ticker, temporal_window <= 48h, semantic_title_similarity >= threshold).
+    Selects the highest-authority source as primary (Tier 1 > Tier 2 > Tier 3, then earliest pub),
+    groups other reports under `duplicates`, aggregates `corroborating_sources`, and updates
+    `verification_status` to EXCHANGE_VERIFIED or CORROBORATED based on corroboration depth.
+    """
+    if not items:
+        return []
+
+    from earnings_engine.data.news_sources import (
+        get_source_tier,
+        TIER_1_OFFICIAL,
+        TIER_2_MAJOR_FINANCIAL_PRESS,
+        TIER_3_AGGREGATORS,
+    )
+
+    # Group by normalized ticker
+    by_ticker: dict[str, list[dict[str, Any]]] = {}
+    for it in items:
+        sym = str(it.get("ticker") or "").strip().upper()
+        by_ticker.setdefault(sym, []).append(dict(it))
+
+    clustered_results: list[dict[str, Any]] = []
+
+    for ticker, ticker_items in by_ticker.items():
+        # Parse and annotate timestamps
+        annotated: list[tuple[datetime | None, dict[str, Any]]] = []
+        for it in ticker_items:
+            dt = _parse_catalyst_dt(it.get("published_at"))
+            annotated.append((dt, it))
+
+        # Clusters for this ticker: list of lists of items
+        clusters: list[list[dict[str, Any]]] = []
+
+        for dt, item in annotated:
+            matched_cluster = None
+            best_sim = -1.0
+
+            title = item.get("title") or ""
+            for cl in clusters:
+                parent_dt = _parse_catalyst_dt(cl[0].get("published_at"))
+                # Temporal gate
+                if dt and parent_dt:
+                    diff_hours = abs((dt - parent_dt).total_seconds()) / 3600.0
+                    if diff_hours > window_hours:
+                        continue
+
+                sim = compute_title_similarity(title, cl[0].get("title") or "")
+                if sim >= similarity_threshold and sim > best_sim:
+                    best_sim = sim
+                    matched_cluster = cl
+
+            if matched_cluster is not None:
+                matched_cluster.append(item)
+            else:
+                clusters.append([item])
+
+        # Consolidate each cluster
+        for cl in clusters:
+            for it in cl:
+                if not it.get("source_tier"):
+                    it["source_tier"] = get_source_tier(it.get("publisher", ""), it.get("source", ""))
+
+            def _rank_key(x: dict[str, Any]) -> tuple[int, int, str]:
+                tier = x.get("source_tier")
+                tier_score = 3 if tier == TIER_1_OFFICIAL else (2 if tier == TIER_2_MAJOR_FINANCIAL_PRESS else 1)
+                impact = int(x.get("impact_score") or 0)
+                pub = str(x.get("published_at") or "9999")
+                return (-tier_score, -impact, pub)
+
+            sorted_cl = sorted(cl, key=_rank_key)
+            parent = dict(sorted_cl[0])
+            duplicates = [dict(x) for x in sorted_cl[1:]]
+
+            # Collect distinct corroborating sources
+            all_publishers: list[str] = []
+            for it in sorted_cl:
+                pub = str(it.get("publisher") or "").strip()
+                if pub and pub not in all_publishers:
+                    all_publishers.append(pub)
+
+            parent["duplicates"] = duplicates
+            parent["cluster_size"] = len(sorted_cl)
+            parent["corroborating_sources"] = all_publishers
+
+            # Deterministic story_cluster_id
+            cluster_seed = f"{ticker}:{parent.get('title', '')[:30]}:{len(sorted_cl)}"
+            parent["story_cluster_id"] = f"cl_{hashlib.sha256(cluster_seed.encode('utf-8')).hexdigest()[:16]}"
+
+            # Determine / elevate verification_status
+            has_tier_1 = any(it.get("source_tier") == TIER_1_OFFICIAL for it in sorted_cl)
+            tier_2_publishers = {
+                it.get("publisher")
+                for it in sorted_cl
+                if it.get("source_tier") == TIER_2_MAJOR_FINANCIAL_PRESS
+                and it.get("publisher")
+            }
+
+            if has_tier_1 or parent.get("verification_status") == "EXCHANGE_VERIFIED":
+                parent["verification_status"] = "EXCHANGE_VERIFIED"
+            elif len(tier_2_publishers) >= 2 or (len(all_publishers) >= 2 and any(it.get("source_tier") == TIER_2_MAJOR_FINANCIAL_PRESS for it in sorted_cl)):
+                parent["verification_status"] = "CORROBORATED"
+            elif parent.get("verification_status") not in ("EXCHANGE_VERIFIED", "CORROBORATED"):
+                parent["verification_status"] = "UNVERIFIED_SINGLE_SOURCE"
+
+            clustered_results.append(parent)
+
+    clustered_results.sort(
+        key=lambda x: (str(x.get("published_at") or ""), int(x.get("impact_score") or 0)),
+        reverse=True,
+    )
+    return clustered_results
+
+
 def disambiguate_ticker_for_headline(ticker: str, title: str, summary: str = "") -> str:
     """Disambiguate ticker when broad search keywords match separate corporate entities."""
     full_text = (title + " " + summary).lower()
@@ -1020,6 +1221,8 @@ def get_short_term_catalysts(
     search_query: str | None = None,
     days: int = 14,
     limit: int = 50,
+    strict_verified_only: bool = False,
+    deduplicate: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Query short-term impact catalysts from SQLite cache sorted chronologically (newest first)."""
@@ -1027,10 +1230,14 @@ def get_short_term_catalysts(
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
 
+        verification_filter = "(verification_status IS NULL OR verification_status != 'REJECTED')"
+        if strict_verified_only:
+            verification_filter = "verification_status IN ('EXCHANGE_VERIFIED', 'CORROBORATED')"
+
         if days and days > 0:
-            query = f"SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-{days} days') AND (verification_status IS NULL OR verification_status = 'VERIFIED')"
+            query = f"SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-{days} days') AND {verification_filter}"
         else:
-            query = "SELECT * FROM news_catalysts WHERE (verification_status IS NULL OR verification_status = 'VERIFIED')"
+            query = f"SELECT * FROM news_catalysts WHERE {verification_filter}"
         params: list[Any] = []
 
         # Filter by watchlist / universe if supplied
@@ -1200,6 +1407,9 @@ def get_short_term_catalysts(
                         )
                     else:
                         v["price_change_pct"] = 0.0
+
+        if deduplicate and valid:
+            valid = cluster_and_deduplicate_news_events(valid)
 
         return valid
 
