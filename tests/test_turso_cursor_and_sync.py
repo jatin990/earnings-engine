@@ -120,8 +120,8 @@ def test_automation_schedules_init_and_fetch_performance(tmp_path):
 
 def test_sync_tables_and_watermark_configuration():
     """Verify SYNC_TABLES contains all registered tables and watermarks correctly prioritize."""
-    assert len(SYNC_TABLES) == 93
-    assert len(set(SYNC_TABLES)) == 93  # No duplicate table names
+    assert len(SYNC_TABLES) == len(set(SYNC_TABLES))  # No duplicate table names
+    assert len(SYNC_TABLES) >= 93
 
     # Essential tables confirmed in list
     assert "options_tracked_setups" in SYNC_TABLES

@@ -929,13 +929,11 @@ def calculate_or_fetch_eps(
                     annual_eps = last_price / trailing_pe
                     eps_rep = round(annual_eps / 4.0, 2)
                     method = "derived_pe_quarterly_eps"
-                    if eps_est is None:
-                        eps_est = round(eps_rep * 0.96, 2)
+                    # Anti-Fabrication: Never fabricate consensus estimate via pseudo-multiplier (0.96x)
             except Exception:
                 pass
 
-        if eps_rep is not None and eps_est is None:
-            eps_est = round(eps_rep * 0.95, 2)
+        # Anti-Fabrication: If estimate is missing, leave as None (do not fabricate 0.95x reported EPS)
 
         # Calculate surprise percentage
         if eps_rep is not None and eps_est is not None and abs(eps_est) > 0.0001:
@@ -995,8 +993,9 @@ def calculate_or_fetch_eps(
 
                     if not target_ed or col_dt_str != target_ed:
                         prior_subset = [e for _, e in inc_stmt_cols_data[i+1:]]
-                        q_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else round(col_eps * 0.95, 2)
-                        q_surp = round(((col_eps - q_est) / abs(q_est)) * 100.0, 2) if abs(q_est) > 0.0001 else 0.0
+                        # Anti-Fabrication: If no prior consensus or history, set estimate to None instead of pseudo 0.95 multiplier
+                        q_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else None
+                        q_surp = round(((col_eps - q_est) / abs(q_est)) * 100.0, 2) if (q_est is not None and abs(q_est) > 0.0001) else None
                         conn.execute("""
                             INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
                             VALUES (?, ?, ?, ?, ?, 'quarterly_income_stmt')
@@ -1040,8 +1039,9 @@ def calculate_or_fetch_eps(
         resolved_ed = inc_stmt_cols_data[0][0].strftime("%Y-%m-%d")
         eps_rep = inc_stmt_cols_data[0][1]
         prior_subset = [e for _, e in inc_stmt_cols_data[1:]]
-        eps_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else round(eps_rep * 0.95, 2)
-        surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2) if abs(eps_est) > 0.0001 else 0.0
+        # Anti-Fabrication: If no prior quarterly history, set estimate to None instead of pseudo 0.95 multiplier
+        eps_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else None
+        surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2) if (eps_est is not None and abs(eps_est) > 0.0001) else None
         method = "quarterly_income_stmt"
 
     # Trigger full metric recalculation and audit trail diff logging

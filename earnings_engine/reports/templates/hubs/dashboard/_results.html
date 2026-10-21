@@ -48,6 +48,9 @@
       <button type="button" id="resultsSummarizeBtn" onclick="window.resultsLedger && window.resultsLedger.summarize(this)"
         style="height:26px;padding:0 0.55rem;background:var(--bg-surface, #0d1117);color:var(--text-secondary, #94a3b8);border:1px solid var(--border-subtle, rgba(255,255,255,0.12));font-size:0.68rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
         title="AI summary of visible results">✦ AI Summary</button>
+      <button type="button" id="resultsChartStudioBtn" onclick="window.app && window.app.openMultiChartModal ? window.app.openMultiChartModal() : (window.resultsLedger && window.resultsLedger.openDrawer && window.resultsLedger.openDrawer('TCS.NS'))"
+        style="height:26px;padding:0 0.55rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:var(--font-mono);"
+        title="Open Multi-Timeframe Chart Studio (5m, 15m, 1D with SMC Order Blocks &amp; FVGs)">📈 Chart Studio</button>
     </div>
   </div>
 

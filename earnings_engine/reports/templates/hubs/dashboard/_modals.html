@@ -766,6 +766,12 @@
                         <span>Sync Crosshair</span>
                     </label>
 
+                    <!-- Auto-Refresh Indicator / Toggle -->
+                    <div id="multiChartAutoRefreshBadge" style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;background:#000000;border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:0.22rem 0.55rem;color:#10b981;font-family:var(--font-mono);">
+                        <span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;animation:pulse 2s infinite;"></span>
+                        <span>Auto-Refresh (15s)</span>
+                    </div>
+
                     <!-- Close Button -->
                     <button type="button" onclick="app.closeMultiChartModal()" class="btn-icon" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#ededed;border-radius:6px;width:30px;height:30px;" title="Close Multi-Chart Studio (Esc)">✕</button>
                 </div>
@@ -782,6 +788,8 @@
                             <span id="chartPaneChange-0" style="font-size:0.7rem;font-weight:600;color:#34d399;font-family:var(--font-mono);">--</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(0, '5m')">5m</button>
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(0, '15m')">15m</button>
                             <button type="button" class="btn-tf active" onclick="app.setChartPaneTimeframe(0, '1D')">1D</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(0, '1W')">1W</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(0, '1M')">1M</button>
@@ -799,6 +807,8 @@
                             <span id="chartPaneChange-1" style="font-size:0.7rem;font-weight:600;color:#34d399;font-family:var(--font-mono);">--</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(1, '5m')">5m</button>
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(1, '15m')">15m</button>
                             <button type="button" class="btn-tf active" onclick="app.setChartPaneTimeframe(1, '1D')">1D</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(1, '1W')">1W</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(1, '1M')">1M</button>
@@ -816,6 +826,8 @@
                             <span id="chartPaneChange-2" style="font-size:0.7rem;font-weight:600;color:#34d399;font-family:var(--font-mono);">--</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(2, '5m')">5m</button>
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(2, '15m')">15m</button>
                             <button type="button" class="btn-tf active" onclick="app.setChartPaneTimeframe(2, '1D')">1D</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(2, '1W')">1W</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(2, '1M')">1M</button>
@@ -833,6 +845,8 @@
                             <span id="chartPaneChange-3" style="font-size:0.7rem;font-weight:600;color:#34d399;font-family:var(--font-mono);">--</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(3, '5m')">5m</button>
+                            <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(3, '15m')">15m</button>
                             <button type="button" class="btn-tf active" onclick="app.setChartPaneTimeframe(3, '1D')">1D</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(3, '1W')">1W</button>
                             <button type="button" class="btn-tf" onclick="app.setChartPaneTimeframe(3, '1M')">1M</button>

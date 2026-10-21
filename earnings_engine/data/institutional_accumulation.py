@@ -4598,7 +4598,8 @@ def get_stock_quarterly_financials(
             SELECT id, ticker, quarter, period_end_date, revenue_cr, net_profit_cr,
                    operating_profit_cr, operating_margin_pct, net_margin_pct, eps,
                    yoy_revenue_growth_pct, yoy_pat_growth_pct, sales_growth_yoy_pct, profit_growth_yoy_pct,
-                   raw_payload_json, created_at, updated_at
+                   raw_payload_json, created_at, updated_at,
+                   interest_expense_cr, total_debt_cr, debt_to_equity, interest_coverage_ratio, net_debt_cr
             FROM quarterly_financials
             WHERE ticker IN ({placeholders})
             ORDER BY period_end_date DESC, quarter DESC
@@ -4617,6 +4618,11 @@ def get_stock_quarterly_financials(
             eps_val = float(r[9]) if r[9] is not None else None
             yoy_rev = float(r[10]) if r[10] is not None else (float(r[12]) if r[12] is not None else None)
             yoy_pat = float(r[11]) if r[11] is not None else (float(r[13]) if r[13] is not None else None)
+            int_exp_cr = float(r[17]) if len(r) > 17 and r[17] is not None else None
+            tot_debt_cr = float(r[18]) if len(r) > 18 and r[18] is not None else None
+            de_ratio = float(r[19]) if len(r) > 19 and r[19] is not None else None
+            int_cov = float(r[20]) if len(r) > 20 and r[20] is not None else None
+            net_debt_cr = float(r[21]) if len(r) > 21 and r[21] is not None else None
 
             results.append({
                 "id": r[0],
@@ -4636,6 +4642,11 @@ def get_stock_quarterly_financials(
                 "raw_payload_json": r[14],
                 "created_at": r[15],
                 "updated_at": r[16],
+                "interest_expense_cr": int_exp_cr,
+                "total_debt_cr": tot_debt_cr,
+                "debt_to_equity": de_ratio,
+                "interest_coverage_ratio": int_cov,
+                "net_debt_cr": net_debt_cr,
             })
 
         # Compute dynamic QoQ and EBITDA metrics across descending quarters

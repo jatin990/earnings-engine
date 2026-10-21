@@ -683,7 +683,7 @@
 
         if (fundBody) {
             if (!fundList || fundList.length === 0) {
-                fundBody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#8e97a8;padding:1.2rem;">No quarterly fundamental filings on record for this equity</td></tr>`;
+                fundBody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#8e97a8;padding:1.2rem;">No quarterly fundamental filings on record for this equity</td></tr>`;
             } else {
                 fundBody.innerHTML = fundList.slice(0, 12).map(q => {
                     const qName = q.quarter || q.period || '--';
@@ -693,6 +693,9 @@
                     const opm = (q.operating_margin_pct != null ? q.operating_margin_pct : q.ebitda_margin_pct);
                     const opmStr = opm != null ? `${Number(opm).toFixed(1)}%` : '--';
                     const pat = q.net_profit_cr != null ? `${currSym}${Number(q.net_profit_cr).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : '--';
+                    const intExp = q.interest_expense_cr != null ? `${currSym}${Number(q.interest_expense_cr).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}` : '--';
+                    const de = q.debt_to_equity != null ? `${Number(q.debt_to_equity).toFixed(2)}x` : '--';
+                    const intCov = q.interest_coverage_ratio != null ? `${Number(q.interest_coverage_ratio).toFixed(1)}x` : '--';
                     const eps = q.eps != null ? `${currSym}${Number(q.eps).toFixed(2)}` : '--';
 
                     // Growth badges
@@ -712,6 +715,9 @@
                             <td style="text-align:right;font-family:var(--font-mono, monospace);color:#38bdf8;">${ebStr}</td>
                             <td style="text-align:right;font-family:var(--font-mono, monospace);font-weight:700;color:${opm > 15 ? '#34d399' : (opm < 5 ? '#fb7185' : '#cbd5e1')};">${opmStr}</td>
                             <td style="text-align:right;font-family:var(--font-mono, monospace);">${pat}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);color:#f59e0b;">${intExp}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);">${de}</td>
+                            <td style="text-align:right;font-family:var(--font-mono, monospace);color:${q.interest_coverage_ratio != null && q.interest_coverage_ratio < 1.5 ? '#fb7185' : '#34d399'};">${intCov}</td>
                             <td style="text-align:right;font-family:var(--font-mono, monospace);font-weight:700;">${eps}</td>
                             <td style="text-align:right;white-space:nowrap;">
                                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.3rem;">

@@ -67,9 +67,13 @@
         sma20Series: [null, null, null, null],
         sma50Series: [null, null, null, null],
         sma200Series: [null, null, null, null],
+        vwapSeries: [null, null, null, null],
+        vwapUpperSeries: [null, null, null, null],
+        vwapLowerSeries: [null, null, null, null],
         tickers: ['TCS.NS', 'RELIANCE.NS', 'INFY.NS', 'HDFCBANK.NS'],
         timeframes: ['1D', '1D', '1D', '1D'],
         isSyncing: false,
+        pollTimer: null,
     };
 
     function calculateSMA(data, period) {
@@ -193,12 +197,37 @@
             title: 'SMA 200',
         });
 
+        // VWAP and Deviation Bands
+        const vwap = chart.addLineSeries({
+            color: '#f59e0b',
+            lineWidth: 1.5,
+            priceLineVisible: false,
+            title: 'VWAP',
+        });
+        const vwapUpper = chart.addLineSeries({
+            color: 'rgba(56, 189, 248, 0.45)',
+            lineWidth: 1,
+            lineStyle: 2,
+            priceLineVisible: false,
+            title: 'VWAP +1σ',
+        });
+        const vwapLower = chart.addLineSeries({
+            color: 'rgba(56, 189, 248, 0.45)',
+            lineWidth: 1,
+            lineStyle: 2,
+            priceLineVisible: false,
+            title: 'VWAP -1σ',
+        });
+
         app.multiChart.instances[idx] = chart;
         app.multiChart.candleSeries[idx] = candleSeries;
         app.multiChart.volumeSeries[idx] = volumeSeries;
         app.multiChart.sma20Series[idx] = sma20;
         app.multiChart.sma50Series[idx] = sma50;
         app.multiChart.sma200Series[idx] = sma200;
+        app.multiChart.vwapSeries[idx] = vwap;
+        app.multiChart.vwapUpperSeries[idx] = vwapUpper;
+        app.multiChart.vwapLowerSeries[idx] = vwapLower;
 
         // ResizeObserver
         const ro = new ResizeObserver(entries => {
@@ -241,51 +270,139 @@
         loadPaneData(idx);
     }
 
-    async function loadPaneData(idx) {
+    async function loadPaneData(idx, preserveRange = false) {
         const ticker = app.multiChart.tickers[idx] || 'TCS.NS';
-        const tf = app.multiChart.timeframes[idx] || '1D';
+        const tf = (app.multiChart.timeframes[idx] || '1D').toLowerCase();
+        const isIntraday = tf === '5m' || tf === '15m' || tf === '1m';
 
         try {
-            const resp = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(ticker)}`);
-            if (!resp.ok) return;
-            const records = await resp.json();
-            if (!records || records.length === 0) return;
-
-            const colors = getThemeColors();
-            const candles = [];
-            const volumes = [];
-
-            records.forEach(r => {
-                const itemTime = r.date;
-                candles.push({
-                    time: itemTime,
-                    open: r.open,
-                    high: r.high,
-                    low: r.low,
-                    close: r.close,
-                });
-                volumes.push({
-                    time: itemTime,
-                    value: r.volume,
-                    color: r.close >= r.open ? colors.volumeUp : colors.volumeDown,
-                });
-            });
-
             const candleSeries = app.multiChart.candleSeries[idx];
             const volumeSeries = app.multiChart.volumeSeries[idx];
             const sma20 = app.multiChart.sma20Series[idx];
             const sma50 = app.multiChart.sma50Series[idx];
             const sma200 = app.multiChart.sma200Series[idx];
+            const vwap = app.multiChart.vwapSeries[idx];
+            const vwapUpper = app.multiChart.vwapUpperSeries[idx];
+            const vwapLower = app.multiChart.vwapLowerSeries[idx];
 
-            if (candleSeries) candleSeries.setData(candles);
-            if (volumeSeries) volumeSeries.setData(volumes);
-            if (sma20) sma20.setData(calculateSMA(records, 20));
-            if (sma50) sma50.setData(calculateSMA(records, 50));
-            if (sma200) sma200.setData(calculateSMA(records, 200));
+            let candles = [];
+            let volumes = [];
+            let lastBar = null;
+            let prevBar = null;
+            const colors = getThemeColors();
+
+            if (isIntraday) {
+                // Fetch intraday chart intelligence with VWAP, Order Blocks, and FVGs
+                const url = `${API_BASE}/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(ticker)}&interval=${encodeURIComponent(tf)}&period=5d&allow_non_fno=true`;
+                const resp = await fetch(url);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!data || !data.candles || data.candles.length === 0) return;
+
+                candles = data.candles.map(c => ({
+                    time: c.time,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                }));
+
+                volumes = data.candles.map(c => ({
+                    time: c.time,
+                    value: c.volume || 0,
+                    color: c.close >= c.open ? colors.volumeUp : colors.volumeDown,
+                }));
+
+                if (candleSeries) candleSeries.setData(candles);
+                if (volumeSeries) volumeSeries.setData(volumes);
+
+                // Hide SMAs on intraday to reduce visual clutter, show VWAP and bands
+                if (sma20) sma20.setData([]);
+                if (sma50) sma50.setData([]);
+                if (sma200) sma200.setData([]);
+
+                const ind = data.indicators || {};
+                if (vwap) vwap.setData(ind.vwap || []);
+                if (vwapUpper) vwapUpper.setData(ind.vwap_upper_1 || ind.vwap_upper || []);
+                if (vwapLower) vwapLower.setData(ind.vwap_lower_1 || ind.vwap_lower || []);
+
+                // SMC Markers (Order Blocks and Fair Value Gaps)
+                const sm = data.smart_money || {};
+                const markers = [];
+                const obs = sm.order_blocks || [];
+                obs.forEach(ob => {
+                    const isBull = ob.type === 'BULLISH_OB';
+                    markers.push({
+                        time: ob.start_time || ob.time,
+                        position: isBull ? 'belowBar' : 'aboveBar',
+                        color: isBull ? '#10b981' : '#f43f5e',
+                        shape: isBull ? 'arrowUp' : 'arrowDown',
+                        text: `${ob.short_label || (isBull ? 'D-OB' : 'S-OB')}${ob.mitigated ? ' (TEST)' : ''}`,
+                    });
+                });
+
+                const fvgs = sm.fvg_gaps || [];
+                fvgs.forEach(fvg => {
+                    const isBull = fvg.type === 'BULLISH_FVG';
+                    markers.push({
+                        time: fvg.time,
+                        position: isBull ? 'belowBar' : 'aboveBar',
+                        color: isBull ? '#38bdf8' : '#fb7185',
+                        shape: 'circle',
+                        text: isBull ? 'B-FVG' : 'S-FVG',
+                    });
+                });
+
+                markers.sort((a, b) => a.time - b.time);
+                if (candleSeries && candleSeries.setMarkers) {
+                    candleSeries.setMarkers(markers);
+                }
+
+                lastBar = data.candles[data.candles.length - 1];
+                prevBar = data.candles.length > 1 ? data.candles[data.candles.length - 2] : lastBar;
+
+            } else {
+                // Fetch daily / weekly / monthly price history
+                const resp = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(ticker)}`);
+                if (!resp.ok) return;
+                const records = await resp.json();
+                if (!records || records.length === 0) return;
+
+                records.forEach(r => {
+                    const itemTime = r.date;
+                    candles.push({
+                        time: itemTime,
+                        open: r.open,
+                        high: r.high,
+                        low: r.low,
+                        close: r.close,
+                    });
+                    volumes.push({
+                        time: itemTime,
+                        value: r.volume,
+                        color: r.close >= r.open ? colors.volumeUp : colors.volumeDown,
+                    });
+                });
+
+                if (candleSeries) {
+                    candleSeries.setData(candles);
+                    candleSeries.setMarkers([]); // clear intraday SMC markers
+                }
+                if (volumeSeries) volumeSeries.setData(volumes);
+                if (sma20) sma20.setData(calculateSMA(records, 20));
+                if (sma50) sma50.setData(calculateSMA(records, 50));
+                if (sma200) sma200.setData(calculateSMA(records, 200));
+
+                // Clear VWAP on daily chart
+                if (vwap) vwap.setData([]);
+                if (vwapUpper) vwapUpper.setData([]);
+                if (vwapLower) vwapLower.setData([]);
+
+                lastBar = records[records.length - 1];
+                prevBar = records.length > 1 ? records[records.length - 2] : lastBar;
+            }
 
             // Update LTP and change % badge
-            const lastBar = records[records.length - 1];
-            const prevBar = records.length > 1 ? records[records.length - 2] : lastBar;
             if (lastBar) {
                 const diff = lastBar.close - prevBar.close;
                 const pct = prevBar.close > 0 ? (diff / prevBar.close) * 100 : 0;
@@ -300,13 +417,35 @@
                 }
             }
 
-            if (app.multiChart.instances[idx]) {
+            if (!preserveRange && app.multiChart.instances[idx]) {
                 app.multiChart.instances[idx].timeScale().fitContent();
             }
         } catch (err) {
             console.warn(`Error loading chart data for pane ${idx} (${ticker}):`, err);
         }
     }
+
+    app.startMultiChartAutoRefresh = function() {
+        if (app.multiChart.pollTimer) return;
+        app.multiChart.pollTimer = setInterval(() => {
+            const modal = document.getElementById('multiChartModal');
+            if (!modal || modal.style.display === 'none') {
+                app.stopMultiChartAutoRefresh();
+                return;
+            }
+            const paneCount = app.multiChart.layout === '1x1' ? 1 : (app.multiChart.layout === '1x2' ? 2 : 4);
+            for (let i = 0; i < paneCount; i++) {
+                loadPaneData(i, true);
+            }
+        }, 15000);
+    };
+
+    app.stopMultiChartAutoRefresh = function() {
+        if (app.multiChart.pollTimer) {
+            clearInterval(app.multiChart.pollTimer);
+            app.multiChart.pollTimer = null;
+        }
+    };
 
     app.openMultiChartModal = function(ticker, layout) {
         if (ticker) {
@@ -321,11 +460,13 @@
         }
 
         app.setMultiChartLayout(layout || app.multiChart.layout || '1x1');
+        app.startMultiChartAutoRefresh();
     };
 
     app.closeMultiChartModal = function() {
         const modal = document.getElementById('multiChartModal');
         if (modal) modal.style.display = 'none';
+        app.stopMultiChartAutoRefresh();
     };
 
     app.setMultiChartLayout = function(layout) {

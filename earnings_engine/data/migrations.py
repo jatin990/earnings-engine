@@ -2502,6 +2502,15 @@ def _migration_050_earnings_provenance_schema(conn: Any) -> None:
         pass
 
 
+def _migration_051_quarterly_solvency_and_coverage_metrics(conn: Any) -> None:
+    """Add solvency, debt, interest expense, and coverage columns to quarterly_financials."""
+    _add_column_if_missing(conn, "quarterly_financials", "interest_expense_cr", "REAL")
+    _add_column_if_missing(conn, "quarterly_financials", "total_debt_cr", "REAL")
+    _add_column_if_missing(conn, "quarterly_financials", "debt_to_equity", "REAL")
+    _add_column_if_missing(conn, "quarterly_financials", "interest_coverage_ratio", "REAL")
+    _add_column_if_missing(conn, "quarterly_financials", "net_debt_cr", "REAL")
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2554,6 +2563,7 @@ MIGRATIONS: list[Migration] = [
     Migration(48, "048_business_update_schedules", _migration_048_business_update_schedules),
     Migration(49, "049_purge_unconfirmed_indian_yfinance_earnings", _migration_049_purge_unconfirmed_indian_yfinance_earnings),
     Migration(50, "050_earnings_provenance_schema", _migration_050_earnings_provenance_schema),
+    Migration(51, "051_quarterly_solvency_and_coverage_metrics", _migration_051_quarterly_solvency_and_coverage_metrics),
 ]
 
 
