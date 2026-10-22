@@ -137,6 +137,7 @@ def test_declared_rdh_expansion(settings):
     assert res["total_candidates"] == 1
     item = res["items"][0]
     assert item["ticker"] == "TECHM.NS"
+    assert item["symbol"] == "TECHM"
     assert item["archetype"] == "RDH_EXPANSION"
     assert item["is_declared"] is True
     assert item["is_breaking_out"] is True
@@ -146,6 +147,9 @@ def test_declared_rdh_expansion(settings):
     assert item["tier"] == "HOT"
     assert item["trade_levels"]["target_price"] > item["trade_levels"]["ideal_entry"]
     assert item["trade_levels"]["stop_loss"] < item["trade_levels"]["ideal_entry"]
+    assert item["target_1"] == item["trade_levels"]["target_1"]
+    assert item["target_2"] == item["trade_levels"]["target_2"]
+    assert item["breakout_trigger"] == item["trade_levels"]["breakout_trigger"]
 
 
 def test_upcoming_pre_earnings_coil(settings):

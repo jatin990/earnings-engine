@@ -449,6 +449,14 @@
                         <button type="button" class="btn btn-sm bk-preset-btn" id="btnResultsPresetUpcoming" onclick="app.setResultsRadarPreset(0, 14, this)" title="Upcoming Anticipation 0 to +14 Days Window">0D to +14D</button>
                     </div>
 
+                    <!-- Timing Status Quick-Filter Pills -->
+                    <div style="display: flex; align-items: center; gap: 0.2rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.15rem 0.3rem; border-radius: 5px;">
+                        <span style="font-size: 0.68rem; color: #71717a; padding: 0 0.2rem;">Timing:</span>
+                        <button type="button" class="btn btn-sm results-timing-pill active" onclick="app.setResultsTimingFilter('ALL', this)" style="padding: 0.12rem 0.45rem; font-size: 0.68rem; font-weight: 700; border-radius: 3px; border: none; cursor: pointer; background: #27272a; color: #f8fafc;" title="All candidates in window">ALL</button>
+                        <button type="button" class="btn btn-sm results-timing-pill" onclick="app.setResultsTimingFilter('DECLARED', this)" style="padding: 0.12rem 0.45rem; font-size: 0.68rem; font-weight: 600; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: #38bdf8;" title="Declared results only (reaction traded)">🟢 DECLARED</button>
+                        <button type="button" class="btn btn-sm results-timing-pill" onclick="app.setResultsTimingFilter('UPCOMING', this)" style="padding: 0.12rem 0.45rem; font-size: 0.68rem; font-weight: 600; border-radius: 3px; border: none; cursor: pointer; background: transparent; color: #fbbf24;" title="Upcoming results only (pre-result setup)">⏳ UPCOMING</button>
+                    </div>
+
                     <!-- Archetype Filter -->
                     <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.5rem; border-radius: 5px;">
                         <span style="font-size: 0.70rem; color: #a1a1aa;">Archetype:</span>
@@ -542,14 +550,28 @@
                         <table id="resultsBreakoutTable" style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
                             <thead>
                                 <tr style="background: #000000; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 10;">
-                                    <th style="padding: 0.5rem 0.6rem;">TICKER</th>
-                                    <th style="padding: 0.5rem 0.5rem;">TIMING</th>
-                                    <th style="padding: 0.5rem 0.5rem;">ARCHETYPE</th>
-                                    <th style="padding: 0.5rem 0.5rem;">CMP</th>
-                                    <th style="padding: 0.5rem 0.5rem;" title="Breakout Trigger: Result-Day High (RDH) for declared or 20D Resistance for upcoming">TRIGGER (RDH)</th>
-                                    <th style="padding: 0.5rem 0.5rem;" title="Distance to Trigger">DIST</th>
-                                    <th style="padding: 0.5rem 0.5rem;" title="Volume Ratio vs 20D Average">VOL SURGE</th>
-                                    <th style="padding: 0.5rem 0.5rem;" title="Composite Conviction Score">SCORE</th>
+                                    <th style="padding: 0.5rem 0.6rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('ticker')" title="Sort by Ticker">
+                                        TICKER <span id="th-results-ticker" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('timing')" title="Sort by Result Timing (Days Relative)">
+                                        TIMING <span id="th-results-timing" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; user-select: none;">ARCHETYPE</th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('cmp')" title="Sort by Current Market Price">
+                                        CMP <span id="th-results-cmp" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('trigger')" title="Sort by Breakout Trigger (RDH / Resistance)">
+                                        TRIGGER (RDH) <span id="th-results-trigger" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('dist')" title="Sort by Distance to Breakout Trigger">
+                                        DIST <span id="th-results-dist" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('vol')" title="Sort by Volume Surge vs 20D Average">
+                                        VOL SURGE <span id="th-results-vol" style="color: #64748b;">↕</span>
+                                    </th>
+                                    <th style="padding: 0.5rem 0.5rem; cursor: pointer; user-select: none;" onclick="app.sortResultsRadar('score')" title="Sort by Conviction Score">
+                                        SCORE <span id="th-results-score" style="color: #38bdf8;">▼</span>
+                                    </th>
                                     <th style="padding: 0.5rem 0.4rem; text-align: center;">ACTION</th>
                                 </tr>
                             </thead>

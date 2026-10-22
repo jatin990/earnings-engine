@@ -419,8 +419,12 @@ def get_results_breakout_candidates(
         is_breaking_out = current_price >= breakout_trigger
 
         # Momentum calculations
-        mom_3d = round(((current_price / closes.iloc[-4] - 1.0) * 100), 2) if len(closes) >= 4 else None
-        mom_7d = round(((current_price / closes.iloc[-8] - 1.0) * 100), 2) if len(closes) >= 8 else None
+        mom_3d = round(float((current_price / closes.iloc[-4] - 1.0) * 100), 2) if len(closes) >= 4 else None
+        mom_7d = round(float((current_price / closes.iloc[-8] - 1.0) * 100), 2) if len(closes) >= 8 else None
+
+        # Squeeze indicator (Bollinger Band inside Keltner Channel)
+        std_20 = float(window_20.std()) if len(window_20) >= 10 else None
+        squeeze_on = bool(std_20 is not None and (2.0 * std_20) <= (1.5 * atr_val))
 
         composite_score = _calc_composite_score(
             pct_from_trigger=pct_from_trigger,
@@ -441,12 +445,14 @@ def get_results_breakout_candidates(
         tier = "HOT" if composite_score >= 60 else "WARM"
 
         # Trade Levels
-        ideal_entry = round(max(current_price, breakout_trigger * 1.002), 2)
-        target_price = round(ideal_entry + 2.0 * atr_val, 2)
-        stop_loss = round(ideal_entry - 1.2 * atr_val, 2)
+        ideal_entry = round(float(max(current_price, breakout_trigger * 1.002)), 2)
+        target_1 = round(float(ideal_entry + 1.5 * atr_val), 2)
+        target_2 = round(float(ideal_entry + 3.0 * atr_val), 2)
+        target_price = target_1
+        stop_loss = round(float(ideal_entry - 1.2 * atr_val), 2)
         risk = max(0.01, ideal_entry - stop_loss)
         reward = max(0.01, target_price - ideal_entry)
-        rrr = round(reward / risk, 2)
+        rrr = round(float(reward / risk), 2)
 
         meta = ARCHETYPE_METADATA.get(selected_archetype, {
             "label": selected_archetype,
@@ -464,57 +470,72 @@ def get_results_breakout_candidates(
 
         company_name = names_map.get(ticker, ticker)
         industry = industry_map.get(ticker, "General")
+        symbol = ticker[:-3] if ticker.endswith(".NS") else ticker
 
         items.append({
             "ticker": ticker,
+            "symbol": symbol,
             "company_name": company_name,
             "industry": industry,
             "market": "NSE" if ticker.endswith(".NS") else "US",
             "earnings_date": edate_str,
-            "days_relative": days_rel,
+            "days_relative": int(days_rel),
+            "days_since_result": int(days_rel),
             "timing_status": timing_status,
             "relative_days_label": relative_days_label,
             "is_declared": is_declared,
-            "current_price": round(current_price, 2),
-            "breakout_trigger": breakout_trigger,
+            "current_price": round(float(current_price), 2),
+            "breakout_trigger": round(float(breakout_trigger), 2),
             "trigger_label": trigger_label,
-            "pct_from_trigger": pct_from_trigger,
+            "pct_from_trigger": round(float(pct_from_trigger), 2),
+            "dist_to_trigger_pct": round(float(pct_from_trigger), 2),
             "is_breaking_out": is_breaking_out,
-            "composite_score": composite_score,
+            "composite_score": int(composite_score),
             "tier": tier,
             "archetype": selected_archetype,
             "archetype_label": meta["label"],
             "archetype_badge": meta["badge"],
             "archetype_description": meta["desc"],
             "result_structure": {
-                "pre_result_close": round(pre_result_close, 2) if pre_result_close else None,
-                "result_day_high": result_day_high,
-                "result_day_low": result_day_low,
-                "reaction_day_gap_pct": reaction_gap_pct,
-                "reaction_day_return_pct": reaction_return_pct,
-                "intraday_recovery_pct": intraday_recovery_pct,
-                "post_high_move_pct": post_high_move_pct,
-                "pullback_from_high_pct": pullback_from_high_pct,
+                "pre_result_close": round(float(pre_result_close), 2) if pre_result_close else None,
+                "pre_close": round(float(pre_result_close), 2) if pre_result_close else None,
+                "result_day_high": round(float(result_day_high), 2) if result_day_high else None,
+                "result_day_low": round(float(result_day_low), 2) if result_day_low else None,
+                "reaction_day_gap_pct": round(float(reaction_gap_pct), 2) if reaction_gap_pct is not None else None,
+                "reaction_day_return_pct": round(float(reaction_return_pct), 2) if reaction_return_pct is not None else None,
+                "reaction_day_ret_pct": round(float(reaction_return_pct), 2) if reaction_return_pct is not None else None,
+                "intraday_recovery_pct": round(float(intraday_recovery_pct), 2) if intraday_recovery_pct is not None else None,
+                "post_high_move_pct": round(float(post_high_move_pct), 2) if post_high_move_pct is not None else None,
+                "pullback_from_high_pct": round(float(pullback_from_high_pct), 2) if pullback_from_high_pct is not None else None,
             },
             "fundamentals": {
-                "eps_reported": ev.get("eps_reported"),
-                "eps_estimate": ev.get("eps_estimate"),
-                "surprise_pct": ev.get("surprise_pct"),
+                "eps_reported": float(ev.get("eps_reported")) if ev.get("eps_reported") is not None else None,
+                "eps_estimate": float(ev.get("eps_estimate")) if ev.get("eps_estimate") is not None else None,
+                "surprise_pct": round(float(ev.get("surprise_pct")), 2) if ev.get("surprise_pct") is not None else None,
                 "quality_score": 70 if ev.get("surprise_pct") and ev["surprise_pct"] > 0 else 50,
             },
             "technicals": {
-                "volume_ratio": volume_ratio,
-                "atr_val": round(atr_val, 2),
-                "atr_pct": atr_pct,
-                "sma_20": round(sma_20, 2),
-                "high_20d": round(high_20d, 2),
-                "high_52w": round(high_52w, 2),
+                "volume_ratio": round(float(volume_ratio), 2),
+                "volume_ratio_20d": round(float(volume_ratio), 2),
+                "atr_val": round(float(atr_val), 2),
+                "atr_14d": round(float(atr_val), 2),
+                "atr_pct": round(float(atr_pct), 2),
+                "sma_20": round(float(sma_20), 2),
+                "high_20d": round(float(high_20d), 2),
+                "resistance_20d": round(float(high_20d), 2),
+                "high_52w": round(float(high_52w), 2),
                 "momentum_3d_pct": mom_3d,
                 "momentum_7d_pct": mom_7d,
+                "squeeze_on": squeeze_on,
             },
             "trade_levels": {
                 "ideal_entry": ideal_entry,
+                "suggested_entry": ideal_entry,
+                "breakout_trigger": round(float(breakout_trigger), 2),
+                "dist_to_trigger_pct": round(float(pct_from_trigger), 2),
                 "target_price": target_price,
+                "target_1": target_1,
+                "target_2": target_2,
                 "stop_loss": stop_loss,
                 "risk_reward_ratio": rrr,
             },
@@ -534,9 +555,15 @@ def get_results_breakout_candidates(
         },
         "total_candidates": len(items),
         "summary": {
+            "total_candidates": len(items),
             "declared_count": declared_count,
+            "declared_results": declared_count,
             "upcoming_count": upcoming_count,
+            "upcoming_results": upcoming_count,
             "breaking_out_count": breaking_out_count,
+            "hot_setups": sum(1 for x in items if x.get("composite_score", 0) >= 60),
+            "top_score": items[0]["composite_score"] if items else None,
+            "top_conviction_score": items[0]["composite_score"] if items else None,
             "archetype_counts": archetype_counts,
         },
         "items": items,
