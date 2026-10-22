@@ -212,8 +212,14 @@
     // -------------------------------------------------------------------------
     app.setResultsTimingFilter = function (filter, btnElement) {
         app._resultsTimingFilter = filter;
-        document.querySelectorAll('.bk-timing-pill').forEach(btn => btn.classList.remove('active'));
-        if (btnElement) btnElement.classList.add('active');
+        document.querySelectorAll('.results-timing-pill, .bk-timing-pill').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.background = 'transparent';
+        });
+        if (btnElement) {
+            btnElement.classList.add('active');
+            btnElement.style.background = '#27272a';
+        }
         app.filterResultsRadar();
     };
 

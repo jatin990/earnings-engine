@@ -38,7 +38,9 @@
 
     // State
     app._currentDrawerTicker = null;
-    app._drawerChartTimeframe = '1Y';
+    app._drawerChartTimeframe = '1D';
+    app._drawerChartRange = '1Y';
+    app._drawerChartPollTimer = null;
     app._stockDrawerContext = { list: [], currentIndex: -1 };
     app._drawerHydratedTabs = new Set();
 
@@ -170,6 +172,11 @@
         if (drawer) drawer.classList.remove('open');
         if (backdrop) backdrop.classList.remove('open');
         document.body.style.overflow = '';
+
+        if (app._drawerChartPollTimer) {
+            clearInterval(app._drawerChartPollTimer);
+            app._drawerChartPollTimer = null;
+        }
 
         if (_drawerAbortCtrl) {
             _drawerAbortCtrl.abort();
@@ -1238,7 +1245,7 @@
 
         let vol = candle.volume;
         if (vol === undefined && app._drawerChartRecords) {
-            const match = app._drawerChartRecords.find(r => r.date === timeStr);
+            const match = app._drawerChartRecords.find(r => r.date === timeStr || r.time === timeStr || String(r.time) === String(timeStr));
             if (match) vol = match.volume;
         }
 
@@ -1349,27 +1356,84 @@
 
     app.setDrawerChartTF = function (tf) {
         app._drawerChartTimeframe = tf;
-        ['1M', '3M', '6M', '1Y', 'ALL'].forEach(r => {
-            const btn = document.getElementById(`btnDrawerRange${r}`);
+
+        // 1. Update Resolution Buttons (5m, 15m, 1D)
+        ['5m', '15m', '1D'].forEach(t => {
+            const btn = document.getElementById(`btnDrawerTF${t}`);
             if (btn) {
-                if (r === tf) btn.classList.add('active');
+                if (t === tf) btn.classList.add('active');
+                else btn.classList.remove('active');
+            }
+        });
+
+        // 2. Toggle Visibility of Daily Range Chips vs Intraday Live Badge & SMC Explainer
+        const rangeChips = document.getElementById('drawerDailyRangeChips');
+        const liveBadge = document.getElementById('drawerIntradayRefreshBadge');
+        const statusBadge = document.getElementById('drawerChartDataStatus');
+        const smcCard = document.getElementById('drawerExplainerSMC');
+
+        const isIntraday = (tf === '5m' || tf === '15m');
+
+        if (rangeChips) {
+            rangeChips.style.display = isIntraday ? 'none' : 'inline-flex';
+        }
+        if (liveBadge) {
+            liveBadge.style.display = isIntraday ? 'inline-flex' : 'none';
+        }
+        if (statusBadge) {
+            statusBadge.textContent = isIntraday ? `${tf.toUpperCase()} SMC FLOW` : '1D OHLCV';
+        }
+        if (smcCard) {
+            smcCard.style.display = isIntraday ? 'block' : 'none';
+        }
+
+        // 3. Manage Intraday 15s Auto-Refresh Timer
+        if (app._drawerChartPollTimer) {
+            clearInterval(app._drawerChartPollTimer);
+            app._drawerChartPollTimer = null;
+        }
+
+        if (isIntraday) {
+            app._drawerChartPollTimer = setInterval(() => {
+                const drawer = document.getElementById('stockSliderDrawer');
+                if (drawer && drawer.classList.contains('open') && app._currentDrawerTicker && (app._drawerChartTimeframe === '5m' || app._drawerChartTimeframe === '15m')) {
+                    app._initOrUpdateDrawerChart(app._currentDrawerTicker);
+                } else if (app._drawerChartPollTimer) {
+                    clearInterval(app._drawerChartPollTimer);
+                    app._drawerChartPollTimer = null;
+                }
+            }, 15000);
+        }
+
+        // 4. Reload chart data for the current ticker under new timeframe resolution
+        if (app._currentDrawerTicker) {
+            app._initOrUpdateDrawerChart(app._currentDrawerTicker);
+        }
+    };
+
+    app.setDrawerChartRange = function (r) {
+        app._drawerChartRange = r;
+        ['1M', '3M', '6M', '1Y', 'ALL'].forEach(range => {
+            const btn = document.getElementById(`btnDrawerRange${range}`);
+            if (btn) {
+                if (range === r) btn.classList.add('active');
                 else btn.classList.remove('active');
             }
         });
 
         if (!app._drawerChartInstance || !app._drawerChartRecords || app._drawerChartRecords.length === 0) return;
 
-        if (tf === 'ALL') {
+        if (r === 'ALL') {
             app._drawerChartInstance.timeScale().fitContent();
             return;
         }
 
         const total = app._drawerChartRecords.length;
         let barsToShow = 252;
-        if (tf === '1M') barsToShow = 22;
-        else if (tf === '3M') barsToShow = 65;
-        else if (tf === '6M') barsToShow = 130;
-        else if (tf === '1Y') barsToShow = 252;
+        if (r === '1M') barsToShow = 22;
+        else if (r === '3M') barsToShow = 65;
+        else if (r === '6M') barsToShow = 130;
+        else if (r === '1Y') barsToShow = 252;
 
         const fromIdx = Math.max(0, total - barsToShow);
         const fromDate = app._drawerChartRecords[fromIdx]?.date;
