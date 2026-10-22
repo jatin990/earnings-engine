@@ -1949,11 +1949,14 @@
 
         tbody.innerHTML = html;
 
-        // Auto-scroll to ATM row smoothly inside container
+        // Auto-scroll to ATM row smoothly inside table container only (without scrolling the page window)
         setTimeout(() => {
             const atmRow = document.getElementById('optionsAtmRow');
             if (atmRow) {
-                atmRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const container = atmRow.closest('.table-responsive');
+                if (container) {
+                    container.scrollTop = atmRow.offsetTop - (container.clientHeight / 2) + (atmRow.clientHeight / 2);
+                }
             }
         }, 150);
     };
