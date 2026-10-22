@@ -129,7 +129,7 @@ def test_api_trigger_financials_and_block_deals_endpoints(monkeypatch):
 
 
 def test_ui_smart_money_ingest_buttons_in_templates():
-    with open("earnings_engine/reports/templates/dashboard/_institutional.html", "r", encoding="utf-8") as f:
+    with open("earnings_engine/reports/templates/hubs/dashboard/_institutional.html", "r", encoding="utf-8") as f:
         html = f.read()
 
     assert "btnForensicRefreshFetch" in html

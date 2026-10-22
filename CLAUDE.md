@@ -30,8 +30,8 @@ Whenever a new SQLite table is created:
 - Equities: Indian equities require `.NS` (`TCS.NS`), US equities have no suffix (`AAPL`). Resolve via `market_of(ticker)`.
 - On-Demand AI: Default 0 tokens. Zero automated LLM inference on page load, modal open, or table render.
 
-### 1.6 Frontend & Template Mirroring Rule (reports/, ui/)
-- Always keep `reports/templates/dashboard/<name>.html` and `reports/templates/hubs/dashboard/<name>.html` identical.
+### 1.6 Frontend & Template Architecture (reports/, ui/)
+- Canonical dashboard templates live under `reports/templates/hubs/dashboard/<name>.html`.
 - Keep UI JS modular under `earnings_engine/ui/js/modules/*.js`.
 
 ## 2. Delivery & Operations Protocol
