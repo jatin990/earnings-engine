@@ -307,6 +307,26 @@
             // Render Tactical GEX Market Briefing & Action Directive Header Bar
             app.renderGexMarketBriefing(data);
 
+            // Render Multi-Timeframe Velocity Meters (Today, 15m, 5m)
+            if (typeof app.renderOiTimeframeMeters === 'function') {
+                app.renderOiTimeframeMeters(data.oi_timeframes, data.pcr_oi);
+            }
+
+            // Render Market Compass Confluence Speedometer & 8-Factor Breakdown
+            if (typeof app.renderMarketCompass === 'function') {
+                app.renderMarketCompass(data.market_compass);
+            }
+
+            // Render Real-Time Institutional Alerts Feed
+            if (typeof app.renderDerivativesAlerts === 'function') {
+                app.renderDerivativesAlerts(data.institutional_alerts);
+            }
+
+            // Render Dual Strike Distribution Charts (Total OI vs OI Change)
+            if (typeof app.renderDualStrikeCharts === 'function') {
+                app.renderDualStrikeCharts(data.strikes, data.spot_price);
+            }
+
             // Render Multi-Mode Open Interest / GEX / Delta / IV Chart
             app.renderOiDistributionChart(data);
 

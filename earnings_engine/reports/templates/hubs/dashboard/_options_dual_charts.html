@@ -1,0 +1,45 @@
+<!-- Dual Strike Distribution Charts: Total OI vs Intraday OI Change -->
+<div id="optDualStrikeChartsSection" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
+        <div>
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
+                <span>📊</span> Strike Distribution: Open Interest &amp; Change in OI
+            </h3>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">Direct strike-by-strike institutional buildup: Total open positions vs Intraday net additions</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.75rem;color:var(--text-secondary);">
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:2px;"></span> Call OI (CE)</span>
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:2px;"></span> Put OI (PE)</span>
+            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:2px;background:#fbbf24;"></span> Spot Strike</span>
+        </div>
+    </div>
+
+    <!-- Dual Chart Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;">
+        <!-- Left Chart: Total OI by Strike -->
+        <div style="background:#0d0e12;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                <span style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+                    OI by Strike (Positioning Depth)
+                </span>
+                <span style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Cumulative Contracts</span>
+            </div>
+            <div style="height:280px;position:relative;">
+                <canvas id="optDualOiChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Right Chart: Intraday OI Change by Strike -->
+        <div style="background:#0d0e12;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
+                <span style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+                    OI Change by Strike (Writing Flow)
+                </span>
+                <span style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Intraday Delta</span>
+            </div>
+            <div style="height:280px;position:relative;">
+                <canvas id="optDualOiChgChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,70 @@
+<!-- Market Compass Confluence Engine & Factor Breakdown -->
+<div id="optMarketCompassSection" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
+        <div>
+            <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
+                <span>🧭</span> Market Compass Confluence
+            </h3>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">8-Factor quantitative derivatives &amp; order-flow regime model</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span id="optCompassVerdictBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.75rem;padding:0.25rem 0.65rem;border-radius:4px;font-weight:800;">
+                BULLISH CONFLUENCE
+            </span>
+            <span id="optCompassConfidencePill" class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;padding:0.25rem 0.65rem;border-radius:4px;font-weight:700;font-family:var(--font-mono);">
+                84% Confidence
+            </span>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;align-items:center;">
+        <!-- Left Column: Radial Speedometer SVG Gauge -->
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem;background:#0d0e12;border:1px solid rgba(255,255,255,0.05);border-radius:10px;">
+            <div style="position:relative;width:240px;height:140px;">
+                <svg viewBox="0 0 200 120" style="width:100%;height:100%;overflow:visible;">
+                    <!-- Outer arc track -->
+                    <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="16" stroke-linecap="round" />
+
+                    <!-- Red Bearish Arc Segment (0 to 40% of arc) -->
+                    <path d="M 20 100 A 80 80 0 0 1 65 35" fill="none" stroke="#ef4444" stroke-width="16" stroke-opacity="0.85" />
+                    <!-- Amber Neutral Arc Segment (40 to 60% of arc) -->
+                    <path d="M 65 35 A 80 80 0 0 1 135 35" fill="none" stroke="#f59e0b" stroke-width="16" stroke-opacity="0.85" />
+                    <!-- Green Bullish Arc Segment (60 to 100% of arc) -->
+                    <path d="M 135 35 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" stroke-width="16" stroke-opacity="0.85" />
+
+                    <!-- Needle Line (Pivot: 100, 100) -->
+                    <!-- Angle: -90 deg = -100 score (left), 0 deg = 0 score (center), +90 deg = +100 score (right) -->
+                    <g id="optCompassNeedleGroup" transform="rotate(45 100 100)" style="transition:transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);">
+                        <polygon points="97,100 103,100 100,26" fill="#f8fafc" />
+                        <circle cx="100" cy="100" r="7" fill="#fbbf24" stroke="#000000" stroke-width="2" />
+                    </g>
+                </svg>
+            </div>
+
+            <!-- Quantitative Score and Status -->
+            <div style="text-align:center;margin-top:0.25rem;">
+                <div style="font-size:1.8rem;font-weight:900;font-family:var(--font-mono);color:#ffffff;" id="optCompassScoreVal">+48.5</div>
+                <div style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;" id="optCompassVerdictText">
+                    Aggressive Put Writing Flow
+                </div>
+            </div>
+
+            <!-- Scale Labels -->
+            <div style="display:flex;justify-content:space-between;width:100%;max-width:240px;margin-top:0.5rem;font-size:0.68rem;font-family:var(--font-mono);color:var(--text-secondary);">
+                <span style="color:#f87171;">-100 (Bearish)</span>
+                <span style="color:#fbbf24;">0 (Neutral)</span>
+                <span style="color:#34d399;">+100 (Bullish)</span>
+            </div>
+        </div>
+
+        <!-- Right Column: 8-Factor Confluence Deck -->
+        <div>
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;margin-bottom:0.6rem;">
+                Weighted Factors Breakdown
+            </div>
+            <div id="optCompassFactorsContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.5rem;">
+                <!-- Populated dynamically via app.renderFactorBreakdown -->
+            </div>
+        </div>
+    </div>
+</div>

@@ -18,6 +18,10 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
+from earnings_engine.data.options_alerts_engine import generate_derivatives_alerts
+from earnings_engine.data.options_chart_engine import get_intraday_structure_summary
+from earnings_engine.data.options_market_compass import calculate_market_compass
+from earnings_engine.data.options_writing_velocity import derive_multi_timeframe_oi
 from earnings_engine.data.providers.provider_manager import get_data_manager
 from earnings_engine.data.universe import is_fno_eligible, resolve_fno_symbol
 
@@ -636,6 +640,45 @@ def _calculate_option_metrics_from_records(
         "iv": iv_summary,
     }
 
+    # Derive Multi-Timeframe Call vs Put Writing Velocity & Sentiment
+    oi_timeframes = derive_multi_timeframe_oi(
+        symbol=symbol,
+        current_call_oi=int(call_oi),
+        current_put_oi=int(put_oi),
+        strikes=formatted_strikes,
+    )
+
+    # Extract Intraday SMC & VWAP Technical Structure
+    chart_intel = get_intraday_structure_summary(symbol=symbol, interval="5m")
+
+    # 8-Factor Confluence Market Compass Model
+    market_compass = calculate_market_compass(
+        symbol=symbol,
+        spot_price=current_spot,
+        pcr_oi=pcr_oi,
+        pcr_volume=pcr_vol,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+        max_pain=max_pain,
+        gamma_profile=gamma_profile_data,
+        oi_timeframes=oi_timeframes,
+        chart_intel=chart_intel,
+        vix_data=vix_profile,
+    )
+
+    # Real-time Institutional Flow and Flow Accumulation Alerts
+    institutional_alerts = generate_derivatives_alerts(
+        symbol=symbol,
+        spot_price=current_spot,
+        call_wall=high_call_strike,
+        put_wall=high_put_strike,
+        max_pain=max_pain,
+        pcr_oi=pcr_oi,
+        oi_timeframes=oi_timeframes,
+        gamma_profile=gamma_profile_data,
+        strikes=formatted_strikes,
+    )
+
     return {
         "symbol": symbol,
         "pcr_oi": pcr_oi,
@@ -659,6 +702,9 @@ def _calculate_option_metrics_from_records(
         "net_delta_summary": net_delta_summary,
         "iv_summary": iv_summary,
         "subtab_summaries": subtab_summaries,
+        "oi_timeframes": oi_timeframes,
+        "market_compass": market_compass,
+        "institutional_alerts": institutional_alerts,
         "vix_profile": vix_profile,
         "market_setups": setups,
         "records_count": len(formatted_strikes),

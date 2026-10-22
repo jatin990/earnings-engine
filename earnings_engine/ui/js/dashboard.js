@@ -37,7 +37,7 @@ const API_BASE = window.location.origin;
                 'coverage': ['/static/js/modules/coverage.js'],
                 'industries': ['/static/js/modules/industries.js'],
                 'patterns': ['/static/js/modules/consensus.js', '/static/js/modules/patterns.js'],
-                'options': ['/static/js/modules/options_hub.js'],
+                'options': ['/static/js/modules/options_compass_renderer.js', '/static/js/modules/options_hub.js'],
                 'commodities': ['/static/js/modules/commodities.js']
             },
 

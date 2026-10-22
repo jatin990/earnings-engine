@@ -1,0 +1,80 @@
+<!-- Institutional Open Interest Flow & Multi-Timeframe Velocity Meters -->
+<div id="optOiVelocitySection" style="margin-bottom:1.5rem;">
+    <!-- Flow Header with Writing Badge and PCR Alert -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="font-size:0.9rem;font-weight:700;color:var(--text-primary);letter-spacing:0.02em;display:flex;align-items:center;gap:0.4rem;">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
+                Open Interest Multi-Timeframe Velocity
+            </span>
+            <span id="optFlowSentimentBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.72rem;padding:0.2rem 0.55rem;border-radius:4px;font-weight:800;letter-spacing:0.04em;">
+                PUT WRITING
+            </span>
+        </div>
+        <div id="optFlowPcrAlert" style="font-size:0.75rem;color:var(--text-secondary);font-family:var(--font-mono);display:flex;align-items:center;gap:0.5rem;">
+            <span>PCR: <strong id="optFlowPcrVal" style="color:#38bdf8;">--</strong></span>
+            <span style="color:rgba(255,255,255,0.2);">|</span>
+            <span id="optFlowPcrBias" style="color:#34d399;font-weight:600;">Bullish Support Dominated</span>
+        </div>
+    </div>
+
+    <!-- 3 Velocity Cards (Today, 15m, 5m) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.75rem;">
+        <!-- Card 1: Today (Full Session) -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">Today (Full Session)</span>
+                <span id="optTfTodayBadge" class="badge" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;">
+                    PUT WRITING
+                </span>
+            </div>
+            <!-- Progress Bar -->
+            <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,0.06);margin-bottom:0.45rem;">
+                <div id="optTfTodayCallBar" style="width:42%;background:#f87171;transition:width 0.4s ease;"></div>
+                <div id="optTfTodayPutBar" style="width:58%;background:#34d399;transition:width 0.4s ease;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;font-family:var(--font-mono);">
+                <span style="color:#f87171;">Calls: <strong id="optTfTodayCallPct">42%</strong> (<span id="optTfTodayCallChg">+0</span>)</span>
+                <span style="color:#34d399;">Puts: <strong id="optTfTodayPutPct">58%</strong> (<span id="optTfTodayPutChg">+0</span>)</span>
+            </div>
+        </div>
+
+        <!-- Card 2: 15-Minute Rolling Velocity -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">15m Velocity</span>
+                <span id="optTf15mBadge" class="badge" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;">
+                    --
+                </span>
+            </div>
+            <!-- Progress Bar -->
+            <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,0.06);margin-bottom:0.45rem;">
+                <div id="optTf15mCallBar" style="width:50%;background:#f87171;transition:width 0.4s ease;"></div>
+                <div id="optTf15mPutBar" style="width:50%;background:#34d399;transition:width 0.4s ease;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;font-family:var(--font-mono);">
+                <span style="color:#f87171;">Calls: <strong id="optTf15mCallPct">50%</strong> (<span id="optTf15mCallChg">+0</span>)</span>
+                <span style="color:#34d399;">Puts: <strong id="optTf15mPutPct">50%</strong> (<span id="optTf15mPutChg">+0</span>)</span>
+            </div>
+        </div>
+
+        <!-- Card 3: 5-Minute Burst -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">5m Burst</span>
+                <span id="optTf5mBadge" class="badge" style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;">
+                    --
+                </span>
+            </div>
+            <!-- Progress Bar -->
+            <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,0.06);margin-bottom:0.45rem;">
+                <div id="optTf5mCallBar" style="width:50%;background:#f87171;transition:width 0.4s ease;"></div>
+                <div id="optTf5mPutBar" style="width:50%;background:#34d399;transition:width 0.4s ease;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;font-family:var(--font-mono);">
+                <span style="color:#f87171;">Calls: <strong id="optTf5mCallPct">50%</strong> (<span id="optTf5mCallChg">+0</span>)</span>
+                <span style="color:#34d399;">Puts: <strong id="optTf5mPutPct">50%</strong> (<span id="optTf5mPutChg">+0</span>)</span>
+            </div>
+        </div>
+    </div>
+</div>

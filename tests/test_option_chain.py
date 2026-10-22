@@ -403,6 +403,60 @@ def test_calculate_option_metrics_subtab_summaries_attached():
     assert res["subtab_summaries"]["oi"]["expected_range"]["support"] is not None
 
 
+def test_calculate_market_compass_and_velocity():
+    from earnings_engine.data.options_market_compass import calculate_market_compass
+    from earnings_engine.data.options_writing_velocity import derive_multi_timeframe_oi
+    from earnings_engine.data.options_alerts_engine import generate_derivatives_alerts
+
+    strikes = [
+        {"strike": 24000.0, "ce_oi": 50000, "pe_oi": 150000, "ce_chg_oi": 5000, "pe_chg_oi": 25000, "ce_iv": 14.2, "pe_iv": 15.1},
+        {"strike": 24200.0, "ce_oi": 80000, "pe_oi": 120000, "ce_chg_oi": 8000, "pe_chg_oi": 18000, "ce_iv": 13.9, "pe_iv": 14.5},
+        {"strike": 24400.0, "ce_oi": 160000, "pe_oi": 40000, "ce_chg_oi": 30000, "pe_chg_oi": 2000, "ce_iv": 13.5, "pe_iv": 14.0},
+    ]
+
+    tf = derive_multi_timeframe_oi("NIFTY", current_call_oi=290000, current_put_oi=310000, strikes=strikes)
+    assert "today" in tf
+    assert "tf_15m" in tf
+    assert "tf_5m" in tf
+    assert tf["today"]["call_pct"] + tf["today"]["put_pct"] == 100
+
+    compass = calculate_market_compass(
+        symbol="NIFTY",
+        spot_price=24220.0,
+        pcr_oi=1.07,
+        pcr_volume=1.15,
+        call_wall=24400.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        gamma_profile={"net_gex": 125000000.0, "regime": "POSITIVE_GAMMA (Low Volatility)"},
+        oi_timeframes=tf,
+        chart_intel={"vwap_dist_pct": 0.25, "orb_status": "BULLISH_EXPANSION"},
+        vix_data={"vix": 13.5, "change_pct": -2.1},
+    )
+
+    assert "score" in compass
+    assert -100.0 <= compass["score"] <= 100.0
+    assert len(compass["factors"]) == 8
+    total_weight = sum(f["weight"] for f in compass["factors"])
+    assert total_weight == 100
+    assert compass["confidence_pct"] >= 50
+
+    alerts = generate_derivatives_alerts(
+        symbol="NIFTY",
+        spot_price=24220.0,
+        call_wall=24400.0,
+        put_wall=24000.0,
+        max_pain=24200.0,
+        pcr_oi=1.07,
+        oi_timeframes=tf,
+        gamma_profile={"net_gex": 125000000.0, "regime": "POSITIVE_GAMMA (Low Volatility)"},
+        strikes=strikes,
+    )
+    assert isinstance(alerts, list)
+    assert len(alerts) > 0
+
+
+
 
 
 

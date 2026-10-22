@@ -96,6 +96,15 @@
     <!-- Primary Algorithmic Setup Alert Card -->
     <div id="optPrimarySetupBanner" style="display:none;margin-bottom:1.25rem;"></div>
 
+    <!-- Institutional Open Interest Flow & Multi-Timeframe Velocity Meters -->
+    {% include 'hubs/dashboard/_options_velocity.html' %}
+
+    <!-- Market Compass Quantitative Confluence & 8-Factor Breakdown -->
+    {% include 'hubs/dashboard/_options_compass.html' %}
+
+    <!-- Real-Time Institutional Derivatives Alerts Feed -->
+    {% include 'hubs/dashboard/_options_alerts.html' %}
+
     <!-- 3. Key Derivatives KPI Cards -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
         <!-- Spot Price -->
@@ -484,6 +493,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Dual Strike Distribution Charts: OI by Strike & Intraday OI Change -->
+    {% include 'hubs/dashboard/_options_dual_charts.html' %}
 
     <!-- 6. Complete Strike Tree Matrix with Greeks & GEX -->
     <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">

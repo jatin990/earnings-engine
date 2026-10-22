@@ -21,7 +21,6 @@ import pandas as pd
 import yfinance as yf
 
 from earnings_engine.config import Settings
-from earnings_engine.data import option_chain as oc_mod
 from earnings_engine.data.universe import is_fno_eligible
 
 logger = logging.getLogger("earnings_engine.data.options_chart_engine")
@@ -501,6 +500,7 @@ def get_options_chart_intelligence(
     period: str = "5d",
     force_refresh: bool = False,
     allow_non_fno: bool = False,
+    include_option_chain: bool = True,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve full candlestick history, quantitative indicators, SMC levels, and tactical trade plans."""
@@ -510,7 +510,7 @@ def get_options_chart_intelligence(
         period = "6mo"
     elif norm_interval in {"1w", "w"} and period in {None, "", "5d"}:
         period = "1y"
-    cache_key = f"{clean_sym}:{norm_interval}:{period}:{allow_non_fno}"
+    cache_key = f"{clean_sym}:{norm_interval}:{period}:{allow_non_fno}:{include_option_chain}"
 
     now = time.monotonic()
     if not force_refresh and cache_key in _CHART_CACHE:
@@ -537,10 +537,11 @@ def get_options_chart_intelligence(
 
     settings = settings or Settings()
 
-    # 1. Fetch Option Chain intelligence (Max Pain, Walls, PCR) if F&O eligible
+    # 1. Fetch Option Chain intelligence (Max Pain, Walls, PCR) if F&O eligible and requested
     opt_analysis = {}
-    if is_fno:
+    if is_fno and include_option_chain:
         try:
+            from earnings_engine.data import option_chain as oc_mod
             opt_analysis = oc_mod.analyze_option_chain(clean_sym, force_refresh=force_refresh, settings=settings)
         except Exception as e:
             logger.debug("[OPTIONS-CHART] Option chain analysis fallback for %s: %s", clean_sym, e)
@@ -673,6 +674,7 @@ def get_intraday_structure_summary(
             period="5d",
             force_refresh=False,
             allow_non_fno=True,
+            include_option_chain=False,
             settings=settings,
         )
         if not data or not data.get("candles"):
