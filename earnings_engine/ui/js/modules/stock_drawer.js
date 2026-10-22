@@ -1361,25 +1361,74 @@
         _applyDrawerIndicatorToggles();
     };
 
+    app.toggleDrawerTFDropdown = function (event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        const menu = document.getElementById('drawerTFDropdownMenu');
+        const btn = document.getElementById('btnDrawerTFDropdown');
+        if (!menu) return;
+        const isHidden = menu.style.display === 'none' || !menu.style.display;
+        menu.style.display = isHidden ? 'block' : 'none';
+        if (btn) btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    };
+
     app.setDrawerChartTF = function (tf) {
         app._drawerChartTimeframe = tf;
 
-        // 1. Update Resolution Buttons (5m, 15m, 1D)
-        ['5m', '15m', '1D'].forEach(t => {
+        // 1. Close dropdown popover if open
+        const menu = document.getElementById('drawerTFDropdownMenu');
+        const dropBtn = document.getElementById('btnDrawerTFDropdown');
+        const dropLabel = document.getElementById('drawerTFDropdownLabel');
+        if (menu) menu.style.display = 'none';
+        if (dropBtn) dropBtn.setAttribute('aria-expanded', 'false');
+
+        // 2. Update Primary Resolution Buttons (5m, 15m, 1h, 1D)
+        const primaryTFs = ['5m', '15m', '1h', '1D'];
+        let matchedPrimary = false;
+
+        primaryTFs.forEach(t => {
             const btn = document.getElementById(`btnDrawerTF${t}`);
             if (btn) {
-                if (t === tf) btn.classList.add('active');
-                else btn.classList.remove('active');
+                if (t.toLowerCase() === tf.toLowerCase()) {
+                    btn.classList.add('active');
+                    matchedPrimary = true;
+                } else {
+                    btn.classList.remove('active');
+                }
             }
         });
 
-        // 2. Toggle Visibility of Daily Range Chips vs Intraday Live Badge & SMC Explainer
+        // 3. Update Dropdown Button active state & label
+        if (dropBtn) {
+            if (!matchedPrimary) {
+                dropBtn.classList.add('active');
+                if (dropLabel) dropLabel.textContent = tf;
+            } else {
+                dropBtn.classList.remove('active');
+                if (dropLabel) dropLabel.textContent = 'More';
+            }
+        }
+
+        // 4. Update Dropdown Menu items active state
+        document.querySelectorAll('.drawer-tf-menu-item').forEach(item => {
+            const badge = item.querySelector('.drawer-tf-badge');
+            if (badge && badge.textContent.trim().toLowerCase() === tf.toLowerCase()) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        // 5. Toggle Visibility of Daily Range Chips vs Intraday Live Badge & SMC Explainer
         const rangeChips = document.getElementById('drawerDailyRangeChips');
         const liveBadge = document.getElementById('drawerIntradayRefreshBadge');
         const statusBadge = document.getElementById('drawerChartDataStatus');
         const smcCard = document.getElementById('drawerExplainerSMC');
 
-        const isIntraday = (tf === '5m' || tf === '15m');
+        const normTF = tf.toLowerCase();
+        const isIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '4h'].includes(normTF);
 
         if (rangeChips) {
             rangeChips.style.display = isIntraday ? 'none' : 'inline-flex';
@@ -1388,13 +1437,13 @@
             liveBadge.style.display = isIntraday ? 'inline-flex' : 'none';
         }
         if (statusBadge) {
-            statusBadge.textContent = isIntraday ? `${tf.toUpperCase()} SMC FLOW` : '1D OHLCV';
+            statusBadge.textContent = isIntraday ? `${tf.toUpperCase()} SMC FLOW` : `${tf.toUpperCase()} OHLCV`;
         }
         if (smcCard) {
             smcCard.style.display = isIntraday ? 'block' : 'none';
         }
 
-        // 3. Manage Intraday 15s Auto-Refresh Timer
+        // 6. Manage Intraday 15s Auto-Refresh Timer
         if (app._drawerChartPollTimer) {
             clearInterval(app._drawerChartPollTimer);
             app._drawerChartPollTimer = null;
@@ -1403,7 +1452,9 @@
         if (isIntraday) {
             app._drawerChartPollTimer = setInterval(() => {
                 const drawer = document.getElementById('stockSliderDrawer');
-                if (drawer && drawer.classList.contains('open') && app._currentDrawerTicker && (app._drawerChartTimeframe === '5m' || app._drawerChartTimeframe === '15m')) {
+                const curTF = (app._drawerChartTimeframe || '').toLowerCase();
+                const stillIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '4h'].includes(curTF);
+                if (drawer && drawer.classList.contains('open') && app._currentDrawerTicker && stillIntraday) {
                     app._initOrUpdateDrawerChart(app._currentDrawerTicker);
                 } else if (app._drawerChartPollTimer) {
                     clearInterval(app._drawerChartPollTimer);
@@ -1412,7 +1463,7 @@
             }, 15000);
         }
 
-        // 4. Reload chart data for the current ticker under new timeframe resolution
+        // 7. Reload chart data for current ticker under new timeframe resolution
         if (app._currentDrawerTicker) {
             app._initOrUpdateDrawerChart(app._currentDrawerTicker);
         }
@@ -1454,6 +1505,30 @@
         } else {
             app._drawerChartInstance.timeScale().fitContent();
         }
+    };
+
+    app.setDrawerChartHeight = function (heightPx) {
+        const h = Math.max(280, Math.min(850, parseInt(heightPx, 10) || 480));
+        const frame = document.getElementById('drawerChartFrameContainer');
+        if (frame) {
+            frame.style.height = `${h}px`;
+        }
+
+        if (app._drawerChartInstance) {
+            app._drawerChartInstance.applyOptions({ height: h });
+        }
+
+        // Update active preset button highlight
+        document.querySelectorAll('.drawer-height-chip').forEach(chip => {
+            const chipH = parseInt(chip.getAttribute('data-height'), 10);
+            if (chipH === h) {
+                chip.classList.add('active');
+            } else {
+                chip.classList.remove('active');
+            }
+        });
+
+        localStorage.setItem('nexus_drawer_chart_height', String(h));
     };
 
     function _updateDrawerTechnicalExplainers(records, techData) {
@@ -1578,9 +1653,15 @@
 
         // Initialize Canvas Instance if not created
         if (!app._drawerChartInstance) {
+            const savedHeight = parseInt(localStorage.getItem('nexus_drawer_chart_height'), 10) || 480;
+            const containerFrame = document.getElementById('drawerChartFrameContainer');
+            if (containerFrame && savedHeight !== 480) {
+                containerFrame.style.height = `${savedHeight}px`;
+            }
+
             const chart = window.LightweightCharts.createChart(container, {
                 width: container.clientWidth || 700,
-                height: 480,
+                height: savedHeight,
                 layout: {
                     background: { type: 'solid', color: '#050505' },
                     textColor: '#94a3b8',
@@ -1702,7 +1783,7 @@
         // Fetch Historical Price Bars or Intraday SMC Intelligence
         try {
             const tf = (app._drawerChartTimeframe || '1D').toLowerCase();
-            const isIntraday = (tf === '5m' || tf === '15m');
+            const isIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '4h'].includes(tf);
 
             if (isIntraday) {
                 // Configure chart timeScale for UNIX epoch intraday timestamps
@@ -1999,6 +2080,57 @@
         });
     }
 
+    function initDrawerChartHeightResizer() {
+        const resizer = document.getElementById('drawerChartHeightResizer');
+        const frame = document.getElementById('drawerChartFrameContainer');
+        if (!resizer || !frame) return;
+
+        let isResizing = false;
+        let startY = 0;
+        let startH = 480;
+
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            isResizing = true;
+            startY = e.clientY;
+            startH = frame.offsetHeight || parseInt(frame.style.height, 10) || 480;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isResizing) return;
+            const deltaY = e.clientY - startY;
+            const newH = Math.max(280, Math.min(850, Math.round(startH + deltaY)));
+            frame.style.height = `${newH}px`;
+            if (app._drawerChartInstance) {
+                app._drawerChartInstance.applyOptions({ height: newH });
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                const finalH = frame.offsetHeight || parseInt(frame.style.height, 10) || 480;
+                localStorage.setItem('nexus_drawer_chart_height', String(finalH));
+
+                // Update preset chips active indicator
+                document.querySelectorAll('.drawer-height-chip').forEach(chip => {
+                    const chipH = parseInt(chip.getAttribute('data-height'), 10);
+                    if (chipH === finalH) {
+                        chip.classList.add('active');
+                    } else {
+                        chip.classList.remove('active');
+                    }
+                });
+            }
+        });
+    }
+
     // =========================================================================
     // 5. GLOBAL KEYBOARD SHORTCUTS & CLICK INTERCEPTOR
     // =========================================================================
@@ -2048,6 +2180,18 @@
                 }
             }
         });
+
+        // Close timeframe dropdown menu on click outside
+        document.addEventListener('click', function (e) {
+            const dropdown = document.getElementById('drawerTFDropdownMenu');
+            const dropBtn = document.getElementById('btnDrawerTFDropdown');
+            if (dropdown && dropdown.style.display !== 'none') {
+                if (!e.target.closest('#drawerTFDropdownMenu') && !e.target.closest('#btnDrawerTFDropdown')) {
+                    dropdown.style.display = 'none';
+                    if (dropBtn) dropBtn.setAttribute('aria-expanded', 'false');
+                }
+            }
+        });
     }
 
     // =========================================================================
@@ -2074,10 +2218,12 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             initDrawerResizer();
+            initDrawerChartHeightResizer();
             initDrawerEventListeners();
         });
     } else {
         initDrawerResizer();
+        initDrawerChartHeightResizer();
         initDrawerEventListeners();
     }
 

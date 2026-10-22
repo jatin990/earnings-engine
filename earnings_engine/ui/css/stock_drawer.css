@@ -614,6 +614,163 @@
     gap: 0.25rem;
 }
 
+/* TradingView-Style Timeframe Dropdown */
+.drawer-tf-dropdown-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-right: 0.4rem;
+}
+
+.drawer-tf-chevron {
+    font-size: 0.55rem;
+    color: #94a3b8;
+    transition: transform 0.15s ease;
+}
+
+.drawer-tf-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 175px;
+    background: #090d16;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+    padding: 0.35rem 0;
+    z-index: 100;
+    animation: fadeInMenu 0.15s ease-out;
+}
+
+@keyframes fadeInMenu {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.drawer-tf-dropdown-header {
+    font-size: 0.62rem;
+    font-weight: 800;
+    font-family: var(--font-mono, monospace);
+    color: #64748b;
+    padding: 0.35rem 0.65rem 0.2rem 0.65rem;
+    letter-spacing: 0.05em;
+}
+
+.drawer-tf-dropdown-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0.25rem 0;
+}
+
+.drawer-tf-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+    border: none;
+    padding: 0.35rem 0.65rem;
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.drawer-tf-menu-item:hover {
+    background: rgba(56, 189, 248, 0.12);
+    color: #ffffff;
+}
+
+.drawer-tf-menu-item.active {
+    background: rgba(37, 99, 235, 0.25);
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+.drawer-tf-badge {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+}
+
+/* Height Preset Chips */
+.drawer-chart-height-presets {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: #09090b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    padding: 2px 4px;
+}
+
+.drawer-height-chip {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.65rem;
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.drawer-height-chip:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.drawer-height-chip.active {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+/* Interactive Height Resizer Bar */
+.drawer-chart-height-resizer {
+    width: 100%;
+    height: 10px;
+    background: #090d16;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.drawer-chart-height-resizer:hover,
+.drawer-chart-height-resizer.resizing {
+    background: rgba(56, 189, 248, 0.18);
+}
+
+.drawer-chart-height-resizer:hover .drawer-resizer-grip-handle,
+.drawer-chart-height-resizer.resizing .drawer-resizer-grip-handle {
+    background: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+    width: 48px;
+}
+
+.drawer-resizer-grip-handle {
+    width: 32px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+    transition: all 0.15s ease;
+}
+
 .drawer-chart-viewport-wrapper {
     display: flex;
     flex-direction: column;

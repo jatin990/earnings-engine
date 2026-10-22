@@ -77,14 +77,16 @@ def fetch_chart_candles(
     clean_sym = symbol.strip().upper().replace(".NS", "")
     yf_symbol = resolve_chart_symbol(clean_sym)
 
-    valid_intervals = {"1m", "5m", "15m", "30m", "1h", "60m", "1d", "1D"}
-    norm_interval = interval.lower() if interval.lower() != "1d" else "1d"
+    valid_intervals = {"1m", "3m", "5m", "15m", "30m", "1h", "60m", "4h", "1d", "1D", "1w", "1W"}
+    norm_interval = interval.lower() if interval.lower() not in {"1d", "1w"} else interval.lower()
     if norm_interval not in valid_intervals:
         norm_interval = "5m"
 
-    # Default periods based on interval: auto-expand daily to 6mo
+    # Default periods based on interval: auto-expand daily/weekly to 6mo/1y
     if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
         period = "6mo"
+    elif norm_interval in {"1w", "w"} and period in {None, "", "5d"}:
+        period = "1y"
     elif not period:
         period = "5d"
 
@@ -503,9 +505,11 @@ def get_options_chart_intelligence(
 ) -> dict[str, Any]:
     """Retrieve full candlestick history, quantitative indicators, SMC levels, and tactical trade plans."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
-    norm_interval = interval.lower() if interval.lower() != "1d" else "1d"
+    norm_interval = interval.lower() if interval.lower() not in {"1d", "1w"} else interval.lower()
     if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
         period = "6mo"
+    elif norm_interval in {"1w", "w"} and period in {None, "", "5d"}:
+        period = "1y"
     cache_key = f"{clean_sym}:{norm_interval}:{period}:{allow_non_fno}"
 
     now = time.monotonic()

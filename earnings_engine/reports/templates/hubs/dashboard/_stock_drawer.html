@@ -166,11 +166,33 @@
                         <button type="button" id="drawerToggleVWAP" onclick="app.toggleDrawerChartIndicator('vwap')" class="drawer-chart-toggle-btn active" title="Volume-Weighted Average Price + 1.5σ Standard Deviation Bands">VWAP ±1.5σ</button>
                         <button type="button" id="drawerToggleBounds" onclick="app.toggleDrawerChartIndicator('bounds')" class="drawer-chart-toggle-btn active" title="Algorithmic Support & Resistance Execution Bounds">S/R Bounds</button>
                     </div>
-                    <!-- Timeframe Resolution Selector -->
+                    <!-- Timeframe Resolution Selector with TradingView Dropdown -->
                     <div class="drawer-chart-tf-selector" role="group" aria-label="Chart Timeframe Resolution">
                         <button type="button" id="btnDrawerTF5m" onclick="app.setDrawerChartTF('5m')" class="drawer-tf-btn" title="5-Minute Intraday Candlesticks (SMC Order Blocks, FVGs, VWAP)">5m</button>
                         <button type="button" id="btnDrawerTF15m" onclick="app.setDrawerChartTF('15m')" class="drawer-tf-btn" title="15-Minute Intraday Candlesticks (SMC Order Blocks, FVGs, VWAP)">15m</button>
+                        <button type="button" id="btnDrawerTF1h" onclick="app.setDrawerChartTF('1h')" class="drawer-tf-btn" title="1-Hour Hourly Candlesticks (Institutional Swing Session)">1h</button>
                         <button type="button" id="btnDrawerTF1D" onclick="app.setDrawerChartTF('1D')" class="drawer-tf-btn active" title="Daily PIT Price Bars (EOD)">1D</button>
+
+                        <!-- TradingView-Style More Timeframes Dropdown -->
+                        <div class="drawer-tf-dropdown-container" style="position:relative;display:inline-block;">
+                            <button type="button" id="btnDrawerTFDropdown" onclick="app.toggleDrawerTFDropdown(event)" class="drawer-tf-btn drawer-tf-dropdown-btn" title="More Timeframes (1m, 3m, 30m, 1h, 4h, 1D, 1W)" aria-haspopup="true" aria-expanded="false">
+                                <span id="drawerTFDropdownLabel">More</span> <span class="drawer-tf-chevron">▼</span>
+                            </button>
+                            <div id="drawerTFDropdownMenu" class="drawer-tf-dropdown-menu" style="display:none;" role="menu">
+                                <div class="drawer-tf-dropdown-header">INTRADAY RESOLUTION</div>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('1m')"><span>1 Minute</span><span class="drawer-tf-badge">1m</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('3m')"><span>3 Minutes</span><span class="drawer-tf-badge">3m</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('5m')"><span>5 Minutes (SMC)</span><span class="drawer-tf-badge">5m</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('15m')"><span>15 Minutes (ORB)</span><span class="drawer-tf-badge">15m</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('30m')"><span>30 Minutes</span><span class="drawer-tf-badge">30m</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('1h')"><span>1 Hour (Session)</span><span class="drawer-tf-badge">1h</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('4h')"><span>4 Hours (Macro)</span><span class="drawer-tf-badge">4h</span></button>
+                                <div class="drawer-tf-dropdown-divider"></div>
+                                <div class="drawer-tf-dropdown-header">DAILY / SWING</div>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('1D')"><span>1 Day (PIT EOD)</span><span class="drawer-tf-badge">1D</span></button>
+                                <button type="button" role="menuitem" class="drawer-tf-menu-item" onclick="app.setDrawerChartTF('1W')"><span>1 Week (Macro)</span><span class="drawer-tf-badge">1W</span></button>
+                            </div>
+                        </div>
                     </div>
                     <!-- Timeframe Range Chips (Daily Mode Only) -->
                     <div id="drawerDailyRangeChips" class="drawer-chart-range-chips" role="group" aria-label="Chart Visible Range">
@@ -179,6 +201,14 @@
                         <button type="button" id="btnDrawerRange6M" onclick="app.setDrawerChartRange('6M')" class="btn-preset-chip" title="6 Months (~130 Trading Sessions)">6M</button>
                         <button type="button" id="btnDrawerRange1Y" onclick="app.setDrawerChartRange('1Y')" class="btn-preset-chip active" title="1 Year (~252 Trading Sessions)">1Y</button>
                         <button type="button" id="btnDrawerRangeALL" onclick="app.setDrawerChartRange('ALL')" class="btn-preset-chip" title="All Historical PIT Price Data">ALL</button>
+                    </div>
+                    <!-- Height Presets & Controls -->
+                    <div class="drawer-chart-height-presets" role="group" aria-label="Chart Canvas Height Presets" title="Adjust Chart Height Preset">
+                        <span style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono, monospace);margin-right:2px;">H:</span>
+                        <button type="button" class="drawer-height-chip" data-height="350" onclick="app.setDrawerChartHeight(350)" title="Compact View (350px)">350</button>
+                        <button type="button" class="drawer-height-chip active" id="btnDrawerHDefault" data-height="480" onclick="app.setDrawerChartHeight(480)" title="Standard View (480px)">480</button>
+                        <button type="button" class="drawer-height-chip" data-height="650" onclick="app.setDrawerChartHeight(650)" title="Expanded Studio (650px)">650</button>
+                        <button type="button" class="drawer-height-chip" data-height="800" onclick="app.setDrawerChartHeight(800)" title="Maximum View (800px)">800</button>
                     </div>
                     <!-- Intraday Live Auto-Refresh Indicator -->
                     <div id="drawerIntradayRefreshBadge" class="drawer-intraday-refresh-pill" style="display:none;" title="Live Market Intraday Auto-Refresh Active (15s cadence)">
@@ -206,6 +236,11 @@
                 <div id="drawerChartFrameContainer" class="drawer-chart-frame-container">
                     <div id="drawerChartShimmer" class="drawer-shimmer drawer-shimmer-chart"></div>
                     <div id="drawerNativeChartCanvas" class="drawer-native-chart-canvas"></div>
+                </div>
+
+                <!-- Interactive Chart Height Resizer Bar -->
+                <div id="drawerChartHeightResizer" class="drawer-chart-height-resizer" title="Drag vertically to adjust chart height (280px - 850px)">
+                    <div class="drawer-resizer-grip-handle"></div>
                 </div>
             </div>
 
