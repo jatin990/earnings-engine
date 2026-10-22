@@ -39,6 +39,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from earnings_engine.data.db_helpers import build_upsert_sql, row_to_dict, normalize_nse_ticker
+
 import numpy as np
 import pandas as pd
 
@@ -232,12 +234,31 @@ def _rebuild_candidates() -> None:
 
 _BREAKOUT_DB_INITIALIZED: bool = False
 
+_BREAKOUT_RADAR_COLS = [
+    "ticker", "strategy", "tier", "company_name", "industry", "composite_score",
+    "resistance_score", "volume_score", "compression_score", "momentum_score", "fundamental_score",
+    "signal_date", "signal_price", "predicted_value", "breakout_trigger", "ideal_entry_price",
+    "is_late", "entry_delay_pct", "target_price", "stop_loss", "risk_reward_ratio",
+    "current_price", "current_date", "realized_return_pct", "max_gain_pct", "breakout_happened",
+    "outcome", "outcome_label", "outcome_badge", "days_elapsed", "setup_archetype",
+    "volume_ratio", "atr_pct", "pct_from_high", "avg_quality_score", "scanned_at",
+    "data_json", "updated_at",
+]
+
+_BREAKOUT_TRACKED_COLS = [
+    "ticker", "strategy", "tier", "company_name", "industry", "composite_score",
+    "resistance_score", "volume_score", "compression_score", "momentum_score", "fundamental_score",
+    "signal_date", "signal_price", "predicted_value", "breakout_trigger", "ideal_entry_price",
+    "is_late", "entry_delay_pct", "target_price", "stop_loss", "risk_reward_ratio",
+    "current_price", "current_date", "realized_return_pct", "max_gain_pct", "breakout_happened",
+    "outcome", "outcome_label", "outcome_badge", "days_elapsed", "setup_archetype",
+    "volume_ratio", "atr_pct", "pct_from_high", "avg_quality_score", "scanned_at",
+    "data_json", "created_at", "updated_at",
+]
+
 
 def _init_breakout_db(conn: Any) -> None:
     """Ensure breakout_radar table and performance indices exist with strategy tracking."""
-    global _BREAKOUT_DB_INITIALIZED
-    if _BREAKOUT_DB_INITIALIZED:
-        return
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS breakout_radar (
@@ -408,64 +429,21 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
                 now_iso,
             ))
 
-        upsert_sql = """
-        INSERT INTO breakout_radar (
-            ticker, strategy, tier, company_name, industry, composite_score,
-            resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
-            signal_date, signal_price, predicted_value, breakout_trigger, ideal_entry_price,
-            is_late, entry_delay_pct, target_price, stop_loss, risk_reward_ratio,
-            current_price, current_date, realized_return_pct, max_gain_pct, breakout_happened,
-            outcome, outcome_label, outcome_badge, days_elapsed, setup_archetype,
-            volume_ratio, atr_pct, pct_from_high, avg_quality_score, scanned_at,
-            data_json, updated_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?
+        _custom_radar_updates = {
+            "signal_date": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_date IS NULL OR breakout_radar.signal_date = '' THEN excluded.signal_date ELSE breakout_radar.signal_date END",
+            "signal_price": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_price IS NULL OR breakout_radar.signal_price <= 0 THEN excluded.signal_price ELSE breakout_radar.signal_price END",
+            "predicted_value": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.predicted_value IS NULL OR breakout_radar.predicted_value <= 0 THEN excluded.predicted_value ELSE breakout_radar.predicted_value END",
+            "breakout_trigger": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.breakout_trigger IS NULL OR breakout_radar.breakout_trigger <= 0 THEN excluded.breakout_trigger ELSE breakout_radar.breakout_trigger END",
+            "ideal_entry_price": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.ideal_entry_price IS NULL OR breakout_radar.ideal_entry_price <= 0 THEN excluded.ideal_entry_price ELSE breakout_radar.ideal_entry_price END",
+            "target_price": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.target_price IS NULL OR breakout_radar.target_price <= 0 THEN excluded.target_price ELSE breakout_radar.target_price END",
+            "stop_loss": "CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.stop_loss IS NULL OR breakout_radar.stop_loss <= 0 THEN excluded.stop_loss ELSE breakout_radar.stop_loss END",
+        }
+        upsert_sql = build_upsert_sql(
+            table_name="breakout_radar",
+            columns=_BREAKOUT_RADAR_COLS,
+            conflict_columns=["ticker", "strategy"],
+            custom_update_clauses=_custom_radar_updates,
         )
-        ON CONFLICT(ticker, strategy) DO UPDATE SET
-            tier = excluded.tier,
-            company_name = excluded.company_name,
-            industry = excluded.industry,
-            composite_score = excluded.composite_score,
-            resistance_score = excluded.resistance_score,
-            volume_score = excluded.volume_score,
-            compression_score = excluded.compression_score,
-            momentum_score = excluded.momentum_score,
-            fundamental_score = excluded.fundamental_score,
-            signal_date = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_date IS NULL OR breakout_radar.signal_date = '' THEN excluded.signal_date ELSE breakout_radar.signal_date END,
-            signal_price = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_price IS NULL OR breakout_radar.signal_price <= 0 THEN excluded.signal_price ELSE breakout_radar.signal_price END,
-            predicted_value = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.predicted_value IS NULL OR breakout_radar.predicted_value <= 0 THEN excluded.predicted_value ELSE breakout_radar.predicted_value END,
-            breakout_trigger = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.breakout_trigger IS NULL OR breakout_radar.breakout_trigger <= 0 THEN excluded.breakout_trigger ELSE breakout_radar.breakout_trigger END,
-            ideal_entry_price = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.ideal_entry_price IS NULL OR breakout_radar.ideal_entry_price <= 0 THEN excluded.ideal_entry_price ELSE breakout_radar.ideal_entry_price END,
-            is_late = excluded.is_late,
-            entry_delay_pct = excluded.entry_delay_pct,
-            target_price = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.target_price IS NULL OR breakout_radar.target_price <= 0 THEN excluded.target_price ELSE breakout_radar.target_price END,
-            stop_loss = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.stop_loss IS NULL OR breakout_radar.stop_loss <= 0 THEN excluded.stop_loss ELSE breakout_radar.stop_loss END,
-            risk_reward_ratio = excluded.risk_reward_ratio,
-            current_price = excluded.current_price,
-            current_date = excluded.current_date,
-            realized_return_pct = excluded.realized_return_pct,
-            max_gain_pct = excluded.max_gain_pct,
-            breakout_happened = excluded.breakout_happened,
-            outcome = excluded.outcome,
-            outcome_label = excluded.outcome_label,
-            outcome_badge = excluded.outcome_badge,
-            days_elapsed = excluded.days_elapsed,
-            setup_archetype = excluded.setup_archetype,
-            volume_ratio = excluded.volume_ratio,
-            atr_pct = excluded.atr_pct,
-            pct_from_high = excluded.pct_from_high,
-            avg_quality_score = excluded.avg_quality_score,
-            scanned_at = excluded.scanned_at,
-            data_json = excluded.data_json,
-            updated_at = excluded.updated_at
-        """
 
         try:
             if hasattr(conn, "executemany"):
@@ -477,63 +455,11 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
                 conn.executemany(fallback_sql, rows_to_insert)
 
         # 2. Also persist / upsert to permanent historical archive: breakout_tracked_signals
-        upsert_tracked_sql = """
-        INSERT INTO breakout_tracked_signals (
-            ticker, strategy, tier, company_name, industry, composite_score,
-            resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
-            signal_date, signal_price, predicted_value, breakout_trigger, ideal_entry_price,
-            is_late, entry_delay_pct, target_price, stop_loss, risk_reward_ratio,
-            current_price, current_date, realized_return_pct, max_gain_pct, breakout_happened,
-            outcome, outcome_label, outcome_badge, days_elapsed, setup_archetype,
-            volume_ratio, atr_pct, pct_from_high, avg_quality_score, scanned_at,
-            data_json, created_at, updated_at
-        ) VALUES (
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?
+        upsert_tracked_sql = build_upsert_sql(
+            table_name="breakout_tracked_signals",
+            columns=_BREAKOUT_TRACKED_COLS,
+            conflict_columns=["ticker", "strategy", "signal_date"],
         )
-        ON CONFLICT(ticker, strategy, signal_date) DO UPDATE SET
-            tier = excluded.tier,
-            company_name = excluded.company_name,
-            industry = excluded.industry,
-            composite_score = excluded.composite_score,
-            resistance_score = excluded.resistance_score,
-            volume_score = excluded.volume_score,
-            compression_score = excluded.compression_score,
-            momentum_score = excluded.momentum_score,
-            fundamental_score = excluded.fundamental_score,
-            signal_price = excluded.signal_price,
-            predicted_value = excluded.predicted_value,
-            breakout_trigger = excluded.breakout_trigger,
-            ideal_entry_price = excluded.ideal_entry_price,
-            is_late = excluded.is_late,
-            entry_delay_pct = excluded.entry_delay_pct,
-            target_price = excluded.target_price,
-            stop_loss = excluded.stop_loss,
-            risk_reward_ratio = excluded.risk_reward_ratio,
-            current_price = excluded.current_price,
-            current_date = excluded.current_date,
-            realized_return_pct = excluded.realized_return_pct,
-            max_gain_pct = excluded.max_gain_pct,
-            breakout_happened = excluded.breakout_happened,
-            outcome = excluded.outcome,
-            outcome_label = excluded.outcome_label,
-            outcome_badge = excluded.outcome_badge,
-            days_elapsed = excluded.days_elapsed,
-            setup_archetype = excluded.setup_archetype,
-            volume_ratio = excluded.volume_ratio,
-            atr_pct = excluded.atr_pct,
-            pct_from_high = excluded.pct_from_high,
-            avg_quality_score = excluded.avg_quality_score,
-            scanned_at = excluded.scanned_at,
-            data_json = excluded.data_json,
-            updated_at = excluded.updated_at
-        """
         rows_for_tracked = []
         today_str = now_iso[:10]
         for r_tuple in rows_to_insert:
@@ -621,18 +547,10 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
         if not rows:
             return False
 
-        col_names = [d[0] for d in cur.description] if cur.description else []
         hot_count = 0
         warm_count = 0
         for row in rows:
-            if hasattr(row, "keys"):
-                row_dict = dict(row)
-            elif col_names and isinstance(row, (tuple, list)):
-                row_dict = dict(zip(col_names, row))
-            elif hasattr(row, "get"):
-                row_dict = dict(row)
-            else:
-                row_dict = {}
+            row_dict = row_to_dict(cur, row)
 
             ticker = str(row_dict.get("ticker") or "")
             tier = str(row_dict.get("tier") or "WARM").upper()
@@ -1572,8 +1490,9 @@ def get_tracked_breakouts(
         rows = cur.fetchall()
 
         items: list[dict[str, Any]] = []
-        for r in rows:
-            raw_json = r[35]
+        for r_raw in rows:
+            r = row_to_dict(cur, r_raw)
+            raw_json = r.get("data_json")
             parsed_data = {}
             if raw_json:
                 try:
@@ -1581,44 +1500,45 @@ def get_tracked_breakouts(
                 except Exception:
                     pass
 
+            ticker_val = r.get("ticker", "")
             item = {
-                "id": r[0],
-                "ticker": r[1],
-                "company_name": r[2] or r[1].replace(".NS", ""),
-                "industry": r[3] or "—",
-                "tier": r[4],
-                "signal_date": r[5],
-                "signal_price": r[6],
-                "predicted_value": r[7],
-                "breakout_trigger": r[8],
-                "ideal_entry_price": r[9],
-                "is_late": bool(r[10]) if r[10] is not None else False,
-                "entry_delay_pct": float(r[11]) if r[11] is not None else 0.0,
-                "target_price": r[12],
-                "stop_loss": r[13],
-                "risk_reward_ratio": r[14] or 2.0,
-                "composite_score": r[15],
-                "resistance_score": r[16],
-                "volume_score": r[17],
-                "compression_score": r[18],
-                "momentum_score": r[19],
-                "fundamental_score": r[20],
-                "volume_ratio": r[21],
-                "atr_pct": r[22],
-                "pct_from_high": r[23],
-                "setup_archetype": r[24] or "Breakout Setup",
-                "current_price": r[25] or r[6],
-                "current_date": r[26] or r[5],
-                "realized_return_pct": r[27] or 0.0,
-                "max_gain_pct": r[28] or 0.0,
-                "breakout_happened": bool(r[29]),
-                "outcome": r[30] or "ACTIVE",
-                "outcome_label": r[31] or "Active Setup",
-                "outcome_badge": r[32] or "ACTIVE",
-                "days_elapsed": r[33] or 0,
-                "scanned_at": r[34],
-                "created_at": r[36],
-                "updated_at": r[37],
+                "id": r.get("id"),
+                "ticker": ticker_val,
+                "company_name": r.get("company_name") or ticker_val.replace(".NS", ""),
+                "industry": r.get("industry") or "—",
+                "tier": r.get("tier"),
+                "signal_date": r.get("signal_date"),
+                "signal_price": r.get("signal_price"),
+                "predicted_value": r.get("predicted_value"),
+                "breakout_trigger": r.get("breakout_trigger"),
+                "ideal_entry_price": r.get("ideal_entry_price"),
+                "is_late": bool(r.get("is_late")) if r.get("is_late") is not None else False,
+                "entry_delay_pct": float(r.get("entry_delay_pct")) if r.get("entry_delay_pct") is not None else 0.0,
+                "target_price": r.get("target_price"),
+                "stop_loss": r.get("stop_loss"),
+                "risk_reward_ratio": r.get("risk_reward_ratio") or 2.0,
+                "composite_score": r.get("composite_score"),
+                "resistance_score": r.get("resistance_score"),
+                "volume_score": r.get("volume_score"),
+                "compression_score": r.get("compression_score"),
+                "momentum_score": r.get("momentum_score"),
+                "fundamental_score": r.get("fundamental_score"),
+                "volume_ratio": r.get("volume_ratio"),
+                "atr_pct": r.get("atr_pct"),
+                "pct_from_high": r.get("pct_from_high"),
+                "setup_archetype": r.get("setup_archetype") or "Breakout Setup",
+                "current_price": r.get("current_price") or r.get("signal_price"),
+                "current_date": r.get("current_date") or r.get("signal_date"),
+                "realized_return_pct": r.get("realized_return_pct") or 0.0,
+                "max_gain_pct": r.get("max_gain_pct") or 0.0,
+                "breakout_happened": bool(r.get("breakout_happened")),
+                "outcome": r.get("outcome") or "ACTIVE",
+                "outcome_label": r.get("outcome_label") or "Active Setup",
+                "outcome_badge": r.get("outcome_badge") or "ACTIVE",
+                "days_elapsed": r.get("days_elapsed") or 0,
+                "scanned_at": r.get("scanned_at"),
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
             }
             if parsed_data:
                 for k, v in parsed_data.items():

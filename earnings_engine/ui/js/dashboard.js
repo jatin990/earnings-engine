@@ -231,104 +231,28 @@ const API_BASE = window.location.origin;
                 }
             },
             async loadConsensusCache() {
-                try {
-                    const res = await fetch(API_BASE + '/api/v1/consensus/latest?limit=500');
-                    const data = await res.json();
-                    if (data && data.predictions) {
-                        data.predictions.forEach(p => {
-                            if (p.ticker) {
-                                this.consensusMap[p.ticker.toUpperCase()] = p;
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Failed to load consensus cache:', e);
+                await this.loadScript('/static/js/modules/consensus.js');
+                if (app.loadConsensusCache && app.loadConsensusCache !== this.loadConsensusCache) {
+                    return app.loadConsensusCache();
                 }
             },
             async loadTradingAgentsCache() {
-                try {
-                    const res = await fetch(API_BASE + '/api/v1/trading-agents/all?limit=500');
-                    const data = await res.json();
-                    if (data && data.reports) {
-                        data.reports.forEach(r => {
-                            if (r.ticker) {
-                                (this.tradingAgentsMap = this.tradingAgentsMap || {})[r.ticker.toUpperCase()] = r;
-                            }
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Failed to load TradingAgents cache:', e);
+                await this.loadScript('/static/js/modules/consensus.js');
+                if (app.loadTradingAgentsCache && app.loadTradingAgentsCache !== this.loadTradingAgentsCache) {
+                    return app.loadTradingAgentsCache();
                 }
             },
             renderConsensusBadge(ticker, market) {
-                if (!ticker) return '—';
-                const sym = String(ticker).trim().toUpperCase();
-                const pred = (this.consensusMap || {})[sym];
-                const safeMarket = (market || this.currentMarket || 'ALL').replace(/'/g, "\\'");
-                const safeSym = sym.replace(/'/g, "\\'");
-                const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
-
-                if (pred && (pred.consensus_direction || pred.direction || typeof pred === 'string')) {
-                    const rawDir = typeof pred === 'string' ? pred : (pred.consensus_direction || pred.direction);
-                    const dir = (typeof rawDir === 'string' ? rawDir : (rawDir && typeof rawDir === 'object' && rawDir.direction ? rawDir.direction : (rawDir != null ? String(rawDir) : 'NEUTRAL'))).toUpperCase();
-                    const isBull = dir.includes('BULL') || dir.includes('BUY');
-                    const isBear = dir.includes('BEAR') || dir.includes('SELL');
-                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
-                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
-                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
-
-                    const retPct = pred.consensus_return_pct != null ? pred.consensus_return_pct : (pred.expected_move_pct != null ? pred.expected_move_pct : null);
-                    const retStr = retPct != null ? ((retPct > 0 ? '+' : '') + Number(retPct).toFixed(1) + '%') : '';
-                    const strength = pred.consensus_strength != null ? Math.round(pred.consensus_strength) + '%' : '';
-                    const agreeRatio = pred.agreement_ratio != null ? Math.round(pred.agreement_ratio * 100) : (pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : null);
-                    const action = pred.consensus_recommended_action || (isBull ? 'BUY' : isBear ? 'SELL' : 'HOLD');
-
-                    const titleText = 'DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: ' + dir + (retStr ? ' (' + retStr + ')' : '') +
-                        (agreeRatio ? ' · ' + agreeRatio + '% Agreement' : '') +
-                        (strength ? ' · ' + strength + ' Strength' : '') +
-                        (action ? ' · Stance: ' + action : '') +
-                        ' (Click to view full price action & 5-pillar targets)';
-
-                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;">' +
-                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
-                        '🤖 ' + dir + (retStr ? ' ' + retStr : '') +
-                        '</span>' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
-                        '</div>';
-                } else {
-                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
-                        '</div>';
+                if (app.renderConsensusBadge && app.renderConsensusBadge !== this.renderConsensusBadge) {
+                    return app.renderConsensusBadge(ticker, market);
                 }
+                return '—';
             },
             renderTradingAgentsBadge(ticker, market) {
-                if (!ticker) return '—';
-                const sym = String(ticker).trim().toUpperCase();
-                const rep = (this.tradingAgentsMap || {})[sym];
-                const safeSym = sym.replace(/'/g, "\\'");
-                const domId = 'trading-agents-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
-
-                if (rep && rep.action) {
-                    const act = (rep.action || 'HOLD').toUpperCase();
-                    const isBull = act.includes('BUY');
-                    const isBear = act.includes('SELL');
-                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
-                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
-                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
-                    const score = rep.conviction_score || 50;
-                    const rrr = rep.risk_reward_ratio ? ` · ${Number(rep.risk_reward_ratio).toFixed(1)}R` : '';
-
-                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.3rem;white-space:nowrap;">' +
-                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.70rem;padding:0.15rem 0.45rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;" onclick="event.stopPropagation(); app.openTradingAgentsWarRoom(\'' + safeSym + '\', event)" title="TradingAgents 7-Agent Synthesis: ' + act + ' (' + score + '% Conviction' + rrr + ') · Click for 7-Agent War Room">' +
-                        '🏛️ ' + act + ' (' + score + '%)' +
-                        '</span>' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Re-run 7-Agent Trading Team for ' + safeSym + '">⚡</button>' +
-                        '</div>';
-                } else {
-                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
-                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.16rem 0.42rem;font-size:0.68rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run 7-Agent Trading Team (TauricResearch) for ' + safeSym + '">🏛️ TradingAgents</button>' +
-                        '</div>';
+                if (app.renderTradingAgentsBadge && app.renderTradingAgentsBadge !== this.renderTradingAgentsBadge) {
+                    return app.renderTradingAgentsBadge(ticker, market);
                 }
+                return '—';
             },
             async runConsensusForTicker(ticker, btn) {
                 await this.loadScript('/static/js/modules/consensus.js');

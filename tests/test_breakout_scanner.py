@@ -347,6 +347,11 @@ class TestBreakoutLateDetection:
         from earnings_engine.api.server import app
 
         self.client = TestClient(app, raise_server_exceptions=False)
+        _pool["hot"].clear()
+        _pool["candidates"].clear()
+        yield
+        _pool["hot"].clear()
+        _pool["candidates"].clear()
 
     def test_score_breakout_setup_calculates_late_detection(self):
         import pandas as pd
@@ -462,8 +467,10 @@ class TestBreakoutAIReasoningPersistentCache:
             _AI_REASONING_CACHE,
         )
         from earnings_engine.data.db import get_db_connection
+        from earnings_engine.data.migrations import apply_migrations
 
         self.settings = Settings(data_dirs={"prices": tmp_path, "earnings": tmp_path})
+        apply_migrations(self.settings)
         conn = get_db_connection(self.settings)
         _init_breakout_db(conn)
         conn.close()

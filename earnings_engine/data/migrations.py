@@ -6,7 +6,7 @@ versions in the `schema_migrations` table.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Callable, NamedTuple
+from typing import Any, Callable, NamedTuple, Sequence
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection, _cache_path
@@ -44,14 +44,22 @@ def _get_table_columns(conn: Any, table_name: str) -> set[str]:
 
 def _add_column_if_missing(conn: Any, table_name: str, col_name: str, col_type: str) -> bool:
     """Idempotently add a column to a table only if it does not already exist."""
+    return _add_columns_if_missing(conn, table_name, [(col_name, col_type)]) > 0
+
+
+def _add_columns_if_missing(conn: Any, table_name: str, columns: Sequence[tuple[str, str]]) -> int:
+    """Idempotently add multiple columns to a table inspecting PRAGMA table_info once."""
     existing = _get_table_columns(conn, table_name)
-    if not existing or col_name not in existing:
-        try:
-            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
-            return True
-        except Exception:
-            return False
-    return False
+    added = 0
+    for col_name, col_type in columns:
+        if not existing or col_name not in existing:
+            try:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+                existing.add(col_name)
+                added += 1
+            except Exception:
+                pass
+    return added
 
 
 # ---------------------------------------------------------------------------
@@ -1939,26 +1947,28 @@ def _migration_040_purge_invalid_price_history_nan_records(conn: Any) -> None:
 def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
     """Add strategy columns & lifecycle tracking fields to institutional_radar_signals and create quarterly_financials table."""
     # 1. Upgrade institutional_radar_signals with strategy, risk/reward, and lifecycle fields
-    _add_column_if_missing(conn, "institutional_radar_signals", "strategy", "TEXT NOT NULL DEFAULT 'WHALE_CONVICTION'")
-    _add_column_if_missing(conn, "institutional_radar_signals", "company_name", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "industry", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "ideal_entry_price", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "target_price", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "stop_loss", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "risk_reward_ratio", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "current_date", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "outcome_return_pct", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "days_elapsed", "INTEGER DEFAULT 0")
-    _add_column_if_missing(conn, "institutional_radar_signals", "whale_count", "INTEGER DEFAULT 0")
-    _add_column_if_missing(conn, "institutional_radar_signals", "trigger_reason", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_status", "TEXT NOT NULL DEFAULT 'ACTIVE'")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_date", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_price", "REAL")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_exit_reason", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_notes", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "lifecycle_reviewed_at", "TEXT")
-    _add_column_if_missing(conn, "institutional_radar_signals", "entry_delay_pct", "REAL DEFAULT 0.0")
-    _add_column_if_missing(conn, "institutional_radar_signals", "is_late", "INTEGER DEFAULT 0")
+    _add_columns_if_missing(conn, "institutional_radar_signals", [
+        ("strategy", "TEXT NOT NULL DEFAULT 'WHALE_CONVICTION'"),
+        ("company_name", "TEXT"),
+        ("industry", "TEXT"),
+        ("ideal_entry_price", "REAL"),
+        ("target_price", "REAL"),
+        ("stop_loss", "REAL"),
+        ("risk_reward_ratio", "REAL"),
+        ("current_date", "TEXT"),
+        ("outcome_return_pct", "REAL"),
+        ("days_elapsed", "INTEGER DEFAULT 0"),
+        ("whale_count", "INTEGER DEFAULT 0"),
+        ("trigger_reason", "TEXT"),
+        ("lifecycle_status", "TEXT NOT NULL DEFAULT 'ACTIVE'"),
+        ("lifecycle_exit_date", "TEXT"),
+        ("lifecycle_exit_price", "REAL"),
+        ("lifecycle_exit_reason", "TEXT"),
+        ("lifecycle_notes", "TEXT"),
+        ("lifecycle_reviewed_at", "TEXT"),
+        ("entry_delay_pct", "REAL DEFAULT 0.0"),
+        ("is_late", "INTEGER DEFAULT 0"),
+    ])
 
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_strat_status ON institutional_radar_signals(strategy, lifecycle_status)")
@@ -1990,15 +2000,14 @@ def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
             UNIQUE(ticker, quarter)
         )
     """)
-    for col, col_type in [
+    _add_columns_if_missing(conn, "quarterly_financials", [
         ("operating_profit_cr", "REAL"),
         ("net_margin_pct", "REAL"),
         ("yoy_revenue_growth_pct", "REAL"),
         ("yoy_pat_growth_pct", "REAL"),
         ("sales_growth_yoy_pct", "REAL"),
         ("profit_growth_yoy_pct", "REAL"),
-    ]:
-        _add_column_if_missing(conn, "quarterly_financials", col, col_type)
+    ])
 
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_qfin_ticker_quarter ON quarterly_financials(ticker, quarter)")
@@ -2491,10 +2500,12 @@ def _migration_049_purge_unconfirmed_indian_yfinance_earnings(conn: Any) -> None
 
 def _migration_050_earnings_provenance_schema(conn: Any) -> None:
     """Add exchange provenance columns to earnings_history."""
-    _add_column_if_missing(conn, "earnings_history", "exchange_source", "TEXT")
-    _add_column_if_missing(conn, "earnings_history", "confirmation_status", "TEXT DEFAULT 'CONFIRMED'")
-    _add_column_if_missing(conn, "earnings_history", "board_meeting_purpose", "TEXT")
-    _add_column_if_missing(conn, "earnings_history", "filing_id", "TEXT")
+    _add_columns_if_missing(conn, "earnings_history", [
+        ("exchange_source", "TEXT"),
+        ("confirmation_status", "TEXT DEFAULT 'CONFIRMED'"),
+        ("board_meeting_purpose", "TEXT"),
+        ("filing_id", "TEXT"),
+    ])
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_exchange ON earnings_history (exchange_source)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_status ON earnings_history (confirmation_status)")
@@ -2504,11 +2515,13 @@ def _migration_050_earnings_provenance_schema(conn: Any) -> None:
 
 def _migration_051_quarterly_solvency_and_coverage_metrics(conn: Any) -> None:
     """Add solvency, debt, interest expense, and coverage columns to quarterly_financials."""
-    _add_column_if_missing(conn, "quarterly_financials", "interest_expense_cr", "REAL")
-    _add_column_if_missing(conn, "quarterly_financials", "total_debt_cr", "REAL")
-    _add_column_if_missing(conn, "quarterly_financials", "debt_to_equity", "REAL")
-    _add_column_if_missing(conn, "quarterly_financials", "interest_coverage_ratio", "REAL")
-    _add_column_if_missing(conn, "quarterly_financials", "net_debt_cr", "REAL")
+    _add_columns_if_missing(conn, "quarterly_financials", [
+        ("interest_expense_cr", "REAL"),
+        ("total_debt_cr", "REAL"),
+        ("debt_to_equity", "REAL"),
+        ("interest_coverage_ratio", "REAL"),
+        ("net_debt_cr", "REAL"),
+    ])
 
 
 # Migration Registry (ordered by version)

@@ -20,6 +20,7 @@ from typing import Any
 from earnings_engine.config import Settings
 from earnings_engine.data.nse_shareholding import get_stock_fetch_status
 from earnings_engine.data.db import get_db_connection, is_server_environment
+from earnings_engine.data.db_helpers import normalize_nse_ticker, strip_nse_suffix
 from earnings_engine.data.names import _NAME_CACHE, get_name
 
 logger = logging.getLogger(__name__)
@@ -335,13 +336,22 @@ def fetch_live_corporate_ownership_batch(
 _TICKER_RETURNS_MEMO: dict[str, tuple[float, tuple[float | None, float | None, float | None]]] = {}
 
 
+def _fetch_price_history(conn: Any, sym: str, limit: int | None = None) -> list[Any]:
+    """Fetch (date, close) records for ticker with automatic .NS / bare symbol fallback."""
+    limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
+    sql = f"SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC{limit_clause}"
+    rows = conn.execute(sql, (sym,)).fetchall()
+    if not rows and (sym.endswith(".NS") or sym.endswith(".BO")):
+        rows = conn.execute(sql, (strip_nse_suffix(sym),)).fetchall()
+    return rows
+
+
 def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None, float | None]:
     """Compute 7-day, 30-day, and 1-year percentage returns directly from price_history with fast memoization."""
     if not sym:
         return None, None, None
 
-    clean_sym = sym.strip().upper()
-    target_sym = clean_sym if (clean_sym.endswith(".NS") or clean_sym.endswith(".BO") or "." in clean_sym) else f"{clean_sym}.NS"
+    target_sym = normalize_nse_ticker(sym)
     now = time.time()
     if target_sym in _TICKER_RETURNS_MEMO:
         exp, val = _TICKER_RETURNS_MEMO[target_sym]
@@ -349,15 +359,7 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
             return val
 
     try:
-        rows = conn.execute(
-            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-            (target_sym,),
-        ).fetchall()
-        if not rows and target_sym.endswith(".NS"):
-            rows = conn.execute(
-                "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-                (target_sym.replace(".NS", ""),),
-            ).fetchall()
+        rows = _fetch_price_history(conn, target_sym, limit=260)
 
         if not rows or len(rows) < 2:
             # Fallback: try on-demand fetch_prices for missing symbols (skip in serverless to prevent blocking timeouts)
@@ -367,15 +369,7 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
                     from earnings_engine.data.prices import fetch_prices
                     df = fetch_prices(target_sym, force=False)
                     if df is not None and not df.empty and "close" in df.columns:
-                        rows = conn.execute(
-                            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-                            (target_sym,),
-                        ).fetchall()
-                        if not rows and target_sym.endswith(".NS"):
-                            rows = conn.execute(
-                                "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-                                (target_sym.replace(".NS", ""),),
-                            ).fetchall()
+                        rows = _fetch_price_history(conn, target_sym, limit=260)
                 except Exception as e:
                     logger.debug("Failed on-demand fetch_prices in _get_ticker_returns for %s: %s", target_sym, e)
 
@@ -1003,30 +997,13 @@ def get_stock_institutional_activity(
                 pats = json.loads(row[28] or "[]")
                 # Enrich with price if missing
                 if pats and (pats[0].get("current_price") is None or pats[0].get("quarter_start_price") is None):
-                    p_series = conn.execute(
-                        "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC",
-                        (sym,),
-                    ).fetchall()
-                    if not p_series and sym.endswith(".NS"):
-                        p_series = conn.execute(
-                            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC",
-                            (sym.replace(".NS", ""),),
-                        ).fetchall()
+                    p_series = _fetch_price_history(conn, sym)
                     lat_cp = round(float(p_series[0][1]), 2) if p_series and p_series[0][1] else None
                     lat_cd = str(p_series[0][0]) if p_series and p_series[0][0] else None
 
-                    import re as _regex
                     for idx, pat in enumerate(pats):
                         q_name = pat.get("quarter", "")
-                        q_sdate = "2026-01-01"
-                        m = _regex.search(r'Q([1-4])\s*FY(\d{2,4})', q_name, _regex.IGNORECASE)
-                        if m:
-                            qn, fyn = int(m.group(1)), int(m.group(2))
-                            if fyn < 100: fyn += 2000
-                            if qn == 1: q_sdate = f"{fyn - 1}-04-01"
-                            elif qn == 2: q_sdate = f"{fyn - 1}-07-01"
-                            elif qn == 3: q_sdate = f"{fyn - 1}-10-01"
-                            elif qn == 4: q_sdate = f"{fyn}-01-01"
+                        q_sdate = _get_quarter_start_date(q_name) if q_name else "2026-01-01"
 
                         q_sprice = None
                         q_act_date = None
@@ -2564,18 +2541,11 @@ def get_stock_buyers_in_period(
         _ensure_institutional_data_for_ticker(sym, conn)
 
         # Retrieve latest market close price for P&L and cost basis comparisons
-        ltp_row = conn.execute(
-            "SELECT close, date FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
-            (sym,),
-        ).fetchone()
-        if not ltp_row and sym.endswith(".NS"):
-            ltp_row = conn.execute(
-                "SELECT close, date FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
-                (sym.replace(".NS", ""),),
-            ).fetchone()
+        ltp_rows = _fetch_price_history(conn, sym, limit=1)
+        ltp_row = ltp_rows[0] if ltp_rows else None
 
-        latest_market_price = round(float(ltp_row[0]), 2) if (ltp_row and ltp_row[0]) else None
-        latest_price_date = str(ltp_row[1]) if (ltp_row and ltp_row[1]) else None
+        latest_market_price = round(float(ltp_row[1]), 2) if (ltp_row and ltp_row[1] is not None) else None
+        latest_price_date = str(ltp_row[0]) if (ltp_row and ltp_row[0]) else None
 
         # 2. Parse date range and quarter boundaries
         start_date, end_date, canonical_q = _normalize_query_dates(

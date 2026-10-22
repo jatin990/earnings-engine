@@ -1216,13 +1216,20 @@
     function updateDrawerHudWithLastBar() {
         if (!app._drawerChartRecords || app._drawerChartRecords.length === 0) return;
         const last = app._drawerChartRecords[app._drawerChartRecords.length - 1];
+        const tf = (app._drawerChartTimeframe || '1D').toLowerCase();
+        const isIntraday = (tf === '5m' || tf === '15m');
+        const timeVal = isIntraday ? (last.time || last.date) : (last.date || last.time);
+        const timeFormatted = isIntraday && typeof timeVal === 'number'
+            ? (window.formatIST ? window.formatIST(timeVal, { includeDate: true, includeTime: true, suffix: true }) : new Date(timeVal * 1000).toLocaleString('en-IN'))
+            : timeVal;
+
         renderDrawerHudData({
             open: last.open,
             high: last.high,
             low: last.low,
             close: last.close,
             volume: last.volume,
-        }, last.date);
+        }, timeFormatted);
     }
 
     function renderDrawerHudData(candle, timeStr) {
@@ -1692,91 +1699,253 @@
             }
         }
 
-        // Fetch Historical Price Bars
+        // Fetch Historical Price Bars or Intraday SMC Intelligence
         try {
-            const cacheKey = `price_history_${sym}`;
-            let records = getCached(cacheKey);
-            if (!records) {
-                const res = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(sym)}`, { signal });
-                if (res.ok) {
-                    records = await res.json();
-                    setCached(cacheKey, records);
+            const tf = (app._drawerChartTimeframe || '1D').toLowerCase();
+            const isIntraday = (tf === '5m' || tf === '15m');
+
+            if (isIntraday) {
+                // Configure chart timeScale for UNIX epoch intraday timestamps
+                app._drawerChartInstance.applyOptions({
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: false,
+                    },
+                });
+
+                const cleanSym = sym.replace('.NS', '');
+                const url = `${API_BASE}/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(cleanSym)}&interval=${encodeURIComponent(tf)}&period=5d&allow_non_fno=true`;
+                const res = await fetch(url, { signal });
+
+                if (!res.ok) {
+                    if (shimmer) shimmer.style.display = 'none';
+                    return;
                 }
-            }
 
-            if (!records || records.length === 0) {
+                const data = await res.json();
+                if (app._currentDrawerTicker !== sym) return;
+
+                const candles = data.candles || [];
+                if (candles.length === 0) {
+                    if (shimmer) shimmer.style.display = 'none';
+                    return;
+                }
+
+                app._drawerChartRecords = candles;
+
+                // 20-period intraday volume baseline
+                const recentVols = candles.slice(-20).map(c => c.volume || 0);
+                app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+                const candleBars = [];
+                const volumeBars = [];
+
+                candles.forEach(c => {
+                    const isBull = c.close >= c.open;
+                    const isSurge = app._drawerAvgVol20 > 0 && c.volume > app._drawerAvgVol20 * 1.8;
+                    const volColor = isSurge
+                        ? isBull
+                            ? 'rgba(16, 185, 129, 0.85)'
+                            : 'rgba(239, 68, 68, 0.85)'
+                        : isBull
+                        ? 'rgba(16, 185, 129, 0.35)'
+                        : 'rgba(239, 68, 68, 0.35)';
+
+                    candleBars.push({
+                        time: c.time,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                    });
+
+                    volumeBars.push({
+                        time: c.time,
+                        value: c.volume,
+                        color: volColor,
+                    });
+                });
+
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candleBars);
+                if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumeBars);
+
+                // In intraday mode, clear daily SMAs
+                if (app._drawerSMA20Series) app._drawerSMA20Series.setData([]);
+                if (app._drawerSMA50Series) app._drawerSMA50Series.setData([]);
+                if (app._drawerSMA200Series) app._drawerSMA200Series.setData([]);
+
+                // Set Session VWAP and Standard Deviation Bands
+                const ind = data.indicators || {};
+                const vwapPoints = ind.vwap || [];
+                const vwapUpperPoints = ind.vwap_upper_1 || ind.vwap_upper || [];
+                const vwapLowerPoints = ind.vwap_lower_1 || ind.vwap_lower || [];
+
+                if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(vwapPoints);
+                if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(vwapUpperPoints);
+                if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(vwapLowerPoints);
+
+                // Set SMC Markers (Order Blocks and Fair Value Gaps)
+                const smc = data.smart_money || {};
+                const obs = smc.order_blocks || [];
+                const fvgs = smc.fvg_gaps || smc.fvgs || [];
+                const markers = [];
+
+                obs.forEach(ob => {
+                    const isBull = ob.type === 'BULLISH_OB';
+                    markers.push({
+                        time: ob.start_time || ob.time,
+                        position: isBull ? 'belowBar' : 'aboveBar',
+                        color: isBull ? '#10b981' : '#f43f5e',
+                        shape: isBull ? 'arrowUp' : 'arrowDown',
+                        text: `${ob.short_label || (isBull ? 'D-OB' : 'S-OB')} (${ob.mitigated ? 'TESTED' : 'UNMIT'})`,
+                    });
+                });
+
+                fvgs.forEach(fvg => {
+                    const isBull = fvg.type === 'BULLISH_FVG';
+                    markers.push({
+                        time: fvg.time,
+                        position: isBull ? 'belowBar' : 'aboveBar',
+                        color: isBull ? '#38bdf8' : '#fb7185',
+                        shape: 'circle',
+                        text: isBull ? 'B-FVG' : 'S-FVG',
+                    });
+                });
+
+                markers.sort((a, b) => a.time - b.time);
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setMarkers(markers);
+
+                // Clear classical S/R price lines in intraday mode
+                if (app._drawerSRLines && app._drawerSRLines.length > 0) {
+                    app._drawerSRLines.forEach(l => {
+                        try { app._drawerCandleSeries.removePriceLine(l); } catch (e) {}
+                    });
+                    app._drawerSRLines = [];
+                }
+
+                // Update SMC Explainer Card
+                const obEl = document.getElementById('drawerChartValOB');
+                const fvgEl = document.getElementById('drawerChartValFVG');
+                const sessionEl = document.getElementById('drawerChartValSession');
+                const badgeSMC = document.getElementById('drawerChartBadgeSMC');
+                const explainerSMC = document.getElementById('drawerChartExplainerSMC');
+
+                if (obEl) {
+                    const unmitObs = obs.filter(o => !o.mitigated).length;
+                    obEl.textContent = `${unmitObs} Active (${obs.length} Total)`;
+                }
+                if (fvgEl) {
+                    const unfilled = fvgs.filter(f => !f.filled).length;
+                    fvgEl.textContent = `${unfilled} Open (${fvgs.length} Imbalances)`;
+                }
+                if (sessionEl) {
+                    sessionEl.textContent = data.tactical_signals?.regime || `${tf.toUpperCase()} Confluence Flow`;
+                }
+                if (badgeSMC) {
+                    badgeSMC.textContent = `${tf.toUpperCase()} SMC ACTIVE`;
+                }
+                if (explainerSMC && data.tactical_signals?.primary_bias) {
+                    explainerSMC.textContent = `Microstructure Bias: ${data.tactical_signals.primary_bias} (Confidence: ${data.tactical_signals.confidence_score || 75}%). VWAP dynamic mean: ₹${candles[candles.length - 1]?.close || '--'}.`;
+                }
+
                 if (shimmer) shimmer.style.display = 'none';
-                return;
-            }
-
-            if (app._currentDrawerTicker !== sym) return;
-
-            app._drawerChartRecords = records;
-
-            // Calculate 20D average volume for surge ratios
-            const recentVols = records.slice(-20).map(r => r.volume || 0);
-            app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
-
-            const candles = [];
-            const volumes = [];
-
-            records.forEach(r => {
-                const itemTime = r.date;
-                candles.push({
-                    time: itemTime,
-                    open: r.open,
-                    high: r.high,
-                    low: r.low,
-                    close: r.close,
+                app._drawerChartInstance.timeScale().fitContent();
+                updateDrawerHudWithLastBar();
+            } else {
+                // Daily EOD Mode
+                app._drawerChartInstance.applyOptions({
+                    timeScale: {
+                        timeVisible: false,
+                        secondsVisible: false,
+                    },
                 });
 
-                const isBull = r.close >= r.open;
-                const isSurge = app._drawerAvgVol20 > 0 && r.volume > app._drawerAvgVol20 * 1.8;
-                const volColor = isSurge
-                    ? isBull
-                        ? 'rgba(16, 185, 129, 0.85)'
-                        : 'rgba(239, 68, 68, 0.85)'
-                    : isBull
-                    ? 'rgba(16, 185, 129, 0.35)'
-                    : 'rgba(239, 68, 68, 0.35)';
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setMarkers([]);
 
-                volumes.push({
-                    time: itemTime,
-                    value: r.volume,
-                    color: volColor,
+                const cacheKey = `price_history_${sym}`;
+                let records = getCached(cacheKey);
+                if (!records) {
+                    const res = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(sym)}`, { signal });
+                    if (res.ok) {
+                        records = await res.json();
+                        setCached(cacheKey, records);
+                    }
+                }
+
+                if (!records || records.length === 0) {
+                    if (shimmer) shimmer.style.display = 'none';
+                    return;
+                }
+
+                if (app._currentDrawerTicker !== sym) return;
+
+                app._drawerChartRecords = records;
+
+                // Calculate 20D average volume for surge ratios
+                const recentVols = records.slice(-20).map(r => r.volume || 0);
+                app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+                const candles = [];
+                const volumes = [];
+
+                records.forEach(r => {
+                    const itemTime = r.date;
+                    candles.push({
+                        time: itemTime,
+                        open: r.open,
+                        high: r.high,
+                        low: r.low,
+                        close: r.close,
+                    });
+
+                    const isBull = r.close >= r.open;
+                    const isSurge = app._drawerAvgVol20 > 0 && r.volume > app._drawerAvgVol20 * 1.8;
+                    const volColor = isSurge
+                        ? isBull
+                            ? 'rgba(16, 185, 129, 0.85)'
+                            : 'rgba(239, 68, 68, 0.85)'
+                        : isBull
+                        ? 'rgba(16, 185, 129, 0.35)'
+                        : 'rgba(239, 68, 68, 0.35)';
+
+                    volumes.push({
+                        time: itemTime,
+                        value: r.volume,
+                        color: volColor,
+                    });
                 });
-            });
 
-            if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candles);
-            if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumes);
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candles);
+                if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumes);
 
-            // Technical Overlays
-            if (app._drawerSMA20Series) app._drawerSMA20Series.setData(calculateSMA(records, 20));
-            if (app._drawerSMA50Series) app._drawerSMA50Series.setData(calculateSMA(records, 50));
-            if (app._drawerSMA200Series) app._drawerSMA200Series.setData(calculateSMA(records, 200));
+                // Technical Overlays
+                if (app._drawerSMA20Series) app._drawerSMA20Series.setData(calculateSMA(records, 20));
+                if (app._drawerSMA50Series) app._drawerSMA50Series.setData(calculateSMA(records, 50));
+                if (app._drawerSMA200Series) app._drawerSMA200Series.setData(calculateSMA(records, 200));
 
-            // VWAP Bands
-            const vwapData = calculateVWAPWithBands(records);
-            if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(vwapData.vwap);
-            if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(vwapData.upper);
-            if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(vwapData.lower);
+                // VWAP Bands
+                const vwapData = calculateVWAPWithBands(records);
+                if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(vwapData.vwap);
+                if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(vwapData.upper);
+                if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(vwapData.lower);
 
-            // Apply indicator toggle visibility
-            _applyDrawerIndicatorToggles();
+                // Apply indicator toggle visibility
+                _applyDrawerIndicatorToggles();
 
-            // Apply S/R Price Lines if technical data exists
-            if (app._drawerTechnicalData) {
-                app._applyDrawerSRPriceLines(app._drawerTechnicalData);
+                // Apply S/R Price Lines if technical data exists
+                if (app._drawerTechnicalData) {
+                    app._applyDrawerSRPriceLines(app._drawerTechnicalData);
+                }
+
+                if (shimmer) shimmer.style.display = 'none';
+
+                // Set Visible Range & HUD
+                app.setDrawerChartRange(app._drawerChartRange || '1Y');
+                updateDrawerHudWithLastBar();
+
+                // Update Technical Explainer Cards
+                _updateDrawerTechnicalExplainers(records, app._drawerTechnicalData);
             }
-
-            if (shimmer) shimmer.style.display = 'none';
-
-            // Set Visible Range & HUD
-            app.setDrawerChartTF(app._drawerChartTimeframe || '1Y');
-            updateDrawerHudWithLastBar();
-
-            // Update Technical Explainer Cards
-            _updateDrawerTechnicalExplainers(records, app._drawerTechnicalData);
         } catch (err) {
             if (err.name !== 'AbortError') console.error('[STOCK-DRAWER] Price history chart error:', err);
             if (shimmer) shimmer.style.display = 'none';

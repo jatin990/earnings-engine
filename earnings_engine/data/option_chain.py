@@ -27,6 +27,11 @@ _NON_FNO_SYMBOLS: set[str] = set()
 _OPTION_CHAIN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = 900.0  # 15 minutes
 
+# Rolling Open Interest & Writing Velocity Cache: symbol -> list of (timestamp_epoch, call_oi, put_oi, dict_strike_oi)
+_OI_SNAPSHOT_CACHE: dict[str, list[dict[str, Any]]] = {}
+_MAX_OI_SNAPSHOTS = 120  # Keep up to ~2 hours of 1-minute resolution or full day snapshots
+
+
 
 def _build_unavailable_subtab_summary(message: str = "No equity derivatives listed for this symbol.") -> dict[str, Any]:
     return {

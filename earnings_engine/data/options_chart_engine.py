@@ -655,5 +655,57 @@ def get_options_chart_intelligence(
     return res
 
 
+def get_intraday_structure_summary(
+    symbol: str = "NIFTY",
+    interval: str = "5m",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Provide lightweight intraday SMC and VWAP technical structure summary for Market Compass."""
+    clean_sym = symbol.strip().upper().replace(".NS", "")
+    try:
+        data = get_options_chart_intelligence(
+            symbol=clean_sym,
+            interval=interval,
+            period="5d",
+            force_refresh=False,
+            allow_non_fno=True,
+            settings=settings,
+        )
+        if not data or not data.get("candles"):
+            return {}
+
+        current_price = float(data.get("current_price") or 0.0)
+        indicators = data.get("indicators") or {}
+        smart_money = data.get("smart_money") or {}
+        orb = indicators.get("orb") or {}
+
+        # 1. VWAP distance
+        vwap_arr = indicators.get("vwap") or []
+        latest_vwap = float(vwap_arr[-1]["value"]) if vwap_arr and "value" in vwap_arr[-1] else 0.0
+        vwap_dist_pct = round(((current_price - latest_vwap) / latest_vwap) * 100.0, 2) if latest_vwap > 0 else 0.0
+
+        # 2. SMC Order Block alignment
+        order_blocks = smart_money.get("order_blocks") or []
+        unmitigated_bullish = [ob for ob in order_blocks if ob.get("type") == "BULLISH_OB" and not ob.get("mitigated")]
+        unmitigated_bearish = [ob for ob in order_blocks if ob.get("type") == "BEARISH_OB" and not ob.get("mitigated")]
+
+        # 3. ORB status
+        orb_status = orb.get("status", "INSIDE_RANGE")
+
+        return {
+            "current_price": current_price,
+            "vwap": latest_vwap,
+            "vwap_dist_pct": vwap_dist_pct,
+            "orb_status": orb_status,
+            "bullish_obs_count": len(unmitigated_bullish),
+            "bearish_obs_count": len(unmitigated_bearish),
+            "smc_bias": "BULLISH" if len(unmitigated_bullish) > len(unmitigated_bearish) else ("BEARISH" if len(unmitigated_bearish) > len(unmitigated_bullish) else "NEUTRAL"),
+            "tactical_regime": (data.get("tactical_signals") or {}).get("primary_bias", "NEUTRAL"),
+        }
+    except Exception as e:
+        logger.debug("[get_intraday_structure_summary] Error evaluating %s: %s", clean_sym, e)
+        return {}
+
+
 # Export alias
 fetch_options_chart_intelligence = get_options_chart_intelligence
