@@ -170,7 +170,7 @@ def test_migration_024_backpopulates_legacy_audit_records(tmp_path, monkeypatch)
         # Insert legacy rows
         conn.execute("""
             INSERT INTO breakout_audit_log (ticker, company_name, event_type, from_tier, to_tier, created_at)
-            VALUES ('INFY.NS', 'Infosys', 'PROMOTED_HOT', 'WARM', 'HOT', '2026-08-20T10:00:00')
+            VALUES ('INFY.NS', 'Infosys', 'PROMOTED_HOT', 'WARM', 'HOT', datetime('now', '-5 days'))
         """)
         conn.commit()
 
@@ -228,6 +228,8 @@ def test_run_hot_rescore_execution(tmp_path, monkeypatch):
 
     # Run hot rescore - should not throw NameError
     run_hot_rescore(settings)
+    assert "TCS.NS::CLASSIC_TECHNICAL" in _pool["hot"]
+    assert _pool["hot"]["TCS.NS::CLASSIC_TECHNICAL"]["result"]["composite_score"] == 88.0
 
 
 def test_prune_breakout_audit_log(tmp_path, monkeypatch):
@@ -302,14 +304,14 @@ def test_migration_033_consolidate_breakout_audit_log(tmp_path, monkeypatch):
         conn.execute("""
             INSERT INTO breakout_audit_log (ticker, company_name, event_type, from_tier, to_tier, score_before, score_after, price, trigger_price, reason, strategy, counter, created_at, updated_at)
             VALUES
-            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 85.0, 2900.0, 2950.0, 'First entry', 'Classic Technical', 1, '2026-08-25 10:00:00', '2026-08-25 10:00:00'),
-            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 88.0, 2920.0, 2950.0, 'Second entry', 'Classic Technical', 2, '2026-08-26 10:00:00', '2026-08-26 10:00:00'),
-            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 92.0, 2940.0, 2950.0, 'Latest entry', 'Classic Technical', 3, '2026-08-27 10:00:00', '2026-08-27 10:00:00')
+            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 85.0, 2900.0, 2950.0, 'First entry', 'Classic Technical', 1, '2026-10-15 10:00:00', '2026-10-15 10:00:00'),
+            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 88.0, 2920.0, 2950.0, 'Second entry', 'Classic Technical', 2, '2026-10-16 10:00:00', '2026-10-16 10:00:00'),
+            ('RELIANCE.NS', 'Reliance Industries', 'PROMOTED_HOT', 'WARM', 'HOT', 70.0, 92.0, 2940.0, 2950.0, 'Latest entry', 'Classic Technical', 3, '2026-10-17 10:00:00', '2026-10-17 10:00:00')
         """)
         # 3. Insert a single distinct row for HDFCBANK.NS
         conn.execute("""
             INSERT INTO breakout_audit_log (ticker, company_name, event_type, from_tier, to_tier, score_before, score_after, price, trigger_price, reason, strategy, counter, created_at, updated_at)
-            VALUES ('HDFCBANK.NS', 'HDFC Bank', 'ADDED_WARM', 'COLD', 'WARM', 60.0, 75.0, 1600.0, 1650.0, 'Single entry', 'Classic Technical', 1, '2026-08-26 10:00:00', '2026-08-26 10:00:00')
+            VALUES ('HDFCBANK.NS', 'HDFC Bank', 'ADDED_WARM', 'COLD', 'WARM', 60.0, 75.0, 1600.0, 1650.0, 'Single entry', 'Classic Technical', 1, '2026-10-16 10:00:00', '2026-10-16 10:00:00')
         """)
 
     # Apply Migration 33
@@ -333,16 +335,12 @@ def test_migration_033_consolidate_breakout_audit_log(tmp_path, monkeypatch):
     # RELIANCE.NS row must have consolidated counter = 1 + 2 + 3 = 6
     rel = next(r for r in rows if r[0] == "RELIANCE.NS")
     assert rel[2] == 6  # counter
-    assert rel[3] == "2026-08-25 10:00:00"  # earliest created_at preserved
-    assert rel[4] == "2026-08-27 10:00:00"  # latest updated_at preserved
+    assert rel[3] == "2026-10-15 10:00:00"  # earliest created_at preserved
+    assert rel[4] == "2026-10-17 10:00:00"  # latest updated_at preserved
     assert rel[5] == 2940.0  # latest price from keep_id (MAX id)
     assert rel[6] == 92.0  # latest score_after from keep_id
 
     # Verify index exists
     idx_row = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_breakout_audit_ticker_strat'").fetchone()
     assert idx_row is not None
-
-
-    assert "TCS.NS::CLASSIC_TECHNICAL" in _pool["hot"]
-    assert _pool["hot"]["TCS.NS::CLASSIC_TECHNICAL"]["result"]["composite_score"] == 88.0
 

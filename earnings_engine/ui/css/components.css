@@ -176,3 +176,45 @@ select:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 1px var(--color-primary);
 }
+
+/* ─── Subtab Navigation Buttons ────────────────────────────────────────── */
+.bk-subtab-btn {
+    padding: 0.22rem 0.6rem;
+    font-size: 0.70rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    transition: all 0.15s ease-in-out;
+}
+
+.bk-subtab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+.bk-subtab-active {
+    background: rgba(56, 189, 248, 0.18) !important;
+    border-color: rgba(56, 189, 248, 0.45) !important;
+    color: #38bdf8 !important;
+    font-weight: 700 !important;
+}
+
+/* ─── High-Density Result Cells & Inputs ───────────────────────────────── */
+.results-cell-mono {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 6px 10px;
+}
+
+.modal-input-compact {
+    background: #09090b !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #f8fafc !important;
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 4px !important;
+}
+

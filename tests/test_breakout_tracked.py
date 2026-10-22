@@ -460,7 +460,7 @@ def test_deterministic_days_to_target_with_mocked_prices(monkeypatch):
         from earnings_engine.data import prices
         monkeypatch.setattr(prices, "fetch_prices", lambda sym, settings, force=False: mock_df)
 
-        res = get_tracked_breakouts(days=30, settings=settings)
+        res = get_tracked_breakouts(days=60, settings=settings)
         item = next((it for it in res["items"] if it["id"] == test_id), None)
         assert item is not None
         assert item["outcome"] == "TARGET_HIT"

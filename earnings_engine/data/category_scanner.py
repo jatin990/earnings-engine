@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 
 from earnings_engine.config import Settings
+from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.prices import _connect, load_prices, load_prices_batch
 from earnings_engine.data.names import get_name
 from earnings_engine.data.watchlists import get_watchlist
@@ -150,7 +151,7 @@ _SCANNER_DB_INITIALIZED: set[str] = set()
 
 def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
     """Connect to SQLite database and ensure scanner tables & indices exist."""
-    conn = _connect(settings)
+    conn = get_db_connection(settings)
     db_key = str(getattr(settings, "sqlite_db_path", "default"))
     if db_key in _SCANNER_DB_INITIALIZED:
         return conn

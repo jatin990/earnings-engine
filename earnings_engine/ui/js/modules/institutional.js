@@ -8,10 +8,8 @@
 
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
-
     window.app = window.app || {};
     const app = window.app;
-
     app.institutionalModule = app;
     Object.assign(app, {
         // =========================================================================
@@ -48,25 +46,18 @@
             ['accumulating', 'stock', 'distributing', 'funds'].forEach(v => {
                 const el = document.getElementById('instView-' + v);
                 const btn = document.getElementById('btnInstTab-' + v);
-
                 if (el) el.style.display = (v === this.institutionalActiveView) ? 'block' : 'none';
 
                 if (btn) {
                     if (v === this.institutionalActiveView) {
                         btn.style.background = '#18181b';
-
                         btn.style.color = '#38bdf8';
-
                         btn.style.borderColor = 'rgba(56,189,248,0.4)';
-
                         btn.style.fontWeight = '700';
                     } else {
                         btn.style.background = 'transparent';
-
                         btn.style.color = '#94a3b8';
-
                         btn.style.borderColor = 'rgba(255,255,255,0.1)';
-
                         btn.style.fontWeight = '500';
                     }
                 }
@@ -78,86 +69,64 @@
             const distEl = document.getElementById('instEquitiesFlow-distributing');
             const btnAcc = document.getElementById('btnInstFlowToggle-acc');
             const btnDist = document.getElementById('btnInstFlowToggle-dist');
-
             if (accEl) accEl.style.display = isAcc ? 'block' : 'none';
-
             if (distEl) distEl.style.display = isAcc ? 'none' : 'block';
 
             if (btnAcc) {
                 btnAcc.style.background = isAcc ? '#18181b' : 'transparent';
-
                 btnAcc.style.color = isAcc ? '#34d399' : '#94a3b8';
-
                 btnAcc.style.borderColor = isAcc ? 'rgba(16,185,129,0.4)' : 'transparent';
-
                 btnAcc.style.fontWeight = isAcc ? '700' : '500';
             }
 
             if (btnDist) {
                 btnDist.style.background = !isAcc ? '#18181b' : 'transparent';
-
                 btnDist.style.color = !isAcc ? '#f87171' : '#94a3b8';
-
                 btnDist.style.borderColor = !isAcc ? 'rgba(239,68,68,0.4)' : 'transparent';
-
                 btnDist.style.fontWeight = !isAcc ? '700' : '500';
             }
         },
         toggleInstitutionalSplitLayout() {
             const grid = document.getElementById('instEquitiesSplitGrid');
             const btn = document.getElementById('btnToggleInstSplit');
-
             if (!grid) return;
             const isCurrentlySplit = grid.style.gridTemplateColumns !== '1fr';
 
             if (isCurrentlySplit) {
                 grid.style.gridTemplateColumns = '1fr';
-
                 if (btn) btn.innerHTML = '◫ Expand Split';
             } else {
                 grid.style.gridTemplateColumns = 'minmax(0, 1.05fr) minmax(0, 0.95fr)';
-
                 if (btn) btn.innerHTML = '◫ 50-50 Split';
             }
         },
         switchInstitutionalPage(page) {
             const pages = ['equities', 'top-additions', 'investors', 'smart-money'];
             const p = pages.includes(page) ? page : 'equities';
-
             this.institutionalSubPage = p;
 
             try {
                 localStorage.setItem('subtab_institutional', p);
-
                 localStorage.setItem('ee_institutional_subpage', p);
-
                 if (!app._subtabState) app._subtabState = {};
-
                 app._subtabState['institutional'] = p;
             } catch (e) {}
 
             pages.forEach(name => {
                 const el = document.getElementById('instPage-' + name);
                 const btn = document.getElementById('btnInstPage-' + name);
-
                 if (el) el.style.display = (name === p) ? 'block' : 'none';
 
                 if (btn) {
                     if (name === p) {
                         btn.style.background = '#18181b';
-
                         btn.style.color = '#38bdf8';
-
                         btn.style.borderColor = 'rgba(56,189,248,0.4)';
-
                         btn.style.fontWeight = '700';
                     } else {
                         btn.style.background = 'transparent';
-
                         btn.style.color = '#94a3b8';
-
                         btn.style.borderColor = 'transparent';
-
                         btn.style.fontWeight = '500';
                     }
                 }
@@ -166,13 +135,9 @@
             const sideAdditions = document.getElementById('sidebarSubInstAdditions');
             const sideInvestors = document.getElementById('sidebarSubInstInvestors');
             const sideSmartMoney = document.getElementById('sidebarSubInstSmartMoney');
-
             if (sideEquities) sideEquities.classList.toggle('active', p === 'equities');
-
             if (sideAdditions) sideAdditions.classList.toggle('active', p === 'top-additions');
-
             if (sideInvestors) sideInvestors.classList.toggle('active', p === 'investors');
-
             if (sideSmartMoney) sideSmartMoney.classList.toggle('active', p === 'smart-money');
             const ctxLabel = document.getElementById('instSubtabContextLabel');
             if (ctxLabel) {
@@ -201,9 +166,7 @@
         async loadInstitutionalData() {
             try {
                 this._accLimit = 25;
-
                 this._distLimit = 20;
-
                 this._fundsLimit = 50;
 
                 // Non-blocking load of institutional data integrity health & provenance status
@@ -219,25 +182,19 @@
 
                 if (resAcc.ok) {
                     const accData = await resAcc.json();
-
                     this.institutionalData.accumulating = accData.items || [];
-
                     this.renderInstitutionalAccumulatingTable(this.institutionalData.accumulating);
                 }
 
                 if (resDist.ok) {
                     const distData = await resDist.json();
-
                     this.institutionalData.distributing = distData.items || [];
-
                     this.renderInstitutionalDistributingTable(this.institutionalData.distributing);
                 }
 
                 if (resFunds.ok) {
                     const fundsData = await resFunds.json();
-
                     this.institutionalData.funds = fundsData.funds || [];
-
                     this.renderInstitutionalFundsTable(this.institutionalData.funds);
                 }
 
@@ -250,9 +207,7 @@
         },
         async loadMoreInstitutionalEquities(type) {
             const isAcc = type === 'accumulating';
-
             if (isAcc && this._loadingMoreAcc) return;
-
             if (!isAcc && this._loadingMoreDist) return;
             const btnId = isAcc ? 'btnInstLoadMoreAcc' : 'btnInstLoadMoreDist';
             const btn = document.getElementById(btnId);
@@ -264,17 +219,14 @@
 
             if (isAcc) {
                 this._loadingMoreAcc = true;
-
                 this._accLimit = (this._accLimit || 25) + 25;
             } else {
                 this._loadingMoreDist = true;
-
                 this._distLimit = (this._distLimit || 20) + 25;
             }
 
             if (btn) {
                 btn.disabled = true;
-
                 btn.innerHTML = '<div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.3rem;">⏳</div> Loading...';
             }
 
@@ -294,31 +246,25 @@
 
                     if (isAcc) {
                         this.institutionalData.accumulating = items;
-
                         this.renderInstitutionalAccumulatingTable(items);
                     } else {
                         this.institutionalData.distributing = items;
-
                         this.renderInstitutionalDistributingTable(items);
                     }
 
                     if (btn) {
                         if (items.length <= prevCount || items.length < targetLimit) {
                             btn.disabled = true;
-
                             btn.style.opacity = '0.6';
-
                             btn.innerHTML = `✓ All Setups Loaded (${items.length})`;
                         } else {
                             btn.disabled = false;
-
                             btn.innerHTML = originalBtnHtml;
                         }
                     }
                 } else {
                     if (btn) {
                         btn.disabled = false;
-
                         btn.innerHTML = originalBtnHtml;
                     }
                 }
@@ -327,12 +273,10 @@
 
                 if (btn) {
                     btn.disabled = false;
-
                     btn.innerHTML = originalBtnHtml;
                 }
             } finally {
                 if (isAcc) this._loadingMoreAcc = false;
-
                 else this._loadingMoreDist = false;
             }
         },
@@ -340,14 +284,11 @@
             if (this._loadingMoreFunds) return;
             const btn = document.getElementById('btnInstLoadMoreFunds');
             const originalBtnHtml = '<span>📥</span> Load More Funds & Whales (+25)';
-
             this._loadingMoreFunds = true;
-
             this._fundsLimit = (this._fundsLimit || 50) + 25;
 
             if (btn) {
                 btn.disabled = true;
-
                 btn.innerHTML = '<div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.3rem;">⏳</div> Loading...';
             }
 
@@ -358,34 +299,28 @@
                 if (res.ok) {
                     const data = await res.json();
                     const allFunds = data.funds || [];
-
                     this.institutionalData.funds = allFunds;
 
                     if (this._currentInvestorFilter === 'ALL') {
                         this.renderInstitutionalFundsTable(allFunds);
                     } else {
                         const filtered = allFunds.filter(f => (f.fund_type || '').toLowerCase().includes(this._currentInvestorFilter.toLowerCase()));
-
                         this.renderInstitutionalFundsTable(filtered);
                     }
 
                     if (btn) {
                         if (allFunds.length <= prevCount || allFunds.length < this._fundsLimit) {
                             btn.disabled = true;
-
                             btn.style.opacity = '0.6';
-
                             btn.innerHTML = `✓ All Funds Loaded (${allFunds.length})`;
                         } else {
                             btn.disabled = false;
-
                             btn.innerHTML = originalBtnHtml;
                         }
                     }
                 } else {
                     if (btn) {
                         btn.disabled = false;
-
                         btn.innerHTML = originalBtnHtml;
                     }
                 }
@@ -394,7 +329,6 @@
 
                 if (btn) {
                     btn.disabled = false;
-
                     btn.innerHTML = originalBtnHtml;
                 }
             } finally {
@@ -413,7 +347,6 @@
 
             if (!items || !items.length) {
                 tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No high-conviction accumulating stocks found.</td></tr>';
-
                 return;
             }
 
@@ -471,7 +404,6 @@
 
             if (!items || !items.length) {
                 tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No high-distribution equities detected.</td></tr>';
-
                 return;
             }
 
@@ -702,7 +634,6 @@
 
             if (!funds || !funds.length) {
                 tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles loaded.</td></tr>';
-
                 return;
             }
 
@@ -748,9 +679,7 @@
 
                 if (res.ok) {
                     const data = await res.json();
-
                     this.institutionalData.funds = data.funds || [];
-
                     this.filterInvestors(this._currentInvestorFilter || 'ALL');
                 }
             } catch (e) {
@@ -763,30 +692,21 @@
 
             pills.forEach(cat => {
                 let id = 'btnInvCat-ALL';
-
                 if (cat === 'Mutual Fund') id = 'btnInvCat-MF';
-
                 else if (cat === 'Super Investor') id = 'btnInvCat-SI';
-
                 else if (cat === 'Foreign') id = 'btnInvCat-FII';
                 const btn = document.getElementById(id);
 
                 if (btn) {
                     if (cat === category) {
                         btn.style.background = '#18181b';
-
                         btn.style.color = '#38bdf8';
-
                         btn.style.borderColor = 'rgba(56,189,248,0.4)';
-
                         btn.style.fontWeight = '700';
                     } else {
                         btn.style.background = 'transparent';
-
                         btn.style.color = '#94a3b8';
-
                         btn.style.borderColor = 'rgba(255,255,255,0.1)';
-
                         btn.style.fontWeight = '500';
                     }
                 }
@@ -797,7 +717,6 @@
                 this.renderInstitutionalFundsTable(allFunds);
             } else {
                 const filtered = allFunds.filter(f => (f.fund_type || '').toLowerCase().includes(category.toLowerCase()));
-
                 this.renderInstitutionalFundsTable(filtered);
             }
         },
@@ -807,7 +726,6 @@
 
                 if (res.ok) {
                     const data = await res.json();
-
                     this.institutionalData.topAdditions = data;
 
                     // Update KPI counters
@@ -825,7 +743,6 @@
 
                     if (kpiLeader && data.latest_additions && data.latest_additions.length > 0) {
                         const top = data.latest_additions[0];
-
                         kpiLeader.innerText = `+${top.increase_pct}% (${top.ticker.replace('.NS', '')})`;
 
                         if (kpiLeaderSub) {
@@ -835,24 +752,20 @@
 
                     if (kpiInflow) {
                         const totalInflow = data.total_inflow_cr || (data.latest_additions ? data.latest_additions.reduce((acc, x) => acc + (x.increase_amount_cr || 0), 0) : 0);
-
                         kpiInflow.innerText = `+₹${Number(Number(totalInflow).toFixed(0)).toLocaleString()} Cr`;
 
                         if (kpiInflowSub && data.latest_additions && data.latest_additions.length > 0) {
                             const topStock = data.latest_additions[0];
-
                             kpiInflowSub.innerText = `Led by ${topStock.ticker.replace('.NS', '')}`;
                         }
                     }
 
                     if (kpiMegaCount) {
                         const count = data.historical_count || (data.historical_surges ? data.historical_surges.length : (data.historical_additions ? data.historical_additions.length : 0));
-
                         kpiMegaCount.innerText = `${count} Surges`;
                     }
 
                     this.renderTopAdditionsTable(data.latest_additions || []);
-
                     this.renderHistoricalAdditionsTable(data.historical_surges || data.historical_additions || []);
                 }
             } catch (e) {
@@ -861,12 +774,10 @@
         },
         renderTopAdditionsTable(items) {
             const tbody = document.getElementById('instTopAdditionsTableBody');
-
             if (!tbody) return;
 
             if (!items || !items.length) {
                 tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">No high-conviction stake additions exceeding threshold.</td></tr>';
-
                 return;
             }
 
@@ -939,12 +850,10 @@
         },
         renderHistoricalAdditionsTable(items) {
             const tbody = document.getElementById('instHistoricalSurgesTableBody') || document.getElementById('instHistoricalAdditionsTableBody');
-
             if (!tbody) return;
 
             if (!items || !items.length) {
                 tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">No historical surges on record.</td></tr>';
-
                 return;
             }
 
@@ -1025,67 +934,50 @@
             if (type === 'pct') {
                 if (btnPct) {
                     btnPct.style.background = '#ffffff';
-
                     btnPct.style.color = '#09090b';
-
                     btnPct.style.borderColor = '#ffffff';
-
                     btnPct.style.fontWeight = '700';
                 }
 
                 if (btnAmt) {
                     btnAmt.style.background = 'transparent';
-
                     btnAmt.style.color = '#a1a1aa';
-
                     btnAmt.style.borderColor = 'transparent';
-
                     btnAmt.style.fontWeight = '500';
                 }
 
                 const sorted = [...surges].sort((a, b) => {
                     const pctB = b.increase_pct != null ? b.increase_pct : (b.inst_addition_pct || 0);
                     const pctA = a.increase_pct != null ? a.increase_pct : (a.inst_addition_pct || 0);
-
                     return pctB - pctA;
                 });
-
                 this.renderHistoricalAdditionsTable(sorted);
             } else {
                 if (btnAmt) {
                     btnAmt.style.background = '#ffffff';
-
                     btnAmt.style.color = '#09090b';
-
                     btnAmt.style.borderColor = '#ffffff';
-
                     btnAmt.style.fontWeight = '700';
                 }
 
                 if (btnPct) {
                     btnPct.style.background = 'transparent';
-
                     btnPct.style.color = '#a1a1aa';
-
                     btnPct.style.borderColor = 'transparent';
-
                     btnPct.style.fontWeight = '500';
                 }
 
                 const sorted = [...surges].sort((a, b) => {
                     const amtB = b.increase_amount_cr != null ? b.increase_amount_cr : (b.net_flow_cr || 0);
                     const amtA = a.increase_amount_cr != null ? a.increase_amount_cr : (a.net_flow_cr || 0);
-
                     return amtB - amtA;
                 });
-
                 this.renderHistoricalAdditionsTable(sorted);
             }
         },
         async searchInstitutionalStock(ticker, autoSwitch = true) {
             if (!ticker) return;
             const cleanTicker = ticker.trim().toUpperCase().endsWith('.NS') ? ticker.trim().toUpperCase() : ticker.trim().toUpperCase() + '.NS';
-
             this._selectedTicker = cleanTicker;
 
             try {
@@ -1093,9 +985,7 @@
 
                 if (res.ok) {
                     const data = await res.json();
-
                     this.institutionalData.currentStock = data;
-
                     this.renderStockInstitutionalDetails(data);
 
                     if (autoSwitch && this.institutionalSubPage === 'investors') {
@@ -1151,7 +1041,6 @@
             const p1Err = document.getElementById('instP1IngestErrorBanner');
             const p3Err = document.getElementById('instP3IngestErrorBanner');
             const fErr = document.getElementById('instForensicIngestErrorBanner');
-
             if (p1Err) p1Err.style.display = 'none';
             if (p3Err) p3Err.style.display = 'none';
             if (fErr) fErr.style.display = 'none';
@@ -1223,7 +1112,6 @@
             const btnTab = document.getElementById('btnForensicQuarterlyTabFetch');
             const fErr = document.getElementById('instForensicIngestErrorBanner');
             const fBadge = document.getElementById('instForensicFetchStatusBadge');
-
             if (fErr) fErr.style.display = 'none';
 
             [btnForensic, btnTab].forEach(b => {
@@ -1289,7 +1177,6 @@
             const btnTab = document.getElementById('btnForensicBlockTabFetch');
             const fErr = document.getElementById('instForensicIngestErrorBanner');
             const fBadge = document.getElementById('instForensicFetchStatusBadge');
-
             if (fErr) fErr.style.display = 'none';
 
             [btnForensic, btnTab].forEach(b => {
@@ -1381,16 +1268,12 @@
             const p3FetchStatus = document.getElementById('instTopSelectedStockFetchStatus');
             this.renderFetchStatusBadge(p1FetchStatus, data.last_fetch);
             this.renderFetchStatusBadge(p3FetchStatus, data.last_fetch);
-
             if (nameEl) nameEl.textContent = data.company_name || '';
 
             if (badgeEl) {
                 badgeEl.textContent = verdictClean;
-
                 badgeEl.style.background = '#18181b';
-
                 badgeEl.style.color = '#f4f4f5';
-
                 badgeEl.style.border = '1px solid rgba(255,255,255,0.25)';
             }
 
@@ -1399,16 +1282,12 @@
             // Populate Page 3 Header (Crisp Monochrome)
 
             if (topTickerEl) topTickerEl.textContent = data.ticker;
-
             if (topNameEl) topNameEl.textContent = data.company_name || '';
 
             if (topBadgeEl) {
                 topBadgeEl.textContent = verdictClean;
-
                 topBadgeEl.style.background = '#18181b';
-
                 topBadgeEl.style.color = '#f4f4f5';
-
                 topBadgeEl.style.border = '1px solid rgba(255,255,255,0.25)';
             }
 
@@ -1440,7 +1319,6 @@
             const p1Ret30d = document.getElementById('instRet30dVal');
             const p1Ret1y = document.getElementById('instRet1yVal');
             const p1Mcap = document.getElementById('instMcapVal');
-
             if (p1Price) p1Price.textContent = priceStr;
 
             if (p1Ret7d) { p1Ret7d.textContent = ret7dStr; p1Ret7d.style.color = ret7dCol; }
@@ -1458,7 +1336,6 @@
             const p3Ret30d = document.getElementById('instTopRet30dVal');
             const p3Ret1y = document.getElementById('instTopRet1yVal');
             const p3Mcap = document.getElementById('instTopMcapVal');
-
             if (p3Price) p3Price.textContent = priceStr;
 
             if (p3Ret7d) { p3Ret7d.textContent = ret7dStr; p3Ret7d.style.color = ret7dCol; }
@@ -1477,9 +1354,7 @@
             const fiiStakeStr = `${data.fii_stake_pct || 0}%${data.fii_delta_pct ? ` (+${data.fii_delta_pct}%)` : ''}`;
             const diiStakeStr = `${data.dii_stake_pct || 0}%${data.dii_delta_pct ? ` (+${data.dii_delta_pct}%)` : ''}`;
             const subtitleHtml = `Inflow (QoQ): <b style="color:#ffffff;">${incAmtStr} (${incPctStr})</b> · Inst Stake: <b style="color:#ffffff;">${data.total_institutional_stake_pct || '—'}%</b> · FII: <b style="color:#ffffff;">${fiiStakeStr}</b> · DII: <b style="color:#ffffff;">${diiStakeStr}</b>`;
-
             if (topSubtitleEl) topSubtitleEl.innerHTML = subtitleHtml;
-
             if (scoreTextEl) scoreTextEl.innerHTML = `Score: <strong style="color:#ffffff;">${data.accumulation_score || 50} / 100</strong> · Inflow: <strong style="color:#ffffff;">${incAmtStr}</strong> · Outflow: <strong style="color:#f87171;">-₹${Number(data.gross_outflow_cr || 0).toLocaleString()} Cr</strong> · Inst Stake: <strong style="color:#ffffff;">${data.total_institutional_stake_pct || '—'}%</b>`;
 
             // 1. Shareholding Pattern History (Rendered to both Page 1 and Page 3)
@@ -1576,10 +1451,8 @@
             }
 
             const patContainer = document.getElementById('instShareholdingPatternContainer');
-
             if (patContainer) patContainer.innerHTML = patTableHtml;
             const patContainerTop = document.getElementById('instTopStockQuarterlyTrendContainer');
-
             if (patContainerTop) patContainerTop.innerHTML = patTableHtml;
 
             // 2. Block Deals (Rendered to both Page 1 and Page 3)
@@ -1620,20 +1493,16 @@
             }
 
             const dealsContainer = document.getElementById('instBlockDealsContainer');
-
             if (dealsContainer) dealsContainer.innerHTML = dealsHtml;
             const dealsContainerTop = document.getElementById('instTopBlockDealsContainer') || document.getElementById('instTopStockBlockDealsBody');
-
             if (dealsContainerTop) dealsContainerTop.innerHTML = dealsHtml;
 
             // 3. Fund-by-Fund Table (Rendered to both Page 1 and Page 3)
 
             const holdings = data.holdings || [];
             const fundBadge = document.getElementById('instStockFundCountBadge');
-
             if (fundBadge) fundBadge.textContent = `${holdings.length} Funds Tracked`;
             const fundBadgeTop = document.getElementById('instTopStockFundCountBadge');
-
             if (fundBadgeTop) fundBadgeTop.textContent = `${holdings.length} Funds Tracked`;
             const tbody = document.getElementById('instStockHoldingsTableBody');
             const tbodyTop = document.getElementById('instTopStockHoldingsTableBody');
@@ -1689,7 +1558,6 @@
             }
 
             if (tbody) tbody.innerHTML = holdingsRowsHtml;
-
             if (tbodyTop) tbodyTop.innerHTML = holdingsRowsHtml;
         },
 
@@ -2113,17 +1981,12 @@
 
                 if (btn) {
                     btn.style.background = s === strategy ? '#ffffff' : 'transparent';
-
                     btn.style.color = s === strategy ? '#09090b' : '#a1a1aa';
-
                     btn.style.borderColor = s === strategy ? '#ffffff' : 'transparent';
                 }
             });
-
             this._smartMoneySortColumn = 'score';
-
             this._smartMoneySortAsc = false;
-
             this.loadSmartMoneyRadar(true);
         },
         switchForensicsTab(tab) {
@@ -2135,9 +1998,7 @@
 
                 if (btn) {
                     btn.style.background = t === tab ? '#ffffff' : 'transparent';
-
                     btn.style.color = t === tab ? '#09090b' : '#a1a1aa';
-
                     btn.style.borderColor = t === tab ? '#ffffff' : 'transparent';
                 }
 
@@ -2493,7 +2354,6 @@
                 const whales = (s.whale_buyers_summary || []).join(' ').toLowerCase();
                 return ticker.includes(q) || name.includes(q) || sector.includes(q) || strat.includes(q) || whales.includes(q);
             });
-
             this.renderSmartMoneyTable(filtered);
         },
         async loadSmartMoneyRadar(force = false) {
@@ -2547,7 +2407,6 @@
                 const kpiDomSub = document.getElementById('kpiSmAvgDominanceSub');
                 const kpiLead = document.getElementById('kpiSmTopLeader');
                 const kpiLeadSub = document.getElementById('kpiSmTopLeaderSub');
-
                 if (kpiStocks) kpiStocks.textContent = `${data.count || this._smartMoneyStocks.length} Setups`;
                 if (kpiStocksSub) kpiStocksSub.textContent = `Strategy: ${this._smartMoneyStrategy.replace('_', ' ')}`;
                 if (kpiCap) kpiCap.textContent = `₹${Number(summary.total_smart_money_cr || 0).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr`;
@@ -2556,7 +2415,6 @@
                 if (kpiDomSub) kpiDomSub.textContent = `Smart Money vs Domestic Ratio`;
                 if (kpiLead) kpiLead.textContent = summary.top_conviction_ticker ? summary.top_conviction_ticker.replace('.NS', '') : 'None';
                 if (kpiLeadSub) kpiLeadSub.textContent = summary.top_conviction_name ? `${summary.top_conviction_name} (Score ${summary.top_conviction_score || 0})` : 'Awaiting data';
-
                 this.renderSmartMoneyTable(this._smartMoneyStocks);
 
                 // Auto-inspect the top stock if available
@@ -2709,7 +2567,6 @@
             }
 
             this._smartMoneySelectedStock = stock;
-
             this._selectedTicker = stock.ticker;
 
             // Highlight selected row in table
@@ -2721,9 +2578,7 @@
 
                 if (row) {
                     const isMatch = s.ticker === stock.ticker;
-
                     row.style.background = isMatch ? 'rgba(56,189,248,0.12)' : 'transparent';
-
                     row.dataset.selected = isMatch ? 'true' : '';
                 }
             });
@@ -2735,9 +2590,7 @@
             const bEl = document.getElementById('instSmSelectedBadge');
             const tfEl = document.getElementById('instSmSelectedTimeframe');
             const linkEl = document.getElementById('instSmSelectedStockLink');
-
             if (tEl) tEl.textContent = stock.ticker;
-
             if (nEl) nEl.textContent = stock.company_name ? `${stock.company_name} · ${stock.sector || ''}` : stock.sector || '';
 
             if (bEl) {
@@ -2745,21 +2598,16 @@
 
                 if (stock.classification_category === 'domestic_absorption') {
                     bEl.style.background = 'rgba(239,68,68,0.15)';
-
                     bEl.style.color = '#f87171';
-
                     bEl.style.borderColor = 'rgba(239,68,68,0.35)';
                 } else {
                     bEl.style.background = 'rgba(16,185,129,0.15)';
-
                     bEl.style.color = '#34d399';
-
                     bEl.style.borderColor = 'rgba(16,185,129,0.35)';
                 }
             }
 
             if (tfEl) tfEl.textContent = `Horizon: ${this._smartMoneyWindow.toUpperCase()} (${this._smartMoneyRawData ? this._smartMoneyRawData.period_description : 'Rolling Lookback'})`;
-
             if (linkEl) linkEl.href = `/stock/${encodeURIComponent(stock.ticker)}`;
 
             // Update Price & Returns Strip
@@ -2769,30 +2617,23 @@
             const r30Val = document.getElementById('instSmRet30dVal');
             const r1yVal = document.getElementById('instSmRet1yVal');
             const mcVal = document.getElementById('instSmMcapVal');
-
             if (pVal) pVal.textContent = stock.current_price != null ? `₹${Number(stock.current_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
 
             if (r7Val) {
                 const v = stock.return_7d_pct != null ? stock.return_7d_pct : 0;
-
                 r7Val.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-
                 r7Val.style.color = v >= 0 ? '#34d399' : '#f87171';
             }
 
             if (r30Val) {
                 const v = stock.return_30d_pct != null ? stock.return_30d_pct : 0;
-
                 r30Val.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-
                 r30Val.style.color = v >= 0 ? '#34d399' : '#f87171';
             }
 
             if (r1yVal) {
                 const v = stock.return_1y_pct != null ? stock.return_1y_pct : 0;
-
                 r1yVal.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-
                 r1yVal.style.color = v >= 0 ? '#34d399' : '#f87171';
             }
 
@@ -2907,17 +2748,11 @@
             const domCrEl = document.getElementById('instSmDomesticCr');
             const convVal = document.getElementById('instSmConvictionVal');
             const insightBox = document.getElementById('instSmInsightBox');
-
             if (dBadge) dBadge.textContent = `${domRatio.toFixed(1)}% Dominance`;
-
             if (barSm) barSm.style.width = `${Math.min(100, Math.max(0, domRatio))}%`;
-
             if (barDom) barDom.style.width = `${Math.min(100, Math.max(0, 100 - domRatio))}%`;
-
             if (depCrEl) depCrEl.textContent = `₹${smCr.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr`;
-
             if (domCrEl) domCrEl.textContent = `₹${domCr.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr`;
-
             if (convVal) convVal.textContent = `${score} / 100`;
 
             // Update Conviction Score 4-Factor Breakdown
@@ -2928,7 +2763,6 @@
             const sbWhale = document.getElementById('instSmScorePartWhale');
             const sbMom = document.getElementById('instSmScorePartMom');
             const sbPenalty = document.getElementById('instSmScoreAbsorptionPenalty');
-
             if (sbTotal) sbTotal.textContent = `${score} / 100`;
             if (sbCap) sbCap.textContent = `${sb.capital_score != null ? sb.capital_score.toFixed(1) : '--'}/35`;
             if (sbDom) sbDom.textContent = `${sb.dominance_score != null ? sb.dominance_score.toFixed(1) : '--'}/30`;
@@ -2947,19 +2781,15 @@
             if (insightBox) {
                 if (stock.classification_category === 'domestic_absorption') {
                     insightBox.style.borderLeftColor = '#f59e0b';
-
                     insightBox.innerHTML = `⚠️ <b style="color:#fbbf24;">Passive Domestic Absorption Alert:</b> Domestic Mutual Funds have absorbed ₹${domCr.toFixed(1)} Cr while Smart Money (FIIs, Sovereign Wealth, Super Investors) represents only ${domRatio.toFixed(1)}% of flow. This setup indicates passive liquidity absorption rather than catalyst-driven re-rating.`;
                 } else if (stock.classification_category === 'high_conviction_smart_money') {
                     insightBox.style.borderLeftColor = '#10b981';
-
                     insightBox.innerHTML = `⭐ <b style="color:#34d399;">High-Conviction Smart Money Accumulation:</b> Smart Money accounts for <b>${domRatio.toFixed(1)}%</b> of all capital deployed (₹${smCr.toFixed(1)} Cr). Supported by ${stock.smart_money_buyers_count || 0} distinct whale entities with catalytic fundamental conviction.`;
                 } else if (stock.classification_category === 'fii_whale_inflow') {
                     insightBox.style.borderLeftColor = '#818cf8';
-
                     insightBox.innerHTML = `🚀 <b style="color:#818cf8;">Foreign Institutional Inflow:</b> Sustained FII & Sovereign Wealth accumulation of ₹${smCr.toFixed(1)} Cr, representing dominant foreign accumulation over domestic retail churn.`;
                 } else {
                     insightBox.style.borderLeftColor = '#38bdf8';
-
                     insightBox.innerHTML = `🎯 <b style="color:#38bdf8;">Institutional Accumulation:</b> ₹${smCr.toFixed(1)} Cr smart money deployed with a conviction score of <b>${score}/100</b> across the ${this._smartMoneyWindow.toUpperCase()} window.`;
                 }
             }
@@ -2969,7 +2799,6 @@
             const buyersTbody = document.getElementById('instSmBuyersTableBody');
             const buyersBadge = document.getElementById('instSmBuyerCountBadge');
             const buyers = stock.whale_buyers || [];
-
             if (buyersBadge) buyersBadge.textContent = `${buyers.length} Buyers Logged`;
 
             if (buyersTbody) {
@@ -3067,7 +2896,6 @@
             if (dealsBadge) dealsBadge.textContent = '⏳';
             const sigBadge = document.getElementById('instSmSignalCountBadge');
             if (sigBadge) sigBadge.textContent = '⏳';
-
             this._smartMoneyForensicDossier = null;
             try {
                 const fRes = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(stock.ticker)}/forensics`);
@@ -3337,13 +3165,11 @@
         async inspectStockIntegrity(tickerInput) {
             const ticker = (tickerInput || '').trim().toUpperCase();
             if (!ticker) return;
-
             this.switchIntegrityModalTab('stock');
             const searchInput = document.getElementById('instModalStockSearchInput');
             if (searchInput) searchInput.value = ticker;
             const container = document.getElementById('instModalStockAuditContainer');
             if (!container) return;
-
             container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:#38bdf8;font-size:0.8rem;">Running cryptographic provenance inspection and pre-commit invariant audit for <b>' + ticker + '</b>...</div>';
 
             try {
@@ -3431,7 +3257,6 @@
             const btn = document.getElementById('btnInstTriggerAudit');
             const spinner = document.getElementById('instAuditBtnSpinner');
             const text = document.getElementById('instAuditBtnText');
-
             if (btn) btn.disabled = true;
             if (spinner) spinner.style.display = 'inline-block';
             if (text) text.textContent = 'Auditing & Auto-Repairing...';

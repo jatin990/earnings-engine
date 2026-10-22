@@ -644,3 +644,9 @@ def override_remote_tables_from_local(
 # Backwards compatibility alias
 sync_all_to_turso = sync_local_to_upstream
 
+
+def sync_single_table(table_name: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Sync single table (or trigger delta sync) to upstream Turso if configured."""
+    return sync_local_to_upstream(settings=settings)
+
+

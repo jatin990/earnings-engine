@@ -11,7 +11,7 @@ from earnings_engine.data.earnings_breakout_scanner import (
     VALID_ARCHETYPES,
     get_results_breakout_candidates,
 )
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.prices import _cache_path, clear_price_df_cache
 
 
 @pytest.fixture
@@ -19,11 +19,13 @@ def settings(tmp_path):
     s = Settings()
     s.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
     s.ensure_dirs()
+    clear_price_df_cache()
     return s
 
 
 def _seed_db(settings, events: list[dict]):
     """Seed price_history + earnings_history into isolated SQLite db."""
+    clear_price_df_cache()
     db_file = _cache_path(settings)
     with sqlite3.connect(str(db_file)) as conn:
         conn.execute(

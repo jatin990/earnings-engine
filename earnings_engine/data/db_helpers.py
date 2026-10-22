@@ -35,6 +35,15 @@ def strip_nse_suffix(ticker: str) -> str:
     return t
 
 
+def get_ticker_variants(ticker: str) -> list[str]:
+    """Return deduplicated list of ticker symbol variants (with .NS, without suffix)."""
+    if not ticker:
+        return []
+    base = strip_nse_suffix(ticker)
+    nse = normalize_nse_ticker(ticker)
+    return list(dict.fromkeys([ticker.strip().upper(), nse, base]))
+
+
 def build_upsert_sql(
     table_name: str,
     columns: Sequence[str],

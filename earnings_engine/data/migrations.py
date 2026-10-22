@@ -833,8 +833,10 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
             created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
         )
     """)
-    _add_column_if_missing(conn, "institutional_holdings", "avg_price", "REAL DEFAULT 0.0")
-    _add_column_if_missing(conn, "institutional_holdings", "recent_buy_price", "REAL DEFAULT 0.0")
+    _add_columns_if_missing(conn, "institutional_holdings", [
+        ("avg_price", "REAL DEFAULT 0.0"),
+        ("recent_buy_price", "REAL DEFAULT 0.0"),
+    ])
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_ticker ON institutional_holdings (ticker)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_fund ON institutional_holdings (fund_name)")
@@ -884,8 +886,10 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
 
 def _migration_014_institutional_avg_and_recent_price(conn: Any) -> None:
     """Add avg_price and recent_buy_price columns to institutional_holdings."""
-    _add_column_if_missing(conn, "institutional_holdings", "avg_price", "REAL DEFAULT 0.0")
-    _add_column_if_missing(conn, "institutional_holdings", "recent_buy_price", "REAL DEFAULT 0.0")
+    _add_columns_if_missing(conn, "institutional_holdings", [
+        ("avg_price", "REAL DEFAULT 0.0"),
+        ("recent_buy_price", "REAL DEFAULT 0.0"),
+    ])
 
 
 def _migration_015_scanner_candidates_schema(conn: Any) -> None:
@@ -1744,9 +1748,11 @@ def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
 def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
     """Add ideal_entry_price, is_late, and entry_delay_pct fields to breakout_radar and breakout_tracked_signals."""
     for tbl in ["breakout_radar", "breakout_tracked_signals"]:
-        _add_column_if_missing(conn, tbl, "ideal_entry_price", "REAL")
-        _add_column_if_missing(conn, tbl, "is_late", "INTEGER DEFAULT 0")
-        _add_column_if_missing(conn, tbl, "entry_delay_pct", "REAL DEFAULT 0.0")
+        _add_columns_if_missing(conn, tbl, [
+            ("ideal_entry_price", "REAL"),
+            ("is_late", "INTEGER DEFAULT 0"),
+            ("entry_delay_pct", "REAL DEFAULT 0.0"),
+        ])
 
     # Backfill late detection metrics from existing data_json payloads where available
     # Note: breakout_radar has composite primary key (ticker, strategy), while breakout_tracked_signals has integer primary key (id).
@@ -2255,11 +2261,13 @@ def _migration_043_missing_query_indexes(conn: Any) -> None:
 
 def _migration_044_shareholding_fetch_tracking(conn: Any) -> None:
     """Enhance nse_shareholding_freshness to track detailed fetch status, error diagnostics, and duration."""
-    _add_column_if_missing(conn, "nse_shareholding_freshness", "status", "TEXT DEFAULT 'SUCCESS'")
-    _add_column_if_missing(conn, "nse_shareholding_freshness", "error_message", "TEXT DEFAULT NULL")
-    _add_column_if_missing(conn, "nse_shareholding_freshness", "response_code", "INTEGER DEFAULT 200")
-    _add_column_if_missing(conn, "nse_shareholding_freshness", "duration_ms", "REAL DEFAULT 0.0")
-    _add_column_if_missing(conn, "nse_shareholding_freshness", "updated_at", "TEXT DEFAULT NULL")
+    _add_columns_if_missing(conn, "nse_shareholding_freshness", [
+        ("status", "TEXT DEFAULT 'SUCCESS'"),
+        ("error_message", "TEXT DEFAULT NULL"),
+        ("response_code", "INTEGER DEFAULT 200"),
+        ("duration_ms", "REAL DEFAULT 0.0"),
+        ("updated_at", "TEXT DEFAULT NULL"),
+    ])
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_nse_shp_fresh_status ON nse_shareholding_freshness (status)")
     except Exception:

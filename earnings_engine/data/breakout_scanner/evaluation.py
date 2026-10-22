@@ -215,6 +215,26 @@ def evaluate_stock_breakout(
     return scored
 
 
+def _dispatch_evaluate_stock_breakout(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Dynamically route to evaluate_stock_breakout or facade monkeypatch if set."""
+    import sys
+    mod = sys.modules.get("earnings_engine.data.breakout_scanner")
+    fn = getattr(mod, "evaluate_stock_breakout", None) if mod else None
+    if not fn:
+        fn = evaluate_stock_breakout
+    return fn(*args, **kwargs)
+
+
+def _dispatch_record_breakout_transition(*args: Any, **kwargs: Any) -> Any:
+    """Dynamically route to record_breakout_transition or facade monkeypatch if set."""
+    import sys
+    mod = sys.modules.get("earnings_engine.data.breakout_scanner")
+    fn = getattr(mod, "record_breakout_transition", None) if mod else None
+    if not fn:
+        fn = record_breakout_transition
+    return fn(*args, **kwargs)
+
+
 def set_ticker_tier(
     ticker: str,
     tier: str,
@@ -231,7 +251,7 @@ def set_ticker_tier(
     if entry:
         result = entry["result"]
     else:
-        eval_res = evaluate_stock_breakout(sym, settings=settings)
+        eval_res = _dispatch_evaluate_stock_breakout(sym, settings=settings)
         if not eval_res.get("success"):
             return {"success": False, "error": eval_res.get("error", "Failed to evaluate ticker")}
         result = eval_res
@@ -239,7 +259,7 @@ def set_ticker_tier(
     if target_tier == "hot":
         _pool["hot"][sym] = {"result": result, "consecutive_low": 0}
         _pool["warm"].pop(sym, None)
-        record_breakout_transition(
+        _dispatch_record_breakout_transition(
             ticker=sym,
             event_type="PROMOTED_HOT",
             from_tier="MANUAL",
@@ -259,7 +279,7 @@ def set_ticker_tier(
     elif target_tier == "warm":
         _pool["warm"][sym] = {"result": result, "consecutive_low": 0}
         _pool["hot"].pop(sym, None)
-        record_breakout_transition(
+        _dispatch_record_breakout_transition(
             ticker=sym,
             event_type="ADDED_WARM",
             from_tier="MANUAL",
@@ -279,7 +299,7 @@ def set_ticker_tier(
     elif target_tier == "cold":
         _pool["hot"].pop(sym, None)
         _pool["warm"].pop(sym, None)
-        record_breakout_transition(
+        _dispatch_record_breakout_transition(
             ticker=sym,
             event_type="REMOVED_COLD",
             from_tier="MANUAL",
