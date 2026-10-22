@@ -384,6 +384,7 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
 
     placeholders = ", ".join(["?"] * len(unique_tickers))
     with _connect(settings) as connection:
+        ensure_earnings_history_schema(connection)
         if source is None:
             sql = f"""
                 SELECT ticker, earnings_date, source, exchange_source,

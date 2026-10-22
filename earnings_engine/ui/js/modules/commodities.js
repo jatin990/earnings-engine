@@ -950,9 +950,31 @@
         const regimeTag = document.getElementById('commRegimeTag');
         const momentumBias = document.getElementById('commMomentumBias');
         const regimeBadge = document.getElementById('commRegimeBadge');
+        const regimeSummary = document.getElementById('commRegimeSummary');
+        const structureStatus = document.getElementById('commStructureStatus');
 
         if (regimeTag) regimeTag.textContent = hud.regime || 'NEUTRAL';
         if (momentumBias) momentumBias.textContent = hud.momentum_bias?.replace(/_/g, ' ') || 'NEUTRAL';
+        if (regimeSummary) {
+            const sym = data.name || data.symbol || 'Asset';
+            const regText = (hud.regime || 'NEUTRAL').replace(/_/g, ' ');
+            const momText = (hud.momentum_bias || 'CONSOLIDATION').replace(/_/g, ' ');
+            regimeSummary.textContent = `${sym} trading in ${regText} with ${momText} momentum bias across VWAP slope and structural key levels.`;
+        }
+        if (structureStatus) {
+            const indSweeps = (ind.liquidity_sweeps || []).length;
+            const indObs = (ind.order_blocks || []).length;
+            if (indSweeps > 0) {
+                structureStatus.textContent = `Sweep Active (${indSweeps})`;
+                structureStatus.style.color = '#f43f5e';
+            } else if (indObs > 0) {
+                structureStatus.textContent = `OB Defended (${indObs})`;
+                structureStatus.style.color = '#10b981';
+            } else {
+                structureStatus.textContent = 'SMC Intact';
+                structureStatus.style.color = '#a855f7';
+            }
+        }
         if (regimeBadge) {
             regimeBadge.style.display = 'inline-block';
             regimeBadge.textContent = hud.regime || 'ACTIVE';

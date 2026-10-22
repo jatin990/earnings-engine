@@ -699,9 +699,9 @@ const ResultsLedger = (() => {
         case 1: return row.dataset.date || '';
         case 2: return parseFloat(row.dataset.buyScore) || 0;
         case 3: return parseFloat(row.dataset.price) || 0;
-        case 4: return parseFloat(row.dataset.beatRate) || 0;
+        case 4: return parseFloat(row.dataset.epsEstimate) || 0;
         case 5: return parseFloat(row.dataset.beatRate) || 0;
-        case 6: return parseFloat(row.dataset.beatRate) || 0;
+        case 6: return parseFloat(row.dataset.surprisePct) || 0;
         case 7: return parseFloat(row.dataset['7dRet']) || 0;
         case 8: return (row.querySelector('.cell-ai-edge')?.textContent || '').trim();
         case 9: return (row.dataset.setup || '').toLowerCase();

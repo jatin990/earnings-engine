@@ -165,6 +165,7 @@ async def dashboard_results_sync_calendar(
 async def dashboard_results_recalculate_prices(
     market: str = Query("ALL", description="Market universe (ALL, IN, NSE_ALL, US, etc.)"),
     days: int = Query(60, description="Look-ahead window in days", ge=1, le=180),
+    past_days: int = Query(60, description="Look-back window in days", ge=0, le=180),
 ):
     """Force re-fetch of price bars and recalculate technical support/resistance levels."""
     try:
