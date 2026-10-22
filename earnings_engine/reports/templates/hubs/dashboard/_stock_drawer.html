@@ -166,13 +166,24 @@
                         <button type="button" id="drawerToggleVWAP" onclick="app.toggleDrawerChartIndicator('vwap')" class="drawer-chart-toggle-btn active" title="Volume-Weighted Average Price + 1.5σ Standard Deviation Bands">VWAP ±1.5σ</button>
                         <button type="button" id="drawerToggleBounds" onclick="app.toggleDrawerChartIndicator('bounds')" class="drawer-chart-toggle-btn active" title="Algorithmic Support & Resistance Execution Bounds">S/R Bounds</button>
                     </div>
-                    <!-- Timeframe Range Chips -->
-                    <div class="drawer-chart-range-chips" role="group" aria-label="Chart Visible Range">
-                        <button type="button" id="btnDrawerRange1M" onclick="app.setDrawerChartTF('1M')" class="btn-preset-chip" title="1 Month (~22 Trading Sessions)">1M</button>
-                        <button type="button" id="btnDrawerRange3M" onclick="app.setDrawerChartTF('3M')" class="btn-preset-chip" title="3 Months (~65 Trading Sessions)">3M</button>
-                        <button type="button" id="btnDrawerRange6M" onclick="app.setDrawerChartTF('6M')" class="btn-preset-chip" title="6 Months (~130 Trading Sessions)">6M</button>
-                        <button type="button" id="btnDrawerRange1Y" onclick="app.setDrawerChartTF('1Y')" class="btn-preset-chip active" title="1 Year (~252 Trading Sessions)">1Y</button>
-                        <button type="button" id="btnDrawerRangeALL" onclick="app.setDrawerChartTF('ALL')" class="btn-preset-chip" title="All Historical PIT Price Data">ALL</button>
+                    <!-- Timeframe Resolution Selector -->
+                    <div class="drawer-chart-tf-selector" role="group" aria-label="Chart Timeframe Resolution">
+                        <button type="button" id="btnDrawerTF5m" onclick="app.setDrawerChartTF('5m')" class="drawer-tf-btn" title="5-Minute Intraday Candlesticks (SMC Order Blocks, FVGs, VWAP)">5m</button>
+                        <button type="button" id="btnDrawerTF15m" onclick="app.setDrawerChartTF('15m')" class="drawer-tf-btn" title="15-Minute Intraday Candlesticks (SMC Order Blocks, FVGs, VWAP)">15m</button>
+                        <button type="button" id="btnDrawerTF1D" onclick="app.setDrawerChartTF('1D')" class="drawer-tf-btn active" title="Daily PIT Price Bars (EOD)">1D</button>
+                    </div>
+                    <!-- Timeframe Range Chips (Daily Mode Only) -->
+                    <div id="drawerDailyRangeChips" class="drawer-chart-range-chips" role="group" aria-label="Chart Visible Range">
+                        <button type="button" id="btnDrawerRange1M" onclick="app.setDrawerChartRange('1M')" class="btn-preset-chip" title="1 Month (~22 Trading Sessions)">1M</button>
+                        <button type="button" id="btnDrawerRange3M" onclick="app.setDrawerChartRange('3M')" class="btn-preset-chip" title="3 Months (~65 Trading Sessions)">3M</button>
+                        <button type="button" id="btnDrawerRange6M" onclick="app.setDrawerChartRange('6M')" class="btn-preset-chip" title="6 Months (~130 Trading Sessions)">6M</button>
+                        <button type="button" id="btnDrawerRange1Y" onclick="app.setDrawerChartRange('1Y')" class="btn-preset-chip active" title="1 Year (~252 Trading Sessions)">1Y</button>
+                        <button type="button" id="btnDrawerRangeALL" onclick="app.setDrawerChartRange('ALL')" class="btn-preset-chip" title="All Historical PIT Price Data">ALL</button>
+                    </div>
+                    <!-- Intraday Live Auto-Refresh Indicator -->
+                    <div id="drawerIntradayRefreshBadge" class="drawer-intraday-refresh-pill" style="display:none;" title="Live Market Intraday Auto-Refresh Active (15s cadence)">
+                        <span class="refresh-pulse-dot"></span>
+                        <span id="drawerRefreshLabel">LIVE 15s</span>
                     </div>
                 </div>
             </div>
@@ -246,6 +257,31 @@
                         <div class="drawer-explainer-stat">
                             <span>ATR 14D (Daily Volatility):</span>
                             <strong id="drawerChartValATR">--</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Smart Money Concepts (SMC) & Liquidity Dynamics -->
+                <div id="drawerExplainerSMC" class="drawer-explainer-card" style="display:none;">
+                    <div class="drawer-explainer-head">
+                        <span class="drawer-explainer-title">Smart Money Concepts (SMC) Structure</span>
+                        <span id="drawerChartBadgeSMC" class="drawer-tech-pill" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">SMC ACTIVE</span>
+                    </div>
+                    <p id="drawerChartExplainerSMC" class="drawer-explainer-text">
+                        Institutional Order Blocks (D-OB / S-OB) and Fair Value Gaps (FVG) identified via quantitative multi-candle liquidity imbalance algorithms.
+                    </p>
+                    <div class="drawer-explainer-metrics">
+                        <div class="drawer-explainer-stat">
+                            <span>Order Blocks:</span>
+                            <strong id="drawerChartValOB" style="color:#10b981;">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>Fair Value Gaps:</span>
+                            <strong id="drawerChartValFVG" style="color:#38bdf8;">--</strong>
+                        </div>
+                        <div class="drawer-explainer-stat">
+                            <span>Session Regime:</span>
+                            <strong id="drawerChartValSession" style="color:#fbbf24;">Intraday Flow</strong>
                         </div>
                     </div>
                 </div>

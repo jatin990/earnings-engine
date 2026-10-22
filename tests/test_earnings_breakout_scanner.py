@@ -293,3 +293,12 @@ def test_insufficient_bars_edge_case(settings):
     assert item["current_price"] == 55.0
     assert item["technicals"]["atr_val"] is not None
     assert item["trade_levels"]["target_price"] is not None
+    # Dual-key aliases and native types
+    assert item["days_since_result"] == item["days_relative"]
+    assert item["breakout_trigger"] == item["trade_levels"]["breakout_trigger"]
+    assert item["pct_from_trigger"] == item["trade_levels"]["dist_to_trigger_pct"]
+    assert item["target_1"] == item["trade_levels"]["target_1"]
+    assert item["target_2"] == item["trade_levels"]["target_2"]
+    assert item["stop_loss"] == item["trade_levels"]["stop_loss"]
+    assert isinstance(item["composite_score"], int)
+    assert isinstance(item["current_price"], float)
