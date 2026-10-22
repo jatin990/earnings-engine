@@ -148,8 +148,8 @@ async def get_options_chain(
 @router.get("/api/v1/options/chart-intelligence")
 async def get_options_chart_intelligence(
     symbol: str = Query("NIFTY", description="NSE symbol or index (e.g. NIFTY, BANKNIFTY, RELIANCE)"),
-    interval: str = Query("5m", description="Candle interval (1m, 5m, 15m, 1h, 1d)"),
-    period: str = Query("5d", description="Lookback window (e.g. 5d, 1mo, 6mo)"),
+    interval: str = Query("5m", description="Candle interval (1m, 5m, 15m, 1h, 1d, 1w, 1mo)"),
+    period: str = Query("5d", description="Lookback window (e.g. 5d, 1mo, 6mo, 1y, 2y, 5y)"),
     force_refresh: bool = Query(False, description="Bypass cache and refresh live candles"),
     allow_non_fno: bool = Query(False, description="Allow fallback for non-FNO tickers"),
 ) -> dict[str, Any]:

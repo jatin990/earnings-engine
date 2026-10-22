@@ -3,39 +3,52 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem;">
         <div>
             <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
-                <span>📊</span> Strike Distribution: Open Interest &amp; Change in OI
+                <span>📊</span> Strike Distribution: Open Interest &amp; Velocity
             </h3>
-            <span style="font-size:0.75rem;color:var(--text-secondary);">Direct strike-by-strike institutional buildup: Total open positions vs Intraday net additions</span>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">Direct strike-by-strike institutional buildup across Total OI, Today's Change, and 15-Min Velocity</span>
         </div>
+
+        <!-- Mode Switcher Buttons: [Open interest] [OI change today] [OI change - 15 min] -->
+        <div style="display:flex;align-items:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:2px;gap:2px;">
+            <button type="button" class="opt-strike-view-btn" data-mode="oi" id="optBtnViewOi" style="background:rgba(255,255,255,0.12);color:#ffffff;border:none;padding:0.25rem 0.65rem;border-radius:4px;font-size:0.72rem;font-weight:600;cursor:pointer;">
+                Open interest
+            </button>
+            <button type="button" class="opt-strike-view-btn" data-mode="today" id="optBtnViewToday" style="background:transparent;color:var(--text-secondary);border:none;padding:0.25rem 0.65rem;border-radius:4px;font-size:0.72rem;font-weight:600;cursor:pointer;">
+                OI change today
+            </button>
+            <button type="button" class="opt-strike-view-btn" data-mode="15m" id="optBtnView15m" style="background:transparent;color:var(--text-secondary);border:none;padding:0.25rem 0.65rem;border-radius:4px;font-size:0.72rem;font-weight:600;cursor:pointer;">
+                OI change - 15 min
+            </button>
+        </div>
+
         <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.75rem;color:var(--text-secondary);">
             <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:2px;"></span> Call OI (CE)</span>
             <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:10px;background:#34d399;border-radius:2px;"></span> Put OI (PE)</span>
-            <span style="display:inline-flex;align-items:center;gap:0.3rem;"><span style="display:inline-block;width:10px;height:2px;background:#fbbf24;"></span> Spot Strike</span>
         </div>
     </div>
 
     <!-- Dual Chart Grid -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1.25rem;">
-        <!-- Left Chart: Total OI by Strike -->
+        <!-- Left Chart: Cumulative Positioning Depth -->
         <div style="background:#0d0e12;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:1rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-                <span style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+                <span id="optDualOiChartTitle" style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
                     OI by Strike (Positioning Depth)
                 </span>
-                <span style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Cumulative Contracts</span>
+                <span id="optDualOiChartSubtitle" style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Cumulative Contracts</span>
             </div>
             <div style="height:280px;position:relative;">
                 <canvas id="optDualOiChart"></canvas>
             </div>
         </div>
 
-        <!-- Right Chart: Intraday OI Change by Strike -->
+        <!-- Right Chart: Intraday / 15m Writing Velocity -->
         <div style="background:#0d0e12;border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:1rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-                <span style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+                <span id="optDualOiChgChartTitle" style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
                     OI Change by Strike (Writing Flow)
                 </span>
-                <span style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Intraday Delta</span>
+                <span id="optDualOiChgChartSubtitle" style="font-size:0.7rem;color:var(--text-secondary);font-family:var(--font-mono);">Intraday Delta</span>
             </div>
             <div style="height:280px;position:relative;">
                 <canvas id="optDualOiChgChart"></canvas>

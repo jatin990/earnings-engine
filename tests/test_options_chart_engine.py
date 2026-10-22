@@ -152,3 +152,25 @@ def test_non_fno_symbol_with_allow_non_fno(monkeypatch):
     assert "vwap" in res["indicators"]
     assert "where_to_buy" in res["tactical_signals"]
 
+
+def test_timeframe_periods_weekly_and_monthly(monkeypatch):
+    """Verify that weekly ('1w') and monthly ('1mo') intervals map to 2y and 5y periods."""
+    captured_calls = []
+
+    def mock_fetch(symbol, interval="5m", period="5d", settings=None):
+        captured_calls.append({"symbol": symbol, "interval": interval, "period": period})
+        return _sample_intraday_df()
+
+    monkeypatch.setattr(oce, "fetch_chart_candles", mock_fetch)
+
+    # 1. Weekly interval test
+    oce.get_options_chart_intelligence(symbol="NIFTY", interval="1w", force_refresh=True)
+    assert captured_calls[-1]["interval"] == "1w"
+    assert captured_calls[-1]["period"] == "2y"
+
+    # 2. Monthly interval test
+    oce.get_options_chart_intelligence(symbol="NIFTY", interval="1mo", force_refresh=True)
+    assert captured_calls[-1]["interval"] == "1mo"
+    assert captured_calls[-1]["period"] == "5y"
+
+

@@ -1,9 +1,9 @@
 /**
  * options_compass_renderer.js - Institutional F&O Confluence & Market Compass Renderer
  * Modular frontend controller for:
- * 1. Multi-Timeframe Call vs Put Open Interest Velocity Meters
+ * 1. Multi-Timeframe Call vs Put Open Interest Velocity Meters & Total Positions Two Bars
  * 2. Market Compass Confluence SVG Speedometer & 8-Factor Breakdown
- * 3. Dual Strike Distribution Charts (Total OI vs Intraday OI Change)
+ * 3. Dual Strike Distribution Charts (Total OI, Today's Change, and 15-Min Velocity)
  * 4. Algorithmic Real-Time Institutional Alerts Feed
  */
 
@@ -17,45 +17,147 @@
     let dualOiChartInstance = null;
     let dualOiChgChartInstance = null;
 
+    // State for interactive strike chart toggling
+    let cachedStrikes = [];
+    let cachedSpotPrice = null;
+    let activeChartMode = 'oi'; // 'oi' | 'today' | '15m'
+    let buttonsInitialized = false;
+
+    // Helper to format number in Indian Lakhs/Crores
+    const fmtOi = (num, signed = true) => {
+        const n = Math.abs(num || 0);
+        const sign = signed ? ((num || 0) >= 0 ? '+' : '-') : '';
+        if (n >= 10000000) return `${sign}${(n / 10000000).toFixed(2)}Cr`;
+        if (n >= 100000) return `${sign}${(n / 100000).toFixed(2)}L`;
+        if (n >= 1000) return `${sign}${(n / 1000).toFixed(1)}k`;
+        return `${sign}${n}`;
+    };
+
     /**
-     * Render Multi-Timeframe Call vs Put OI Meters (Today, 15m, 5m)
+     * Render Multi-Timeframe Call vs Put OI Meters & Total Positions
      */
     app.renderOiTimeframeMeters = function (timeframesData, pcrOi) {
         if (!timeframesData) return;
 
-        // 1. Overall Flow Sentiment Header Badge
-        const flowBadge = document.getElementById('optFlowSentimentBadge');
-        const pcrVal = document.getElementById('optFlowPcrVal');
-        const pcrBias = document.getElementById('optFlowPcrBias');
+        // 1. Total Positions (Two Bars: Calls vs Puts)
+        const tp = timeframesData.total_positions || {};
+        const totCallsFmt = document.getElementById('optTotCallsFormatted');
+        const totCallsPct = document.getElementById('optTotCallsPct');
+        const totCallsBar = document.getElementById('optTotCallsBar');
+        const totPutsFmt = document.getElementById('optTotPutsFormatted');
+        const totPutsPct = document.getElementById('optTotPutsPct');
+        const totPutsBar = document.getElementById('optTotPutsBar');
 
-        const todaySentiment = timeframesData.today?.sentiment || 'NEUTRAL';
-        if (flowBadge) {
-            flowBadge.textContent = todaySentiment;
-            if (todaySentiment.includes('PUT WRITING') || todaySentiment.includes('SHORT COVERING')) {
-                flowBadge.style.background = 'rgba(16, 185, 129, 0.15)';
-                flowBadge.style.color = '#34d399';
-                flowBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-            } else if (todaySentiment.includes('CALL WRITING') || todaySentiment.includes('LONG UNWINDING')) {
-                flowBadge.style.background = 'rgba(239, 68, 68, 0.15)';
-                flowBadge.style.color = '#f87171';
-                flowBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-            } else {
-                flowBadge.style.background = 'rgba(245, 158, 11, 0.15)';
-                flowBadge.style.color = '#fbbf24';
-                flowBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        if (tp.call_oi !== undefined || timeframesData.today?.call_oi !== undefined) {
+            const cOi = tp.call_oi !== undefined ? tp.call_oi : (timeframesData.today?.call_oi || 0);
+            const pOi = tp.put_oi !== undefined ? tp.put_oi : (timeframesData.today?.put_oi || 0);
+            const cPct = tp.call_pct !== undefined ? tp.call_pct : Math.round((cOi / Math.max(cOi + pOi, 1)) * 100);
+            const pPct = tp.put_pct !== undefined ? tp.put_pct : Math.round((pOi / Math.max(cOi + pOi, 1)) * 100);
+
+            if (totCallsFmt) totCallsFmt.textContent = tp.call_oi_formatted || fmtOi(cOi, false);
+            if (totCallsPct) totCallsPct.textContent = `${cPct}%`;
+            if (totCallsBar) totCallsBar.style.width = `${cPct}%`;
+
+            if (totPutsFmt) totPutsFmt.textContent = tp.put_oi_formatted || fmtOi(pOi, false);
+            if (totPutsPct) totPutsPct.textContent = `${pPct}%`;
+            if (totPutsBar) totPutsBar.style.width = `${pPct}%`;
+        }
+
+        // 2. Card: Today
+        const td = timeframesData.today;
+        if (td) {
+            const badge = document.getElementById('optTfTodayBadge');
+            const callBar = document.getElementById('optTfTodayCallBar');
+            const putBar = document.getElementById('optTfTodayPutBar');
+            const callChg = document.getElementById('optTfTodayCallChg');
+            const putChg = document.getElementById('optTfTodayPutChg');
+            const callPctChg = document.getElementById('optTfTodayCallPctChg');
+            const putPctChg = document.getElementById('optTfTodayPutPctChg');
+
+            if (badge) badge.textContent = td.sentiment || 'NEUTRAL';
+            if (callBar) callBar.style.width = `${td.call_pct || 50}%`;
+            if (putBar) putBar.style.width = `${td.put_pct || 50}%`;
+            if (callChg) callChg.textContent = fmtOi(td.call_chg);
+            if (putChg) putChg.textContent = fmtOi(td.put_chg);
+
+            if (callPctChg) {
+                const pct = td.call_pct_chg !== undefined ? td.call_pct_chg : 0;
+                callPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+            }
+            if (putPctChg) {
+                const pct = td.put_pct_chg !== undefined ? td.put_pct_chg : 0;
+                putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
             }
         }
 
-        if (pcrVal && pcrOi !== undefined) {
-            pcrVal.textContent = Number(pcrOi).toFixed(2);
+        // 3. Card: 15m Velocity
+        const m15 = timeframesData.tf_15m;
+        if (m15) {
+            const badge = document.getElementById('optTf15mBadge');
+            const callBar = document.getElementById('optTf15mCallBar');
+            const putBar = document.getElementById('optTf15mPutBar');
+            const callChg = document.getElementById('optTf15mCallChg');
+            const putChg = document.getElementById('optTf15mPutChg');
+            const callPctChg = document.getElementById('optTf15mCallPctChg');
+            const putPctChg = document.getElementById('optTf15mPutPctChg');
+
+            if (badge) badge.textContent = m15.sentiment || 'NEUTRAL';
+            if (callBar) callBar.style.width = `${m15.call_pct || 50}%`;
+            if (putBar) putBar.style.width = `${m15.put_pct || 50}%`;
+            if (callChg) callChg.textContent = fmtOi(m15.call_chg);
+            if (putChg) putChg.textContent = fmtOi(m15.put_chg);
+
+            if (callPctChg) {
+                const pct = m15.call_pct_chg !== undefined ? m15.call_pct_chg : 0;
+                callPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+            }
+            if (putPctChg) {
+                const pct = m15.put_pct_chg !== undefined ? m15.put_pct_chg : 0;
+                putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+            }
         }
 
-        if (pcrBias && pcrOi !== undefined) {
-            if (pcrOi >= 1.2) {
-                pcrBias.textContent = 'Bullish Support Dominated';
+        // 4. Card: 5m Burst
+        const m5 = timeframesData.tf_5m;
+        if (m5) {
+            const badge = document.getElementById('optTf5mBadge');
+            const callBar = document.getElementById('optTf5mCallBar');
+            const putBar = document.getElementById('optTf5mPutBar');
+            const callChg = document.getElementById('optTf5mCallChg');
+            const putChg = document.getElementById('optTf5mPutChg');
+            const callPctChg = document.getElementById('optTf5mCallPctChg');
+            const putPctChg = document.getElementById('optTf5mPutPctChg');
+
+            if (badge) badge.textContent = m5.sentiment || 'NEUTRAL';
+            if (callBar) callBar.style.width = `${m5.call_pct || 50}%`;
+            if (putBar) putBar.style.width = `${m5.put_pct || 50}%`;
+            if (callChg) callChg.textContent = fmtOi(m5.call_chg);
+            if (putChg) putChg.textContent = fmtOi(m5.put_chg);
+
+            if (callPctChg) {
+                const pct = m5.call_pct_chg !== undefined ? m5.call_pct_chg : 0;
+                callPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+            }
+            if (putPctChg) {
+                const pct = m5.put_pct_chg !== undefined ? m5.put_pct_chg : 0;
+                putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
+            }
+        }
+
+        // 5. PCR (OI) & 15m Delta
+        const pcrVal = document.getElementById('optFlowPcrVal');
+        const pcrBias = document.getElementById('optFlowPcrBias');
+        const pcr15m = document.getElementById('optFlowPcr15mChg');
+
+        const activePcr = pcrOi !== undefined ? pcrOi : (timeframesData.summary_alert?.pcr_oi || 1.0);
+        if (pcrVal) pcrVal.textContent = Number(activePcr).toFixed(2);
+
+        if (pcrBias) {
+            if (activePcr >= 1.2) {
+                pcrBias.textContent = 'Put Writing Support';
                 pcrBias.style.color = '#34d399';
-            } else if (pcrOi <= 0.75) {
-                pcrBias.textContent = 'Bearish Resistance Dominated';
+            } else if (activePcr <= 0.8) {
+                pcrBias.textContent = 'Call Writing Resistance';
                 pcrBias.style.color = '#f87171';
             } else {
                 pcrBias.textContent = 'Balanced Equilibrium';
@@ -63,74 +165,44 @@
             }
         }
 
-        // Helper to format number in Indian Lakhs/Crores
-        const fmtOi = (num) => {
-            const n = Math.abs(num || 0);
-            const sign = (num || 0) >= 0 ? '+' : '-';
-            if (n >= 10000000) return `${sign}${(n / 10000000).toFixed(2)}Cr`;
-            if (n >= 100000) return `${sign}${(n / 100000).toFixed(1)}L`;
-            if (n >= 1000) return `${sign}${(n / 1000).toFixed(0)}k`;
-            return `${sign}${n}`;
-        };
-
-        // 2. Card 1: Today
-        const td = timeframesData.today;
-        if (td) {
-            const badge = document.getElementById('optTfTodayBadge');
-            const callBar = document.getElementById('optTfTodayCallBar');
-            const putBar = document.getElementById('optTfTodayPutBar');
-            const callPct = document.getElementById('optTfTodayCallPct');
-            const putPct = document.getElementById('optTfTodayPutPct');
-            const callChg = document.getElementById('optTfTodayCallChg');
-            const putChg = document.getElementById('optTfTodayPutChg');
-
-            if (badge) badge.textContent = td.sentiment || 'NEUTRAL';
-            if (callBar) callBar.style.width = `${td.call_pct || 50}%`;
-            if (putBar) putBar.style.width = `${td.put_pct || 50}%`;
-            if (callPct) callPct.textContent = `${td.call_pct || 50}%`;
-            if (putPct) putPct.textContent = `${td.put_pct || 50}%`;
-            if (callChg) callChg.textContent = fmtOi(td.call_chg);
-            if (putChg) putChg.textContent = fmtOi(td.put_chg);
+        if (pcr15m) {
+            const delta = timeframesData.summary_alert?.pcr_15m_delta;
+            if (delta !== undefined && delta !== null) {
+                const sign = delta >= 0 ? '+' : '';
+                const color = delta > 0 ? '#34d399' : (delta < 0 ? '#f87171' : 'var(--text-secondary)');
+                pcr15m.innerHTML = `<span style="color:${color};font-weight:700;">${sign}${delta.toFixed(2)} in 15 min</span>`;
+            } else {
+                pcr15m.innerHTML = `<span style="color:var(--text-secondary);">-- in 15 min</span>`;
+            }
         }
 
-        // 3. Card 2: 15m Velocity
-        const m15 = timeframesData.tf_15m;
-        if (m15) {
-            const badge = document.getElementById('optTf15mBadge');
-            const callBar = document.getElementById('optTf15mCallBar');
-            const putBar = document.getElementById('optTf15mPutBar');
-            const callPct = document.getElementById('optTf15mCallPct');
-            const putPct = document.getElementById('optTf15mPutPct');
-            const callChg = document.getElementById('optTf15mCallChg');
-            const putChg = document.getElementById('optTf15mPutChg');
+        // 6. Dynamic Flow Alert Banner
+        const alertBanner = document.getElementById('optVelocityAlertBanner');
+        const alertText = document.getElementById('optVelocityAlertText');
+        const alertTag = document.getElementById('optVelocityAlertTag');
 
-            if (badge) badge.textContent = m15.sentiment || 'NEUTRAL';
-            if (callBar) callBar.style.width = `${m15.call_pct || 50}%`;
-            if (putBar) putBar.style.width = `${m15.put_pct || 50}%`;
-            if (callPct) callPct.textContent = `${m15.call_pct || 50}%`;
-            if (putPct) putPct.textContent = `${m15.put_pct || 50}%`;
-            if (callChg) callChg.textContent = fmtOi(m15.call_chg);
-            if (putChg) putChg.textContent = fmtOi(m15.put_chg);
-        }
-
-        // 4. Card 3: 5m Burst
-        const m5 = timeframesData.tf_5m;
-        if (m5) {
-            const badge = document.getElementById('optTf5mBadge');
-            const callBar = document.getElementById('optTf5mCallBar');
-            const putBar = document.getElementById('optTf5mPutBar');
-            const callPct = document.getElementById('optTf5mCallPct');
-            const putPct = document.getElementById('optTf5mPutPct');
-            const callChg = document.getElementById('optTf5mCallChg');
-            const putChg = document.getElementById('optTf5mPutChg');
-
-            if (badge) badge.textContent = m5.sentiment || 'NEUTRAL';
-            if (callBar) callBar.style.width = `${m5.call_pct || 50}%`;
-            if (putBar) putBar.style.width = `${m5.put_pct || 50}%`;
-            if (callPct) callPct.textContent = `${m5.call_pct || 50}%`;
-            if (putPct) putPct.textContent = `${m5.put_pct || 50}%`;
-            if (callChg) callChg.textContent = fmtOi(m5.call_chg);
-            if (putChg) putChg.textContent = fmtOi(m5.put_chg);
+        if (timeframesData.summary_alert) {
+            const sumAlert = timeframesData.summary_alert;
+            if (alertText) alertText.textContent = sumAlert.text || 'Order flow analysis completed.';
+            if (alertTag) {
+                alertTag.textContent = sumAlert.bias || 'FLOW INTEL';
+                if (sumAlert.bias === 'BULLISH') {
+                    alertTag.style.background = 'rgba(16, 185, 129, 0.15)';
+                    alertTag.style.color = '#34d399';
+                    alertTag.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    if (alertBanner) alertBanner.style.borderLeftColor = '#10b981';
+                } else if (sumAlert.bias === 'BEARISH') {
+                    alertTag.style.background = 'rgba(239, 68, 68, 0.15)';
+                    alertTag.style.color = '#f87171';
+                    alertTag.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                    if (alertBanner) alertBanner.style.borderLeftColor = '#ef4444';
+                } else {
+                    alertTag.style.background = 'rgba(56, 189, 248, 0.15)';
+                    alertTag.style.color = '#38bdf8';
+                    alertTag.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+                    if (alertBanner) alertBanner.style.borderLeftColor = '#38bdf8';
+                }
+            }
         }
     };
 
@@ -303,16 +375,81 @@
     };
 
     /**
+     * Internal setup of mode buttons [Open interest] [OI change today] [OI change - 15 min]
+     */
+    function _setupStrikeChartModeButtons() {
+        if (buttonsInitialized) return;
+        const btnOi = document.getElementById('optBtnViewOi');
+        const btnToday = document.getElementById('optBtnViewToday');
+        const btn15m = document.getElementById('optBtnView15m');
+
+        if (!btnOi || !btnToday || !btn15m) return;
+
+        const updateBtnStyles = (activeMode) => {
+            [btnOi, btnToday, btn15m].forEach(b => {
+                if (b.getAttribute('data-mode') === activeMode) {
+                    b.style.background = 'rgba(255,255,255,0.15)';
+                    b.style.color = '#ffffff';
+                } else {
+                    b.style.background = 'transparent';
+                    b.style.color = 'var(--text-secondary)';
+                }
+            });
+        };
+
+        btnOi.addEventListener('click', () => {
+            activeChartMode = 'oi';
+            updateBtnStyles('oi');
+            if (cachedStrikes.length) app.renderDualStrikeCharts(cachedStrikes, cachedSpotPrice);
+        });
+
+        btnToday.addEventListener('click', () => {
+            activeChartMode = 'today';
+            updateBtnStyles('today');
+            if (cachedStrikes.length) app.renderDualStrikeCharts(cachedStrikes, cachedSpotPrice);
+        });
+
+        btn15m.addEventListener('click', () => {
+            activeChartMode = '15m';
+            updateBtnStyles('15m');
+            if (cachedStrikes.length) app.renderDualStrikeCharts(cachedStrikes, cachedSpotPrice);
+        });
+
+        buttonsInitialized = true;
+    }
+
+    /**
      * Render Dual Strike Distribution Charts (Chart.js)
      * Left: Total OI (Calls vs Puts)
-     * Right: Intraday OI Change (Writing Flow)
+     * Right: Intraday / 15m OI Change (Writing Flow)
      */
     app.renderDualStrikeCharts = function (strikes, spotPrice) {
         if (!strikes || !strikes.length || !window.Chart) return;
 
+        cachedStrikes = strikes;
+        cachedSpotPrice = spotPrice;
+        _setupStrikeChartModeButtons();
+
         const oiCanvas = document.getElementById('optDualOiChart');
         const oiChgCanvas = document.getElementById('optDualOiChgChart');
         if (!oiCanvas || !oiChgCanvas) return;
+
+        // Dynamic Subtitles and Titles according to mode
+        const leftTitle = document.getElementById('optDualOiChartTitle');
+        const leftSub = document.getElementById('optDualOiChartSubtitle');
+        const rightTitle = document.getElementById('optDualOiChgChartTitle');
+        const rightSub = document.getElementById('optDualOiChgChartSubtitle');
+
+        if (leftTitle) leftTitle.textContent = 'OI by Strike (Positioning Depth)';
+        if (leftSub) leftSub.textContent = 'Cumulative Contracts';
+
+        if (activeChartMode === '15m') {
+            if (rightTitle) rightTitle.textContent = '15-Min OI Change by Strike';
+            if (rightSub) rightSub.textContent = '15m Rolling Velocity';
+        } else {
+            if (rightTitle) rightTitle.textContent = 'Intraday OI Change by Strike';
+            if (rightSub) rightSub.textContent = 'Session Delta';
+        }
 
         // Sort strikes ascending
         const sortedStrikes = [...strikes].sort((a, b) => a.strike - b.strike);
@@ -329,14 +466,30 @@
         const labels = displayStrikes.map(s => String(s.strike));
         const callOiData = displayStrikes.map(s => s.ce_oi || 0);
         const putOiData = displayStrikes.map(s => s.pe_oi || 0);
-        const callOiChgData = displayStrikes.map(s => s.ce_chg_oi || 0);
-        const putOiChgData = displayStrikes.map(s => s.pe_chg_oi || 0);
+
+        // Right chart data changes based on active mode
+        let callOiChgData;
+        let putOiChgData;
+        let rightCallLabel;
+        let rightPutLabel;
+
+        if (activeChartMode === '15m') {
+            callOiChgData = displayStrikes.map(s => s.ce_change_15m !== undefined ? s.ce_change_15m : (s.ce_chg_oi || 0));
+            putOiChgData = displayStrikes.map(s => s.pe_change_15m !== undefined ? s.pe_change_15m : (s.pe_chg_oi || 0));
+            rightCallLabel = 'Call 15m ΔOI (CE)';
+            rightPutLabel = 'Put 15m ΔOI (PE)';
+        } else {
+            callOiChgData = displayStrikes.map(s => s.ce_chg_oi !== undefined ? s.ce_chg_oi : (s.ce_change_oi || 0));
+            putOiChgData = displayStrikes.map(s => s.pe_chg_oi !== undefined ? s.pe_chg_oi : (s.pe_change_oi || 0));
+            rightCallLabel = 'Call Today ΔOI (CE)';
+            rightPutLabel = 'Put Today ΔOI (PE)';
+        }
 
         // Common Chart.js options
         const baseOptions = {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 300 },
+            animation: { duration: 250 },
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
@@ -418,7 +571,7 @@
             options: baseOptions
         });
 
-        // 3. Render Right Chart: Intraday OI Change
+        // 3. Render Right Chart: Intraday or 15m OI Change
         const ctxOiChg = oiChgCanvas.getContext('2d');
         dualOiChgChartInstance = new window.Chart(ctxOiChg, {
             type: 'bar',
@@ -426,7 +579,7 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Call ΔOI (CE)',
+                        label: rightCallLabel,
                         data: callOiChgData,
                         backgroundColor: callOiChgData.map(v => v >= 0 ? 'rgba(248, 113, 113, 0.85)' : 'rgba(248, 113, 113, 0.35)'),
                         borderColor: '#f87171',
@@ -434,7 +587,7 @@
                         borderRadius: 3
                     },
                     {
-                        label: 'Put ΔOI (PE)',
+                        label: rightPutLabel,
                         data: putOiChgData,
                         backgroundColor: putOiChgData.map(v => v >= 0 ? 'rgba(52, 211, 153, 0.85)' : 'rgba(52, 211, 153, 0.35)'),
                         borderColor: '#34d399',
