@@ -4,11 +4,12 @@ import pytest
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
-from earnings_engine.data.migrations import apply_migrations, MIGRATIONS
+from earnings_engine.data.migrations import apply_migrations, reset_migration_cache, MIGRATIONS
 
 
 @pytest.fixture
 def test_settings(tmp_path, monkeypatch):
+    reset_migration_cache()
     monkeypatch.delenv("TURSO_DATABASE_URL", raising=False)
     monkeypatch.delenv("TURSO_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("EARNINGS_ENGINE_DB_PATH", raising=False)
@@ -17,7 +18,8 @@ def test_settings(tmp_path, monkeypatch):
     s.data_dirs["prices"] = tmp_path
     s.data_dirs["earnings"] = tmp_path
     s.ensure_dirs()
-    return s
+    yield s
+    reset_migration_cache()
 
 
 def test_migrations_apply_all_in_order(test_settings):
