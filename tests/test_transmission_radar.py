@@ -556,6 +556,73 @@ def test_graph_payload_upstream_shock_propagation():
     assert mtar_node["trade_action"]["execution_bias"] == "STAND_ASIDE"
 
 
+def test_sync_transmission_snapshots_batch_api(monkeypatch):
+    """Test sync_transmission_snapshots uses internal batch API without per-symbol yfinance."""
+    import pandas as pd
+    import earnings_engine.data.transmission_radar as tr_mod
+    from earnings_engine.data.transmission_radar import sync_transmission_snapshots
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    called_batch_quotes = []
+    called_batch_prices = []
+    called_single_fetch_prices = []
+
+    def mock_fetch_batch_live_quotes(tickers, settings=None, sync_db=True, force=False):
+        called_batch_quotes.extend(tickers)
+        return {
+            t: {
+                "ticker": t,
+                "current_price": 100.0,
+                "previous_close": 98.0,
+                "day_change": 2.0,
+                "day_change_pct": 2.04,
+                "volume": 50000,
+            }
+            for t in tickers
+        }
+
+    def mock_load_prices_batch(tickers, settings=None, days=60):
+        called_batch_prices.extend(tickers)
+        dates = pd.date_range(end=pd.Timestamp.now(), periods=10, freq="D")
+        return {
+            t: pd.DataFrame(
+                {
+                    "close": [90.0, 91.0, 92.0, 93.0, 94.0, 95.0, 96.0, 97.0, 98.0, 100.0],
+                    "volume": [10000] * 10,
+                },
+                index=dates,
+            )
+            for t in tickers
+        }
+
+    def mock_fetch_prices(ticker, settings=None, force=False):
+        called_single_fetch_prices.append(ticker)
+        return pd.DataFrame()
+
+    monkeypatch.setattr(tr_mod, "sync_transmission_fundamentals", lambda conn, basket_id, force: 0)
+
+    import earnings_engine.data.prices as prices_mod
+    monkeypatch.setattr(prices_mod, "fetch_batch_live_quotes", mock_fetch_batch_live_quotes)
+    monkeypatch.setattr(prices_mod, "load_prices_batch", mock_load_prices_batch)
+    monkeypatch.setattr(prices_mod, "fetch_prices", mock_fetch_prices)
+
+    count = sync_transmission_snapshots(conn, basket_id="AI_INFRA_HARDWARE", force=True)
+    assert count > 0
+
+    # Batch APIs were called with all symbols
+    assert len(called_batch_quotes) > 0
+    assert any(s.endswith(".NS") for s in called_batch_quotes)
+    assert len(called_batch_prices) > 0
+
+    # Single fetch_prices was NEVER called for Indian equities (.NS)
+    assert not any(s.endswith(".NS") for s in called_single_fetch_prices)
+
+
+
 
 
 

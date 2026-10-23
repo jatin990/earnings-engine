@@ -520,7 +520,12 @@ def sync_transmission_snapshots(
     Zero mock fallback: uses real quotes from fetch_live_quote and price bars from load_prices.
     """
     from earnings_engine.config import Settings
-    from earnings_engine.data.prices import fetch_live_quote, load_prices, fetch_prices
+    from earnings_engine.data.prices import (
+        fetch_batch_live_quotes,
+        load_prices_batch,
+        get_latest_cached_prices,
+        fetch_prices,
+    )
     from earnings_engine.data.transmission_schema import prune_old_snapshots
 
     if settings is None:
@@ -561,27 +566,46 @@ def sync_transmission_snapshots(
         if target_id not in edge_anchor_map and source_pe:
             edge_anchor_map[target_id] = float(source_pe)
 
-    import concurrent.futures
+    # Hydrate prices and live quotes using internal batch APIs without per-symbol yfinance fetches
+    symbols = list(dict.fromkeys([r[1] for r in nodes if r[1]]))
+    quotes_map: dict[str, Any] = {}
+    try:
+        quotes_map = fetch_batch_live_quotes(symbols, settings=settings, sync_db=True, force=force)
+    except Exception as exc:
+        logger.warning("[TRANSMISSION] Batch live quote fetch error: %s", exc)
 
-    def _fetch_node_market_data(item: tuple) -> tuple:
-        nid, sym, role, c_band, tpe, turnaround = item
-        quote = None
-        df = None
-        try:
-            quote = fetch_live_quote(sym, settings=settings, force=force)
-        except Exception as exc:
-            logger.warning("[TRANSMISSION] Failed quote for %s: %s", sym, exc)
-        try:
-            df = load_prices(sym, settings=settings)
-            if df is None or df.empty:
+    prices_map: dict[str, Any] = {}
+    try:
+        prices_map = load_prices_batch(symbols, settings=settings, days=60)
+    except Exception as exc:
+        logger.warning("[TRANSMISSION] Batch price history load error: %s", exc)
+
+    latest_cached = get_latest_cached_prices(symbols, settings=settings)
+
+    fetched_nodes = []
+    for nid, sym, role, c_band, tpe, turnaround in nodes:
+        quote = quotes_map.get(sym)
+        df = prices_map.get(sym)
+
+        # If price df is missing or empty, check latest cached SQLite bar before falling back
+        if df is None or df.empty:
+            lc = latest_cached.get(sym)
+            if lc and lc.get("close"):
+                import pandas as pd
+                c_val = float(lc["close"])
+                v_val = int(lc.get("volume") or 0)
+                d_val = pd.to_datetime(lc.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+                df = pd.DataFrame([{"close": c_val, "volume": v_val}], index=[d_val])
+                df.index.name = "date"
+
+        # For US anchors (not ending in .NS), if price history is still missing, permit single fallback
+        if (df is None or df.empty) and sym and not sym.upper().endswith(".NS"):
+            try:
                 df = fetch_prices(sym, settings=settings, force=False)
-        except Exception as exc:
-            logger.warning("[TRANSMISSION] Failed prices for %s: %s", sym, exc)
-        return nid, sym, role, c_band, tpe, turnaround, quote, df
+            except Exception as exc:
+                logger.warning("[TRANSMISSION] Failed prices fallback for %s: %s", sym, exc)
 
-    max_workers = min(len(nodes), 8)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        fetched_nodes = list(executor.map(_fetch_node_market_data, nodes))
+        fetched_nodes.append((nid, sym, role, c_band, tpe, turnaround, quote, df))
 
     synced_count = 0
     for node_id, symbol, role, circuit_band_pct, trailing_pe, is_turnaround, quote, df in fetched_nodes:
