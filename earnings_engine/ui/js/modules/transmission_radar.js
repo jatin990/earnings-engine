@@ -247,7 +247,7 @@
         if (f === 'BUYS') {
             filtered = filtered.filter(n => ['STRONG_BUY_DIP', 'ACCUMULATE_BREAKOUT', 'HOLD_MOMENTUM'].includes(n.trade_action?.action));
         } else if (f === 'RISK') {
-            filtered = filtered.filter(n => ['TRIM_CIRCUIT_RISK', 'FADE_VALUATION_TRAP', 'EXPECT_TRANSMISSION_DIP'].includes(n.trade_action?.action));
+            filtered = filtered.filter(n => ['TRIM_CIRCUIT_RISK', 'FADE_VALUATION_TRAP', 'EXPECT_TRANSMISSION_DIP', 'AVOID_FALLING_KNIFE', 'VALUATION_HEADWIND'].includes(n.trade_action?.action));
         }
 
         if (filtered.length === 0) {
