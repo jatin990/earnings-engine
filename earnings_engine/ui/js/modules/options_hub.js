@@ -2499,13 +2499,98 @@
     });
 
     /**
+     * Check if Indian Stock & Derivatives Markets (NSE) are actively open for trading.
+     * NSE hours: Monday to Friday, 09:15 to 15:30 IST (Asia/Kolkata).
+     */
+    app.isNSEMarketOpen = function () {
+        try {
+            const now = new Date();
+            // Format current date and time in Asia/Kolkata timezone
+            const istDateStr = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+            const istTimeStr = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // "HH:MM:SS"
+
+            const istDate = new Date(istDateStr);
+            const dayOfWeek = istDate.getDay(); // 0 = Sunday, 6 = Saturday
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                return false; // Weekend
+            }
+
+            const parts = istTimeStr.split(':');
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            const currentMins = hours * 60 + minutes;
+
+            // Active market session: 09:15 IST (555 mins) to 15:30 IST (930 mins)
+            return currentMins >= 555 && currentMins <= 930;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    /**
+     * Update the live refresh indicator status badge
+     */
+    app.updateMarketHoursStatusUI = function (isOpen) {
+        const pulseDot = document.getElementById('optLivePulseDot');
+        const refreshText = document.getElementById('optAutoRefreshText');
+        const headerBadge = document.getElementById('optLiveHeaderBadge');
+
+        if (isOpen) {
+            if (pulseDot) {
+                pulseDot.style.background = '#10b981';
+                pulseDot.style.boxShadow = '0 0 6px #10b981';
+            }
+            if (refreshText) {
+                refreshText.textContent = 'Auto: 15s';
+                refreshText.style.color = 'var(--text-secondary)';
+            }
+            if (headerBadge) {
+                headerBadge.textContent = 'LIVE NSE F&O';
+                headerBadge.style.color = '#38bdf8';
+                headerBadge.style.background = 'rgba(56,189,248,0.15)';
+                headerBadge.style.borderColor = 'rgba(56,189,248,0.3)';
+            }
+        } else {
+            if (pulseDot) {
+                pulseDot.style.background = '#fbbf24';
+                pulseDot.style.boxShadow = 'none';
+            }
+            if (refreshText) {
+                refreshText.textContent = 'Market Closed (Static EOD)';
+                refreshText.style.color = '#fbbf24';
+            }
+            if (headerBadge) {
+                headerBadge.textContent = 'NSE EOD SNAPSHOT';
+                headerBadge.style.color = '#fbbf24';
+                headerBadge.style.background = 'rgba(251,191,36,0.15)';
+                headerBadge.style.borderColor = 'rgba(251,191,36,0.3)';
+            }
+        }
+    };
+
+    /**
      * Start continuous 15-second background polling for all Option Chain & Derivatives data
+     * Polling strictly pauses outside market hours (Monday-Friday 09:15-15:30 IST) to freeze at the last market candle.
      */
     app.startOptionsPolling = function () {
-        if (app._optionsPollTimer) clearInterval(app._optionsPollTimer);
+        if (app._optionsPollTimer) {
+            clearInterval(app._optionsPollTimer);
+            app._optionsPollTimer = null;
+        }
+
+        const isMarketOpen = app.isNSEMarketOpen();
+        app.updateMarketHoursStatusUI(isMarketOpen);
+
+        // Always schedule a lightweight periodic tick to monitor market state transitions
         app._optionsPollTimer = setInterval(() => {
+            const currentlyOpen = app.isNSEMarketOpen();
+            app.updateMarketHoursStatusUI(currentlyOpen);
+
             const tab = document.getElementById('tab-options');
-            if (tab && !tab.classList.contains('hidden') && tab.style.display !== 'none') {
+            const isTabVisible = tab && !tab.classList.contains('hidden') && tab.style.display !== 'none';
+
+            // Only fetch continuous background updates when market is actively open
+            if (currentlyOpen && isTabVisible) {
                 app.loadOptionChain(false, true);
                 app.loadOptionsChartIntelligence(false, true);
             }

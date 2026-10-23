@@ -103,6 +103,25 @@ def fetch_chart_candles(
                 # Ensure index is localized datetime
                 if not isinstance(df.index, pd.DatetimeIndex):
                     df.index = pd.to_datetime(df.index)
+
+                # Clamping for intraday intervals: Indian markets close strictly at 15:30 IST.
+                # Filter out any post-market settlement bars (>15:30 IST) to stop chart updates after market hours.
+                if norm_interval in {"1m", "3m", "5m", "15m", "30m", "1h", "60m"}:
+                    try:
+                        import zoneinfo
+                        ist_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+                        if df.index.tz is None:
+                            df_ist_index = df.index.tz_localize("UTC").tz_convert(ist_tz)
+                        else:
+                            df_ist_index = df.index.tz_convert(ist_tz)
+                        time_mins = df_ist_index.hour * 60 + df_ist_index.minute
+                        # Only keep candles on or before 15:30 IST (930 minutes)
+                        valid_mask = (time_mins <= 930) & (time_mins >= 540)  # 09:00 - 15:30 IST
+                        if valid_mask.any():
+                            df = df.loc[valid_mask]
+                    except Exception as tz_err:
+                        logger.debug("[OPTIONS-CHART] Error filtering post-market intraday candles: %s", tz_err)
+
                 return df
     except Exception as e:
         logger.debug("[OPTIONS-CHART] yfinance history error for %s (%s): %s", yf_symbol, norm_interval, e)
