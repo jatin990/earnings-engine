@@ -416,6 +416,8 @@ def derive_multi_timeframe_oi(
     current_put_oi: int,
     strikes: list[dict[str, Any]],
     spot_price: float | None = None,
+    current_call_vol: int = 0,
+    current_put_vol: int = 0,
 ) -> dict[str, Any]:
     """Compute multi-timeframe Call vs Put Open Interest metrics across 5m, 15m, 30m, 1h, 4h, and Today."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
@@ -432,6 +434,12 @@ def derive_multi_timeframe_oi(
     # Current PCR
     curr_pcr = round(current_put_oi / max(current_call_oi, 1), 2)
 
+    # Volume and Gross Added contracts
+    tot_vol = max(current_call_vol + current_put_vol, 0)
+    today_ce_chg = sum(int(s.get("ce_change_oi") or 0) for s in strikes)
+    today_pe_chg = sum(int(s.get("pe_change_oi") or 0) for s in strikes)
+    today_total_added = abs(today_ce_chg) + abs(today_pe_chg)
+
     # 1. Total Positions (Two Bars: Calls vs Puts)
     tot_oi = max(current_call_oi + current_put_oi, 1)
     tot_call_pct = round((current_call_oi / tot_oi) * 100, 1)
@@ -444,12 +452,18 @@ def derive_multi_timeframe_oi(
         "put_pct": tot_put_pct,
         "call_oi_formatted": _fmt_indian_qty(current_call_oi).lstrip("+"),
         "put_oi_formatted": _fmt_indian_qty(current_put_oi).lstrip("+"),
+        "call_vol": current_call_vol,
+        "put_vol": current_put_vol,
+        "total_vol": tot_vol,
+        "total_traded": tot_vol,
+        "total_added": today_total_added,
+        "call_vol_fmt": _fmt_indian_qty(current_call_vol).lstrip("+"),
+        "put_vol_fmt": _fmt_indian_qty(current_put_vol).lstrip("+"),
+        "total_traded_fmt": _fmt_indian_qty(tot_vol).lstrip("+"),
+        "total_added_fmt": _fmt_indian_qty(today_total_added).lstrip("+"),
     }
 
     # 2. Today (Full Session) Intraday Aggregation
-    today_ce_chg = sum(int(s.get("ce_change_oi") or 0) for s in strikes)
-    today_pe_chg = sum(int(s.get("pe_change_oi") or 0) for s in strikes)
-
     call_base_today = max(current_call_oi - today_ce_chg, 1)
     put_base_today = max(current_put_oi - today_pe_chg, 1)
     call_today_pct_chg = round((today_ce_chg / call_base_today) * 100, 1)
@@ -471,11 +485,19 @@ def derive_multi_timeframe_oi(
         "call_chg": today_ce_chg,
         "put_chg": today_pe_chg,
         "net_delta": today_pe_chg - today_ce_chg,
+        "call_traded": current_call_vol,
+        "put_traded": current_put_vol,
+        "total_traded": tot_vol,
+        "call_added": abs(today_ce_chg),
+        "put_added": abs(today_pe_chg),
+        "total_added": today_total_added,
         "call_pct_chg": call_today_pct_chg,
         "put_pct_chg": put_today_pct_chg,
         "call_chg_fmt": _fmt_indian_qty(today_ce_chg),
         "put_chg_fmt": _fmt_indian_qty(today_pe_chg),
         "net_delta_fmt": _fmt_indian_qty(today_pe_chg - today_ce_chg),
+        "total_traded_fmt": _fmt_indian_qty(tot_vol).lstrip("+"),
+        "total_added_fmt": _fmt_indian_qty(today_total_added).lstrip("+"),
         "sentiment": today_sent,
         "badge": today_badge,
         "theme": today_theme,
@@ -545,6 +567,12 @@ def derive_multi_timeframe_oi(
         c_pct_chg = round((c_chg / call_base) * 100, 1)
         p_pct_chg = round((p_chg / put_base) * 100, 1)
 
+        duration_fraction = min(seconds / 22500.0, 1.0)
+        c_vol = int(current_call_vol * duration_fraction)
+        p_vol = int(current_put_vol * duration_fraction)
+        tf_traded = c_vol + p_vol
+        tf_added = abs(c_chg) + abs(p_chg)
+
         bias, happening, todo = _derive_timeframe_guidance(tf_key, sent, c_chg, p_chg, curr_pcr)
 
         metric = {
@@ -554,6 +582,12 @@ def derive_multi_timeframe_oi(
             "call_chg": c_chg,
             "put_chg": p_chg,
             "net_delta": p_chg - c_chg,
+            "call_traded": c_vol,
+            "put_traded": p_vol,
+            "total_traded": tf_traded,
+            "call_added": abs(c_chg),
+            "put_added": abs(p_chg),
+            "total_added": tf_added,
             "call_pct_chg": c_pct_chg,
             "put_pct_chg": p_pct_chg,
             "call_pct": round((abs(c_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
@@ -561,6 +595,8 @@ def derive_multi_timeframe_oi(
             "call_chg_fmt": _fmt_indian_qty(c_chg),
             "put_chg_fmt": _fmt_indian_qty(p_chg),
             "net_delta_fmt": _fmt_indian_qty(p_chg - c_chg),
+            "total_traded_fmt": _fmt_indian_qty(tf_traded).lstrip("+"),
+            "total_added_fmt": _fmt_indian_qty(tf_added).lstrip("+"),
             "sentiment": sent,
             "badge": badge,
             "theme": theme,
@@ -633,6 +669,11 @@ def derive_multi_timeframe_oi(
         c_pct_chg = round((c_chg / call_base) * 100, 1)
         p_pct_chg = round((p_chg / put_base) * 100, 1)
 
+        macro_added = abs(c_chg) + abs(p_chg)
+        macro_traded = int(tot_vol * target_days)
+        macro_c_traded = int(current_call_vol * target_days)
+        macro_p_traded = int(current_put_vol * target_days)
+
         bias, happening, todo = _derive_timeframe_guidance(tf_key, sent, c_chg, p_chg, curr_pcr)
 
         return {
@@ -642,6 +683,12 @@ def derive_multi_timeframe_oi(
             "call_chg": c_chg,
             "put_chg": p_chg,
             "net_delta": p_chg - c_chg,
+            "call_traded": macro_c_traded,
+            "put_traded": macro_p_traded,
+            "total_traded": macro_traded,
+            "call_added": abs(c_chg),
+            "put_added": abs(p_chg),
+            "total_added": macro_added,
             "call_pct_chg": c_pct_chg,
             "put_pct_chg": p_pct_chg,
             "call_pct": round((abs(c_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
@@ -649,6 +696,8 @@ def derive_multi_timeframe_oi(
             "call_chg_fmt": _fmt_indian_qty(c_chg),
             "put_chg_fmt": _fmt_indian_qty(p_chg),
             "net_delta_fmt": _fmt_indian_qty(p_chg - c_chg),
+            "total_traded_fmt": _fmt_indian_qty(macro_traded).lstrip("+"),
+            "total_added_fmt": _fmt_indian_qty(macro_added).lstrip("+"),
             "sentiment": sent,
             "badge": badge,
             "theme": theme,

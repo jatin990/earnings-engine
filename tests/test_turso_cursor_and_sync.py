@@ -177,10 +177,22 @@ def test_sync_tables_and_watermark_configuration():
 
 def test_sync_local_to_upstream_no_credentials():
     """Verify sync gracefully skips when credentials are absent."""
-    with patch.dict("os.environ", {"TURSO_DATABASE_URL": "", "TURSO_AUTH_TOKEN": ""}):
+    with patch.dict("os.environ", {"TURSO_SYNC_ENABLED": "true", "TURSO_DATABASE_URL": "", "TURSO_AUTH_TOKEN": ""}):
         result = sync_local_to_upstream()
         assert result["status"] == "skipped"
         assert "No Turso credentials" in result["reason"]
+
+
+def test_sync_local_to_upstream_disabled_flag():
+    """Verify sync gracefully skips when TURSO_SYNC_ENABLED=false."""
+    with patch.dict("os.environ", {
+        "TURSO_SYNC_ENABLED": "false",
+        "TURSO_DATABASE_URL": "libsql://test.turso.io",
+        "TURSO_AUTH_TOKEN": "secret-token",
+    }):
+        result = sync_local_to_upstream()
+        assert result["status"] == "skipped"
+        assert "TURSO_SYNC_ENABLED" in result["reason"]
 
 
 def test_automation_schedules_warm_latency_benchmark(tmp_path):

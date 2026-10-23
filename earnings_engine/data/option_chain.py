@@ -691,6 +691,8 @@ def _calculate_option_metrics_from_records(
         current_put_oi=int(put_oi),
         strikes=formatted_strikes,
         spot_price=current_spot,
+        current_call_vol=int(call_vol),
+        current_put_vol=int(put_vol),
     )
 
     # Extract Intraday SMC & VWAP Technical Structure
@@ -732,6 +734,9 @@ def _calculate_option_metrics_from_records(
         "sentiment": sentiment,
         "call_oi_total": int(call_oi),
         "put_oi_total": int(put_oi),
+        "call_vol_total": int(call_vol),
+        "put_vol_total": int(put_vol),
+        "total_volume": int(call_vol + put_vol),
         "resistance_strike": high_call_strike,
         "support_strike": high_put_strike,
         "pin_strike": pin_strike,

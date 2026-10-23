@@ -46,10 +46,19 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
     ]
     current_call_oi = 250000
     current_put_oi = 370000
+    current_call_vol = 1200000
+    current_put_vol = 1800000
 
-    metrics = derive_multi_timeframe_oi(symbol, current_call_oi, current_put_oi, strikes)
+    metrics = derive_multi_timeframe_oi(
+        symbol,
+        current_call_oi,
+        current_put_oi,
+        strikes,
+        current_call_vol=current_call_vol,
+        current_put_vol=current_put_vol,
+    )
 
-    # 1. Total Positions (Two Bars)
+    # 1. Total Positions (Two Bars + Traded/Added Metrics)
     total_pos = metrics.get("total_positions", {})
     assert total_pos["call_oi"] == 250000
     assert total_pos["put_oi"] == 370000
@@ -58,12 +67,20 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
     assert total_pos["put_pct"] == round((370000 / tot) * 100, 1)
     assert "2.50 L" in total_pos["call_oi_formatted"]
     assert "3.70 L" in total_pos["put_oi_formatted"]
+    assert total_pos["total_traded"] == 3000000
+    assert total_pos["total_added"] == (17000 + 38000)
+    assert "30.00 L" in total_pos["total_traded_fmt"]
+    assert "55.0 k" in total_pos["total_added_fmt"]
 
     # 2. Today full session metrics
     today = metrics.get("today", {})
     assert today["call_chg"] == 17000
     assert today["put_chg"] == 38000
     assert today["sentiment"] == "PUT WRITING"
+    assert today["total_traded"] == 3000000
+    assert today["total_added"] == 55000
+    assert "30.00 L" in today["total_traded_fmt"]
+    assert "55.0 k" in today["total_added_fmt"]
 
     # 3. 15-Minute velocity metrics
     tf_15m = metrics.get("tf_15m", {})
@@ -71,6 +88,10 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
     assert "put_chg" in tf_15m
     assert "call_pct_chg" in tf_15m
     assert "put_pct_chg" in tf_15m
+    assert "total_traded" in tf_15m
+    assert "total_added" in tf_15m
+    assert "total_traded_fmt" in tf_15m
+    assert "total_added_fmt" in tf_15m
 
     # 4. Strike-level 15m changes
     for s in strikes:
@@ -104,6 +125,10 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
         assert "call_chg_fmt" in row
         assert "put_chg_fmt" in row
         assert "net_delta_fmt" in row
+        assert "total_traded" in row
+        assert "total_added" in row
+        assert "total_traded_fmt" in row
+        assert "total_added_fmt" in row
         assert row["bias"] in ("BULLISH", "BEARISH", "NEUTRAL")
         assert len(row["what_is_happening"]) > 10
         assert len(row["what_to_do"]) > 10

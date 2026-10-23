@@ -16,10 +16,12 @@
     // Chart instances cache
     let dualOiChartInstance = null;
     let dualOiChgChartInstance = null;
+    let totalContractsChartInstance = null;
 
     // State for interactive strike chart toggling
     let cachedStrikes = [];
     let cachedSpotPrice = null;
+    let cachedTimeframesData = null;
     let activeChartMode = 'oi'; // 'oi' | 'today' | '15m'
     let buttonsInitialized = false;
 
@@ -33,6 +35,9 @@
         btn.addEventListener('click', () => {
             showExtendedTf = !showExtendedTf;
             _updateExtendedTfDisplay();
+            if (cachedTimeframesData) {
+                app.renderTotalContractsChart(cachedTimeframesData);
+            }
         });
         extendedTfButtonBound = true;
     }
@@ -86,6 +91,8 @@
         const totPutsFmt = document.getElementById('optTotPutsFormatted');
         const totPutsPct = document.getElementById('optTotPutsPct');
         const totPutsBar = document.getElementById('optTotPutsBar');
+        const totTradedFmt = document.getElementById('optTotTradedFormatted');
+        const totAddedFmt = document.getElementById('optTotAddedFormatted');
 
         if (tp.call_oi !== undefined || timeframesData.today?.call_oi !== undefined) {
             const cOi = tp.call_oi !== undefined ? tp.call_oi : (timeframesData.today?.call_oi || 0);
@@ -100,6 +107,9 @@
             if (totPutsFmt) totPutsFmt.textContent = tp.put_oi_formatted || fmtOi(pOi, false);
             if (totPutsPct) totPutsPct.textContent = `${pPct}%`;
             if (totPutsBar) totPutsBar.style.width = `${pPct}%`;
+
+            if (totTradedFmt) totTradedFmt.textContent = tp.total_traded_fmt || (tp.total_traded ? fmtOi(tp.total_traded, false) : '--');
+            if (totAddedFmt) totAddedFmt.textContent = tp.total_added_fmt || (tp.total_added ? fmtOi(tp.total_added, false) : '--');
         }
 
         // 2. Card: Today
@@ -112,6 +122,8 @@
             const putChg = document.getElementById('optTfTodayPutChg');
             const callPctChg = document.getElementById('optTfTodayCallPctChg');
             const putPctChg = document.getElementById('optTfTodayPutPctChg');
+            const tdTraded = document.getElementById('optTfTodayTraded');
+            const tdAdded = document.getElementById('optTfTodayAdded');
 
             if (badge) badge.textContent = td.sentiment || 'NEUTRAL';
             if (callBar) callBar.style.width = `${td.call_pct || 50}%`;
@@ -127,6 +139,8 @@
                 const pct = td.put_pct_chg !== undefined ? td.put_pct_chg : 0;
                 putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
             }
+            if (tdTraded) tdTraded.textContent = td.total_traded_fmt || (td.total_traded ? fmtOi(td.total_traded, false) : '--');
+            if (tdAdded) tdAdded.textContent = td.total_added_fmt || (td.total_added ? fmtOi(td.total_added, false) : '--');
         }
 
         // 3. Card: 15m Velocity
@@ -139,6 +153,8 @@
             const putChg = document.getElementById('optTf15mPutChg');
             const callPctChg = document.getElementById('optTf15mCallPctChg');
             const putPctChg = document.getElementById('optTf15mPutPctChg');
+            const m15Traded = document.getElementById('optTf15mTraded');
+            const m15Added = document.getElementById('optTf15mAdded');
 
             if (badge) badge.textContent = m15.sentiment || 'NEUTRAL';
             if (callBar) callBar.style.width = `${m15.call_pct || 50}%`;
@@ -154,6 +170,8 @@
                 const pct = m15.put_pct_chg !== undefined ? m15.put_pct_chg : 0;
                 putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
             }
+            if (m15Traded) m15Traded.textContent = m15.total_traded_fmt || (m15.total_traded ? fmtOi(m15.total_traded, false) : '--');
+            if (m15Added) m15Added.textContent = m15.total_added_fmt || (m15.total_added ? fmtOi(m15.total_added, false) : '--');
         }
 
         // 4. Card: 5m Burst
@@ -166,6 +184,8 @@
             const putChg = document.getElementById('optTf5mPutChg');
             const callPctChg = document.getElementById('optTf5mCallPctChg');
             const putPctChg = document.getElementById('optTf5mPutPctChg');
+            const m5Traded = document.getElementById('optTf5mTraded');
+            const m5Added = document.getElementById('optTf5mAdded');
 
             if (badge) badge.textContent = m5.sentiment || 'NEUTRAL';
             if (callBar) callBar.style.width = `${m5.call_pct || 50}%`;
@@ -181,6 +201,8 @@
                 const pct = m5.put_pct_chg !== undefined ? m5.put_pct_chg : 0;
                 putPctChg.textContent = `${pct >= 0 ? '+' : ''}${pct}%`;
             }
+            if (m5Traded) m5Traded.textContent = m5.total_traded_fmt || (m5.total_traded ? fmtOi(m5.total_traded, false) : '--');
+            if (m5Added) m5Added.textContent = m5.total_added_fmt || (m5.total_added ? fmtOi(m5.total_added, false) : '--');
         }
 
         // 5. PCR (OI) & 15m Delta
@@ -326,6 +348,10 @@
                 const callFmt = row.call_chg_fmt || fmtOi(callVal);
                 const putFmt = row.put_chg_fmt || fmtOi(putVal);
                 const netFmt = row.net_delta_fmt || fmtOi(netVal);
+                const totAddedVal = row.total_added !== undefined ? row.total_added : (Math.abs(callVal) + Math.abs(putVal));
+                const totTradedVal = row.total_traded !== undefined ? row.total_traded : 0;
+                const totAddedFmt = row.total_added_fmt || fmtOi(totAddedVal, false);
+                const totTradedFmt = row.total_traded_fmt || fmtOi(totTradedVal, false);
 
                 // Colors
                 const callCol = callVal > 0 ? '#f87171' : (callVal < 0 ? '#38bdf8' : 'var(--text-secondary)');
@@ -373,6 +399,12 @@
                     <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:800;color:${netCol};">
                         ${netFmt}
                     </td>
+                    <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fbbf24;">
+                        ${totAddedFmt}
+                    </td>
+                    <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#38bdf8;">
+                        ${totTradedFmt}
+                    </td>
                     <td style="padding:0.6rem;text-align:center;">
                         <span class="badge" style="background:${biasBg};color:${biasCol};border:1px solid ${biasBrd};font-size:0.65rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:800;">
                             ${bias}
@@ -395,6 +427,119 @@
             tableBody.innerHTML = rowsHtml;
             _updateExtendedTfDisplay();
         }
+
+        // 8. Render Total Contracts Traded vs Gross Added Across Timeframes Graph
+        cachedTimeframesData = timeframesData;
+        app.renderTotalContractsChart(timeframesData);
+    };
+
+    /**
+     * Render Total Contracts Traded vs Gross Added Chart (Chart.js)
+     */
+    app.renderTotalContractsChart = function (timeframesData) {
+        if (!timeframesData || !window.Chart) return;
+
+        const chartCanvas = document.getElementById('optTotalContractsChart');
+        if (!chartCanvas) return;
+
+        const allRows = timeframesData.timeframes_table || [];
+        if (!allRows.length) return;
+
+        // Display core timeframes by default, or all 9 if extended toggle is open
+        const activeRows = allRows.filter(r => showExtendedTf || !r.is_extended);
+        const labels = activeRows.map(r => r.timeframe);
+        const tradedData = activeRows.map(r => r.total_traded || 0);
+        const addedData = activeRows.map(r => r.total_added || (Math.abs(r.call_chg || 0) + Math.abs(r.put_chg || 0)));
+
+        // If chart already exists and has identical labels length, update in-place without flicker
+        if (totalContractsChartInstance && totalContractsChartInstance.data.labels.length === labels.length) {
+            totalContractsChartInstance.data.labels = labels;
+            totalContractsChartInstance.data.datasets[0].data = tradedData;
+            totalContractsChartInstance.data.datasets[1].data = addedData;
+            totalContractsChartInstance.update('none'); // Instant flicker-free update during 15s refresh
+            return;
+        }
+
+        // Otherwise destroy old instance and recreate cleanly
+        if (totalContractsChartInstance) {
+            try { totalContractsChartInstance.destroy(); } catch (e) {}
+            totalContractsChartInstance = null;
+        }
+
+        const ctx = chartCanvas.getContext('2d');
+        totalContractsChartInstance = new window.Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Traded Contracts (Turnover Volume)',
+                        data: tradedData,
+                        backgroundColor: 'rgba(56, 189, 248, 0.75)',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1,
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.7
+                    },
+                    {
+                        label: 'Gross Added Contracts (Underwritten Δ)',
+                        data: addedData,
+                        backgroundColor: 'rgba(251, 191, 36, 0.75)',
+                        borderColor: '#fbbf24',
+                        borderWidth: 1,
+                        borderRadius: 3,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 250 },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#18181b',
+                        titleColor: '#ffffff',
+                        bodyColor: '#cbd5e1',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        padding: 8,
+                        callbacks: {
+                            label: function (ctx) {
+                                const val = ctx.raw || 0;
+                                return `${ctx.dataset.label}: ${val.toLocaleString('en-IN')} (${fmtOi(val, false)})`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.03)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 10, family: 'monospace', weight: '700' }
+                        }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: {
+                            color: '#64748b',
+                            font: { size: 10, family: 'monospace' },
+                            callback: function (val) {
+                                if (Math.abs(val) >= 10000000) return (val / 10000000).toFixed(1) + 'Cr';
+                                if (Math.abs(val) >= 100000) return (val / 100000).toFixed(0) + 'L';
+                                if (Math.abs(val) >= 1000) return (val / 1000).toFixed(0) + 'k';
+                                return val;
+                            }
+                        }
+                    }
+                }
+            }
+        });
     };
 
     /**
