@@ -456,6 +456,25 @@ def test_calculate_market_compass_and_velocity():
     assert len(alerts) > 0
 
 
+def test_option_chain_15s_cache_and_vix_resolution():
+    from earnings_engine.data.option_chain import _CACHE_TTL_SECONDS, _resolve_vix_profile
+    from earnings_engine.data.options_chart_engine import _CHART_CACHE_TTL_SECONDS
+
+    # 1. 15-second cache TTL guarantee for rapid background polling
+    assert _CACHE_TTL_SECONDS == 15.0
+    assert _CHART_CACHE_TTL_SECONDS == 15.0
+
+    # 2. VIX profile resolution returns valid benchmark structure
+    vix_profile = _resolve_vix_profile()
+    assert isinstance(vix_profile, dict)
+    assert "vix_value" in vix_profile
+    assert "vix_change_pct" in vix_profile
+    assert "vix_regime" in vix_profile
+    assert vix_profile["vix_value"] > 0
+    assert vix_profile["vix_regime"] in ("LOW_VOL", "NORMAL_VOL", "ELEVATED_VOL", "HIGH_VOL")
+
+
+
 
 
 

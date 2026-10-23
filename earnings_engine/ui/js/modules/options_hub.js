@@ -241,7 +241,7 @@
     /**
      * Load Option Chain and calculate key metrics
      */
-    app.loadOptionChain = async function (forceRefresh = false) {
+    app.loadOptionChain = async function (forceRefresh = false, isBackground = false) {
         const symbol = app._optionsSymbol || 'NIFTY';
         const expiry = app._optionsExpiry || '';
         const strikeRange = app._optionsStrikeRange || 20;
@@ -250,11 +250,13 @@
         const chartLoading = document.getElementById('optionsChartLoading');
         const statusBanner = document.getElementById('optionsStatusBanner');
 
-        if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.innerHTML = '<span>⏳</span> Loading...';
+        if (!isBackground) {
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<span>⏳</span> Loading...';
+            }
+            if (chartLoading) chartLoading.style.display = 'flex';
         }
-        if (chartLoading) chartLoading.style.display = 'flex';
 
         try {
             let url = `/api/v1/options/chain?symbol=${encodeURIComponent(symbol)}&strike_range=${strikeRange}`;
@@ -347,11 +349,13 @@
                 statusBanner.innerHTML = `❌ <strong>Error loading option chain:</strong> ${err.message}`;
             }
         } finally {
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = '<span>🔄</span> Refresh';
+            if (!isBackground) {
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = '<span>🔄</span> Refresh';
+                }
+                if (chartLoading) chartLoading.style.display = 'none';
             }
-            if (chartLoading) chartLoading.style.display = 'none';
         }
     };
 
@@ -1125,9 +1129,10 @@
         }
 
         // Gamma Regime Badge
-        const gammaRegimeEl = document.getElementById('optKpiGammaRegimeBadge');
+        const gammaRegimeEl = document.getElementById('optGammaRegimeBadge') || document.getElementById('optKpiGammaRegimeBadge');
         if (gammaRegimeEl) {
             const regime = data.gamma_regime || 'NEUTRAL';
+            gammaRegimeEl.style.display = 'inline-block';
             if (regime === 'POSITIVE_GAMMA') {
                 gammaRegimeEl.textContent = '🛡️ POSITIVE GAMMA (Vol Dampening / Pin)';
                 gammaRegimeEl.style.background = 'rgba(16,185,129,0.15)';
@@ -1161,15 +1166,24 @@
         }
 
         // India VIX Badge
-        const vixBadge = document.getElementById('optKpiVixBadge');
+        const vixBadge = document.getElementById('optVixBadge') || document.getElementById('optKpiVixBadge');
         if (vixBadge) {
-            vixBadge.textContent = data.vix != null ? `INDIA VIX: ${Number(data.vix).toFixed(2)}` : 'INDIA VIX: --';
+            vixBadge.style.display = 'inline-block';
+            const vixVal = data.vix != null ? Number(data.vix).toFixed(2) : (data.vix_profile && data.vix_profile.vix_value != null ? Number(data.vix_profile.vix_value).toFixed(2) : null);
+            const vixChg = data.vix_profile && data.vix_profile.vix_change_pct != null ? data.vix_profile.vix_change_pct : null;
+            if (vixVal != null) {
+                const chgStr = vixChg != null ? ` (${vixChg >= 0 ? '+' : ''}${vixChg.toFixed(2)}%)` : '';
+                vixBadge.textContent = `INDIA VIX: ${vixVal}${chgStr}`;
+            } else {
+                vixBadge.textContent = 'INDIA VIX: --';
+            }
         }
 
         // Expected Move (±1σ) Badge
-        const expMoveBadge = document.getElementById('optKpiExpectedMoveBadge');
+        const expMoveBadge = document.getElementById('optExpectedMoveBadge') || document.getElementById('optKpiExpectedMoveBadge');
         const expMove = data.expected_move || {};
         if (expMoveBadge) {
+            expMoveBadge.style.display = 'inline-block';
             if (expMove.range_1sigma != null && expMove.upper_1sigma != null && expMove.lower_1sigma != null) {
                 expMoveBadge.textContent = `Exp Move (±1σ): ±${Number(expMove.range_1sigma).toFixed(1)} (${Number(expMove.lower_1sigma).toFixed(0)} - ${Number(expMove.upper_1sigma).toFixed(0)})`;
             } else {
@@ -2331,6 +2345,20 @@
     });
 
     /**
+     * Start continuous 15-second background polling for all Option Chain & Derivatives data
+     */
+    app.startOptionsPolling = function () {
+        if (app._optionsPollTimer) clearInterval(app._optionsPollTimer);
+        app._optionsPollTimer = setInterval(() => {
+            const tab = document.getElementById('tab-options');
+            if (tab && !tab.classList.contains('hidden') && tab.style.display !== 'none') {
+                app.loadOptionChain(false, true);
+                app.loadOptionsChartIntelligence(false, true);
+            }
+        }, 15000);
+    };
+
+    /**
      * Entry point for tab activation from dashboard.js
      */
     app.initOptionsHub = function () {
@@ -2348,20 +2376,13 @@
                 }
             }
         }, 100);
+
+        app.startOptionsPolling();
     };
 
     // Auto-initialize when loaded
     if (document.getElementById('tab-options')) {
         app.initOptionsHub();
-
-        // Auto-refresh timer every 15 seconds during active usage
-        if (app._optionsPollTimer) clearInterval(app._optionsPollTimer);
-        app._optionsPollTimer = setInterval(() => {
-            const tab = document.getElementById('tab-options');
-            if (tab && !tab.classList.contains('hidden') && tab.style.display !== 'none') {
-                app.loadOptionsChartIntelligence(false, true);
-            }
-        }, 15000);
     }
 
 })(window);

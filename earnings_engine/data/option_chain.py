@@ -29,11 +29,51 @@ logger = logging.getLogger("earnings_engine.data.option_chain")
 
 _NON_FNO_SYMBOLS: set[str] = set()
 _OPTION_CHAIN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_CACHE_TTL_SECONDS = 900.0  # 15 minutes
+_CACHE_TTL_SECONDS = 15.0  # 15 seconds continuous rolling cache
 
 # Rolling Open Interest & Writing Velocity Cache: symbol -> list of (timestamp_epoch, call_oi, put_oi, dict_strike_oi)
 _OI_SNAPSHOT_CACHE: dict[str, list[dict[str, Any]]] = {}
 _MAX_OI_SNAPSHOTS = 120  # Keep up to ~2 hours of 1-minute resolution or full day snapshots
+
+
+def _resolve_vix_profile(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve live India VIX quote with 1D delta % and volatility regime classification."""
+    settings = settings or Settings()
+    vix_val = 14.5
+    vix_change_pct = 0.0
+
+    try:
+        from earnings_engine.data.prices import fetch_batch_live_quotes, load_prices
+        live_quotes = fetch_batch_live_quotes(["^INDIAVIX"], settings=settings, sync_db=False)
+        vix_entry = live_quotes.get("^INDIAVIX")
+        if vix_entry and vix_entry.get("current_price") and float(vix_entry["current_price"]) > 0:
+            vix_val = float(vix_entry["current_price"])
+            vix_change_pct = float(vix_entry.get("change_pct", 0.0) or 0.0)
+        else:
+            hist = load_prices("^INDIAVIX", settings)
+            if hist is not None and not hist.empty and "close" in hist.columns:
+                closes = hist["close"].dropna().values
+                if len(closes) > 0 and float(closes[-1]) > 0:
+                    vix_val = float(closes[-1])
+                    if len(closes) >= 2 and float(closes[-2]) > 0:
+                        vix_change_pct = float(((vix_val - closes[-2]) / closes[-2]) * 100.0)
+    except Exception as e:
+        logger.debug("[OPTION-CHAIN] Could not retrieve live VIX: %s", e)
+
+    if vix_val < 13.0:
+        vix_regime = "LOW_VOL"
+    elif vix_val <= 17.0:
+        vix_regime = "NORMAL_VOL"
+    elif vix_val <= 22.0:
+        vix_regime = "ELEVATED_VOL"
+    else:
+        vix_regime = "HIGH_VOL"
+
+    return {
+        "vix_value": round(vix_val, 2),
+        "vix_change_pct": round(vix_change_pct, 2),
+        "vix_regime": vix_regime,
+    }
 
 
 
@@ -284,6 +324,7 @@ def analyze_option_chain(
         return res
 
     spot_price = _resolve_spot_price(clean_symbol, spot_price, settings)
+    vix_data = _resolve_vix_profile(settings)
 
     logger.debug("[OPTION-CHAIN] Fetching Option Chain for symbol=%s (expiry=%s, spot=%s)...", clean_symbol, expiry_date, spot_price)
     mgr = get_data_manager(settings)
@@ -320,6 +361,8 @@ def analyze_option_chain(
                 "strikes": [],
                 "as_of_date": last_snap.get("as_of_date"),
                 "signals": ["ARCHIVED_SNAPSHOT"],
+                "vix": vix_data.get("vix_value"),
+                "vix_profile": vix_data,
             }
             _OPTION_CHAIN_CACHE[cache_key] = (now, res)
             return res
@@ -343,6 +386,8 @@ def analyze_option_chain(
             "selected_expiry": selected_expiry,
             "strikes": [],
             "signals": ["OPTION_CHAIN_UNREACHABLE"],
+            "vix": vix_data.get("vix_value"),
+            "vix_profile": vix_data,
             "gex_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
             "oi_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
             "net_delta_summary": _build_unavailable_subtab_summary("Live NSE option chain unreachable and no archival snapshot found for this symbol."),
@@ -362,11 +407,14 @@ def analyze_option_chain(
         records=records,
         spot_price=spot_price,
         strike_range=strike_range,
+        vix_data=vix_data,
     )
     res["spot_price"] = spot_price
     res["expiries"] = expiries
     res["selected_expiry"] = selected_expiry
     res["timestamp"] = raw_chain.get("timestamp") or datetime.now().isoformat()
+    res["vix"] = vix_data.get("vix_value")
+    res["vix_profile"] = vix_data
     _OPTION_CHAIN_CACHE[cache_key] = (now, res)
     store_option_chain_snapshot(res, settings)
     logger.info(
@@ -570,11 +618,7 @@ def _calculate_option_metrics_from_records(
                 "net_oi_delta": enr.get("net_oi_delta", 0),
             })
 
-    vix_profile = vix_data or {
-        "vix_value": 13.5,
-        "vix_change_pct": 0.0,
-        "vix_regime": "NORMAL_VOL",
-    }
+    vix_profile = vix_data or _resolve_vix_profile()
 
     setups = derive_market_setups(
         symbol=symbol,

@@ -26,7 +26,7 @@ from earnings_engine.data.universe import is_fno_eligible
 logger = logging.getLogger("earnings_engine.data.options_chart_engine")
 
 _CHART_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_CHART_CACHE_TTL_SECONDS = 30.0  # 30 seconds cache for rapid polling
+_CHART_CACHE_TTL_SECONDS = 15.0  # 15 seconds cache for rapid polling
 
 INDEX_MAP = {
     "NIFTY": "^NSEI",
@@ -83,7 +83,7 @@ def fetch_chart_candles(
 
     # Default periods based on interval: auto-expand daily/weekly/monthly to adequate historical windows
     if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
-        period = "6mo"
+        period = "2y"
     elif norm_interval in {"1w", "w"} and period in {None, "", "5d"}:
         period = "2y"
     elif norm_interval in {"1mo", "1m_month", "m"} and period in {None, "", "5d"}:
@@ -113,7 +113,13 @@ def fetch_chart_candles(
         settings = settings or Settings()
         fallback_df = load_prices(yf_symbol, settings)
         if fallback_df is not None and not fallback_df.empty:
-            return fallback_df.tail(120)
+            if period in {"2y", "2Y"}:
+                return fallback_df.tail(504)
+            elif period in {"5y", "5Y"}:
+                return fallback_df.tail(1260)
+            elif period in {"1y", "1Y"}:
+                return fallback_df.tail(252)
+            return fallback_df
     except Exception:
         pass
 
@@ -509,7 +515,7 @@ def get_options_chart_intelligence(
     clean_sym = symbol.strip().upper().replace(".NS", "")
     norm_interval = interval.lower()
     if norm_interval in {"1d", "d"} and period in {None, "", "5d"}:
-        period = "6mo"
+        period = "2y"
     elif norm_interval in {"1w", "w"} and period in {None, "", "5d"}:
         period = "2y"
     elif norm_interval in {"1mo", "1m_month", "m"} and period in {None, "", "5d"}:
