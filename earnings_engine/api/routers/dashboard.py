@@ -804,11 +804,26 @@ async def get_price_history(
         clean_ticker = unquote(ticker).strip()
         force_val = force_refresh if isinstance(force_refresh, bool) else False
         from earnings_engine.data import prices as prices_mod
-        df = await asyncio.to_thread(prices_mod.fetch_prices, clean_ticker, _settings, force=force_val)
+        clean_start_date = start_date.strip() if isinstance(start_date, str) and start_date.strip() else None
+        import inspect
+        fetch_kwargs = {"force": force_val}
+        if clean_start_date:
+            try:
+                sig = inspect.signature(prices_mod.fetch_prices)
+                if "start_date" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+                    fetch_kwargs["start_date"] = clean_start_date
+            except Exception:
+                pass
+        df = await asyncio.to_thread(
+            prices_mod.fetch_prices,
+            clean_ticker,
+            _settings,
+            **fetch_kwargs,
+        )
         if df is None or df.empty:
             return []
-        if isinstance(start_date, str) and start_date.strip():
-            df = df[df.index >= start_date.strip()]
+        if clean_start_date:
+            df = df[df.index >= clean_start_date]
         if isinstance(end_date, str) and end_date.strip():
             df = df[df.index <= end_date.strip()]
 

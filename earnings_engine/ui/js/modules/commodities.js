@@ -47,6 +47,10 @@
     mod._isFullscreen = false;
     mod._escListenerBound = false;
     mod._crosshairBound = false;
+    mod._rangeChangeBound = false;
+    mod._isLoadingMore = false;
+    mod._hasMoreHistory = true;
+    mod._rangeDebounceTimer = null;
 
     /**
      * Universal IST (Indian Standard Time / Asia/Kolkata) Timestamp Formatter
@@ -159,6 +163,8 @@
         const clean = symbol.trim().toUpperCase();
         mod._symbol = clean;
         mod._hasFitted = false;
+        mod._isLoadingMore = false;
+        mod._hasMoreHistory = true;
 
         // Update pill UI
         document.querySelectorAll('.comm-asset-pill').forEach(pill => {
@@ -187,6 +193,8 @@
         if (!tf || tf === mod._timeframe) return;
         mod._timeframe = tf;
         mod._hasFitted = false;
+        mod._isLoadingMore = false;
+        mod._hasMoreHistory = true;
 
         document.querySelectorAll('.comm-tf-btn').forEach(btn => {
             if (btn.getAttribute('data-tf') === tf) {
@@ -210,6 +218,8 @@
         if (!period || period === mod._period) return;
         mod._period = period;
         mod._hasFitted = false;
+        mod._isLoadingMore = false;
+        mod._hasMoreHistory = true;
 
         document.querySelectorAll('.comm-period-btn').forEach(btn => {
             if (btn.getAttribute('data-period') === period) {
@@ -384,6 +394,14 @@
                     mod.handleCrosshairMove(param);
                 });
                 mod._crosshairBound = true;
+            }
+
+            // Dynamic infinite scrollback subscription
+            if (!mod._rangeChangeBound) {
+                mod._chart.timeScale().subscribeVisibleLogicalRangeChange((newRange) => {
+                    mod.onVisibleLogicalRangeChange(newRange);
+                });
+                mod._rangeChangeBound = true;
             }
 
             window.addEventListener('resize', () => {
@@ -600,6 +618,96 @@
                 mod._chart.applyOptions({ width: container.clientWidth, height: 640 });
                 mod._chart.timeScale().fitContent();
             }
+        }
+    };
+
+    /**
+     * Infinite scrollback listener for Commodities Chart
+     */
+    mod.onVisibleLogicalRangeChange = function (newRange) {
+        if (!newRange || mod._isLoadingMore || !mod._hasMoreHistory || !mod._candleSeries) return;
+        if (newRange.from <= 8) {
+            if (mod._rangeDebounceTimer) clearTimeout(mod._rangeDebounceTimer);
+            mod._rangeDebounceTimer = setTimeout(() => {
+                mod.loadMoreCandles();
+            }, 120);
+        }
+    };
+
+    /**
+     * Dynamically fetch and prepend earlier commodity candles when scrolling back
+     */
+    mod.loadMoreCandles = async function () {
+        if (mod._isLoadingMore || !mod._hasMoreHistory || !mod._chart || !mod._candleSeries) return;
+        mod._isLoadingMore = true;
+
+        try {
+            const currentCandles = mod._chartData?.candles || [];
+            if (currentCandles.length === 0) {
+                mod._hasMoreHistory = false;
+                return;
+            }
+
+            // Expand lookback period to 2y (or 1mo for ultra-short intraday)
+            const isIntraday = ['1m', '5m', '15m', '30m', '1h', '60m'].includes(mod._timeframe.toLowerCase());
+            const targetPeriod = isIntraday ? '1mo' : '2y';
+            if (mod._period === targetPeriod) {
+                mod._hasMoreHistory = false;
+                return;
+            }
+
+            const url = `/api/v1/commodities/chart-intelligence?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}&period=${targetPeriod}&force_refresh=false`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                mod._hasMoreHistory = false;
+                return;
+            }
+
+            const data = await res.json();
+            const incomingCandles = data.candles || [];
+            if (incomingCandles.length <= currentCandles.length) {
+                mod._hasMoreHistory = false;
+                return;
+            }
+
+            const earliestTime = currentCandles[0].time;
+            const olderCandles = incomingCandles.filter(c => c.time < earliestTime);
+
+            if (olderCandles.length === 0) {
+                mod._hasMoreHistory = false;
+                return;
+            }
+
+            const mergedCandles = [...olderCandles, ...currentCandles];
+            mod._chartData.candles = mergedCandles;
+            mod._period = targetPeriod;
+
+            const curRange = mod._chart.timeScale().getVisibleLogicalRange();
+            const shift = olderCandles.length;
+
+            mod._candleSeries.setData(mergedCandles);
+            if (mod._volumeSeries) {
+                const volData = mergedCandles.map(c => ({
+                    time: c.time,
+                    value: c.volume,
+                    color: c.close >= c.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(244, 63, 94, 0.25)',
+                }));
+                mod._volumeSeries.setData(volData);
+            }
+
+            if (curRange) {
+                mod._chart.timeScale().setVisibleLogicalRange({
+                    from: curRange.from + shift,
+                    to: curRange.to + shift,
+                });
+            }
+
+            mod._hasMoreHistory = false;
+        } catch (e) {
+            console.warn('[COMMODITIES] Error loading more historical candles:', e);
+            mod._hasMoreHistory = false;
+        } finally {
+            mod._isLoadingMore = false;
         }
     };
 

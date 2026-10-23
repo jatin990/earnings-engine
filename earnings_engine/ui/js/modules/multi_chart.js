@@ -74,6 +74,12 @@
         timeframes: ['1D', '1D', '1D', '1D'],
         isSyncing: false,
         pollTimer: null,
+        isLoadingMore: [false, false, false, false],
+        hasMoreHistory: [true, true, true, true],
+        rangeDebounceTimer: [null, null, null, null],
+        renderedCandles: [[], [], [], []],
+        renderedVolumes: [[], [], [], []],
+        renderedRecords: [[], [], [], []],
     };
 
     function calculateSMA(data, period) {
@@ -266,14 +272,177 @@
             app.multiChart.isSyncing = false;
         });
 
+        // Dynamic Infinite Scrollback Subscription
+        chart.timeScale().subscribeVisibleLogicalRangeChange(newRange => {
+            onPaneVisibleLogicalRangeChange(idx, newRange);
+        });
+
         // Load data
         loadPaneData(idx);
+    }
+
+    function onPaneVisibleLogicalRangeChange(idx, newRange) {
+        if (!newRange || newRange.from === undefined || newRange.from === null) return;
+        if (newRange.from <= 8 && !app.multiChart.isLoadingMore[idx] && app.multiChart.hasMoreHistory[idx]) {
+            if (app.multiChart.rangeDebounceTimer[idx]) {
+                clearTimeout(app.multiChart.rangeDebounceTimer[idx]);
+            }
+            app.multiChart.rangeDebounceTimer[idx] = setTimeout(() => {
+                loadMorePaneCandles(idx);
+            }, 120);
+        }
+    }
+
+    async function loadMorePaneCandles(idx) {
+        if (app.multiChart.isLoadingMore[idx] || !app.multiChart.hasMoreHistory[idx]) return;
+        const ticker = app.multiChart.tickers[idx];
+        const tf = (app.multiChart.timeframes[idx] || '1D').toLowerCase();
+        const isIntraday = tf === '5m' || tf === '15m' || tf === '1m';
+        const chart = app.multiChart.instances[idx];
+        const candleSeries = app.multiChart.candleSeries[idx];
+        const volumeSeries = app.multiChart.volumeSeries[idx];
+        const sma20 = app.multiChart.sma20Series[idx];
+        const sma50 = app.multiChart.sma50Series[idx];
+        const sma200 = app.multiChart.sma200Series[idx];
+        if (!chart || !candleSeries || !ticker) return;
+
+        const renderedCandles = app.multiChart.renderedCandles[idx] || [];
+        if (renderedCandles.length === 0) return;
+
+        app.multiChart.isLoadingMore[idx] = true;
+        const colors = getThemeColors();
+
+        try {
+            if (isIntraday) {
+                const url = `${API_BASE}/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(ticker)}&interval=${encodeURIComponent(tf)}&period=1mo&allow_non_fno=true`;
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const data = await resp.json();
+                if (!data || !data.candles || data.candles.length === 0) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const earliestTime = renderedCandles[0].time;
+                const olderBars = data.candles.filter(c => c.time < earliestTime);
+                if (olderBars.length === 0) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const olderCandles = olderBars.map(c => ({
+                    time: c.time,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                }));
+                const olderVolumes = olderBars.map(c => ({
+                    time: c.time,
+                    value: c.volume || 0,
+                    color: c.close >= c.open ? colors.volumeUp : colors.volumeDown,
+                }));
+                const mergedCandles = olderCandles.concat(renderedCandles);
+                const mergedVolumes = olderVolumes.concat(app.multiChart.renderedVolumes[idx] || []);
+
+                app.multiChart.renderedCandles[idx] = mergedCandles;
+                app.multiChart.renderedVolumes[idx] = mergedVolumes;
+
+                const curRange = chart.timeScale().getVisibleLogicalRange();
+                const shift = olderCandles.length;
+
+                candleSeries.setData(mergedCandles);
+                if (volumeSeries) volumeSeries.setData(mergedVolumes);
+
+                if (curRange) {
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: curRange.from + shift,
+                        to: curRange.to + shift,
+                    });
+                }
+                app.multiChart.hasMoreHistory[idx] = false;
+            } else {
+                const earliestDate = renderedCandles[0].time;
+                const twoYearsAgo = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                if (typeof earliestDate === 'string' && earliestDate <= twoYearsAgo) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+
+                const resp = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(ticker)}?start_date=${encodeURIComponent(twoYearsAgo)}`);
+                if (!resp.ok) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const records = await resp.json();
+                if (!records || records.length === 0) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const olderRecords = records.filter(r => r.date < earliestDate);
+                if (olderRecords.length === 0) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                    return;
+                }
+                const olderCandles = olderRecords.map(r => ({
+                    time: r.date,
+                    open: r.open,
+                    high: r.high,
+                    low: r.low,
+                    close: r.close,
+                }));
+                const olderVolumes = olderRecords.map(r => ({
+                    time: r.date,
+                    value: r.volume,
+                    color: r.close >= r.open ? colors.volumeUp : colors.volumeDown,
+                }));
+
+                const mergedCandles = olderCandles.concat(renderedCandles);
+                const mergedVolumes = olderVolumes.concat(app.multiChart.renderedVolumes[idx] || []);
+                const mergedRecords = olderRecords.concat(app.multiChart.renderedRecords[idx] || []);
+
+                app.multiChart.renderedCandles[idx] = mergedCandles;
+                app.multiChart.renderedVolumes[idx] = mergedVolumes;
+                app.multiChart.renderedRecords[idx] = mergedRecords;
+
+                const curRange = chart.timeScale().getVisibleLogicalRange();
+                const shift = olderCandles.length;
+
+                candleSeries.setData(mergedCandles);
+                if (volumeSeries) volumeSeries.setData(mergedVolumes);
+                if (sma20) sma20.setData(calculateSMA(mergedRecords, 20));
+                if (sma50) sma50.setData(calculateSMA(mergedRecords, 50));
+                if (sma200) sma200.setData(calculateSMA(mergedRecords, 200));
+
+                if (curRange) {
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: curRange.from + shift,
+                        to: curRange.to + shift,
+                    });
+                }
+
+                if (olderRecords[0].date <= twoYearsAgo) {
+                    app.multiChart.hasMoreHistory[idx] = false;
+                }
+            }
+        } catch (err) {
+            console.warn(`[MULTI-CHART] Error loading more candles for pane ${idx}:`, err);
+            app.multiChart.hasMoreHistory[idx] = false;
+        } finally {
+            app.multiChart.isLoadingMore[idx] = false;
+        }
     }
 
     async function loadPaneData(idx, preserveRange = false) {
         const ticker = app.multiChart.tickers[idx] || 'TCS.NS';
         const tf = (app.multiChart.timeframes[idx] || '1D').toLowerCase();
         const isIntraday = tf === '5m' || tf === '15m' || tf === '1m';
+
+        if (!preserveRange) {
+            app.multiChart.hasMoreHistory[idx] = true;
+            app.multiChart.isLoadingMore[idx] = false;
+        }
 
         try {
             const candleSeries = app.multiChart.candleSeries[idx];
@@ -315,6 +484,9 @@
 
                 if (candleSeries) candleSeries.setData(candles);
                 if (volumeSeries) volumeSeries.setData(volumes);
+                app.multiChart.renderedCandles[idx] = candles;
+                app.multiChart.renderedVolumes[idx] = volumes;
+                app.multiChart.renderedRecords[idx] = [];
 
                 // Hide SMAs on intraday to reduce visual clutter, show VWAP and bands
                 if (sma20) sma20.setData([]);
@@ -392,6 +564,10 @@
                 if (sma20) sma20.setData(calculateSMA(records, 20));
                 if (sma50) sma50.setData(calculateSMA(records, 50));
                 if (sma200) sma200.setData(calculateSMA(records, 200));
+
+                app.multiChart.renderedCandles[idx] = candles;
+                app.multiChart.renderedVolumes[idx] = volumes;
+                app.multiChart.renderedRecords[idx] = records;
 
                 // Clear VWAP on daily chart
                 if (vwap) vwap.setData([]);

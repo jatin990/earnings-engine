@@ -2311,8 +2311,104 @@
             if (app._bkSma20Series) app._bkSma20Series.setData(calculateSMA(candles, 20));
             if (app._bkSma50Series) app._bkSma50Series.setData(calculateSMA(candles, 50));
 
+            app._bkRenderedCandles = candles;
+            app._bkRenderedVolumes = volumes;
+            app._bkIsLoadingMore = false;
+            app._bkHasMoreHistory = true;
+
             if (app._bkLightweightChart) {
                 app._bkLightweightChart.timeScale().fitContent();
+            }
+        };
+
+        app.onBreakoutChartVisibleLogicalRangeChange = function(newRange) {
+            if (!newRange || app._bkIsLoadingMore || !app._bkHasMoreHistory || !app._bkCandleSeries) return;
+            if (newRange.from <= 8) {
+                if (app._bkRangeDebounceTimer) clearTimeout(app._bkRangeDebounceTimer);
+                app._bkRangeDebounceTimer = setTimeout(() => {
+                    app.loadMoreBreakoutCandles();
+                }, 120);
+            }
+        };
+
+        app.loadMoreBreakoutCandles = async function() {
+            if (app._bkIsLoadingMore || !app._bkHasMoreHistory || !app._bkCandleSeries || !app._bkLightweightChart) return;
+            app._bkIsLoadingMore = true;
+
+            try {
+                const renderedCandles = app._bkRenderedCandles || [];
+                if (renderedCandles.length === 0) {
+                    app._bkHasMoreHistory = false;
+                    return;
+                }
+
+                const earliestRenderedTime = renderedCandles[0].time;
+                let olderRaw = (app._bkRawBars || []).filter(b => (b.date || b.time) < earliestRenderedTime);
+
+                if (olderRaw.length === 0 && app._bkCurrentTicker) {
+                    const earliestDate = typeof earliestRenderedTime === 'string' ? earliestRenderedTime : new Date(earliestRenderedTime * 1000).toISOString().split('T')[0];
+                    const earliestDt = new Date(earliestDate);
+                    earliestDt.setFullYear(earliestDt.getFullYear() - 1);
+                    const targetStart = earliestDt.toISOString().split('T')[0];
+
+                    const res = await fetch(`/api/v1/price-history/${encodeURIComponent(app._bkCurrentTicker)}?start_date=${targetStart}`);
+                    if (res.ok) {
+                        const fetchedBars = await res.json();
+                        if (Array.isArray(fetchedBars) && fetchedBars.length > 0) {
+                            const newOlder = fetchedBars.filter(b => (b.date || b.time) < earliestRenderedTime);
+                            if (newOlder.length > 0) {
+                                const existingDates = new Set((app._bkRawBars || []).map(b => b.date || b.time));
+                                const toAdd = newOlder.filter(b => !existingDates.has(b.date || b.time));
+                                app._bkRawBars = [...toAdd, ...(app._bkRawBars || [])];
+                                olderRaw = toAdd;
+                            }
+                        }
+                    }
+                }
+
+                if (olderRaw.length === 0) {
+                    app._bkHasMoreHistory = false;
+                    return;
+                }
+
+                const newCandles = olderRaw.map(r => ({
+                    time: r.date || r.time,
+                    open: Number(r.open),
+                    high: Number(r.high),
+                    low: Number(r.low),
+                    close: Number(r.close),
+                }));
+                const newVolumes = olderRaw.map(r => ({
+                    time: r.date || r.time,
+                    value: Number(r.volume || 0),
+                    color: Number(r.close) >= Number(r.open) ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                }));
+
+                const mergedCandles = [...newCandles, ...renderedCandles];
+                const mergedVolumes = [...newVolumes, ...(app._bkRenderedVolumes || [])];
+
+                app._bkRenderedCandles = mergedCandles;
+                app._bkRenderedVolumes = mergedVolumes;
+
+                const curRange = app._bkLightweightChart.timeScale().getVisibleLogicalRange();
+                const shift = newCandles.length;
+
+                app._bkCandleSeries.setData(mergedCandles);
+                if (app._bkVolumeSeries) app._bkVolumeSeries.setData(mergedVolumes);
+                if (app._bkSma20Series) app._bkSma20Series.setData(calculateSMA(mergedCandles, 20));
+                if (app._bkSma50Series) app._bkSma50Series.setData(calculateSMA(mergedCandles, 50));
+
+                if (curRange) {
+                    app._bkLightweightChart.timeScale().setVisibleLogicalRange({
+                        from: curRange.from + shift,
+                        to: curRange.to + shift,
+                    });
+                }
+            } catch (err) {
+                console.warn('[BREAKOUT] Error loading more candles on scrollback:', err);
+                app._bkHasMoreHistory = false;
+            } finally {
+                app._bkIsLoadingMore = false;
             }
         };
 
@@ -2347,6 +2443,10 @@
             }
 
             try {
+                app._bkCurrentTicker = ticker;
+                app._bkIsLoadingMore = false;
+                app._bkHasMoreHistory = true;
+
                 const chartWidth = container.clientWidth || 600;
                 const chartHeight = wrap ? (wrap.clientHeight || wrap.offsetHeight || 480) : 480;
                 const chart = window.LightweightCharts.createChart(container, {
@@ -2573,6 +2673,7 @@
                     }
                 });
 
+                chart.timeScale().subscribeVisibleLogicalRangeChange(app.onBreakoutChartVisibleLogicalRangeChange);
                 chart.timeScale().fitContent();
             } catch (err) {
                 console.warn('[BREAKOUT] Error initializing quantum chart:', err);

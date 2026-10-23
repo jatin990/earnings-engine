@@ -15,6 +15,7 @@ from earnings_engine.api.routers.dashboard import get_price_history
 @pytest.fixture
 def temp_settings(tmp_path):
     """Provide isolated Settings pointing to a temporary SQLite database."""
+    prices_mod.clear_price_df_cache()
     s = Settings()
     s.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
     s.ensure_dirs()
@@ -113,6 +114,7 @@ def test_load_prices_batch_nan_safety(temp_settings):
             "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (ticker, "2026-09-04", 103.0, 108.0, 98.0, 105.0, 4000),
         )
+        conn.commit()
 
     res = prices_mod.load_prices_batch([ticker], temp_settings)
     df = res.get(ticker)
@@ -154,3 +156,43 @@ def test_get_price_history_strict_json_compliance(monkeypatch, temp_settings):
         assert isinstance(rec["low"], (int, float)) and not math.isnan(rec["low"])
         assert isinstance(rec["close"], (int, float)) and not math.isnan(rec["close"])
         assert isinstance(rec["volume"], int)
+
+
+def test_first_cached_date_and_start_date_support(monkeypatch, temp_settings):
+    """Ensure _first_cached_date properly retrieves minimum cached timestamp and get_price_history forwards start_date."""
+    ticker = "TEST_FIRST_DATE.NS"
+    with prices_mod._connect(temp_settings) as conn:
+        conn.execute(
+            "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (ticker, "2024-01-05", 100.0, 105.0, 95.0, 102.0, 1000),
+        )
+        conn.execute(
+            "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (ticker, "2025-06-10", 110.0, 115.0, 108.0, 114.0, 2000),
+        )
+        conn.commit()
+
+    first_date = prices_mod._first_cached_date(ticker, temp_settings)
+    assert first_date == pd.Timestamp("2024-01-05")
+
+    received_start_date = {}
+
+    def mock_fetch(sym, settings, start_date=None, force=False):
+        received_start_date["val"] = start_date
+        return pd.DataFrame(
+            {
+                "open": [100.0],
+                "high": [105.0],
+                "low": [95.0],
+                "close": [102.0],
+                "volume": [1000],
+            },
+            index=pd.to_datetime(["2024-01-05"]),
+        )
+
+    monkeypatch.setattr(prices_mod, "fetch_prices", mock_fetch)
+
+    records = asyncio.run(get_price_history(ticker, start_date="2024-01-01"))
+    assert len(records) == 1
+    assert received_start_date["val"] == "2024-01-01"
+

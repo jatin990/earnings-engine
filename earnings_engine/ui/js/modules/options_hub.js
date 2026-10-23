@@ -41,6 +41,9 @@
     app._hasInitialChartFitted = false;
     app._avgVolume = 1;
     app._crosshairBound = false;
+    app._isLoadingMore = false;
+    app._hasMoreHistory = true;
+    app._rangeDebounceTimer = null;
 
     /**
      * Universal IST (Indian Standard Time / Asia/Kolkata) Timestamp Formatter
@@ -106,6 +109,8 @@
         app._optionsSymbol = clean;
         app._optionsExpiry = ''; // Reset expiry to default to nearest active
         app._hasInitialChartFitted = false;
+        app._hasMoreHistory = true;
+        app._isLoadingMore = false;
 
         // Update active class on quick pills
         document.querySelectorAll('.option-sym-pill').forEach(pill => {
@@ -142,6 +147,8 @@
         if (!tf) return;
         app._optionsTimeframe = tf;
         app._hasInitialChartFitted = false;
+        app._hasMoreHistory = true;
+        app._isLoadingMore = false;
 
         document.querySelectorAll('.opt-tf-btn').forEach(btn => {
             const isActive = btn.getAttribute('data-tf') === tf;
@@ -463,6 +470,9 @@
         // Subscribe to crosshair movement for Sticky Hover Inspector HUD
         chart.subscribeCrosshairMove(app.handleOptionsCrosshairMove);
 
+        // Infinite scroll / pagination: dynamically load older candles when panning left
+        chart.timeScale().subscribeVisibleLogicalRangeChange(app.onOptionsSmartChartVisibleLogicalRangeChange);
+
         // Responsive ResizeObserver
         const ro = new ResizeObserver(entries => {
             if (!entries || entries.length === 0 || !app._smartChart) return;
@@ -691,6 +701,127 @@
                 loadingEl.style.display = 'none';
                 loadingEl.style.pointerEvents = 'none';
             }
+        }
+    };
+
+    /**
+     * Dynamic scrollback handler: detect when user pans left near earliest candles
+     */
+    app.onOptionsSmartChartVisibleLogicalRangeChange = function (newRange) {
+        if (!newRange || app._isLoadingMore || !app._hasMoreHistory) return;
+        if (newRange.from <= 8) {
+            if (app._rangeDebounceTimer) clearTimeout(app._rangeDebounceTimer);
+            app._rangeDebounceTimer = setTimeout(() => {
+                app.loadMoreOptionsSmartChartCandles();
+            }, 120);
+        }
+    };
+
+    /**
+     * Fetch older candles and prepend to series while preserving viewport zoom & scroll position
+     */
+    app.loadMoreOptionsSmartChartCandles = async function () {
+        if (app._isLoadingMore || !app._hasMoreHistory || !app._smartChartData || !app._smartChartData.candles || app._smartChartData.candles.length === 0) return;
+        app._isLoadingMore = true;
+
+        const curCandles = app._smartChartData.candles;
+        const earliestCandle = curCandles[0];
+        const earliestTime = earliestCandle.time;
+        const symbol = app._optionsSymbol || 'NIFTY';
+        const tf = app._optionsTimeframe || '5m';
+
+        try {
+            const isDailyOrAbove = ['1d', '1w', '1mo'].includes(tf.toLowerCase());
+            let olderCandles = [];
+
+            if (isDailyOrAbove) {
+                const lookbackMs = 730 * 24 * 60 * 60 * 1000;
+                const startDateStr = new Date(Date.now() - lookbackMs).toISOString().split('T')[0];
+                const url = `/api/v1/stock-detail/price-history?ticker=${encodeURIComponent(symbol)}&start_date=${startDateStr}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const json = await res.json();
+                    const rawBars = json.data || [];
+                    olderCandles = rawBars
+                        .map(b => {
+                            const t = typeof b.date === 'string' && b.date.includes('T')
+                                ? Math.floor(new Date(b.date).getTime() / 1000)
+                                : (typeof b.date === 'string' ? Math.floor(new Date(b.date + 'T00:00:00Z').getTime() / 1000) : b.date);
+                            return {
+                                time: t,
+                                open: Number(b.open),
+                                high: Number(b.high),
+                                low: Number(b.low),
+                                close: Number(b.close),
+                                volume: Number(b.volume || 0),
+                            };
+                        })
+                        .filter(c => c.time < earliestTime && !isNaN(c.close));
+                }
+            } else {
+                const url = `/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(symbol)}&interval=${tf}&period=60d&allow_non_fno=true`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const json = await res.json();
+                    const rawCandles = json.candles || [];
+                    olderCandles = rawCandles.filter(c => c.time < earliestTime);
+                }
+            }
+
+            if (!olderCandles || olderCandles.length === 0) {
+                app._hasMoreHistory = false;
+                return;
+            }
+
+            // Sort ascending by time and ensure uniqueness
+            olderCandles.sort((a, b) => a.time - b.time);
+            const seenTimes = new Set(curCandles.map(c => c.time));
+            const deduplicatedOlder = olderCandles.filter(c => !seenTimes.has(c.time));
+
+            if (deduplicatedOlder.length === 0) {
+                app._hasMoreHistory = false;
+                return;
+            }
+
+            const mergedCandles = deduplicatedOlder.concat(curCandles);
+            app._smartChartData.candles = mergedCandles;
+
+            // Capture current visible range before prepending
+            let curRange = null;
+            try {
+                curRange = app._smartChart.timeScale().getVisibleLogicalRange();
+            } catch (e) {}
+
+            // Update series data
+            app._candleSeries.setData(mergedCandles.map(c => ({
+                time: c.time,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+            })));
+
+            if (app._volumeSeries) {
+                app._volumeSeries.setData(mergedCandles.map(c => ({
+                    time: c.time,
+                    value: c.volume,
+                    color: c.close >= c.open ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                })));
+            }
+
+            // Preserve user viewport zoom and pan position by compensating the logical index
+            if (curRange && curRange.from !== null && curRange.to !== null) {
+                const shift = deduplicatedOlder.length;
+                app._smartChart.timeScale().setVisibleLogicalRange({
+                    from: curRange.from + shift,
+                    to: curRange.to + shift,
+                });
+            }
+        } catch (err) {
+            console.error('[OptionsHub] Failed to load older candles:', err);
+            app._hasMoreHistory = false;
+        } finally {
+            app._isLoadingMore = false;
         }
     };
 

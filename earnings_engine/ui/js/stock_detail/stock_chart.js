@@ -25,6 +25,9 @@
     let _avgVolume = 1;
     let _hasInitialChartFitted = false;
     let _chartTimer = null;
+    let _isLoadingMore = false;
+    let _hasMoreHistory = true;
+    let _rangeDebounceTimer = null;
 
     let _optionsTimeframe = '5m';
     let _optionsLayers = {
@@ -50,6 +53,8 @@
         if (!tf) return;
         _optionsTimeframe = tf;
         _hasInitialChartFitted = false;
+        _hasMoreHistory = true;
+        _isLoadingMore = false;
 
         document.querySelectorAll('.opt-tf-btn').forEach(btn => {
             const isActive = btn.getAttribute('data-tf') === tf;
@@ -255,6 +260,9 @@
 
         // Subscribe to crosshair movement for Sticky Real-time Hover Inspector HUD
         chart.subscribeCrosshairMove(handleCrosshairMove);
+
+        // Infinite scroll / pagination: dynamically load older candles when panning left
+        chart.timeScale().subscribeVisibleLogicalRangeChange(onSmartChartVisibleLogicalRangeChange);
 
         // Responsive ResizeObserver
         const ro = new ResizeObserver(entries => {
@@ -492,6 +500,129 @@
         }
     }
     window.loadStockChartData = loadStockChartData;
+
+    /**
+     * Dynamic scrollback handler: detect when user pans left near earliest candles
+     */
+    function onSmartChartVisibleLogicalRangeChange(newRange) {
+        if (!newRange || _isLoadingMore || !_hasMoreHistory) return;
+        if (newRange.from <= 8) {
+            if (_rangeDebounceTimer) clearTimeout(_rangeDebounceTimer);
+            _rangeDebounceTimer = setTimeout(() => {
+                loadMoreSmartChartCandles();
+            }, 120);
+        }
+    }
+
+    /**
+     * Fetch older candles and prepend to series while preserving viewport zoom & scroll position
+     */
+    async function loadMoreSmartChartCandles() {
+        if (_isLoadingMore || !_hasMoreHistory || !_smartChartData || !_smartChartData.candles || _smartChartData.candles.length === 0) return;
+        _isLoadingMore = true;
+
+        const curCandles = _smartChartData.candles;
+        const earliestCandle = curCandles[0];
+        const earliestTime = earliestCandle.time;
+        const symbol = getCleanSymbol();
+        const tf = _optionsTimeframe || '5m';
+
+        try {
+            // For daily/weekly (>1D) timeframes, request up to 2 years (730 days) of history via stock-detail price-history
+            const isDailyOrAbove = ['1d', '1w', '1mo'].includes(tf.toLowerCase());
+            let olderCandles = [];
+
+            if (isDailyOrAbove) {
+                const lookbackMs = 730 * 24 * 60 * 60 * 1000;
+                const startDateStr = new Date(Date.now() - lookbackMs).toISOString().split('T')[0];
+                const url = `/api/v1/stock-detail/price-history?ticker=${encodeURIComponent(symbol)}&start_date=${startDateStr}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const json = await res.json();
+                    const rawBars = json.data || [];
+                    olderCandles = rawBars
+                        .map(b => {
+                            const t = typeof b.date === 'string' && b.date.includes('T')
+                                ? Math.floor(new Date(b.date).getTime() / 1000)
+                                : (typeof b.date === 'string' ? Math.floor(new Date(b.date + 'T00:00:00Z').getTime() / 1000) : b.date);
+                            return {
+                                time: t,
+                                open: Number(b.open),
+                                high: Number(b.high),
+                                low: Number(b.low),
+                                close: Number(b.close),
+                                volume: Number(b.volume || 0),
+                            };
+                        })
+                        .filter(c => c.time < earliestTime && !isNaN(c.close));
+                }
+            } else {
+                // Intraday: query chart-intelligence with extended period (e.g. 60d)
+                const url = `/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(symbol)}&interval=${tf}&period=60d&allow_non_fno=true`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const json = await res.json();
+                    const rawCandles = json.candles || [];
+                    olderCandles = rawCandles.filter(c => c.time < earliestTime);
+                }
+            }
+
+            if (!olderCandles || olderCandles.length === 0) {
+                _hasMoreHistory = false;
+                return;
+            }
+
+            // Sort ascending by time and ensure uniqueness
+            olderCandles.sort((a, b) => a.time - b.time);
+            const seenTimes = new Set(curCandles.map(c => c.time));
+            const deduplicatedOlder = olderCandles.filter(c => !seenTimes.has(c.time));
+
+            if (deduplicatedOlder.length === 0) {
+                _hasMoreHistory = false;
+                return;
+            }
+
+            const mergedCandles = deduplicatedOlder.concat(curCandles);
+            _smartChartData.candles = mergedCandles;
+
+            // Capture current visible range before prepending
+            let curRange = null;
+            try {
+                curRange = _smartChart.timeScale().getVisibleLogicalRange();
+            } catch (e) {}
+
+            // Update series data
+            _candleSeries.setData(mergedCandles.map(c => ({
+                time: c.time,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+            })));
+
+            if (_volumeSeries) {
+                _volumeSeries.setData(mergedCandles.map(c => ({
+                    time: c.time,
+                    value: c.volume,
+                    color: c.close >= c.open ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                })));
+            }
+
+            // Preserve user viewport zoom and pan position by compensating the logical index
+            if (curRange && curRange.from !== null && curRange.to !== null) {
+                const shift = deduplicatedOlder.length;
+                _smartChart.timeScale().setVisibleLogicalRange({
+                    from: curRange.from + shift,
+                    to: curRange.to + shift,
+                });
+            }
+        } catch (err) {
+            console.error('[StockChart] Failed to load older candles:', err);
+            _hasMoreHistory = false;
+        } finally {
+            _isLoadingMore = false;
+        }
+    }
 
     /**
      * Render Candlesticks, Indicators, Order Blocks & Structural Lines on Lightweight Chart

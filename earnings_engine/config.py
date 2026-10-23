@@ -38,11 +38,11 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _default_history_start() -> str:
-    """Calculate the default start date for price history (1 year / 365 days ago)."""
+    """Calculate the default start date for price history (2 years / 730 days ago)."""
     raw = os.getenv("EARNINGS_ENGINE_HISTORY_START", "").strip()
     if raw:
         return raw
-    return (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+    return (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
 
 
 @dataclass

@@ -164,7 +164,7 @@ def fetch_commodity_candles(
         norm_interval = "5m"
 
     if not period:
-        period = "5d" if norm_interval in {"1m", "5m", "15m", "30m", "1h", "60m"} else "6mo"
+        period = "5d" if norm_interval in {"1m", "5m", "15m", "30m", "1h", "60m"} else "2y"
 
     for yf_symbol in tickers_to_try:
         try:
@@ -189,7 +189,9 @@ def fetch_commodity_candles(
         for yf_symbol in tickers_to_try:
             fallback_df = load_prices(yf_symbol, settings)
             if fallback_df is not None and not fallback_df.empty:
-                return fallback_df.tail(120)
+                # Retain up to 2 years (~504 trading days) of fallback price history
+                max_bars = 504 if norm_interval in {"1d", "1w", "1mo"} else 120
+                return fallback_df.tail(max_bars)
     except Exception:
         pass
 

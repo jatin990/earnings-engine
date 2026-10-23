@@ -1197,6 +1197,221 @@
         return { vwap: vwapArr, upper: upperArr, lower: lowerArr };
     }
 
+    // =========================================================================
+    // DYNAMIC HISTORICAL CANDLE PAGINATION ON SCROLL
+    // =========================================================================
+
+    let _drawerScrollDebounce = null;
+
+    function onDrawerVisibleLogicalRangeChange(newRange) {
+        if (!newRange || !app._drawerChartInstance || app._drawerLoadingMore || app._drawerHasMoreHistory === false) return;
+        // Trigger backfill when user pans within 8 bars of earliest rendered candle
+        if (newRange.from <= 8) {
+            if (_drawerScrollDebounce) clearTimeout(_drawerScrollDebounce);
+            _drawerScrollDebounce = setTimeout(async () => {
+                await loadMoreDrawerCandles();
+            }, 120);
+        }
+    }
+
+    async function loadMoreDrawerCandles() {
+        if (app._drawerLoadingMore || app._drawerHasMoreHistory === false || !app._currentDrawerTicker) return;
+        app._drawerLoadingMore = true;
+
+        try {
+            const sym = app._currentDrawerTicker;
+            const tf = (app._drawerChartTimeframe || '1D').toLowerCase();
+            const isIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '4h'].includes(tf);
+
+            if (!isIntraday) {
+                const oldRecords = app._drawerChartRecords || [];
+                if (oldRecords.length === 0) {
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const earliestDateStr = oldRecords[0].date;
+                if (!earliestDateStr) {
+                    app._drawerHasMoreHistory = false;
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const curDate = new Date(earliestDateStr);
+                curDate.setFullYear(curDate.getFullYear() - 2);
+                const targetStart = curDate.toISOString().slice(0, 10);
+
+                const res = await fetch(`${API_BASE}/api/v1/price-history/${encodeURIComponent(sym)}?start_date=${encodeURIComponent(targetStart)}`);
+                if (!res.ok) {
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const newRecords = await res.json();
+                if (!Array.isArray(newRecords) || newRecords.length <= oldRecords.length) {
+                    app._drawerHasMoreHistory = false;
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                if (app._currentDrawerTicker !== sym) {
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const addedCount = newRecords.length - oldRecords.length;
+                app._drawerChartRecords = newRecords;
+
+                // Cache updated records
+                try {
+                    setCached(`price_history_${sym}`, newRecords);
+                } catch (e) {}
+
+                // Recalculate 20D average volume
+                const recentVols = newRecords.slice(-20).map(r => r.volume || 0);
+                app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+                const candles = [];
+                const volumes = [];
+
+                newRecords.forEach(r => {
+                    const itemTime = r.date;
+                    candles.push({
+                        time: itemTime,
+                        open: r.open,
+                        high: r.high,
+                        low: r.low,
+                        close: r.close,
+                    });
+
+                    const isBull = r.close >= r.open;
+                    const isSurge = app._drawerAvgVol20 > 0 && r.volume > app._drawerAvgVol20 * 1.8;
+                    const volColor = isSurge
+                        ? (isBull ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)')
+                        : (isBull ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)');
+
+                    volumes.push({
+                        time: itemTime,
+                        value: r.volume,
+                        color: volColor,
+                    });
+                });
+
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candles);
+                if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumes);
+
+                if (app._drawerSMA20Series) app._drawerSMA20Series.setData(calculateSMA(newRecords, 20));
+                if (app._drawerSMA50Series) app._drawerSMA50Series.setData(calculateSMA(newRecords, 50));
+                if (app._drawerSMA200Series) app._drawerSMA200Series.setData(calculateSMA(newRecords, 200));
+
+                const vwapData = calculateVWAPWithBands(newRecords);
+                if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(vwapData.vwap);
+                if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(vwapData.upper);
+                if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(vwapData.lower);
+
+                // Viewport preservation formula: shift visible range by addedCount to prevent zoom/pan jumping
+                if (app._drawerChartInstance) {
+                    const curRange = app._drawerChartInstance.timeScale().getVisibleLogicalRange();
+                    if (curRange) {
+                        app._drawerChartInstance.timeScale().setVisibleLogicalRange({
+                            from: curRange.from + addedCount,
+                            to: curRange.to + addedCount,
+                        });
+                    }
+                }
+            } else {
+                // Intraday timeframe pagination: expand lookback period (5d -> 1mo -> 60d)
+                const currentPeriod = app._drawerIntradayPeriod || '5d';
+                let nextPeriod = null;
+                if (currentPeriod === '5d') nextPeriod = '1mo';
+                else if (currentPeriod === '1mo') nextPeriod = '60d';
+
+                if (!nextPeriod) {
+                    app._drawerHasMoreHistory = false;
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const cleanSym = sym.replace('.NS', '');
+                const url = `${API_BASE}/api/v1/options/chart-intelligence?symbol=${encodeURIComponent(cleanSym)}&interval=${encodeURIComponent(tf)}&period=${encodeURIComponent(nextPeriod)}&allow_non_fno=true`;
+                const res = await fetch(url);
+                if (!res.ok) {
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const data = await res.json();
+                const newCandles = data.candles || [];
+                const oldCandles = app._drawerChartRecords || [];
+
+                if (newCandles.length <= oldCandles.length) {
+                    app._drawerHasMoreHistory = false;
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                if (app._currentDrawerTicker !== sym) {
+                    app._drawerLoadingMore = false;
+                    return;
+                }
+
+                const addedCount = newCandles.length - oldCandles.length;
+                app._drawerIntradayPeriod = nextPeriod;
+                app._drawerChartRecords = newCandles;
+
+                const recentVols = newCandles.slice(-20).map(c => c.volume || 0);
+                app._drawerAvgVol20 = recentVols.length > 0 ? recentVols.reduce((a, b) => a + b, 0) / recentVols.length : 1;
+
+                const candleBars = [];
+                const volumeBars = [];
+
+                newCandles.forEach(c => {
+                    const isBull = c.close >= c.open;
+                    const isSurge = app._drawerAvgVol20 > 0 && c.volume > app._drawerAvgVol20 * 1.8;
+                    const volColor = isSurge
+                        ? (isBull ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)')
+                        : (isBull ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)');
+
+                    candleBars.push({
+                        time: c.time,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                    });
+
+                    volumeBars.push({
+                        time: c.time,
+                        value: c.volume,
+                        color: volColor,
+                    });
+                });
+
+                if (app._drawerCandleSeries) app._drawerCandleSeries.setData(candleBars);
+                if (app._drawerVolumeSeries) app._drawerVolumeSeries.setData(volumeBars);
+
+                const ind = data.indicators || {};
+                if (app._drawerVWAPSeries) app._drawerVWAPSeries.setData(ind.vwap || []);
+                if (app._drawerVWAPUpperSeries) app._drawerVWAPUpperSeries.setData(ind.vwap_upper_1 || ind.vwap_upper || []);
+                if (app._drawerVWAPLowerSeries) app._drawerVWAPLowerSeries.setData(ind.vwap_lower_1 || ind.vwap_lower || []);
+
+                if (app._drawerChartInstance) {
+                    const curRange = app._drawerChartInstance.timeScale().getVisibleLogicalRange();
+                    if (curRange) {
+                        app._drawerChartInstance.timeScale().setVisibleLogicalRange({
+                            from: curRange.from + addedCount,
+                            to: curRange.to + addedCount,
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[STOCK-DRAWER] Error paginating historical candles:', e);
+        } finally {
+            app._drawerLoadingMore = false;
+        }
+    }
+
     function handleDrawerCrosshairMove(param) {
         if (!param || !param.time || !app._drawerCandleSeries || !param.seriesData) {
             updateDrawerHudWithLastBar();
@@ -1646,6 +1861,10 @@
         const shimmer = document.getElementById('drawerChartShimmer');
         if (shimmer) shimmer.style.display = 'block';
 
+        app._drawerHasMoreHistory = true;
+        app._drawerLoadingMore = false;
+        app._drawerIntradayPeriod = '5d';
+
         if (!container || !window.LightweightCharts) {
             if (shimmer) shimmer.style.display = 'none';
             return;
@@ -1766,6 +1985,7 @@
             app._drawerVWAPLowerSeries = vwapLowerSeries;
 
             chart.subscribeCrosshairMove(handleDrawerCrosshairMove);
+            chart.timeScale().subscribeVisibleLogicalRangeChange(onDrawerVisibleLogicalRangeChange);
 
             // Responsive Resize Observer
             if (!app._drawerResizeObserver && window.ResizeObserver) {

@@ -195,6 +195,28 @@ def _last_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
     return pd.Timestamp(row[0])
 
 
+def _first_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
+    """Return the earliest date for a ticker already in the price cache.
+
+    Returns ``None`` if the ticker has no cached rows.
+    """
+    sym = canonical_symbol(ticker)
+    if not is_turso_enabled():
+        path = _cache_path(settings)
+        if not path.exists():
+            return None
+
+    with _connect(settings) as connection:
+        row = connection.execute(
+            "SELECT MIN(date) FROM price_history WHERE ticker = ?",
+            (sym,),
+        ).fetchone()
+
+    if not row or not row[0]:
+        return None
+    return pd.Timestamp(row[0])
+
+
 def _mark_fetched(ticker: str, settings: Settings) -> None:
     """Record the moment this ticker's prices were last written to the cache."""
     sym = canonical_symbol(ticker)
@@ -415,31 +437,46 @@ def fetch_prices(
     """
     sym = canonical_symbol(ticker)
     fetch_symbol = sym
+    target_start_str = start_date or settings.history_start
+    target_start_ts = pd.Timestamp(target_start_str)
+
     if not force and not hard_refresh:
-        cached_df = load_prices(sym, settings)
-        if not cached_df.empty and prices_recent_enough(sym, settings):
-            logger.debug("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL)", sym)
-            return cached_df
+        first_cached = _first_cached_date(sym, settings)
+        # Only reuse cached_df if the cache already covers target_start (within 4-day grace) AND is recent enough
+        if first_cached is not None and (target_start_ts >= first_cached - pd.Timedelta(days=4)):
+            cached_df = load_prices(sym, settings)
+            if not cached_df.empty and prices_recent_enough(sym, settings):
+                logger.debug("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL and covers %s)", sym, target_start_ts.date())
+                return cached_df
 
     clear_price_df_cache(sym)
 
     # Delta fetch: only download the dates we're missing.
-    # If hard_refresh=True, we explicitly bypass delta fetch and pull 1 year of history (or custom start_date).
+    # If hard_refresh=True, we explicitly bypass delta fetch and pull 2 years of history (or custom start_date).
     if hard_refresh:
-        start = start_date or (pd.Timestamp.now() - pd.Timedelta(days=365)).strftime("%Y-%m-%d")
+        start = start_date or (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")
         last_cached = None
-        logger.debug("[DATA-FETCH] [yfinance] Hard-refreshing 1-year historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
+        logger.debug("[DATA-FETCH] [yfinance] Hard-refreshing historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
     else:
-        start = start_date or settings.history_start
+        first_cached = _first_cached_date(sym, settings)
         last_cached = _last_cached_date(sym, settings)
-        if last_cached is not None:
-            overlap = pd.Timedelta(days=5)
-            start = (last_cached - overlap).strftime("%Y-%m-%d")
-            logger.debug(
-                "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
-                sym, fetch_symbol, start, last_cached.date(),
-            )
+        if first_cached is not None and last_cached is not None:
+            # If the user requested earlier data than what's in cache, fetch backfill from target_start
+            if target_start_ts < first_cached - pd.Timedelta(days=4):
+                start = target_start_ts.strftime("%Y-%m-%d")
+                logger.debug(
+                    "[DATA-FETCH] [yfinance] Backfilling earlier price history for ticker=%s (%s) from=%s (first cached: %s)",
+                    sym, fetch_symbol, start, first_cached.date(),
+                )
+            else:
+                overlap = pd.Timedelta(days=5)
+                start = (last_cached - overlap).strftime("%Y-%m-%d")
+                logger.debug(
+                    "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
+                    sym, fetch_symbol, start, last_cached.date(),
+                )
         else:
+            start = target_start_str
             logger.debug("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
 
     from earnings_engine.data.providers.provider_manager import get_data_manager
