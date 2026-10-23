@@ -331,8 +331,18 @@ def get_node_recent_catalysts(
     return unique_cats[:limit]
 
 
-def compute_node_trade_recommendation(node: dict[str, Any]) -> dict[str, Any]:
-    """Algorithmic microstructure trade action recommendation for a transmission node."""
+def compute_node_trade_recommendation(
+    node: dict[str, Any],
+    upstream_shock_pct: float | None = None,
+    gate1_status: str | None = None,
+) -> dict[str, Any]:
+    """Algorithmic microstructure trade action recommendation for a transmission node.
+
+    Includes upstream lead-lag contagion awareness:
+    When upstream US Tier-1 anchors are down significantly (<= -3.0%) or Gate 1 is FAIL,
+    tactical buy actions on downstream Indian followers are overridden to warn of
+    downstream sympathy dips and lead-lag contagion risk.
+    """
     c_status = node.get("circuit_status") or "STABLE"
     c_dist = node.get("distance_to_lower_circuit_pct")
     e_label = node.get("elasticity_label") or "NORMAL"
@@ -371,7 +381,22 @@ def compute_node_trade_recommendation(node: dict[str, Any]) -> dict[str, Any]:
             "execution_bias": "FADE_OR_HEDGE",
         }
 
-    # 3. Strong Buy on Pullback / Dip
+    # 3. Macro Lead-Lag Spillover & Contagion Protection
+    # If upstream US anchor(s) are severely down (<= -3%) or Gate 1 failed, protect downstream followers
+    is_downstream = role in ("PRIMARY_LEADER", "HIGH_BETA_FOLLOWER", "ORBIT_PEER", "INDEPENDENT")
+    upstream_severely_down = (upstream_shock_pct is not None and upstream_shock_pct <= -3.0) or (gate1_status == "FAIL")
+
+    if is_downstream and upstream_severely_down:
+        shock_str = f"{round(upstream_shock_pct, 1)}%" if upstream_shock_pct is not None else "drawdown"
+        return {
+            "action": "EXPECT_TRANSMISSION_DIP",
+            "action_color": "#f97316",
+            "rationale": f"Upstream Tier-1 US anchor shock ({shock_str}) in flight. Transmission lead-lag window (24–72h) underway; expect sympathy dip in Indian proxy.",
+            "key_risk": "Spillover contagion drag & delayed domestic repricing across transmission window",
+            "execution_bias": "STAND_ASIDE",
+        }
+
+    # 4. Strong Buy on Pullback / Dip (Only when upstream anchors are stabilized)
     if c1d <= -2.0 and (inst_pct is None or inst_pct >= 20.0) and (c_dist is None or c_dist > 3.0) and (e_label in ("DISCOUNTED", "NORMAL") or e_ratio is None or e_ratio < 1.8 or has_positive_cat):
         return {
             "action": "STRONG_BUY_DIP",
@@ -381,7 +406,7 @@ def compute_node_trade_recommendation(node: dict[str, Any]) -> dict[str, Any]:
             "execution_bias": "TACTICAL_LONG",
         }
 
-    # 4. Accumulate Breakout / Expansion
+    # 5. Accumulate Breakout / Expansion
     if c1d >= 2.0 and (c_dist is None or c_dist > 3.0) and e_label != "EXTREME" and (vol_mult >= 1.5 or has_positive_cat):
         return {
             "action": "ACCUMULATE_BREAKOUT",
@@ -391,7 +416,7 @@ def compute_node_trade_recommendation(node: dict[str, Any]) -> dict[str, Any]:
             "execution_bias": "MOMENTUM_ADD",
         }
 
-    # 5. Hold Momentum
+    # 6. Hold Momentum
     if c1d > 0.0 and (c_dist is None or c_dist > 3.0) and e_label != "EXTREME":
         return {
             "action": "HOLD_MOMENTUM",
@@ -401,7 +426,7 @@ def compute_node_trade_recommendation(node: dict[str, Any]) -> dict[str, Any]:
             "execution_bias": "TRAIL_STOP",
         }
 
-    # 6. Neutral Watch
+    # 7. Neutral Watch
     return {
         "action": "NEUTRAL_WATCH",
         "action_color": "#6b7280",
@@ -869,10 +894,9 @@ def get_transmission_graph_payload(
             "is_stale": is_node_stale,
             "status": ("BEARISH_PULLBACK" if c1d < -2.0 else ("BULLISH_EXPANSION" if c1d > 2.0 else "NEUTRAL")) if c1d is not None else "NEUTRAL",
         }
-        # Ingest verified corporate catalysts and compute tactical trade recommendation
+        # Ingest verified corporate catalysts
         node_catalysts = get_node_recent_catalysts(n["symbol"], conn, limit=3)
         node_data["catalysts"] = node_catalysts
-        node_data["trade_action"] = compute_node_trade_recommendation(node_data)
         enriched_nodes.append(node_data)
 
     # 4. Enriched Edges
@@ -1002,6 +1026,22 @@ def get_transmission_graph_payload(
         else ("Export cash flow deficit flagged in forensic audit." if gate3_status == "FAIL"
               else "Awaiting Q2 billed export cash flow prints.")
     )
+
+    # Compute upstream anchor shock for contagion-aware trade action calculation
+    upstream_anchor_shock = None
+    if anchor_node and anchor_node.get("change_1d_pct") is not None:
+        upstream_anchor_shock = float(anchor_node["change_1d_pct"])
+    elif tier1_nodes:
+        t1_c1ds = [float(n["change_1d_pct"]) for n in tier1_nodes if n.get("change_1d_pct") is not None]
+        if t1_c1ds:
+            upstream_anchor_shock = min(t1_c1ds)
+
+    for en in enriched_nodes:
+        en["trade_action"] = compute_node_trade_recommendation(
+            en,
+            upstream_shock_pct=upstream_anchor_shock,
+            gate1_status=gate1_status,
+        )
 
     oldest_age = max(node_ages) if node_ages else 0
     has_stale = any(age > stale_limit_minutes for age in node_ages) if node_ages else True

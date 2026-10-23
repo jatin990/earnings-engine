@@ -505,6 +505,58 @@ def test_sync_transmission_fundamentals_cdmo(monkeypatch):
     assert row[2] == 42.0
 
 
+def test_trade_recommendation_upstream_shock_contagion():
+    # Downstream Indian follower with strong pullback but upstream US anchor down -5.0%
+    node = {
+        "node_id": "MTARTECH.NS",
+        "symbol": "MTARTECH.NS",
+        "circuit_status": "STABLE",
+        "distance_to_lower_circuit_pct": 5.0,
+        "elasticity_label": "DISCOUNTED",
+        "elasticity_ratio": 0.56,
+        "institutional_holding_pct": 33.7,
+        "change_1d_pct": -3.1,
+        "role": "INDEPENDENT",
+        "anomaly_flag": "NONE",
+        "catalysts": [],
+    }
+    # When upstream shock is severe (-5.0%), tactical buy must be overridden to warning
+    rec = compute_node_trade_recommendation(node, upstream_shock_pct=-5.0, gate1_status="FAIL")
+    assert rec["action"] == "EXPECT_TRANSMISSION_DIP"
+    assert rec["action_color"] == "#f97316"
+    assert rec["execution_bias"] == "STAND_ASIDE"
+    assert "transmission lead-lag window" in rec["rationale"].lower() or "upstream" in rec["rationale"].lower()
+
+
+def test_graph_payload_upstream_shock_propagation():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_transmission_db(conn)
+    seed_default_transmission_baskets(conn)
+
+    # Insert snapshot where anchor BE is down -5.0%
+    conn.execute(
+        "INSERT INTO transmission_snapshots (node_id, current_price, change_1d_pct, change_5d_pct, change_20d_pct) "
+        "VALUES ('BE', 18.0, -5.2, -6.0, -8.0)"
+    )
+    # Insert snapshot for downstream proxy MTARTECH.NS
+    conn.execute(
+        "INSERT INTO transmission_snapshots (node_id, current_price, change_1d_pct) "
+        "VALUES ('MTARTECH.NS', 1800.0, -2.5)"
+    )
+    conn.commit()
+
+    payload = get_transmission_graph_payload("AI_INFRA_HARDWARE", conn, auto_sync=False)
+    assert payload["status"] == "ok"
+    assert payload["reentry_gates"]["us_anchor_stabilization"]["status"] == "FAIL"
+
+    # Verify downstream follower gets EXPECT_TRANSMISSION_DIP instead of naive buy
+    mtar_node = next(n for n in payload["nodes"] if n["node_id"] == "MTARTECH.NS")
+    assert mtar_node["trade_action"]["action"] == "EXPECT_TRANSMISSION_DIP"
+    assert mtar_node["trade_action"]["execution_bias"] == "STAND_ASIDE"
+
+
+
 
 
 
