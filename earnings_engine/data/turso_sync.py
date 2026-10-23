@@ -23,6 +23,7 @@ from earnings_engine.config import Settings
 from earnings_engine.data.db import (
     _cache_path,
     is_turso_enabled,
+    is_turso_sync_enabled,
     TursoConnection,
 )
 
@@ -328,6 +329,10 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
     are transferred over the network, reducing sync times from minutes to sub-second durations.
     """
     s = settings or Settings()
+    if not is_turso_sync_enabled():
+        logger.info("[TURSO-SYNC] Upstream Turso remote sync disabled via TURSO_SYNC_ENABLED flag. Running in pure local SQLite mode.")
+        return {"status": "skipped", "reason": "Turso sync disabled via TURSO_SYNC_ENABLED=false"}
+
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 
@@ -541,6 +546,10 @@ def override_remote_tables_from_local(
     the clean, authentic local records to eliminate any remote synthetic artifacts.
     """
     s = settings or Settings()
+    if not is_turso_sync_enabled():
+        logger.info("[TURSO-OVERRIDE] Upstream Turso remote sync disabled via TURSO_SYNC_ENABLED flag. Skipping remote override.")
+        return {"status": "skipped", "reason": "Turso sync disabled via TURSO_SYNC_ENABLED=false"}
+
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 

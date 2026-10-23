@@ -74,6 +74,7 @@
         timeframes: ['1D', '1D', '1D', '1D'],
         isSyncing: false,
         pollTimer: null,
+        isProgrammaticRangeChange: [false, false, false, false],
         isLoadingMore: [false, false, false, false],
         hasMoreHistory: [true, true, true, true],
         rangeDebounceTimer: [null, null, null, null],
@@ -282,7 +283,7 @@
     }
 
     function onPaneVisibleLogicalRangeChange(idx, newRange) {
-        if (!newRange || newRange.from === undefined || newRange.from === null) return;
+        if (app.multiChart.isProgrammaticRangeChange?.[idx] || !newRange || newRange.from === undefined || newRange.from === null) return;
         if (newRange.from <= 8 && !app.multiChart.isLoadingMore[idx] && app.multiChart.hasMoreHistory[idx]) {
             if (app.multiChart.rangeDebounceTimer[idx]) {
                 clearTimeout(app.multiChart.rangeDebounceTimer[idx]);
@@ -356,10 +357,19 @@
                 if (volumeSeries) volumeSeries.setData(mergedVolumes);
 
                 if (curRange) {
-                    chart.timeScale().setVisibleLogicalRange({
-                        from: curRange.from + shift,
-                        to: curRange.to + shift,
-                    });
+                    app.multiChart.isProgrammaticRangeChange[idx] = true;
+                    try {
+                        chart.timeScale().setVisibleLogicalRange({
+                            from: curRange.from + shift,
+                            to: curRange.to + shift,
+                        });
+                    } finally {
+                        setTimeout(() => {
+                            if (app.multiChart?.isProgrammaticRangeChange) {
+                                app.multiChart.isProgrammaticRangeChange[idx] = false;
+                            }
+                        }, 50);
+                    }
                 }
                 app.multiChart.hasMoreHistory[idx] = false;
             } else {
@@ -416,10 +426,19 @@
                 if (sma200) sma200.setData(calculateSMA(mergedRecords, 200));
 
                 if (curRange) {
-                    chart.timeScale().setVisibleLogicalRange({
-                        from: curRange.from + shift,
-                        to: curRange.to + shift,
-                    });
+                    app.multiChart.isProgrammaticRangeChange[idx] = true;
+                    try {
+                        chart.timeScale().setVisibleLogicalRange({
+                            from: curRange.from + shift,
+                            to: curRange.to + shift,
+                        });
+                    } finally {
+                        setTimeout(() => {
+                            if (app.multiChart?.isProgrammaticRangeChange) {
+                                app.multiChart.isProgrammaticRangeChange[idx] = false;
+                            }
+                        }, 50);
+                    }
                 }
 
                 if (olderRecords[0].date <= twoYearsAgo) {
@@ -438,6 +457,7 @@
         const ticker = app.multiChart.tickers[idx] || 'TCS.NS';
         const tf = (app.multiChart.timeframes[idx] || '1D').toLowerCase();
         const isIntraday = tf === '5m' || tf === '15m' || tf === '1m';
+        const prevRange = preserveRange && app.multiChart.instances[idx] ? app.multiChart.instances[idx].timeScale().getVisibleLogicalRange() : null;
 
         if (!preserveRange) {
             app.multiChart.hasMoreHistory[idx] = true;
@@ -481,6 +501,17 @@
                     value: c.volume || 0,
                     color: c.close >= c.open ? colors.volumeUp : colors.volumeDown,
                 }));
+
+                // Non-destructive merge during 15s background auto-refresh: preserve older prepended candles
+                if (preserveRange && app.multiChart.renderedCandles[idx]?.length > 0 && candles.length > 0) {
+                    const firstIncoming = candles[0].time;
+                    const olderCandles = app.multiChart.renderedCandles[idx].filter(c => c.time < firstIncoming);
+                    const olderVolumes = (app.multiChart.renderedVolumes[idx] || []).filter(v => v.time < firstIncoming);
+                    if (olderCandles.length > 0) {
+                        candles = olderCandles.concat(candles);
+                        volumes = olderVolumes.concat(volumes);
+                    }
+                }
 
                 if (candleSeries) candleSeries.setData(candles);
                 if (volumeSeries) volumeSeries.setData(volumes);
@@ -556,6 +587,19 @@
                     });
                 });
 
+                // Non-destructive merge during 15s background auto-refresh: preserve older prepended history
+                if (preserveRange && app.multiChart.renderedCandles[idx]?.length > 0 && candles.length > 0) {
+                    const firstIncoming = candles[0].time;
+                    const olderCandles = app.multiChart.renderedCandles[idx].filter(c => c.time < firstIncoming);
+                    const olderVolumes = (app.multiChart.renderedVolumes[idx] || []).filter(v => v.time < firstIncoming);
+                    const olderRecords = (app.multiChart.renderedRecords[idx] || []).filter(r => r.date < firstIncoming);
+                    if (olderCandles.length > 0) {
+                        candles = olderCandles.concat(candles);
+                        volumes = olderVolumes.concat(volumes);
+                        records = olderRecords.concat(records);
+                    }
+                }
+
                 if (candleSeries) {
                     candleSeries.setData(candles);
                     candleSeries.setMarkers([]); // clear intraday SMC markers
@@ -593,7 +637,19 @@
                 }
             }
 
-            if (!preserveRange && app.multiChart.instances[idx]) {
+            if (preserveRange && prevRange && app.multiChart.instances[idx]) {
+                app.multiChart.isProgrammaticRangeChange[idx] = true;
+                try {
+                    app.multiChart.instances[idx].timeScale().setVisibleLogicalRange(prevRange);
+                } catch (e) {
+                } finally {
+                    setTimeout(() => {
+                        if (app.multiChart?.isProgrammaticRangeChange) {
+                            app.multiChart.isProgrammaticRangeChange[idx] = false;
+                        }
+                    }, 50);
+                }
+            } else if (!preserveRange && app.multiChart.instances[idx]) {
                 app.multiChart.instances[idx].timeScale().fitContent();
             }
         } catch (err) {

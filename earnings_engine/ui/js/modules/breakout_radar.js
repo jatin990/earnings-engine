@@ -2322,7 +2322,7 @@
         };
 
         app.onBreakoutChartVisibleLogicalRangeChange = function(newRange) {
-            if (!newRange || app._bkIsLoadingMore || !app._bkHasMoreHistory || !app._bkCandleSeries) return;
+            if (app._bkIsProgrammaticRangeChange || !newRange || app._bkIsLoadingMore || !app._bkHasMoreHistory || !app._bkCandleSeries) return;
             if (newRange.from <= 8) {
                 if (app._bkRangeDebounceTimer) clearTimeout(app._bkRangeDebounceTimer);
                 app._bkRangeDebounceTimer = setTimeout(() => {
@@ -2399,10 +2399,17 @@
                 if (app._bkSma50Series) app._bkSma50Series.setData(calculateSMA(mergedCandles, 50));
 
                 if (curRange) {
-                    app._bkLightweightChart.timeScale().setVisibleLogicalRange({
-                        from: curRange.from + shift,
-                        to: curRange.to + shift,
-                    });
+                    app._bkIsProgrammaticRangeChange = true;
+                    try {
+                        app._bkLightweightChart.timeScale().setVisibleLogicalRange({
+                            from: curRange.from + shift,
+                            to: curRange.to + shift,
+                        });
+                    } finally {
+                        setTimeout(() => {
+                            app._bkIsProgrammaticRangeChange = false;
+                        }, 50);
+                    }
                 }
             } catch (err) {
                 console.warn('[BREAKOUT] Error loading more candles on scrollback:', err);

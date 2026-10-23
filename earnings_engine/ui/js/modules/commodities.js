@@ -51,6 +51,7 @@
     mod._isLoadingMore = false;
     mod._hasMoreHistory = true;
     mod._rangeDebounceTimer = null;
+    mod._isProgrammaticRangeChange = false;
 
     /**
      * Universal IST (Indian Standard Time / Asia/Kolkata) Timestamp Formatter
@@ -260,6 +261,8 @@
         }
 
         try {
+            const prevRange = preserveZoom && mod._chart ? mod._chart.timeScale().getVisibleLogicalRange() : null;
+
             const url = `/api/v1/commodities/chart-intelligence?symbol=${encodeURIComponent(mod._symbol)}&interval=${encodeURIComponent(mod._timeframe)}&period=${encodeURIComponent(mod._period)}${forceRefresh ? '&force_refresh=true' : ''}`;
             const res = await fetch(url);
             if (!res.ok) {
@@ -267,6 +270,17 @@
             }
 
             const data = await res.json();
+
+            // Non-destructive merge during refresh with preserveZoom: preserve older prepended candles
+            if (preserveZoom && mod._chartData?.candles?.length > 0 && data.candles?.length > 0) {
+                const existing = mod._chartData.candles;
+                const firstIncomingTime = data.candles[0].time;
+                const older = existing.filter(c => c.time < firstIncomingTime);
+                if (older.length > 0) {
+                    data.candles = older.concat(data.candles);
+                }
+            }
+
             mod._chartData = data;
 
             // Compute average volume for hover surge metrics
@@ -283,6 +297,18 @@
             // Render Lightweight Chart
             mod.initChartCanvas();
             mod.renderChart(data);
+
+            if (preserveZoom && prevRange && mod._chart) {
+                mod._isProgrammaticRangeChange = true;
+                try {
+                    mod._chart.timeScale().setVisibleLogicalRange(prevRange);
+                } catch (e) {
+                } finally {
+                    setTimeout(() => {
+                        mod._isProgrammaticRangeChange = false;
+                    }, 50);
+                }
+            }
 
         } catch (err) {
             console.error('[COMMODITIES-MODULE] Error loading chart intelligence:', err);
@@ -625,7 +651,7 @@
      * Infinite scrollback listener for Commodities Chart
      */
     mod.onVisibleLogicalRangeChange = function (newRange) {
-        if (!newRange || mod._isLoadingMore || !mod._hasMoreHistory || !mod._candleSeries) return;
+        if (mod._isProgrammaticRangeChange || !newRange || mod._isLoadingMore || !mod._hasMoreHistory || !mod._candleSeries) return;
         if (newRange.from <= 8) {
             if (mod._rangeDebounceTimer) clearTimeout(mod._rangeDebounceTimer);
             mod._rangeDebounceTimer = setTimeout(() => {
@@ -696,10 +722,17 @@
             }
 
             if (curRange) {
-                mod._chart.timeScale().setVisibleLogicalRange({
-                    from: curRange.from + shift,
-                    to: curRange.to + shift,
-                });
+                mod._isProgrammaticRangeChange = true;
+                try {
+                    mod._chart.timeScale().setVisibleLogicalRange({
+                        from: curRange.from + shift,
+                        to: curRange.to + shift,
+                    });
+                } finally {
+                    setTimeout(() => {
+                        mod._isProgrammaticRangeChange = false;
+                    }, 50);
+                }
             }
 
             mod._hasMoreHistory = false;

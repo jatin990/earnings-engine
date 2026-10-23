@@ -28,6 +28,7 @@
     let _isLoadingMore = false;
     let _hasMoreHistory = true;
     let _rangeDebounceTimer = null;
+    let _isProgrammaticRangeChange = false;
 
     let _optionsTimeframe = '5m';
     let _optionsLayers = {
@@ -468,6 +469,17 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();
+
+            // Non-destructive merge during 15s background auto-refresh: preserve older prepended candles
+            if (isBackground && _smartChartData?.candles?.length > 0 && data.candles?.length > 0) {
+                const existing = _smartChartData.candles;
+                const firstIncomingTime = data.candles[0].time;
+                const older = existing.filter(c => c.time < firstIncomingTime);
+                if (older.length > 0) {
+                    data.candles = older.concat(data.candles);
+                }
+            }
+
             _smartChartData = data;
 
             // Calculate average volume for surge metric
@@ -505,7 +517,7 @@
      * Dynamic scrollback handler: detect when user pans left near earliest candles
      */
     function onSmartChartVisibleLogicalRangeChange(newRange) {
-        if (!newRange || _isLoadingMore || !_hasMoreHistory) return;
+        if (_isProgrammaticRangeChange || !newRange || _isLoadingMore || !_hasMoreHistory) return;
         if (newRange.from <= 8) {
             if (_rangeDebounceTimer) clearTimeout(_rangeDebounceTimer);
             _rangeDebounceTimer = setTimeout(() => {
@@ -611,10 +623,17 @@
             // Preserve user viewport zoom and pan position by compensating the logical index
             if (curRange && curRange.from !== null && curRange.to !== null) {
                 const shift = deduplicatedOlder.length;
-                _smartChart.timeScale().setVisibleLogicalRange({
-                    from: curRange.from + shift,
-                    to: curRange.to + shift,
-                });
+                _isProgrammaticRangeChange = true;
+                try {
+                    _smartChart.timeScale().setVisibleLogicalRange({
+                        from: curRange.from + shift,
+                        to: curRange.to + shift,
+                    });
+                } finally {
+                    setTimeout(() => {
+                        _isProgrammaticRangeChange = false;
+                    }, 50);
+                }
             }
         } catch (err) {
             console.error('[StockChart] Failed to load older candles:', err);
@@ -814,10 +833,15 @@
 
         // Restore viewport zoom & scroll position if already fitted; else fit initial
         if (_hasInitialChartFitted && prevLogicalRange && isBackground) {
+            _isProgrammaticRangeChange = true;
             try {
                 _smartChart.timeScale().setVisibleLogicalRange(prevLogicalRange);
             } catch (e) {
                 _smartChart.timeScale().fitContent();
+            } finally {
+                setTimeout(() => {
+                    _isProgrammaticRangeChange = false;
+                }, 50);
             }
         } else if (!_hasInitialChartFitted) {
             _smartChart.timeScale().fitContent();

@@ -398,8 +398,20 @@ class TursoConnectionCursor:
         pass
 
 
+def is_turso_sync_enabled() -> bool:
+    """Check if upstream Turso remote sync is enabled.
+
+    Can be turned off by setting TURSO_SYNC_ENABLED=false (or 0 / off / no) in .env.
+    Defaults to True as long as credentials are configured.
+    """
+    flag = os.getenv("TURSO_SYNC_ENABLED", "true").strip().lower()
+    return flag not in ("false", "0", "no", "off", "disabled")
+
+
 def is_turso_enabled() -> bool:
-    """Check if Turso cloud database credentials are present in the environment."""
+    """Check if Turso cloud database credentials are present and enabled."""
+    if not is_turso_sync_enabled():
+        return False
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     return bool(url and token)

@@ -1204,7 +1204,7 @@
     let _drawerScrollDebounce = null;
 
     function onDrawerVisibleLogicalRangeChange(newRange) {
-        if (!newRange || !app._drawerChartInstance || app._drawerLoadingMore || app._drawerHasMoreHistory === false) return;
+        if (app._isDrawerProgrammaticRangeChange || !newRange || !app._drawerChartInstance || app._drawerLoadingMore || app._drawerHasMoreHistory === false) return;
         // Trigger backfill when user pans within 8 bars of earliest rendered candle
         if (newRange.from <= 8) {
             if (_drawerScrollDebounce) clearTimeout(_drawerScrollDebounce);
@@ -1313,10 +1313,17 @@
                 if (app._drawerChartInstance) {
                     const curRange = app._drawerChartInstance.timeScale().getVisibleLogicalRange();
                     if (curRange) {
-                        app._drawerChartInstance.timeScale().setVisibleLogicalRange({
-                            from: curRange.from + addedCount,
-                            to: curRange.to + addedCount,
-                        });
+                        app._isDrawerProgrammaticRangeChange = true;
+                        try {
+                            app._drawerChartInstance.timeScale().setVisibleLogicalRange({
+                                from: curRange.from + addedCount,
+                                to: curRange.to + addedCount,
+                            });
+                        } finally {
+                            setTimeout(() => {
+                                app._isDrawerProgrammaticRangeChange = false;
+                            }, 50);
+                        }
                     }
                 }
             } else {
@@ -1398,10 +1405,17 @@
                 if (app._drawerChartInstance) {
                     const curRange = app._drawerChartInstance.timeScale().getVisibleLogicalRange();
                     if (curRange) {
-                        app._drawerChartInstance.timeScale().setVisibleLogicalRange({
-                            from: curRange.from + addedCount,
-                            to: curRange.to + addedCount,
-                        });
+                        app._isDrawerProgrammaticRangeChange = true;
+                        try {
+                            app._drawerChartInstance.timeScale().setVisibleLogicalRange({
+                                from: curRange.from + addedCount,
+                                to: curRange.to + addedCount,
+                            });
+                        } finally {
+                            setTimeout(() => {
+                                app._isDrawerProgrammaticRangeChange = false;
+                            }, 50);
+                        }
                     }
                 }
             }
@@ -1670,7 +1684,7 @@
                 const curTF = (app._drawerChartTimeframe || '').toLowerCase();
                 const stillIntraday = ['1m', '3m', '5m', '15m', '30m', '1h', '4h'].includes(curTF);
                 if (drawer && drawer.classList.contains('open') && app._currentDrawerTicker && stillIntraday) {
-                    app._initOrUpdateDrawerChart(app._currentDrawerTicker);
+                    app._initOrUpdateDrawerChart(app._currentDrawerTicker, null, true);
                 } else if (app._drawerChartPollTimer) {
                     clearInterval(app._drawerChartPollTimer);
                     app._drawerChartPollTimer = null;
@@ -1856,17 +1870,21 @@
         }
     }
 
-    app._initOrUpdateDrawerChart = async function (sym, signal) {
+    app._initOrUpdateDrawerChart = async function (sym, signal, isBackground = false) {
         const container = document.getElementById('drawerNativeChartCanvas');
         const shimmer = document.getElementById('drawerChartShimmer');
-        if (shimmer) shimmer.style.display = 'block';
+        if (shimmer && !isBackground) shimmer.style.display = 'block';
 
-        app._drawerHasMoreHistory = true;
-        app._drawerLoadingMore = false;
-        app._drawerIntradayPeriod = '5d';
+        const prevRange = isBackground && app._drawerChartInstance ? app._drawerChartInstance.timeScale().getVisibleLogicalRange() : null;
+
+        if (!isBackground) {
+            app._drawerHasMoreHistory = true;
+            app._drawerLoadingMore = false;
+            app._drawerIntradayPeriod = '5d';
+        }
 
         if (!container || !window.LightweightCharts) {
-            if (shimmer) shimmer.style.display = 'none';
+            if (shimmer && !isBackground) shimmer.style.display = 'none';
             return;
         }
 
@@ -2026,10 +2044,19 @@
                 const data = await res.json();
                 if (app._currentDrawerTicker !== sym) return;
 
-                const candles = data.candles || [];
+                let candles = data.candles || [];
                 if (candles.length === 0) {
-                    if (shimmer) shimmer.style.display = 'none';
+                    if (shimmer && !isBackground) shimmer.style.display = 'none';
                     return;
+                }
+
+                // Non-destructive merge during 15s background auto-refresh: preserve older prepended candles
+                if (isBackground && app._drawerChartRecords?.length > 0 && candles.length > 0) {
+                    const firstIncoming = candles[0].time;
+                    const older = app._drawerChartRecords.filter(c => c.time < firstIncoming);
+                    if (older.length > 0) {
+                        candles = older.concat(candles);
+                    }
                 }
 
                 app._drawerChartRecords = candles;
@@ -2149,8 +2176,22 @@
                     explainerSMC.textContent = `Microstructure Bias: ${data.tactical_signals.primary_bias} (Confidence: ${data.tactical_signals.confidence_score || 75}%). VWAP dynamic mean: ₹${candles[candles.length - 1]?.close || '--'}.`;
                 }
 
-                if (shimmer) shimmer.style.display = 'none';
-                app._drawerChartInstance.timeScale().fitContent();
+                if (shimmer && !isBackground) shimmer.style.display = 'none';
+
+                if (isBackground && prevRange && app._drawerChartInstance) {
+                    app._isDrawerProgrammaticRangeChange = true;
+                    try {
+                        app._drawerChartInstance.timeScale().setVisibleLogicalRange(prevRange);
+                    } catch (e) {
+                    } finally {
+                        setTimeout(() => {
+                            app._isDrawerProgrammaticRangeChange = false;
+                        }, 50);
+                    }
+                } else if (!isBackground) {
+                    app._drawerChartInstance.timeScale().fitContent();
+                }
+
                 updateDrawerHudWithLastBar();
             } else {
                 // Daily EOD Mode
@@ -2174,11 +2215,20 @@
                 }
 
                 if (!records || records.length === 0) {
-                    if (shimmer) shimmer.style.display = 'none';
+                    if (shimmer && !isBackground) shimmer.style.display = 'none';
                     return;
                 }
 
                 if (app._currentDrawerTicker !== sym) return;
+
+                // Non-destructive merge during 15s background auto-refresh: preserve older prepended records
+                if (isBackground && app._drawerChartRecords?.length > 0 && records.length > 0) {
+                    const firstIncoming = records[0].date;
+                    const older = app._drawerChartRecords.filter(r => r.date < firstIncoming);
+                    if (older.length > 0) {
+                        records = older.concat(records);
+                    }
+                }
 
                 app._drawerChartRecords = records;
 
@@ -2238,10 +2288,22 @@
                     app._applyDrawerSRPriceLines(app._drawerTechnicalData);
                 }
 
-                if (shimmer) shimmer.style.display = 'none';
+                if (shimmer && !isBackground) shimmer.style.display = 'none';
 
                 // Set Visible Range & HUD
-                app.setDrawerChartRange(app._drawerChartRange || '1Y');
+                if (isBackground && prevRange && app._drawerChartInstance) {
+                    app._isDrawerProgrammaticRangeChange = true;
+                    try {
+                        app._drawerChartInstance.timeScale().setVisibleLogicalRange(prevRange);
+                    } catch (e) {
+                    } finally {
+                        setTimeout(() => {
+                            app._isDrawerProgrammaticRangeChange = false;
+                        }, 50);
+                    }
+                } else if (!isBackground) {
+                    app.setDrawerChartRange(app._drawerChartRange || '1Y');
+                }
                 updateDrawerHudWithLastBar();
 
                 // Update Technical Explainer Cards
