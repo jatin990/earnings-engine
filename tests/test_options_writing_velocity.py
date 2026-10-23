@@ -83,11 +83,18 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
     assert summary.get("bias") in ("BULLISH", "BEARISH", "NEUTRAL")
     assert summary.get("pcr_oi") == round(370000 / 250000, 2)
 
-    # 6. Expanded Multi-Timeframe Table
+    # 6. Expanded Multi-Timeframe Table (6 Core + 3 Extended Macro)
     tf_table = metrics.get("timeframes_table", [])
-    assert len(tf_table) == 6
+    assert len(tf_table) == 9
     timeframe_keys = [row["key"] for row in tf_table]
-    assert timeframe_keys == ["5m", "15m", "30m", "1h", "4h", "today"]
+    assert timeframe_keys == ["5m", "15m", "30m", "1h", "4h", "today", "1w", "1mo", "3mo"]
+
+    # Verify is_extended flags
+    for row in tf_table:
+        if row["key"] in ("1w", "1mo", "3mo"):
+            assert row["is_extended"] is True
+        else:
+            assert row["is_extended"] is False
 
     for row in tf_table:
         assert "timeframe" in row
@@ -135,4 +142,22 @@ def test_derive_timeframe_guidance_diagnostics():
     assert bias == "NEUTRAL"
     assert "Macro Indecision" in happening
     assert "HARVEST THETA" in todo
+
+    # 5. 1w Macro Put Writing
+    bias, happening, todo = _derive_timeframe_guidance("1w", "PUT WRITING", 10000, 45000)
+    assert bias == "BULLISH"
+    assert "Structural Weekly Put Writing" in happening
+    assert "BUY WEEKLY DIP BASES" in todo
+
+    # 6. 1mo Macro Call Writing
+    bias, happening, todo = _derive_timeframe_guidance("1mo", "CALL WRITING", 90000, 20000)
+    assert bias == "BEARISH"
+    assert "Macro Monthly Supply Overhang" in happening
+    assert "DEFENSIVE CYCLE PLAY" in todo
+
+    # 7. 3mo Strategic Squeeze
+    bias, happening, todo = _derive_timeframe_guidance("3mo", "SHORT COVERING", -60000, -10000)
+    assert bias == "BULLISH"
+    assert "Quarterly Capitulation Squeeze" in happening
+    assert "LONG-TERM BULLISH TREND" in todo
 

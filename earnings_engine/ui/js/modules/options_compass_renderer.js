@@ -23,6 +23,45 @@
     let activeChartMode = 'oi'; // 'oi' | 'today' | '15m'
     let buttonsInitialized = false;
 
+    // State for extended macro timeframes toggle (Weekly, Monthly, Quarterly)
+    let showExtendedTf = false;
+    let extendedTfButtonBound = false;
+
+    function _setupExtendedTfToggle() {
+        const btn = document.getElementById('optToggleExtendedTfBtn');
+        if (!btn || extendedTfButtonBound) return;
+        btn.addEventListener('click', () => {
+            showExtendedTf = !showExtendedTf;
+            _updateExtendedTfDisplay();
+        });
+        extendedTfButtonBound = true;
+    }
+
+    function _updateExtendedTfDisplay() {
+        const btn = document.getElementById('optToggleExtendedTfBtn');
+        const icon = document.getElementById('optToggleExtendedTfIcon');
+        const label = document.getElementById('optToggleExtendedTfLabel');
+        if (btn) {
+            if (showExtendedTf) {
+                btn.style.background = 'rgba(56, 189, 248, 0.15)';
+                btn.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+                btn.style.color = '#38bdf8';
+                if (icon) icon.textContent = '➖';
+                if (label) label.textContent = 'Hide Macro (1W / 1M / 3M)';
+            } else {
+                btn.style.background = 'rgba(255, 255, 255, 0.06)';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                btn.style.color = 'var(--text-primary)';
+                if (icon) icon.textContent = '➕';
+                if (label) label.textContent = 'Weekly / Monthly / Quarterly';
+            }
+        }
+        const extRows = document.querySelectorAll('.opt-extended-tf-row');
+        extRows.forEach(row => {
+            row.style.display = showExtendedTf ? 'table-row' : 'none';
+        });
+    }
+
     // Helper to format number in Indian Lakhs/Crores
     const fmtOi = (num, signed = true) => {
         const n = Math.abs(num || 0);
@@ -270,8 +309,14 @@
         // Render Table Rows
         const tfRows = timeframesData.timeframes_table || [];
         if (tableBody && tfRows.length > 0) {
+            _setupExtendedTfToggle();
             let rowsHtml = '';
             tfRows.forEach(row => {
+                const isExt = Boolean(row.is_extended);
+                const displayStyle = isExt ? (showExtendedTf ? 'table-row' : 'none') : 'table-row';
+                const rowClass = isExt ? 'opt-extended-tf-row' : '';
+                const macroBadge = isExt ? '<span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:3px;padding:0.05rem 0.25rem;font-size:0.58rem;font-weight:700;margin-left:0.35rem;">MACRO</span>' : '';
+
                 const callVal = row.call_chg !== undefined ? row.call_chg : 0;
                 const putVal = row.put_chg !== undefined ? row.put_chg : 0;
                 const netVal = row.net_delta !== undefined ? row.net_delta : (putVal - callVal);
@@ -309,9 +354,12 @@
                 }
 
                 rowsHtml += `
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.2s ease;">
+                <tr class="${rowClass}" style="display:${displayStyle};border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.2s ease;">
                     <td style="padding:0.6rem;font-weight:700;color:var(--text-primary);white-space:nowrap;">
-                        <div>${row.timeframe}</div>
+                        <div style="display:flex;align-items:center;">
+                            <span>${row.timeframe}</span>
+                            ${macroBadge}
+                        </div>
                         <div style="font-size:0.65rem;color:var(--text-secondary);font-family:var(--font-mono);font-weight:400;">
                             ${row.scope || ''}
                         </div>
@@ -345,6 +393,7 @@
                 </tr>`;
             });
             tableBody.innerHTML = rowsHtml;
+            _updateExtendedTfDisplay();
         }
     };
 

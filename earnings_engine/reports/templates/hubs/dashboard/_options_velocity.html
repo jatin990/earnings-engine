@@ -161,10 +161,14 @@
                     </span>
                 </div>
                 <div style="font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;">
-                    Institutional delta writing velocity across 5m, 15m, 30m, 1h, 4h & Session with real-time diagnostics & trade execution playbooks
+                    Institutional delta writing velocity across Intraday (5m, 15m, 30m, 1h, 4h, Today) & Macro (Weekly, Monthly, Quarterly) horizons
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <button id="optToggleExtendedTfBtn" type="button" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(255,255,255,0.06);color:var(--text-primary);border:1px solid rgba(255,255,255,0.12);font-size:0.68rem;padding:0.2rem 0.55rem;border-radius:4px;cursor:pointer;font-weight:700;transition:all 0.2s ease;">
+                    <span id="optToggleExtendedTfIcon">➕</span>
+                    <span id="optToggleExtendedTfLabel">Weekly / Monthly / Quarterly</span>
+                </button>
                 <span id="optMultiTfMacroPill" class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.55rem;border-radius:4px;font-weight:700;">
                     MACRO: Awaiting Data
                 </span>

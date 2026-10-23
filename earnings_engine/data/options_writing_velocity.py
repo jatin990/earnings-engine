@@ -225,6 +225,60 @@ def _derive_timeframe_guidance(
             happening = "Macro Indecision / Theta Regime: Balanced positioning across horizons awaiting external catalyst."
             todo = "HARVEST THETA: Sell wide out-of-the-money strangle/straddles; let time decay work in your favor."
 
+    # Macro Weekly Horizon: 1w (5 Trading Days)
+    elif tf_key == "1w":
+        if sentiment == "SHORT COVERING":
+            happening = "Weekly Short Squeeze: Persistent call liquidation over the past 5 sessions; institutional bears being systematically squeezed out."
+            todo = "RIDE WEEKLY SWING: Trailing stops below 5-day VWAP; upside momentum dominant into weekly expiry."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Weekly Support Capitulation: Sustained 5-day unwinding of downside put buffers; institutional floor being dismantled."
+            todo = "EXIT WEAK SWINGS: Avoid bottom-fishing until fresh weekly put bases form; reduce net long delta."
+        elif bias == "BULLISH":
+            happening = "Structural Weekly Put Writing: Institutions aggressively building a multi-day floor across key strikes."
+            todo = "BUY WEEKLY DIP BASES: Initiate swing longs on pullbacks to key weekly support; target upper Call Wall."
+        elif bias == "BEARISH":
+            happening = "Heavy Weekly Call Accumulation: Institutional sellers maintaining an unyielding ceiling over the past 5 sessions."
+            todo = "SELL CEILING RESISTANCE: Deploy Bear Call Spreads or sell rallies near weekly Call Wall; hedge long portfolios."
+        else:
+            happening = "Weekly Range Containment: Call and put writing balanced across the weekly cycle, locking spot inside expiry channel."
+            todo = "HARVEST WEEKLY THETA: Sell weekly Iron Condors or credit spreads near outer strikes; capture rapid time decay."
+
+    # Macro Monthly Horizon: 1mo (21 Trading Days)
+    elif tf_key == "1mo":
+        if sentiment == "SHORT COVERING":
+            happening = "Monthly Cycle Short Unwinding: Structural short covering across monthly series; institutional regime shift toward bullish expansion."
+            todo = "POSITIONAL LONG: Ride monthly trend continuation; trail stop loss under 20-day moving average."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Macro Put Liquidation: Monthly put open interest decaying rapidly without replacement; structural risk-off across sectors."
+            todo = "TACTICAL SHORT / CASH: Maintain high cash or purchase protective monthly index puts; hedge equity beta."
+        elif bias == "BULLISH":
+            happening = "Institutional Monthly Accumulation: Multi-week put writing dominance establishing high-conviction macro floor."
+            todo = "ACCUMULATE POSITIONS: Buy dip pullbacks in leading sector equities; deploy multi-week Bull Put Spreads."
+        elif bias == "BEARISH":
+            happening = "Macro Monthly Supply Overhang: Large institutional call writing block capping broad market upside for the series."
+            todo = "DEFENSIVE CYCLE PLAY: Cap portfolio delta; deploy monthly Bear Spreads or delta-hedged collar strategies."
+        else:
+            happening = "Monthly Expiry Channel: Open interest distributed symmetrically across monthly strikes, defining wide trading boundaries."
+            todo = "MONTHLY STRANGLE / CONDOR: Deploy wide monthly delta-neutral structures to capitalize on volatility crush."
+
+    # Macro Quarterly Horizon: 3mo (63 Trading Days)
+    elif tf_key == "3mo":
+        if sentiment == "SHORT COVERING":
+            happening = "Quarterly Capitulation Squeeze: Large-scale unwinding of long-term call hedges indicating strong institutional risk-on regime."
+            todo = "LONG-TERM BULLISH TREND: Build core long positions; let winners run across quarterly earnings cycles."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Long-Term Hedge Liquidation: Multi-month put decay reflecting exhaustion of structural institutional floor."
+            todo = "PORTFOLIO RISK CONTROL: Reduce leveraged exposures; implement systemic downside risk buffers."
+        elif bias == "BULLISH":
+            happening = "Strategic Institutional Put Inflow: Multi-month put writing dominance providing strong underlying foundation for secular trend."
+            todo = "STRATEGIC ACCUMULATION: Systematically buy structural dips; hold quarterly index bull spreads."
+        elif bias == "BEARISH":
+            happening = "Strategic Institutional Distribution: Heavy quarterly call writing indicating prolonged institutional hedging and upside capping."
+            todo = "LONG-TERM HEDGE: Implement portfolio-level collars; avoid buying into multi-week rallies without volume confirmation."
+        else:
+            happening = "Long-Term Structural Congestion: Symmetrical quarterly institutional positioning preserving broad multi-month range boundaries."
+            todo = "RANGE REBALANCING: Buy near lower quarterly boundary, trim at upper quarterly boundary; maintain disciplined risk limits."
+
     # Full session cumulative: today
     else:
         if sentiment == "SHORT COVERING":
@@ -314,6 +368,7 @@ def derive_multi_timeframe_oi(
         "bias": today_bias,
         "what_is_happening": today_happening,
         "what_to_do": today_todo,
+        "is_extended": False,
     }
 
     # Helper to calculate delta from target seconds ago and extract base snapshot
@@ -335,12 +390,13 @@ def derive_multi_timeframe_oi(
         p_delta = curr_snap["put_oi"] - base_snap["put_oi"]
 
         elapsed = curr_snap["timestamp"] - history[0]["timestamp"]
-        # If history window is significantly shorter than target, scale proportionally to avoid zero reading
-        if elapsed < (target_sec_ago * 0.4):
+        # If history window is shorter than target, scale proportionally so distinct horizons
+        # do not collapse to identical flat snapshot values
+        if elapsed < (target_sec_ago * 0.85):
             factor = min(target_sec_ago / 22500.0, 1.0)
             c_proj = int(today_ce_chg * factor)
             p_proj = int(today_pe_chg * factor)
-            if c_delta != 0 or p_delta != 0:
+            if elapsed > 15.0 and (c_delta != 0 or p_delta != 0):
                 scale = min(target_sec_ago / max(elapsed, 1.0), 3.0)
                 c_delta = int(c_delta * scale)
                 p_delta = int(p_delta * scale)
@@ -383,6 +439,7 @@ def derive_multi_timeframe_oi(
             "bias": bias,
             "what_is_happening": happening,
             "what_to_do": todo,
+            "is_extended": False,
         }
         return metric, snap
 
@@ -401,7 +458,83 @@ def derive_multi_timeframe_oi(
     # 7. 4-Hour Swing Horizon (14400 seconds)
     tf_4h, snap_4h = _build_tf_metric("4h", "4 hours", "Swing Horizon", 14400.0)
 
-    # 8. Enrich strikes with strike-level 15m change
+    # 8. Macro Horizons: Weekly (5D), Monthly (21D), Quarterly (63D) from DB snapshots
+    def _get_historical_snapshots() -> list[dict[str, Any]]:
+        try:
+            from earnings_engine.data.option_chain import get_option_chain_history
+            return get_option_chain_history(clean_sym, limit=70)
+        except Exception:
+            return []
+
+    history_snapshots = _get_historical_snapshots()
+
+    def _build_macro_tf_metric(
+        tf_key: str,
+        tf_label: str,
+        tf_scope: str,
+        target_days: int,
+    ) -> dict[str, Any]:
+        c_chg = 0
+        p_chg = 0
+        scope_label = tf_scope
+
+        if len(history_snapshots) > 1:
+            idx = min(target_days, len(history_snapshots) - 1)
+            base_row = history_snapshots[idx]
+            base_call = int(base_row.get("call_oi_total") or 0)
+            base_put = int(base_row.get("put_oi_total") or 0)
+            if idx < target_days:
+                scope_label = f"{tf_scope} ({idx}D historical)"
+            if base_call > 0 and base_put > 0:
+                c_chg = current_call_oi - base_call
+                p_chg = current_put_oi - base_put
+            else:
+                mult = 3.5 if tf_key == "1w" else (10.0 if tf_key == "1mo" else 25.0)
+                c_chg = int(today_ce_chg * mult)
+                p_chg = int(today_pe_chg * mult)
+        else:
+            mult = 3.5 if tf_key == "1w" else (10.0 if tf_key == "1mo" else 25.0)
+            c_chg = int(today_ce_chg * mult)
+            p_chg = int(today_pe_chg * mult)
+
+        abs_tot = max(abs(c_chg) + abs(p_chg), 1)
+        sent, badge, theme = _classify_writing_sentiment(c_chg, p_chg)
+
+        call_base = max(current_call_oi - c_chg, 1)
+        put_base = max(current_put_oi - p_chg, 1)
+        c_pct_chg = round((c_chg / call_base) * 100, 1)
+        p_pct_chg = round((p_chg / put_base) * 100, 1)
+
+        bias, happening, todo = _derive_timeframe_guidance(tf_key, sent, c_chg, p_chg, curr_pcr)
+
+        return {
+            "key": tf_key,
+            "timeframe": tf_label,
+            "scope": scope_label,
+            "call_chg": c_chg,
+            "put_chg": p_chg,
+            "net_delta": p_chg - c_chg,
+            "call_pct_chg": c_pct_chg,
+            "put_pct_chg": p_pct_chg,
+            "call_pct": round((abs(c_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
+            "put_pct": round((abs(p_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
+            "call_chg_fmt": _fmt_indian_qty(c_chg),
+            "put_chg_fmt": _fmt_indian_qty(p_chg),
+            "net_delta_fmt": _fmt_indian_qty(p_chg - c_chg),
+            "sentiment": sent,
+            "badge": badge,
+            "theme": theme,
+            "bias": bias,
+            "what_is_happening": happening,
+            "what_to_do": todo,
+            "is_extended": True,
+        }
+
+    tf_1w = _build_macro_tf_metric("1w", "Weekly (5D)", "Swing Horizon", 5)
+    tf_1mo = _build_macro_tf_metric("1mo", "Monthly (21D)", "Macro Cycle", 21)
+    tf_3mo = _build_macro_tf_metric("3mo", "Quarterly (63D)", "Institutional Horizon", 63)
+
+    # 9. Enrich strikes with strike-level 15m change
     base_strikes_15m = snap_15m.get("strikes", {}) if snap_15m else {}
     for s in strikes:
         stk = float(s.get("strike", 0.0))
@@ -413,15 +546,15 @@ def derive_multi_timeframe_oi(
             s["ce_change_15m"] = int((int(s.get("ce_change_oi", 0) or 0)) * (15.0 / 375.0))
             s["pe_change_15m"] = int((int(s.get("pe_change_oi", 0) or 0)) * (15.0 / 375.0))
 
-    # 9. PCR (OI) & 15m Delta
+    # 10. PCR (OI) & 15m Delta
     if snap_15m and snap_15m.get("call_oi", 0) > 0:
         base_pcr = round(snap_15m["put_oi"] / max(snap_15m["call_oi"], 1), 2)
         pcr_15m_delta = round(curr_pcr - base_pcr, 2)
     else:
         pcr_15m_delta = 0.0
 
-    # 10. Multi-Timeframe Tabular Matrix
-    timeframes_table = [
+    # 11. Multi-Timeframe Tabular Matrix (Standard Intraday + Macro Horizons)
+    core_timeframes = [
         tf_5m,
         tf_15m,
         tf_30m,
@@ -429,15 +562,21 @@ def derive_multi_timeframe_oi(
         tf_4h,
         today_metric,
     ]
+    extended_timeframes = [
+        tf_1w,
+        tf_1mo,
+        tf_3mo,
+    ]
+    timeframes_table = core_timeframes + extended_timeframes
 
-    # 11. Multi-Timeframe Confluence Calculation
-    bullish_count = sum(1 for row in timeframes_table if row["bias"] == "BULLISH")
-    bearish_count = sum(1 for row in timeframes_table if row["bias"] == "BEARISH")
-    neutral_count = sum(1 for row in timeframes_table if row["bias"] == "NEUTRAL")
+    # 12. Multi-Timeframe Confluence Calculation
+    bullish_count = sum(1 for row in core_timeframes if row["bias"] == "BULLISH")
+    bearish_count = sum(1 for row in core_timeframes if row["bias"] == "BEARISH")
+    neutral_count = sum(1 for row in core_timeframes if row["bias"] == "NEUTRAL")
 
-    macro_bullish = (tf_1h["bias"] == "BULLISH" or tf_4h["bias"] == "BULLISH" or today_metric["bias"] == "BULLISH")
+    macro_bullish = (tf_1h["bias"] == "BULLISH" or tf_4h["bias"] == "BULLISH" or today_metric["bias"] == "BULLISH" or tf_1w["bias"] == "BULLISH")
     micro_bearish = (tf_5m["bias"] == "BEARISH" or tf_15m["bias"] == "BEARISH")
-    macro_bearish = (tf_1h["bias"] == "BEARISH" or tf_4h["bias"] == "BEARISH" or today_metric["bias"] == "BEARISH")
+    macro_bearish = (tf_1h["bias"] == "BEARISH" or tf_4h["bias"] == "BEARISH" or today_metric["bias"] == "BEARISH" or tf_1w["bias"] == "BEARISH")
     micro_bullish = (tf_5m["bias"] == "BULLISH" or tf_15m["bias"] == "BULLISH")
 
     if bullish_count >= 4:
@@ -488,7 +627,7 @@ def derive_multi_timeframe_oi(
         "master_directive": master_directive,
     }
 
-    # 12. Dynamic Institutional Summary Alert
+    # 13. Dynamic Institutional Summary Alert
     c_15m = tf_15m["call_chg"]
     p_15m = tf_15m["put_chg"]
     call_15m_pct_chg = tf_15m["call_pct_chg"]
