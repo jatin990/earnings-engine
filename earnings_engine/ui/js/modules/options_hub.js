@@ -25,6 +25,7 @@
         derivatives: true,
         orb: true,
         trendlines: true,
+        fib: false,
     };
 
     app._optionsChart = null; // Chart.js instance for multi-mode derivatives visualizer
@@ -173,6 +174,7 @@
             derivatives: 'optToggleDeriv',
             orb: 'optToggleOrb',
             trendlines: 'optToggleTrendlines',
+            fib: 'optToggleFib',
         };
 
         const btn = document.getElementById(btnIdMap[layer]);
@@ -630,6 +632,36 @@
                 }
             }
 
+            // 5. Check Fibonacci Retracement Levels
+            if (!matchedZone && app._optionsLayers.fib && data.candles && data.candles.length > 0) {
+                let sHigh = -Infinity;
+                let sLow = Infinity;
+                data.candles.forEach(c => {
+                    if (c.high > sHigh) sHigh = c.high;
+                    if (c.low < sLow) sLow = c.low;
+                });
+                const sRange = sHigh - sLow;
+                if (sRange > 0) {
+                    const fibTargets = [
+                        { ratio: 0.0, label: 'Fib 0.0% (Base Low)', color: '#94a3b8' },
+                        { ratio: 0.236, label: 'Fib 23.6%', color: '#f87171' },
+                        { ratio: 0.382, label: 'Fib 38.2%', color: '#fb923c' },
+                        { ratio: 0.5, label: 'Fib 50.0% (Equilibrium)', color: '#fbbf24' },
+                        { ratio: 0.618, label: 'Fib 61.8% (Golden Pocket)', color: '#34d399' },
+                        { ratio: 0.786, label: 'Fib 78.6%', color: '#38bdf8' },
+                        { ratio: 1.0, label: 'Fib 100.0% (Swing High)', color: '#c084fc' },
+                    ];
+                    for (const fib of fibTargets) {
+                        const targetPrice = sLow + (sRange * fib.ratio);
+                        if (Math.abs(hoverPrice - targetPrice) <= (targetPrice * 0.0025)) {
+                            matchedZone = `${fib.label} @ ₹${targetPrice.toFixed(1)}`;
+                            zoneColor = fib.color;
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (matchedZone) {
                 inspectZoneDetails.textContent = matchedZone;
                 if (inspectZone) {
@@ -1030,6 +1062,40 @@
                 ]);
                 app._trendlineSeries.push(s);
             });
+        }
+
+        // 6. Fibonacci Retracement Levels
+        if (app._optionsLayers.fib && candles.length > 0) {
+            let swingHigh = -Infinity;
+            let swingLow = Infinity;
+            candles.forEach(c => {
+                if (c.high > swingHigh) swingHigh = c.high;
+                if (c.low < swingLow) swingLow = c.low;
+            });
+            const range = swingHigh - swingLow;
+            if (range > 0) {
+                const fibRatios = [
+                    { ratio: 0.0, label: '0.0% (Base Low)', color: '#94a3b8', width: 1 },
+                    { ratio: 0.236, label: '23.6%', color: '#f87171', width: 1 },
+                    { ratio: 0.382, label: '38.2%', color: '#fb923c', width: 1 },
+                    { ratio: 0.5, label: '50.0% (Equilibrium)', color: '#fbbf24', width: 2 },
+                    { ratio: 0.618, label: '61.8% (Golden Pocket)', color: '#34d399', width: 2 },
+                    { ratio: 0.786, label: '78.6%', color: '#38bdf8', width: 1 },
+                    { ratio: 1.0, label: '100.0% (Swing High)', color: '#c084fc', width: 1 },
+                ];
+                fibRatios.forEach(fib => {
+                    const price = swingLow + (range * fib.ratio);
+                    const line = app._candleSeries.createPriceLine({
+                        price: parseFloat(price.toFixed(2)),
+                        color: fib.color,
+                        lineWidth: fib.width,
+                        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `Fib ${fib.label}: ₹${price.toFixed(1)}`,
+                    });
+                    app._chartPriceLines.push(line);
+                });
+            }
         }
 
         // Restore viewport zoom & scroll position if already fitted; else fit initial
