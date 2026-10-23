@@ -1,7 +1,8 @@
 """Institutional Option Writing Velocity & Rolling OI Snapshot Cache.
 
-Tracks rolling multi-timeframe Open Interest (Today, 15m velocity, 5m burst)
-and classifies institutional writing flow (Put Writing vs Call Writing).
+Tracks rolling multi-timeframe Open Interest (5m, 15m, 30m, 1h, 4h, and Today)
+and classifies institutional writing flow (Put Writing vs Call Writing) with
+actionable trading directives ('what is happening' and 'what to do').
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from typing import Any
 # Rolling Open Interest & Writing Velocity Cache: symbol -> list of dict snapshots
 # Each snapshot: {"timestamp": float, "call_oi": int, "put_oi": int, "strikes": dict}
 _OI_SNAPSHOT_CACHE: dict[str, list[dict[str, Any]]] = {}
-_MAX_OI_SNAPSHOTS = 120  # Keep up to 2 hours of snapshots
+_MAX_OI_SNAPSHOTS = 1200  # Keep up to 5 hours of 15s snapshots
 
 
 def track_oi_snapshot(
@@ -102,13 +103,156 @@ def _fmt_indian_qty(num: int | float) -> str:
     return f"{sign}{int(n)}"
 
 
+def _derive_timeframe_guidance(
+    tf_key: str,
+    sentiment: str,
+    call_delta: int,
+    put_delta: int,
+    pcr_oi: float = 1.0,
+) -> tuple[str, str, str]:
+    """Derive bias, institutional diagnosis ('what is happening'), and actionable trading directive ('what should I do').
+
+    Returns:
+        (bias, what_is_happening, what_to_do)
+        where bias is 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+    """
+    # 1. Determine Bias
+    if sentiment in ("BALANCED", "NEUTRAL"):
+        bias = "NEUTRAL"
+    elif sentiment == "PUT WRITING":
+        bias = "BULLISH"
+    elif sentiment == "CALL WRITING":
+        bias = "BEARISH"
+    elif sentiment == "SHORT COVERING":
+        bias = "BULLISH"
+    elif sentiment == "LONG UNWINDING":
+        bias = "BEARISH"
+    elif put_delta >= call_delta * 1.25 and put_delta > 0:
+        bias = "BULLISH"
+    elif call_delta >= put_delta * 1.25 and call_delta > 0:
+        bias = "BEARISH"
+    else:
+        bias = "NEUTRAL"
+
+    # 2. Timeframe-specific diagnoses and trade playbooks
+    # Microstructure burst: 5m
+    if tf_key == "5m":
+        if sentiment == "SHORT COVERING":
+            happening = "Microstructure Short Squeeze: Call writers panic-covering positions on rapid upward momentum burst."
+            todo = "RIDE MOMENTUM: Scalp long momentum breakouts above immediate strike; trail stops very tightly."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Microstructure PE Unwinding: Put sellers liquidating downside contracts; temporary slip hazard."
+            todo = "TIGHTEN LONG STOPS: Avoid aggressive dip-buying; wait for fresh put writing to materialize."
+        elif bias == "BULLISH":
+            happening = "Microstructure Put Writing Surge: Smart money rapidly underwriting immediate floor strikes; aggressive short put bids."
+            todo = "BUY DIPS: Scalp longs on minor pullbacks toward VWAP or nearest strike support; avoid chasing tops."
+        elif bias == "BEARISH":
+            happening = "Microstructure Call Writing Block: Aggressive ask-side liquidity building overhead; quick capping of upside."
+            todo = "FADE RALLIES: Scalp short or lock profits on spikes into resistance; do not chase intraday highs."
+        else:
+            happening = "Scalper Equilibrium: Balanced two-way order flow; tight range-bound scalping between immediate strikes."
+            todo = "SCALP BOUNDARIES: Trade only at extreme edges; avoid entering trades in the middle of the range."
+
+    # Primary intraday velocity: 15m
+    elif tf_key == "15m":
+        if sentiment == "SHORT COVERING":
+            happening = "Intraday Short Squeeze: Sustained CE unwinding forcing trapped bears to buy back contracts."
+            todo = "FAVOR UPSIDE: Ride the squeeze toward upper Call Wall; watch for volume exhaustion before exiting."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Intraday Support Erosion: PE unwinding indicates waning floor confidence and tactical risk-off."
+            todo = "DEFEND LONGS: Tighten stop-losses; avoid adding longs until put sellers re-enter."
+        elif bias == "BULLISH":
+            happening = "Intraday Put Defense: Institutions aggressively underwriting downside puts, reinforcing session demand zone."
+            todo = "LONG BIAS: Enter long pullbacks near Put Wall; deploy Bull Put Spreads or ATM Calls with defined stops."
+        elif bias == "BEARISH":
+            happening = "Intraday Ceiling Build: Heavy institutional call writing pinning price below key resistance strikes."
+            todo = "SHORT BIAS: Sell rallies into Call Wall resistance; deploy Bear Call Spreads or ATM Put options."
+        else:
+            happening = "Two-Way Consolidation: Neither bulls nor bears possess decisive writing velocity; price coiling for breakout."
+            todo = "WAIT & OBSERVE: Look for volume surge or wait for an OI expansion trigger before taking directional risk."
+
+    # Session continuation & momentum: 30m
+    elif tf_key == "30m":
+        if sentiment == "SHORT COVERING":
+            happening = "Structural Short Covering: Major overhead calls being liquidated, clearing the way for higher price discovery."
+            todo = "BUY BREAKOUTS: Enter continuation trades on breaks above intraday highs; trail stop under prior 30m candle."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Floor Abandonment: Key put strikes losing open interest, leaving the market vulnerable to sharp downward dips."
+            todo = "REDUCE EXPOSURE: Hedge existing long deltas; look for tactical short opportunities on failed bounces."
+        elif bias == "BULLISH":
+            happening = "Sustained Put Writing Momentum: Strong accumulation of short put inventory, establishing durable floor."
+            todo = "FAVOR LONGS: Hold long delta; trail stop-loss under 30m session low; target Call Wall resistance."
+        elif bias == "BEARISH":
+            happening = "Sustained Overhead Supply: Call OI expanding across upper strikes, locking the market below resistance."
+            todo = "DEFEND / SHORT: Protect existing longs with put hedges; initiate tactical short plays on bounces."
+        else:
+            happening = "Range-Bound Equilibrium: Symmetric call and put writing pinning spot price between nearest walls."
+            todo = "RANGE STRATEGIES: Deploy non-directional strategies (Iron Condor / Short Straddle) to harvest theta."
+
+    # Institutional block positioning: 1h
+    elif tf_key == "1h":
+        if sentiment == "SHORT COVERING":
+            happening = "Higher-Timeframe Short Unwinding: Trapped call sellers capitulating; significant delta rebalancing to upside."
+            todo = "SWING LONG: Hold long positions with trailing stop; institutional sellers are abandoning resistance."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Institutional Put De-risking: Sustained unwinding of downside buffers; caution warranted for bulls."
+            todo = "RAISE CASH: Trim long equity/options exposure; institutional put writers are pulling their bids."
+        elif bias == "BULLISH":
+            happening = "Institutional Floor Solidification: Major liquidity providers establishing high-conviction structural floor."
+            todo = "TREND ACCUMULATION: Build swing long exposure via Bull Call Ladders or Put Credit Spreads."
+        elif bias == "BEARISH":
+            happening = "Institutional Distribution Ceiling: Large-scale call sales pinning market under overhead Gamma Flip."
+            todo = "REDUCE LONG RISK: Exit weak long positions; initiate Bear Put Spreads targeting lower Put Wall."
+        else:
+            happening = "Structural Congestion: Multi-strike straddle/strangle writing creating non-directional range containment."
+            todo = "WAIT FOR EXPANSION: Range-bound chop; wait for clear OI volume breakout before directional entry."
+
+    # Multi-session institutional swing horizon: 4h
+    elif tf_key == "4h":
+        if sentiment == "SHORT COVERING":
+            happening = "Multi-Hour Bear Capitulation: Broad-based short call liquidation across key resistance strikes."
+            todo = "HOLD SWING LONGS: Major overhead supply cleared; trend continuation favored on multi-session horizon."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Macro Support Liquidation: Multi-hour erosion of put contracts pointing toward prolonged drift."
+            todo = "AVOID AGGRESSIVE LONGS: Lack of institutional put absorption indicates vulnerable downside trajectory."
+        elif bias == "BULLISH":
+            happening = "Macro Swing Bullish Cushion: Large institutional participants heavily short puts, providing multi-session trend ballast."
+            todo = "HOLD BULLISH SWINGS: Macro floor intact; buy dips with wider stops; avoid shorting rallies."
+        elif bias == "BEARISH":
+            happening = "Macro Resistance Fortification: Strong swing-level call writing establishes durable multi-hour resistance wall."
+            todo = "SWING SHORT LEAN: Macro resistance holding firm; sell call spreads or hold delta-hedged shorts."
+        else:
+            happening = "Macro Indecision / Theta Regime: Balanced positioning across horizons awaiting external catalyst."
+            todo = "HARVEST THETA: Sell wide out-of-the-money strangle/straddles; let time decay work in your favor."
+
+    # Full session cumulative: today
+    else:
+        if sentiment == "SHORT COVERING":
+            happening = "Session-Wide Short Squeeze: Trapped call writers steadily abandoning positions, propelling bullish run."
+            todo = "TREND FOLLOWING: Ride the strong intraday trend; let profits run with trailing stop at VWAP."
+        elif sentiment == "LONG UNWINDING":
+            happening = "Session Support Drainage: Institutional put sellers stepping away, removing downside floor cushion."
+            todo = "DEFENSIVE POSTURE: Move to cash or hedge; session support has failed to attract fresh institutional writing."
+        elif bias == "BULLISH":
+            happening = "Full-Day Put Accumulation: Session-wide put delta dominance creating an expanding institutional safety buffer."
+            todo = "BUY WITH CONFIDENCE: Favor long strategies; buy at VWAP/support floors; trail stops systematically."
+        elif bias == "BEARISH":
+            happening = "Full-Day Supply Dominance: Sustained call additions suppressing spot rallies throughout the session."
+            todo = "DEFENSIVE / SHORT: Institutional ceiling active; sell rallies, tighten trailing stops on longs."
+        else:
+            happening = "Neutral Session Balance: Net writing delta near parity; market operating in theta-decay equilibrium."
+            todo = "DELTA-NEUTRAL: Market in consolidation balance; scalp channel extremes or collect premium."
+
+    return bias, happening, todo
+
+
 def derive_multi_timeframe_oi(
     symbol: str,
     current_call_oi: int,
     current_put_oi: int,
     strikes: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Compute multi-timeframe Call vs Put Open Interest metrics across Today, 15m, and 5m."""
+    """Compute multi-timeframe Call vs Put Open Interest metrics across 5m, 15m, 30m, 1h, 4h, and Today."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
     now = time.time()
     now_time = datetime.now().strftime("%H:%M")
@@ -116,6 +260,9 @@ def derive_multi_timeframe_oi(
     # Track current snapshot
     track_oi_snapshot(clean_sym, current_call_oi, current_put_oi, strikes)
     history = _OI_SNAPSHOT_CACHE.get(clean_sym, [])
+
+    # Current PCR
+    curr_pcr = round(current_put_oi / max(current_call_oi, 1), 2)
 
     # 1. Total Positions (Two Bars: Calls vs Puts)
     tot_oi = max(current_call_oi + current_put_oi, 1)
@@ -141,19 +288,32 @@ def derive_multi_timeframe_oi(
     put_today_pct_chg = round((today_pe_chg / put_base_today) * 100, 1)
 
     today_sent, today_badge, today_theme = _classify_writing_sentiment(today_ce_chg, today_pe_chg)
+    today_bias, today_happening, today_todo = _derive_timeframe_guidance(
+        "today", today_sent, today_ce_chg, today_pe_chg, curr_pcr
+    )
 
     today_metric = {
+        "key": "today",
+        "timeframe": "Today",
+        "scope": "Full Session",
         "call_oi": current_call_oi,
         "put_oi": current_put_oi,
         "call_pct": tot_call_pct,
         "put_pct": tot_put_pct,
         "call_chg": today_ce_chg,
         "put_chg": today_pe_chg,
+        "net_delta": today_pe_chg - today_ce_chg,
         "call_pct_chg": call_today_pct_chg,
         "put_pct_chg": put_today_pct_chg,
+        "call_chg_fmt": _fmt_indian_qty(today_ce_chg),
+        "put_chg_fmt": _fmt_indian_qty(today_pe_chg),
+        "net_delta_fmt": _fmt_indian_qty(today_pe_chg - today_ce_chg),
         "sentiment": today_sent,
         "badge": today_badge,
         "theme": today_theme,
+        "bias": today_bias,
+        "what_is_happening": today_happening,
+        "what_to_do": today_todo,
     }
 
     # Helper to calculate delta from target seconds ago and extract base snapshot
@@ -174,57 +334,74 @@ def derive_multi_timeframe_oi(
         c_delta = curr_snap["call_oi"] - base_snap["call_oi"]
         p_delta = curr_snap["put_oi"] - base_snap["put_oi"]
 
-        if c_delta == 0 and p_delta == 0 and len(history) <= 3:
+        elapsed = curr_snap["timestamp"] - history[0]["timestamp"]
+        # If history window is significantly shorter than target, scale proportionally to avoid zero reading
+        if elapsed < (target_sec_ago * 0.4):
             factor = min(target_sec_ago / 22500.0, 1.0)
-            return int(today_ce_chg * factor), int(today_pe_chg * factor), base_snap
+            c_proj = int(today_ce_chg * factor)
+            p_proj = int(today_pe_chg * factor)
+            if c_delta != 0 or p_delta != 0:
+                scale = min(target_sec_ago / max(elapsed, 1.0), 3.0)
+                c_delta = int(c_delta * scale)
+                p_delta = int(p_delta * scale)
+            else:
+                c_delta = c_proj
+                p_delta = p_proj
 
         return c_delta, p_delta, base_snap
 
-    # 3. 15-Minute Velocity (900 seconds)
-    c_15m, p_15m, snap_15m = _get_rolling_snapshot(900.0)
-    abs_15m = max(abs(c_15m) + abs(p_15m), 1)
-    sent_15m, badge_15m, theme_15m = _classify_writing_sentiment(c_15m, p_15m)
+    # Builder for individual timeframe metrics
+    def _build_tf_metric(tf_key: str, tf_label: str, tf_scope: str, seconds: float) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        c_chg, p_chg, snap = _get_rolling_snapshot(seconds)
+        abs_tot = max(abs(c_chg) + abs(p_chg), 1)
+        sent, badge, theme = _classify_writing_sentiment(c_chg, p_chg)
 
-    call_base_15m = max(current_call_oi - c_15m, 1)
-    put_base_15m = max(current_put_oi - p_15m, 1)
-    call_15m_pct_chg = round((c_15m / call_base_15m) * 100, 1)
-    put_15m_pct_chg = round((p_15m / put_base_15m) * 100, 1)
+        call_base = max(current_call_oi - c_chg, 1)
+        put_base = max(current_put_oi - p_chg, 1)
+        c_pct_chg = round((c_chg / call_base) * 100, 1)
+        p_pct_chg = round((p_chg / put_base) * 100, 1)
 
-    tf_15m = {
-        "call_chg": c_15m,
-        "put_chg": p_15m,
-        "call_pct_chg": call_15m_pct_chg,
-        "put_pct_chg": put_15m_pct_chg,
-        "call_pct": round((abs(c_15m) / abs_15m) * 100, 1) if abs_15m > 0 else 50.0,
-        "put_pct": round((abs(p_15m) / abs_15m) * 100, 1) if abs_15m > 0 else 50.0,
-        "sentiment": sent_15m,
-        "badge": badge_15m,
-        "theme": theme_15m,
-    }
+        bias, happening, todo = _derive_timeframe_guidance(tf_key, sent, c_chg, p_chg, curr_pcr)
 
-    # 4. 5-Minute Burst (300 seconds)
-    c_5m, p_5m, snap_5m = _get_rolling_snapshot(300.0)
-    abs_5m = max(abs(c_5m) + abs(p_5m), 1)
-    sent_5m, badge_5m, theme_5m = _classify_writing_sentiment(c_5m, p_5m)
+        metric = {
+            "key": tf_key,
+            "timeframe": tf_label,
+            "scope": tf_scope,
+            "call_chg": c_chg,
+            "put_chg": p_chg,
+            "net_delta": p_chg - c_chg,
+            "call_pct_chg": c_pct_chg,
+            "put_pct_chg": p_pct_chg,
+            "call_pct": round((abs(c_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
+            "put_pct": round((abs(p_chg) / abs_tot) * 100, 1) if abs_tot > 0 else 50.0,
+            "call_chg_fmt": _fmt_indian_qty(c_chg),
+            "put_chg_fmt": _fmt_indian_qty(p_chg),
+            "net_delta_fmt": _fmt_indian_qty(p_chg - c_chg),
+            "sentiment": sent,
+            "badge": badge,
+            "theme": theme,
+            "bias": bias,
+            "what_is_happening": happening,
+            "what_to_do": todo,
+        }
+        return metric, snap
 
-    call_base_5m = max(current_call_oi - c_5m, 1)
-    put_base_5m = max(current_put_oi - p_5m, 1)
-    call_5m_pct_chg = round((c_5m / call_base_5m) * 100, 1)
-    put_5m_pct_chg = round((p_5m / put_base_5m) * 100, 1)
+    # 3. 5-Minute Burst (300 seconds)
+    tf_5m, snap_5m = _build_tf_metric("5m", "5 min", "Scalp Burst", 300.0)
 
-    tf_5m = {
-        "call_chg": c_5m,
-        "put_chg": p_5m,
-        "call_pct_chg": call_5m_pct_chg,
-        "put_pct_chg": put_5m_pct_chg,
-        "call_pct": round((abs(c_5m) / abs_5m) * 100, 1) if abs_5m > 0 else 50.0,
-        "put_pct": round((abs(p_5m) / abs_5m) * 100, 1) if abs_5m > 0 else 50.0,
-        "sentiment": sent_5m,
-        "badge": badge_5m,
-        "theme": theme_5m,
-    }
+    # 4. 15-Minute Velocity (900 seconds)
+    tf_15m, snap_15m = _build_tf_metric("15m", "15 min", "Intraday Velocity", 900.0)
 
-    # 5. Enrich strikes with strike-level 15m change
+    # 5. 30-Minute Structure (1800 seconds)
+    tf_30m, snap_30m = _build_tf_metric("30m", "30 min", "Session Trend", 1800.0)
+
+    # 6. 1-Hour Positioning Block (3600 seconds)
+    tf_1h, snap_1h = _build_tf_metric("1h", "1 hour", "Institutional Block", 3600.0)
+
+    # 7. 4-Hour Swing Horizon (14400 seconds)
+    tf_4h, snap_4h = _build_tf_metric("4h", "4 hours", "Swing Horizon", 14400.0)
+
+    # 8. Enrich strikes with strike-level 15m change
     base_strikes_15m = snap_15m.get("strikes", {}) if snap_15m else {}
     for s in strikes:
         stk = float(s.get("strike", 0.0))
@@ -236,15 +413,88 @@ def derive_multi_timeframe_oi(
             s["ce_change_15m"] = int((int(s.get("ce_change_oi", 0) or 0)) * (15.0 / 375.0))
             s["pe_change_15m"] = int((int(s.get("pe_change_oi", 0) or 0)) * (15.0 / 375.0))
 
-    # 6. PCR (OI) & 15m Delta
-    curr_pcr = round(current_put_oi / max(current_call_oi, 1), 2)
+    # 9. PCR (OI) & 15m Delta
     if snap_15m and snap_15m.get("call_oi", 0) > 0:
         base_pcr = round(snap_15m["put_oi"] / max(snap_15m["call_oi"], 1), 2)
         pcr_15m_delta = round(curr_pcr - base_pcr, 2)
     else:
         pcr_15m_delta = 0.0
 
-    # 7. Identify hot strike and form dynamic institutional summary alert
+    # 10. Multi-Timeframe Tabular Matrix
+    timeframes_table = [
+        tf_5m,
+        tf_15m,
+        tf_30m,
+        tf_1h,
+        tf_4h,
+        today_metric,
+    ]
+
+    # 11. Multi-Timeframe Confluence Calculation
+    bullish_count = sum(1 for row in timeframes_table if row["bias"] == "BULLISH")
+    bearish_count = sum(1 for row in timeframes_table if row["bias"] == "BEARISH")
+    neutral_count = sum(1 for row in timeframes_table if row["bias"] == "NEUTRAL")
+
+    macro_bullish = (tf_1h["bias"] == "BULLISH" or tf_4h["bias"] == "BULLISH" or today_metric["bias"] == "BULLISH")
+    micro_bearish = (tf_5m["bias"] == "BEARISH" or tf_15m["bias"] == "BEARISH")
+    macro_bearish = (tf_1h["bias"] == "BEARISH" or tf_4h["bias"] == "BEARISH" or today_metric["bias"] == "BEARISH")
+    micro_bullish = (tf_5m["bias"] == "BULLISH" or tf_15m["bias"] == "BULLISH")
+
+    if bullish_count >= 4:
+        overall_bias = "BULLISH"
+        headline = f"{bullish_count}/6 Timeframes Bullish — Strong Put Writing Confluence"
+        master_directive = (
+            "Aggressive Bullish Confluence: Institutional put underwriting dominates across horizons. "
+            "High-probability environment to buy dips near Put Wall support and deploy Bull Put Spreads."
+        )
+    elif bearish_count >= 4:
+        overall_bias = "BEARISH"
+        headline = f"{bearish_count}/6 Timeframes Bearish — Heavy Call Resistance Confluence"
+        master_directive = (
+            "Defensive Bearish Confluence: Institutional call sellers dominate the tape. "
+            "Fade rallies into Call Wall, tighten stops on longs, and deploy Bear Call Spreads."
+        )
+    elif macro_bullish and micro_bearish:
+        overall_bias = "BULLISH (PULLBACK)"
+        headline = "Timeframe Divergence: Macro Bullish vs Micro Intraday Resistance"
+        master_directive = (
+            "Divergence Setup: Higher timeframes (1h/4h/Today) show structural put defense, "
+            "but short-term (5m/15m) call writing is causing an intraday pause. Do not chase highs; "
+            "wait for intraday selling to exhaust near Put Wall support, then re-enter longs."
+        )
+    elif macro_bearish and micro_bullish:
+        overall_bias = "BEARISH (COUNTER-BOUNCE)"
+        headline = "Timeframe Divergence: Micro Bounce into Macro Overhead Resistance"
+        master_directive = (
+            "Counter-Trend Warning: Short-term (5m/15m) put writing/short covering is producing a bounce "
+            "directly into heavy higher-timeframe (1h/4h) call walls. Treat rallies as profit-taking opportunities "
+            "or setup for short continuation."
+        )
+    else:
+        overall_bias = "NEUTRAL / MIXED"
+        headline = f"{neutral_count}/6 Timeframes Balanced — Two-Way Congestion"
+        master_directive = (
+            "Two-Way Market Equilibrium: Institutional delta flow is balanced across timeframes. "
+            "Avoid heavy directional bets; trade range reversals between Put Wall and Call Wall, "
+            "or harvest theta via delta-neutral spreads."
+        )
+
+    confluence_summary = {
+        "bullish_count": bullish_count,
+        "bearish_count": bearish_count,
+        "neutral_count": neutral_count,
+        "overall_bias": overall_bias,
+        "headline": headline,
+        "master_directive": master_directive,
+    }
+
+    # 12. Dynamic Institutional Summary Alert
+    c_15m = tf_15m["call_chg"]
+    p_15m = tf_15m["put_chg"]
+    call_15m_pct_chg = tf_15m["call_pct_chg"]
+    put_15m_pct_chg = tf_15m["put_pct_chg"]
+    sent_15m = tf_15m["sentiment"]
+
     lead_ce = max(strikes, key=lambda s: int(s.get("ce_change_15m") or 0), default=None) if strikes else None
     lead_pe = max(strikes, key=lambda s: int(s.get("pe_change_15m") or 0), default=None) if strikes else None
 
@@ -284,7 +534,13 @@ def derive_multi_timeframe_oi(
     return {
         "total_positions": total_positions,
         "today": today_metric,
-        "tf_15m": tf_15m,
         "tf_5m": tf_5m,
+        "tf_15m": tf_15m,
+        "tf_30m": tf_30m,
+        "tf_1h": tf_1h,
+        "tf_4h": tf_4h,
+        "timeframes_table": timeframes_table,
+        "confluence_summary": confluence_summary,
         "summary_alert": summary_alert,
     }
+

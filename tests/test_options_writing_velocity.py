@@ -82,3 +82,57 @@ def test_derive_multi_timeframe_oi_two_bars_and_15m():
     assert "TESTNIFTY" in summary.get("text", "")
     assert summary.get("bias") in ("BULLISH", "BEARISH", "NEUTRAL")
     assert summary.get("pcr_oi") == round(370000 / 250000, 2)
+
+    # 6. Expanded Multi-Timeframe Table
+    tf_table = metrics.get("timeframes_table", [])
+    assert len(tf_table) == 6
+    timeframe_keys = [row["key"] for row in tf_table]
+    assert timeframe_keys == ["5m", "15m", "30m", "1h", "4h", "today"]
+
+    for row in tf_table:
+        assert "timeframe" in row
+        assert "call_chg" in row
+        assert "put_chg" in row
+        assert "net_delta" in row
+        assert "call_chg_fmt" in row
+        assert "put_chg_fmt" in row
+        assert "net_delta_fmt" in row
+        assert row["bias"] in ("BULLISH", "BEARISH", "NEUTRAL")
+        assert len(row["what_is_happening"]) > 10
+        assert len(row["what_to_do"]) > 10
+
+    # 7. Confluence Summary
+    confluence = metrics.get("confluence_summary", {})
+    assert "overall_bias" in confluence
+    assert "headline" in confluence
+    assert "master_directive" in confluence
+    assert confluence["bullish_count"] + confluence["bearish_count"] + confluence["neutral_count"] == 6
+
+
+def test_derive_timeframe_guidance_diagnostics():
+    from earnings_engine.data.options_writing_velocity import _derive_timeframe_guidance
+
+    # 1. 5m Bullish Put Writing
+    bias, happening, todo = _derive_timeframe_guidance("5m", "PUT WRITING", 1000, 10000)
+    assert bias == "BULLISH"
+    assert "Microstructure Put Writing" in happening
+    assert "BUY DIPS" in todo
+
+    # 2. 15m Bearish Call Writing
+    bias, happening, todo = _derive_timeframe_guidance("15m", "CALL WRITING", 25000, 2000)
+    assert bias == "BEARISH"
+    assert "Intraday Ceiling Build" in happening
+    assert "SHORT BIAS" in todo
+
+    # 3. 1h Short Covering
+    bias, happening, todo = _derive_timeframe_guidance("1h", "SHORT COVERING", -30000, -5000)
+    assert bias == "BULLISH"
+    assert "Short Unwinding" in happening
+    assert "SWING LONG" in todo
+
+    # 4. 4h Neutral
+    bias, happening, todo = _derive_timeframe_guidance("4h", "BALANCED", 5000, 5200)
+    assert bias == "NEUTRAL"
+    assert "Macro Indecision" in happening
+    assert "HARVEST THETA" in todo
+

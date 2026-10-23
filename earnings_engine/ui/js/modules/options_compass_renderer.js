@@ -204,6 +204,148 @@
                 }
             }
         }
+
+        // 7. Multi-Timeframe Tabular Matrix & Action Directives
+        const tableBody = document.getElementById('optMultiTfTableBody');
+        const confBadge = document.getElementById('optMultiTfConfluenceBadge');
+        const macroPill = document.getElementById('optMultiTfMacroPill');
+        const headlineEl = document.getElementById('optMultiTfHeadline');
+        const directiveEl = document.getElementById('optMultiTfDirectiveText');
+        const directiveBox = document.getElementById('optMultiTfMasterDirectiveBox');
+
+        // Update Confluence Header & Master Directive
+        const cs = timeframesData.confluence_summary;
+        if (cs) {
+            if (confBadge) {
+                confBadge.textContent = `${cs.bullish_count}/6 BULLISH | ${cs.bearish_count}/6 BEARISH`;
+                if (cs.overall_bias.includes('BULLISH')) {
+                    confBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                    confBadge.style.color = '#34d399';
+                    confBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                } else if (cs.overall_bias.includes('BEARISH')) {
+                    confBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                    confBadge.style.color = '#f87171';
+                    confBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                } else {
+                    confBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                    confBadge.style.color = '#fbbf24';
+                    confBadge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                }
+            }
+
+            if (macroPill) {
+                macroPill.textContent = `VERDICT: ${cs.overall_bias}`;
+                if (cs.overall_bias.includes('BULLISH')) {
+                    macroPill.style.color = '#34d399';
+                    macroPill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                    macroPill.style.background = 'rgba(16, 185, 129, 0.08)';
+                } else if (cs.overall_bias.includes('BEARISH')) {
+                    macroPill.style.color = '#f87171';
+                    macroPill.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                    macroPill.style.background = 'rgba(239, 68, 68, 0.08)';
+                } else {
+                    macroPill.style.color = '#fbbf24';
+                    macroPill.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                    macroPill.style.background = 'rgba(245, 158, 11, 0.08)';
+                }
+            }
+
+            if (headlineEl) headlineEl.textContent = cs.headline || 'Cross-Timeframe Master Directive';
+            if (directiveEl) directiveEl.textContent = cs.master_directive || 'Order flow delta synthesized.';
+
+            if (directiveBox) {
+                if (cs.overall_bias.includes('BULLISH')) {
+                    directiveBox.style.background = 'rgba(16, 185, 129, 0.06)';
+                    directiveBox.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+                } else if (cs.overall_bias.includes('BEARISH')) {
+                    directiveBox.style.background = 'rgba(239, 68, 68, 0.06)';
+                    directiveBox.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                } else {
+                    directiveBox.style.background = 'rgba(245, 158, 11, 0.06)';
+                    directiveBox.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+                }
+            }
+        }
+
+        // Render Table Rows
+        const tfRows = timeframesData.timeframes_table || [];
+        if (tableBody && tfRows.length > 0) {
+            let rowsHtml = '';
+            tfRows.forEach(row => {
+                const callVal = row.call_chg !== undefined ? row.call_chg : 0;
+                const putVal = row.put_chg !== undefined ? row.put_chg : 0;
+                const netVal = row.net_delta !== undefined ? row.net_delta : (putVal - callVal);
+                const bias = row.bias || 'NEUTRAL';
+
+                // Formatting
+                const callFmt = row.call_chg_fmt || fmtOi(callVal);
+                const putFmt = row.put_chg_fmt || fmtOi(putVal);
+                const netFmt = row.net_delta_fmt || fmtOi(netVal);
+
+                // Colors
+                const callCol = callVal > 0 ? '#f87171' : (callVal < 0 ? '#38bdf8' : 'var(--text-secondary)');
+                const putCol = putVal > 0 ? '#34d399' : (putVal < 0 ? '#f87171' : 'var(--text-secondary)');
+                const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : 'var(--text-secondary)');
+
+                // Bias Badge Styles
+                let biasBg = 'rgba(245, 158, 11, 0.15)';
+                let biasCol = '#fbbf24';
+                let biasBrd = 'rgba(245, 158, 11, 0.3)';
+                let actionBrd = 'rgba(245, 158, 11, 0.2)';
+                let actionCol = '#fbbf24';
+
+                if (bias === 'BULLISH') {
+                    biasBg = 'rgba(16, 185, 129, 0.15)';
+                    biasCol = '#34d399';
+                    biasBrd = 'rgba(16, 185, 129, 0.3)';
+                    actionBrd = 'rgba(16, 185, 129, 0.25)';
+                    actionCol = '#34d399';
+                } else if (bias === 'BEARISH') {
+                    biasBg = 'rgba(239, 68, 68, 0.15)';
+                    biasCol = '#f87171';
+                    biasBrd = 'rgba(239, 68, 68, 0.3)';
+                    actionBrd = 'rgba(239, 68, 68, 0.25)';
+                    actionCol = '#f87171';
+                }
+
+                rowsHtml += `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.2s ease;">
+                    <td style="padding:0.6rem;font-weight:700;color:var(--text-primary);white-space:nowrap;">
+                        <div>${row.timeframe}</div>
+                        <div style="font-size:0.65rem;color:var(--text-secondary);font-family:var(--font-mono);font-weight:400;">
+                            ${row.scope || ''}
+                        </div>
+                    </td>
+                    <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${callCol};">
+                        ${callFmt}
+                    </td>
+                    <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${putCol};">
+                        ${putFmt}
+                    </td>
+                    <td style="padding:0.6rem;text-align:right;font-family:var(--font-mono);font-weight:800;color:${netCol};">
+                        ${netFmt}
+                    </td>
+                    <td style="padding:0.6rem;text-align:center;">
+                        <span class="badge" style="background:${biasBg};color:${biasCol};border:1px solid ${biasBrd};font-size:0.65rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:800;">
+                            ${bias}
+                        </span>
+                        <div style="font-size:0.62rem;color:var(--text-secondary);font-family:var(--font-mono);margin-top:0.2rem;">
+                            ${row.badge || row.sentiment || ''}
+                        </div>
+                    </td>
+                    <td style="padding:0.6rem;color:var(--text-primary);line-height:1.35;font-size:0.72rem;">
+                        ${row.what_is_happening || '--'}
+                    </td>
+                    <td style="padding:0.6rem;line-height:1.35;">
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid ${actionBrd};border-left:3px solid ${biasCol};border-radius:4px;padding:0.3rem 0.5rem;font-size:0.72rem;font-weight:600;color:var(--text-primary);">
+                            <span style="color:${actionCol};font-weight:800;margin-right:0.3rem;">ACTION:</span>
+                            ${row.what_to_do || '--'}
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            tableBody.innerHTML = rowsHtml;
+        }
     };
 
     /**
