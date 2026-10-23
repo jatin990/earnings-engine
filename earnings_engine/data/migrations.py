@@ -2532,6 +2532,40 @@ def _migration_051_quarterly_solvency_and_coverage_metrics(conn: Any) -> None:
     ])
 
 
+def _migration_052_option_chain_intraday_snapshots(conn: Any) -> None:
+    """Create option_chain_intraday_snapshots table for persistent high-frequency OI delta tracking."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS option_chain_intraday_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            recorded_at TEXT NOT NULL,
+            spot_price REAL,
+            call_oi_total INTEGER NOT NULL,
+            put_oi_total INTEGER NOT NULL,
+            pcr_oi REAL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    try:
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_opt_intraday_sym_ts
+            ON option_chain_intraday_snapshots(symbol, timestamp)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_opt_intraday_recorded
+            ON option_chain_intraday_snapshots(recorded_at)
+            """
+        )
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -2585,6 +2619,7 @@ MIGRATIONS: list[Migration] = [
     Migration(49, "049_purge_unconfirmed_indian_yfinance_earnings", _migration_049_purge_unconfirmed_indian_yfinance_earnings),
     Migration(50, "050_earnings_provenance_schema", _migration_050_earnings_provenance_schema),
     Migration(51, "051_quarterly_solvency_and_coverage_metrics", _migration_051_quarterly_solvency_and_coverage_metrics),
+    Migration(52, "052_option_chain_intraday_snapshots", _migration_052_option_chain_intraday_snapshots),
 ]
 
 

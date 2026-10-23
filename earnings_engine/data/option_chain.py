@@ -690,6 +690,7 @@ def _calculate_option_metrics_from_records(
         current_call_oi=int(call_oi),
         current_put_oi=int(put_oi),
         strikes=formatted_strikes,
+        spot_price=current_spot,
     )
 
     # Extract Intraday SMC & VWAP Technical Structure

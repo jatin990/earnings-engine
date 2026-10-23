@@ -161,3 +161,46 @@ def test_derive_timeframe_guidance_diagnostics():
     assert "Quarterly Capitulation Squeeze" in happening
     assert "LONG-TERM BULLISH TREND" in todo
 
+
+def test_distinct_deltas_and_no_15m_30m_duplication():
+    """Verify that 15m and 30m timeframes never collapse to identical duplicate deltas."""
+    symbol = "NODUPNIFTY"
+    _OI_SNAPSHOT_CACHE.pop(symbol, None)
+
+    strikes = [
+        {"strike": 24000.0, "ce_oi": 100000, "pe_oi": 200000, "ce_change_oi": 15000, "pe_change_oi": 45000},
+        {"strike": 24100.0, "ce_oi": 150000, "pe_oi": 150000, "ce_change_oi": 20000, "pe_change_oi": 35000},
+    ]
+    current_call_oi = 250000
+    current_put_oi = 350000
+
+    metrics = derive_multi_timeframe_oi(
+        symbol=symbol,
+        current_call_oi=current_call_oi,
+        current_put_oi=current_put_oi,
+        strikes=strikes,
+        spot_price=24050.0,
+    )
+
+    tf_table = {row["key"]: row for row in metrics["timeframes_table"]}
+
+    # Verify 5m, 15m, 30m, 1h, 4h, today deltas exist
+    assert "5m" in tf_table
+    assert "15m" in tf_table
+    assert "30m" in tf_table
+    assert "1h" in tf_table
+    assert "4h" in tf_table
+    assert "today" in tf_table
+
+    # CRITICAL INVARIANT: 15m and 30m must NOT have identical deltas (eradicating the +58k / +58k bug)
+    call_15m = tf_table["15m"]["call_chg"]
+    call_30m = tf_table["30m"]["call_chg"]
+    put_15m = tf_table["15m"]["put_chg"]
+    put_30m = tf_table["30m"]["put_chg"]
+
+    assert call_15m != call_30m, f"Call delta duplicated across 15m and 30m: {call_15m}"
+    assert put_15m != put_30m, f"Put delta duplicated across 15m and 30m: {put_15m}"
+    assert abs(call_30m) > abs(call_15m), f"30m call delta ({call_30m}) should be larger horizon than 15m ({call_15m})"
+    assert abs(put_30m) > abs(put_15m), f"30m put delta ({put_30m}) should be larger horizon than 15m ({put_15m})"
+
+

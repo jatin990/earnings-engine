@@ -7,9 +7,13 @@ actionable trading directives ('what is happening' and 'what to do').
 
 from __future__ import annotations
 
+import logging
+import math
 import time
 from datetime import datetime
 from typing import Any
+
+logger = logging.getLogger("earnings_engine.data.options_writing_velocity")
 
 # Rolling Open Interest & Writing Velocity Cache: symbol -> list of dict snapshots
 # Each snapshot: {"timestamp": float, "call_oi": int, "put_oi": int, "strikes": dict}
@@ -17,15 +21,117 @@ _OI_SNAPSHOT_CACHE: dict[str, list[dict[str, Any]]] = {}
 _MAX_OI_SNAPSHOTS = 1200  # Keep up to 5 hours of 15s snapshots
 
 
+def _hydrate_cache_from_db(clean_sym: str) -> None:
+    """Prepopulate rolling in-memory snapshot cache from persistent SQLite option_chain_intraday_snapshots."""
+    if clean_sym in _OI_SNAPSHOT_CACHE and len(_OI_SNAPSHOT_CACHE[clean_sym]) >= 10:
+        return
+
+    try:
+        from earnings_engine.data.db import get_db_connection
+        conn = get_db_connection()
+        now_ts = time.time()
+        cutoff_ts = now_ts - 86400.0  # Last 24 hours of intraday snapshots
+        cur = conn.execute(
+            """
+            SELECT timestamp, call_oi_total, put_oi_total, spot_price
+            FROM option_chain_intraday_snapshots
+            WHERE symbol = ? AND timestamp >= ?
+            ORDER BY timestamp ASC
+            LIMIT 1200
+            """,
+            (clean_sym, cutoff_ts),
+        )
+        rows = cur.fetchall()
+        if not rows:
+            return
+
+        db_snapshots: list[dict[str, Any]] = []
+        for r in rows:
+            ts = float(r[0] if isinstance(r, (tuple, list)) else r["timestamp"])
+            c_oi = int(r[1] if isinstance(r, (tuple, list)) else r["call_oi_total"])
+            p_oi = int(r[2] if isinstance(r, (tuple, list)) else r["put_oi_total"])
+            db_snapshots.append({
+                "timestamp": ts,
+                "call_oi": c_oi,
+                "put_oi": p_oi,
+                "strikes": {},
+            })
+
+        if clean_sym not in _OI_SNAPSHOT_CACHE or not _OI_SNAPSHOT_CACHE[clean_sym]:
+            _OI_SNAPSHOT_CACHE[clean_sym] = db_snapshots
+        else:
+            existing = {s["timestamp"]: s for s in _OI_SNAPSHOT_CACHE[clean_sym]}
+            for s in db_snapshots:
+                if s["timestamp"] not in existing:
+                    existing[s["timestamp"]] = s
+            _OI_SNAPSHOT_CACHE[clean_sym] = sorted(existing.values(), key=lambda x: x["timestamp"])[-_MAX_OI_SNAPSHOTS:]
+    except Exception as e:
+        logger.debug("[OI-CACHE-HYDRATE] Failed to hydrate cache for %s: %s", clean_sym, e)
+
+
+def _persist_intraday_snapshot_to_db(
+    clean_sym: str,
+    timestamp: float,
+    call_oi: int,
+    put_oi: int,
+    spot_price: float | None = None,
+    pcr_oi: float | None = None,
+) -> None:
+    """Save an intraday snapshot to option_chain_intraday_snapshots table with throttling."""
+    try:
+        from earnings_engine.data.db import get_db_connection
+        conn = get_db_connection()
+        now_iso = datetime.now().isoformat()
+        recorded_at = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Check last snapshot timestamp to throttle writes to >= 10s intervals
+        cur = conn.execute(
+            "SELECT timestamp FROM option_chain_intraday_snapshots WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1",
+            (clean_sym,),
+        )
+        row = cur.fetchone()
+        if row:
+            last_ts = float(row[0] if isinstance(row, (tuple, list)) else row["timestamp"])
+            if (timestamp - last_ts) < 10.0:
+                return
+
+        conn.execute(
+            """
+            INSERT INTO option_chain_intraday_snapshots (
+                symbol, timestamp, recorded_at, spot_price,
+                call_oi_total, put_oi_total, pcr_oi, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                clean_sym,
+                timestamp,
+                recorded_at,
+                spot_price,
+                int(call_oi),
+                int(put_oi),
+                pcr_oi,
+                now_iso,
+            ),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.debug("[OI-INTRADAY-PERSIST] Failed to persist snapshot for %s: %s", clean_sym, e)
+
+
 def track_oi_snapshot(
     symbol: str,
     total_call_oi: int,
     total_put_oi: int,
     strikes: list[dict[str, Any]],
+    spot_price: float | None = None,
 ) -> None:
-    """Store timestamped snapshot into the in-memory rolling ring buffer."""
+    """Store timestamped snapshot into the in-memory rolling ring buffer and persist to SQLite."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
     now = time.time()
+
+    # Hydrate if empty
+    if clean_sym not in _OI_SNAPSHOT_CACHE or not _OI_SNAPSHOT_CACHE[clean_sym]:
+        _hydrate_cache_from_db(clean_sym)
 
     strike_map = {}
     for s in strikes or []:
@@ -61,6 +167,10 @@ def track_oi_snapshot(
     # Trim to max window
     if len(history) > _MAX_OI_SNAPSHOTS:
         _OI_SNAPSHOT_CACHE[clean_sym] = history[-_MAX_OI_SNAPSHOTS:]
+
+    # Persist to persistent SQLite table
+    pcr = round(total_put_oi / max(total_call_oi, 1), 2)
+    _persist_intraday_snapshot_to_db(clean_sym, now, total_call_oi, total_put_oi, spot_price=spot_price, pcr_oi=pcr)
 
 
 def _classify_writing_sentiment(call_delta: int, put_delta: int) -> tuple[str, str, str]:
@@ -305,14 +415,18 @@ def derive_multi_timeframe_oi(
     current_call_oi: int,
     current_put_oi: int,
     strikes: list[dict[str, Any]],
+    spot_price: float | None = None,
 ) -> dict[str, Any]:
     """Compute multi-timeframe Call vs Put Open Interest metrics across 5m, 15m, 30m, 1h, 4h, and Today."""
     clean_sym = symbol.strip().upper().replace(".NS", "")
     now = time.time()
     now_time = datetime.now().strftime("%H:%M")
 
-    # Track current snapshot
-    track_oi_snapshot(clean_sym, current_call_oi, current_put_oi, strikes)
+    # Hydrate cache from SQLite if needed
+    _hydrate_cache_from_db(clean_sym)
+
+    # Track current snapshot and persist to SQLite
+    track_oi_snapshot(clean_sym, current_call_oi, current_put_oi, strikes, spot_price=spot_price)
     history = _OI_SNAPSHOT_CACHE.get(clean_sym, [])
 
     # Current PCR
@@ -373,9 +487,12 @@ def derive_multi_timeframe_oi(
 
     # Helper to calculate delta from target seconds ago and extract base snapshot
     def _get_rolling_snapshot(target_sec_ago: float) -> tuple[int, int, dict[str, Any] | None]:
+        duration_fraction = min(target_sec_ago / 22500.0, 1.0)
+        c_session_proj = int(today_ce_chg * duration_fraction)
+        p_session_proj = int(today_pe_chg * duration_fraction)
+
         if len(history) < 2:
-            factor = min(target_sec_ago / 22500.0, 1.0)
-            return int(today_ce_chg * factor), int(today_pe_chg * factor), None
+            return c_session_proj, p_session_proj, None
 
         target_time = now - target_sec_ago
         base_snap = history[0]
@@ -389,20 +506,31 @@ def derive_multi_timeframe_oi(
         c_delta = curr_snap["call_oi"] - base_snap["call_oi"]
         p_delta = curr_snap["put_oi"] - base_snap["put_oi"]
 
-        elapsed = curr_snap["timestamp"] - history[0]["timestamp"]
-        # If history window is shorter than target, scale proportionally so distinct horizons
-        # do not collapse to identical flat snapshot values
-        if elapsed < (target_sec_ago * 0.85):
-            factor = min(target_sec_ago / 22500.0, 1.0)
-            c_proj = int(today_ce_chg * factor)
-            p_proj = int(today_pe_chg * factor)
-            if elapsed > 15.0 and (c_delta != 0 or p_delta != 0):
-                scale = min(target_sec_ago / max(elapsed, 1.0), 3.0)
-                c_delta = int(c_delta * scale)
-                p_delta = int(p_delta * scale)
+        total_cache_elapsed = curr_snap["timestamp"] - history[0]["timestamp"]
+
+        # If cache history does not reach back to target_sec_ago (base_snap was clamped to history[0])
+        if total_cache_elapsed < (target_sec_ago * 0.85):
+            if total_cache_elapsed >= 30.0 and (c_delta != 0 or p_delta != 0):
+                # Rate per second from observed history, scaled strictly to the target horizon
+                rate_c = c_delta / max(total_cache_elapsed, 1.0)
+                rate_p = p_delta / max(total_cache_elapsed, 1.0)
+                c_rate_proj = int(rate_c * target_sec_ago)
+                p_rate_proj = int(rate_p * target_sec_ago)
+
+                # Cap rate projection so extreme early micro-swings don't exceed session envelope
+                max_c = max(abs(today_ce_chg), abs(c_session_proj) * 2)
+                max_p = max(abs(today_pe_chg), abs(p_session_proj) * 2)
+
+                c_clamped = int(max(min(c_rate_proj, max_c), -max_c))
+                p_clamped = int(max(min(p_rate_proj, max_p), -max_p))
+
+                # Blend 60% observed rate projection with 40% session progress
+                c_delta = int(0.6 * c_clamped + 0.4 * c_session_proj)
+                p_delta = int(0.6 * p_clamped + 0.4 * p_session_proj)
             else:
-                c_delta = c_proj
-                p_delta = p_proj
+                # Early cold cache: strictly use session progress based on timeframe duration
+                c_delta = c_session_proj
+                p_delta = p_session_proj
 
         return c_delta, p_delta, base_snap
 

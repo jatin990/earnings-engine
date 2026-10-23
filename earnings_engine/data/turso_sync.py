@@ -135,6 +135,9 @@ SYNC_TABLES = [
     "upcoming_board_meetings",
     # Advanced Options Tracked Setups Ledger
     "options_tracked_setups",
+    # Option Chain Historical Daily & Intraday Snapshots
+    "option_chain_history",
+    "option_chain_intraday_snapshots",
     # Corporate Business Updates Radar & Seasonality Schedules
     "business_update_schedules",
     # Transmission Lead-Lag Radar DAG & Telemetry Snapshots
