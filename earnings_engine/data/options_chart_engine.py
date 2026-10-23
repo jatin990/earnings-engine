@@ -408,6 +408,109 @@ def _detect_trendlines(df: pd.DataFrame) -> list[dict[str, Any]]:
     return trendlines
 
 
+def _decompose_order_flow_and_whales(df: pd.DataFrame) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Decompose candle volume into Buyer vs Seller flow using intrabar price discovery and wick pressure.
+    Identifies institutional Whale Orders via rolling volume distribution Z-Score and volume percentiles.
+
+    Formula:
+        Range = High - Low
+        Buyer Volume = Volume * ((Close - Low + High - Open) / (2 * Range))
+        Seller Volume = Volume - Buyer Volume
+        Delta = Buyer Volume - Seller Volume
+        Whale Threshold: Volume >= 90th percentile OR (Mean + 1.8 * Std)
+    """
+    flow_candles: list[dict[str, Any]] = []
+    if df.empty:
+        return flow_candles, {"total_buyer_vol": 0, "total_seller_vol": 0, "net_delta": 0, "whale_count": 0}
+
+    volumes = df["volume"].fillna(0).astype(float).values
+    non_zero_vols = volumes[volumes > 0]
+
+    # Adaptive whale thresholds
+    if len(non_zero_vols) >= 5:
+        vol_mean = float(np.mean(non_zero_vols))
+        vol_std = float(np.std(non_zero_vols))
+        p90 = float(np.percentile(non_zero_vols, 90))
+        p95 = float(np.percentile(non_zero_vols, 95))
+        whale_floor = max(p90, vol_mean + 1.8 * vol_std)
+    else:
+        vol_mean = 1.0
+        vol_std = 1.0
+        p90 = 1.0
+        p95 = 1.0
+        whale_floor = 1e9  # high bar if insufficient bars
+
+    tot_buy = 0
+    tot_sell = 0
+    whale_count = 0
+
+    for stamp, row in df.iterrows():
+        unix_ts = int(stamp.timestamp())
+        open_p = float(row["open"])
+        high_p = float(row["high"])
+        low_p = float(row["low"])
+        close_p = float(row["close"])
+        vol = float(row.get("volume", 0))
+
+        tr = max(high_p - low_p, 1e-4)
+
+        # Intrabar buyer/seller ratio based on close relative to low and high relative to open
+        # Weighting: Lower wick rejection + close near high = Buyer dominated
+        # Upper wick rejection + close near low = Seller dominated
+        buyer_score = max(0.0, (close_p - low_p) + (high_p - open_p)) / (2.0 * tr)
+        buyer_ratio = max(0.05, min(0.95, buyer_score))
+
+        # When pure bullish marubozu: buyer ratio approaches 1.0; pure bearish: approaches 0.0
+        buyer_vol = int(round(vol * buyer_ratio))
+        seller_vol = int(max(0, vol - buyer_vol))
+        delta = buyer_vol - seller_vol
+
+        # Identify whale activity
+        is_whale = bool(vol >= whale_floor and vol > 0)
+        whale_tier = "MEGA" if vol >= p95 else ("WHALE" if is_whale else "NORMAL")
+        whale_side = "BUYER" if delta > 0 else ("SELLER" if delta < 0 else "BALANCED")
+
+        # Whale bubble execution level: estimated VWAP of the candle
+        candle_typical = round((high_p + low_p + close_p) / 3.0, 2)
+
+        if is_whale:
+            whale_count += 1
+
+        tot_buy += buyer_vol
+        tot_sell += seller_vol
+
+        flow_candles.append({
+            "time": unix_ts,
+            "open": round(open_p, 2),
+            "high": round(high_p, 2),
+            "low": round(low_p, 2),
+            "close": round(close_p, 2),
+            "volume": int(vol),
+            "buyer_vol": buyer_vol,
+            "seller_vol": seller_vol,
+            "net_delta": delta,
+            "delta_pct": round((delta / vol) * 100, 1) if vol > 0 else 0.0,
+            "dominant_side": "BUY" if delta > 0 else ("SELL" if delta < 0 else "FLAT"),
+            "typical_price": candle_typical,
+            "is_whale": is_whale,
+            "whale_tier": whale_tier,
+            "whale_side": whale_side,
+            "z_score": round((vol - vol_mean) / (vol_std + 1e-5), 2) if vol_std > 0 else 0.0,
+        })
+
+    flow_summary = {
+        "total_buyer_vol": tot_buy,
+        "total_seller_vol": tot_sell,
+        "net_delta": tot_buy - tot_sell,
+        "whale_count": whale_count,
+        "whale_threshold": int(whale_floor),
+        "dominant_session_side": "BUYERS" if tot_buy > tot_sell else ("SELLERS" if tot_sell > tot_buy else "BALANCED"),
+    }
+
+    return flow_candles, flow_summary
+
+
 def _generate_tactical_signals(
     df: pd.DataFrame,
     current_price: float,
@@ -633,7 +736,10 @@ def get_options_chart_intelligence(
     order_blocks, fvgs = _detect_order_blocks_and_fvg(df)
     trendlines = _detect_trendlines(df)
 
-    # 5. Derivatives Structural Levels
+    # 5. Order Flow Decomposition & Whale Transactions
+    flow_candles, flow_summary = _decompose_order_flow_and_whales(df)
+
+    # 6. Derivatives Structural Levels
     if is_fno:
         derivatives_levels = {
             "max_pain": opt_analysis.get("max_pain_strike") or round(spot_price, 2),
@@ -649,7 +755,7 @@ def get_options_chart_intelligence(
     else:
         derivatives_levels = {}
 
-    # 6. Tactical Confluence Signals
+    # 7. Tactical Confluence Signals
     tactical_signals = _generate_tactical_signals(
         df=df,
         current_price=last_close,
@@ -680,6 +786,10 @@ def get_options_chart_intelligence(
             "order_blocks": order_blocks,
             "fvg_gaps": fvgs,
             "trendlines": trendlines,
+        },
+        "order_flow": {
+            "flow_candles": flow_candles,
+            "summary": flow_summary,
         },
         "derivatives_levels": derivatives_levels,
         "tactical_signals": tactical_signals,

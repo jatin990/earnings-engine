@@ -174,3 +174,31 @@ def test_timeframe_periods_weekly_and_monthly(monkeypatch):
     assert captured_calls[-1]["period"] == "5y"
 
 
+def test_decompose_order_flow_and_whales():
+    """Verify intrabar order flow decomposition and institutional whale detection."""
+    df = _sample_intraday_df()
+    flow_candles, summary = oce._decompose_order_flow_and_whales(df)
+
+    assert len(flow_candles) == len(df)
+    assert "total_buyer_vol" in summary
+    assert "total_seller_vol" in summary
+    assert "net_delta" in summary
+    assert "whale_count" in summary
+    assert "whale_threshold" in summary
+    assert summary["dominant_session_side"] in ["BUYERS", "SELLERS", "BALANCED"]
+
+    for candle in flow_candles:
+        assert "time" in candle
+        assert "open" in candle
+        assert "close" in candle
+        assert "buyer_vol" in candle
+        assert "seller_vol" in candle
+        assert "net_delta" in candle
+        assert "is_whale" in candle
+        assert "whale_tier" in candle
+        assert "whale_side" in candle
+        assert candle["buyer_vol"] + candle["seller_vol"] == candle["volume"]
+        assert candle["net_delta"] == candle["buyer_vol"] - candle["seller_vol"]
+
+
+

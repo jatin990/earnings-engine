@@ -275,13 +275,62 @@
             </div>
         </div>
 
-        <!-- High-Resolution Interactive Lightweight Charts Canvas -->
-        <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:560px;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
-            <div id="optionsSmartChartCanvas" style="width:100%;height:100%;"></div>
-            <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:none;pointer-events:none;align-items:center;justify-content:center;background:rgba(5,5,5,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
-                <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
-                    <div style="width:24px;height:24px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-                    <span>Streaming live candlestick bars &amp; computing Order Blocks...</span>
+        <!-- High-Resolution Interactive Lightweight Charts Canvas with Dedicated Moving Whale Flow Radar Panel -->
+        <div id="optionsChartAndRadarGrid" style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:1rem;margin-bottom:1.25rem;align-items:stretch;">
+            <!-- Main Candlestick Chart Wrapper -->
+            <div id="optionsSmartChartWrapper" style="position:relative;width:100%;height:560px;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">
+                <div id="optionsSmartChartCanvas" style="width:100%;height:100%;"></div>
+                <div id="optionsSmartChartLoading" style="position:absolute;inset:0;display:none;pointer-events:none;align-items:center;justify-content:center;background:rgba(5,5,5,0.85);z-index:20;font-size:0.88rem;color:var(--text-secondary);backdrop-filter:blur(3px);">
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
+                        <div style="width:24px;height:24px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                        <span>Streaming live candlestick bars &amp; computing Order Blocks...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dedicated Side-Panel: Moving Whale Flow Radar -->
+            <div id="optWhaleFlowRadarCard" style="background:rgba(12,12,15,0.92);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:0.85rem;display:flex;flex-direction:column;position:relative;height:560px;overflow:hidden;box-shadow:inset 0 0 25px rgba(0,0,0,0.5);">
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span style="display:inline-block;width:9px;height:9px;background:#38bdf8;border-radius:50%;box-shadow:0 0 8px #38bdf8;animation:pulse 2s infinite;"></span>
+                        <h4 style="margin:0;font-size:0.82rem;font-weight:800;color:#f8fafc;text-transform:uppercase;letter-spacing:0.04em;">Whale Order Flow Radar</h4>
+                    </div>
+                    <span id="optWhaleCountBadge" class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;font-family:var(--font-mono);font-weight:700;">
+                        0 Whales
+                    </span>
+                </div>
+
+                <!-- Sub-KPI Ticker -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.6rem;font-family:var(--font-mono);font-size:0.72rem;">
+                    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:5px;padding:0.35rem 0.5rem;">
+                        <span style="color:#34d399;font-size:0.65rem;display:block;">BUY AGGRESSION</span>
+                        <strong id="optWhaleBuyerVolText" style="color:#ffffff;font-size:0.8rem;">--</strong>
+                    </div>
+                    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:5px;padding:0.35rem 0.5rem;">
+                        <span style="color:#f87171;font-size:0.65rem;display:block;">SELL DISTRIBUTION</span>
+                        <strong id="optWhaleSellerVolText" style="color:#ffffff;font-size:0.8rem;">--</strong>
+                    </div>
+                </div>
+
+                <!-- Canvas Visualizer Container (Moving Left-to-Right Bubbles) -->
+                <div style="position:relative;flex:1;min-height:220px;border-radius:6px;background:radial-gradient(ellipse at center, rgba(30,41,59,0.4) 0%, rgba(5,5,8,0.95) 100%);border:1px solid rgba(255,255,255,0.05);overflow:hidden;">
+                    <canvas id="optWhaleFlowCanvas" style="width:100%;height:100%;display:block;cursor:crosshair;"></canvas>
+                    <div id="optWhaleCanvasTooltip" style="position:absolute;pointer-events:none;display:none;background:rgba(15,15,20,0.95);border:1px solid rgba(56,189,248,0.5);border-radius:6px;padding:0.45rem 0.65rem;font-size:0.72rem;font-family:var(--font-mono);color:#ededed;box-shadow:0 8px 20px rgba(0,0,0,0.8);z-index:30;">
+                        <!-- dynamic tooltip content -->
+                    </div>
+                    <!-- Axis Label Overlay -->
+                    <div style="position:absolute;bottom:4px;left:6px;font-size:0.62rem;color:rgba(255,255,255,0.3);font-family:var(--font-mono);pointer-events:none;">
+                        Time Stream &rarr; (Past to Latest)
+                    </div>
+                    <div style="position:absolute;top:4px;right:6px;font-size:0.62rem;color:rgba(255,255,255,0.3);font-family:var(--font-mono);pointer-events:none;">
+                        Bubble Size = Volume Delta
+                    </div>
+                </div>
+
+                <!-- Recent Institutional Block Feed Ticker -->
+                <div style="margin-top:0.6rem;padding-top:0.4rem;border-top:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;gap:0.3rem;font-family:var(--font-mono);font-size:0.7rem;max-height:120px;overflow-y:auto;" id="optWhaleEventsFeed">
+                    <div style="color:var(--text-secondary);text-align:center;padding:0.4rem 0;">Analyzing candle volume distributions...</div>
                 </div>
             </div>
         </div>
