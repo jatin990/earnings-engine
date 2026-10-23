@@ -213,6 +213,169 @@ def _fmt_indian_qty(num: int | float) -> str:
     return f"{sign}{int(n)}"
 
 
+def classify_strike_activity(
+    price_change: float,
+    oi_change: int,
+    option_type: str = "CE",
+) -> dict[str, Any]:
+    """Classify strike activity into 4 categories and addition vs unwinding.
+
+    Categories:
+      - CALL_BUY: Long Buildup (Addition: ΔPrice >= 0, ΔOI > 0) OR Long Liquidation (Unwinding: ΔPrice < 0, ΔOI < 0)
+      - CALL_SELL: Short Buildup/Writing (Addition: ΔPrice <= 0, ΔOI > 0) OR Short Covering (Unwinding: ΔPrice > 0, ΔOI < 0)
+      - PUT_BUY: Long Buildup (Addition: ΔPrice >= 0, ΔOI > 0) OR Long Liquidation (Unwinding: ΔPrice < 0, ΔOI < 0)
+      - PUT_SELL: Short Buildup/Writing (Addition: ΔPrice <= 0, ΔOI > 0) OR Short Covering (Unwinding: ΔPrice > 0, ΔOI < 0)
+    """
+    is_addition = oi_change > 0
+    is_unwinding = oi_change < 0
+    abs_oi = abs(oi_change)
+
+    if option_type == "CE":
+        if is_addition:
+            category = "CALL_BUY" if price_change >= 0 else "CALL_SELL"
+            flow_type = "Long Buildup" if price_change >= 0 else "Short Buildup (Writing)"
+        elif is_unwinding:
+            category = "CALL_SELL" if price_change >= 0 else "CALL_BUY"
+            flow_type = "Short Covering" if price_change >= 0 else "Long Liquidation"
+        else:
+            category = "NEUTRAL"
+            flow_type = "Neutral"
+    else:
+        if is_addition:
+            category = "PUT_BUY" if price_change >= 0 else "PUT_SELL"
+            flow_type = "Long Buildup" if price_change >= 0 else "Short Buildup (Writing)"
+        elif is_unwinding:
+            category = "PUT_SELL" if price_change >= 0 else "PUT_BUY"
+            flow_type = "Short Covering" if price_change >= 0 else "Long Liquidation"
+        else:
+            category = "NEUTRAL"
+            flow_type = "Neutral"
+
+    return {
+        "category": category,
+        "flow_type": flow_type,
+        "is_addition": is_addition,
+        "is_unwinding": is_unwinding,
+        "contracts": abs_oi,
+    }
+
+
+def derive_4category_flow(strikes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate contracts into Call Buy, Call Sell, Put Buy, Put Sell (Added vs Unwound)."""
+    call_buy_added = call_buy_unwound = 0
+    call_sell_added = call_sell_unwound = 0
+    put_buy_added = put_buy_unwound = 0
+    put_sell_added = put_sell_unwound = 0
+
+    for s in strikes or []:
+        ce_chg = int(s.get("ce_change_oi") or 0)
+        pe_chg = int(s.get("pe_change_oi") or 0)
+        ce_p_chg = float(s.get("ce_pchange_oi") or 0.0)
+        pe_p_chg = float(s.get("pe_pchange_oi") or 0.0)
+
+        ce_res = classify_strike_activity(ce_p_chg, ce_chg, option_type="CE")
+        if ce_res["category"] == "CALL_BUY":
+            if ce_res["is_addition"]:
+                call_buy_added += ce_res["contracts"]
+            else:
+                call_buy_unwound += ce_res["contracts"]
+        elif ce_res["category"] == "CALL_SELL":
+            if ce_res["is_addition"]:
+                call_sell_added += ce_res["contracts"]
+            else:
+                call_sell_unwound += ce_res["contracts"]
+
+        pe_res = classify_strike_activity(pe_p_chg, pe_chg, option_type="PE")
+        if pe_res["category"] == "PUT_BUY":
+            if pe_res["is_addition"]:
+                put_buy_added += pe_res["contracts"]
+            else:
+                put_buy_unwound += pe_res["contracts"]
+        elif pe_res["category"] == "PUT_SELL":
+            if pe_res["is_addition"]:
+                put_sell_added += pe_res["contracts"]
+            else:
+                put_sell_unwound += pe_res["contracts"]
+
+    tot_flow = (
+        call_buy_added + call_buy_unwound +
+        call_sell_added + call_sell_unwound +
+        put_buy_added + put_buy_unwound +
+        put_sell_added + put_sell_unwound
+    )
+    safe_tot = max(tot_flow, 1)
+
+    cb_tot = call_buy_added + call_buy_unwound
+    cs_tot = call_sell_added + call_sell_unwound
+    pb_tot = put_buy_added + put_buy_unwound
+    ps_tot = put_sell_added + put_sell_unwound
+
+    return {
+        "call_buy": {
+            "name": "Call Buy",
+            "added": call_buy_added,
+            "unwound": call_buy_unwound,
+            "total": cb_tot,
+            "pct": round((cb_tot / safe_tot) * 100, 1),
+            "added_pct": round((call_buy_added / max(cb_tot, 1)) * 100, 1) if cb_tot > 0 else 0.0,
+            "unwound_pct": round((call_buy_unwound / max(cb_tot, 1)) * 100, 1) if cb_tot > 0 else 0.0,
+            "added_fmt": _fmt_indian_qty(call_buy_added).lstrip("+"),
+            "unwound_fmt": _fmt_indian_qty(call_buy_unwound).lstrip("+"),
+            "total_fmt": _fmt_indian_qty(cb_tot).lstrip("+"),
+            "bias": "BULLISH",
+            "theme": "emerald",
+            "desc": "Long Buildup (+Added) vs Long Liquidation (-Unwound)",
+        },
+        "call_sell": {
+            "name": "Call Sell",
+            "added": call_sell_added,
+            "unwound": call_sell_unwound,
+            "total": cs_tot,
+            "pct": round((cs_tot / safe_tot) * 100, 1),
+            "added_pct": round((call_sell_added / max(cs_tot, 1)) * 100, 1) if cs_tot > 0 else 0.0,
+            "unwound_pct": round((call_sell_unwound / max(cs_tot, 1)) * 100, 1) if cs_tot > 0 else 0.0,
+            "added_fmt": _fmt_indian_qty(call_sell_added).lstrip("+"),
+            "unwound_fmt": _fmt_indian_qty(call_sell_unwound).lstrip("+"),
+            "total_fmt": _fmt_indian_qty(cs_tot).lstrip("+"),
+            "bias": "BEARISH",
+            "theme": "rose",
+            "desc": "Short Buildup/Writing (+Added) vs Short Covering (-Unwound)",
+        },
+        "put_buy": {
+            "name": "Put Buy",
+            "added": put_buy_added,
+            "unwound": put_buy_unwound,
+            "total": pb_tot,
+            "pct": round((pb_tot / safe_tot) * 100, 1),
+            "added_pct": round((put_buy_added / max(pb_tot, 1)) * 100, 1) if pb_tot > 0 else 0.0,
+            "unwound_pct": round((put_buy_unwound / max(pb_tot, 1)) * 100, 1) if pb_tot > 0 else 0.0,
+            "added_fmt": _fmt_indian_qty(put_buy_added).lstrip("+"),
+            "unwound_fmt": _fmt_indian_qty(put_buy_unwound).lstrip("+"),
+            "total_fmt": _fmt_indian_qty(pb_tot).lstrip("+"),
+            "bias": "BEARISH",
+            "theme": "rose",
+            "desc": "Put Buying (+Added) vs Put Liquidation (-Unwound)",
+        },
+        "put_sell": {
+            "name": "Put Sell",
+            "added": put_sell_added,
+            "unwound": put_sell_unwound,
+            "total": ps_tot,
+            "pct": round((ps_tot / safe_tot) * 100, 1),
+            "added_pct": round((put_sell_added / max(ps_tot, 1)) * 100, 1) if ps_tot > 0 else 0.0,
+            "unwound_pct": round((put_sell_unwound / max(ps_tot, 1)) * 100, 1) if ps_tot > 0 else 0.0,
+            "added_fmt": _fmt_indian_qty(put_sell_added).lstrip("+"),
+            "unwound_fmt": _fmt_indian_qty(put_sell_unwound).lstrip("+"),
+            "total_fmt": _fmt_indian_qty(ps_tot).lstrip("+"),
+            "bias": "BULLISH",
+            "theme": "emerald",
+            "desc": "Put Underwriting/Floor (+Added) vs Put Short Covering (-Unwound)",
+        },
+        "total_contracts": tot_flow,
+        "total_contracts_fmt": _fmt_indian_qty(tot_flow).lstrip("+"),
+    }
+
+
 def _derive_timeframe_guidance(
     tf_key: str,
     sentiment: str,
@@ -847,6 +1010,9 @@ def derive_multi_timeframe_oi(
         "pcr_15m_delta": pcr_15m_delta,
     }
 
+    # 14. 4-Category Flow Matrix: Call Buy, Call Sell, Put Buy, Put Sell (Added vs Unwound)
+    four_category_flow = derive_4category_flow(strikes)
+
     return {
         "total_positions": total_positions,
         "today": today_metric,
@@ -858,5 +1024,6 @@ def derive_multi_timeframe_oi(
         "timeframes_table": timeframes_table,
         "confluence_summary": confluence_summary,
         "summary_alert": summary_alert,
+        "four_category_flow": four_category_flow,
     }
 

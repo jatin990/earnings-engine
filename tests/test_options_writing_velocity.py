@@ -4,6 +4,8 @@ import pytest
 from earnings_engine.data.options_writing_velocity import (
     derive_multi_timeframe_oi,
     track_oi_snapshot,
+    classify_strike_activity,
+    derive_4category_flow,
     _classify_writing_sentiment,
     _fmt_indian_qty,
     _OI_SNAPSHOT_CACHE,
@@ -227,5 +229,116 @@ def test_distinct_deltas_and_no_15m_30m_duplication():
     assert put_15m != put_30m, f"Put delta duplicated across 15m and 30m: {put_15m}"
     assert abs(call_30m) > abs(call_15m), f"30m call delta ({call_30m}) should be larger horizon than 15m ({call_15m})"
     assert abs(put_30m) > abs(put_15m), f"30m put delta ({put_30m}) should be larger horizon than 15m ({put_15m})"
+
+
+def test_classify_strike_activity_4categories():
+    """Verify 4-quadrant classification of additions vs unwinding."""
+    # 1. CE: Price Up, OI Up -> Call Buy (Long Buildup)
+    res = classify_strike_activity(price_change=12.5, oi_change=5000, option_type="CE")
+    assert res["category"] == "CALL_BUY"
+    assert res["flow_type"] == "Long Buildup"
+    assert res["is_addition"] is True
+    assert res["is_unwinding"] is False
+    assert res["contracts"] == 5000
+
+    # 2. CE: Price Down, OI Down -> Call Buy (Long Liquidation / Unwinding)
+    res = classify_strike_activity(price_change=-8.0, oi_change=-3000, option_type="CE")
+    assert res["category"] == "CALL_BUY"
+    assert res["flow_type"] == "Long Liquidation"
+    assert res["is_addition"] is False
+    assert res["is_unwinding"] is True
+    assert res["contracts"] == 3000
+
+    # 3. CE: Price Down, OI Up -> Call Sell (Short Buildup / Writing)
+    res = classify_strike_activity(price_change=-15.0, oi_change=8000, option_type="CE")
+    assert res["category"] == "CALL_SELL"
+    assert res["flow_type"] == "Short Buildup (Writing)"
+    assert res["is_addition"] is True
+    assert res["is_unwinding"] is False
+    assert res["contracts"] == 8000
+
+    # 4. CE: Price Up, OI Down -> Call Sell (Short Covering / Unwinding)
+    res = classify_strike_activity(price_change=20.0, oi_change=-4000, option_type="CE")
+    assert res["category"] == "CALL_SELL"
+    assert res["flow_type"] == "Short Covering"
+    assert res["is_addition"] is False
+    assert res["is_unwinding"] is True
+    assert res["contracts"] == 4000
+
+    # 5. PE: Price Up, OI Up -> Put Buy (Long Buildup)
+    res = classify_strike_activity(price_change=10.0, oi_change=6000, option_type="PE")
+    assert res["category"] == "PUT_BUY"
+    assert res["flow_type"] == "Long Buildup"
+    assert res["is_addition"] is True
+    assert res["is_unwinding"] is False
+    assert res["contracts"] == 6000
+
+    # 6. PE: Price Down, OI Down -> Put Buy (Long Liquidation / Unwinding)
+    res = classify_strike_activity(price_change=-5.0, oi_change=-2500, option_type="PE")
+    assert res["category"] == "PUT_BUY"
+    assert res["flow_type"] == "Long Liquidation"
+    assert res["is_addition"] is False
+    assert res["is_unwinding"] is True
+    assert res["contracts"] == 2500
+
+    # 7. PE: Price Down, OI Up -> Put Sell (Short Buildup / Writing)
+    res = classify_strike_activity(price_change=-12.0, oi_change=10000, option_type="PE")
+    assert res["category"] == "PUT_SELL"
+    assert res["flow_type"] == "Short Buildup (Writing)"
+    assert res["is_addition"] is True
+    assert res["is_unwinding"] is False
+    assert res["contracts"] == 10000
+
+    # 8. PE: Price Up, OI Down -> Put Sell (Short Covering / Unwinding)
+    res = classify_strike_activity(price_change=18.0, oi_change=-3500, option_type="PE")
+    assert res["category"] == "PUT_SELL"
+    assert res["flow_type"] == "Short Covering"
+    assert res["is_addition"] is False
+    assert res["is_unwinding"] is True
+    assert res["contracts"] == 3500
+
+
+def test_derive_4category_flow_aggregation():
+    """Verify aggregated 4-category flow breakdown with additions and liquidations."""
+    strikes = [
+        # Call Buy (Long Buildup: Price +10, OI +10000)
+        {"strike": 24000.0, "ce_pchange_oi": 10.0, "ce_change_oi": 10000, "pe_pchange_oi": -5.0, "pe_change_oi": 20000},
+        # Call Sell (Short Buildup: Price -8, OI +15000), Put Buy (Long Buildup: Price +12, OI +8000)
+        {"strike": 24100.0, "ce_pchange_oi": -8.0, "ce_change_oi": 15000, "pe_pchange_oi": 12.0, "pe_change_oi": 8000},
+        # Call Buy Unwinding (Price -5, OI -4000), Put Sell Unwinding (Price +15, OI -6000)
+        {"strike": 24200.0, "ce_pchange_oi": -5.0, "ce_change_oi": -4000, "pe_pchange_oi": 15.0, "pe_change_oi": -6000},
+    ]
+
+    flow = derive_4category_flow(strikes)
+    assert "call_buy" in flow
+    assert "call_sell" in flow
+    assert "put_buy" in flow
+    assert "put_sell" in flow
+
+    cb = flow["call_buy"]
+    assert cb["added"] == 10000
+    assert cb["unwound"] == 4000
+    assert cb["total"] == 14000
+    assert "14.0 k" in cb["total_fmt"]
+
+    cs = flow["call_sell"]
+    assert cs["added"] == 15000
+    assert cs["unwound"] == 0
+    assert cs["total"] == 15000
+
+    pb = flow["put_buy"]
+    assert pb["added"] == 8000
+    assert pb["unwound"] == 0
+    assert pb["total"] == 8000
+
+    ps = flow["put_sell"]
+    assert ps["added"] == 20000
+    assert ps["unwound"] == 6000
+    assert ps["total"] == 26000
+
+    tot = 14000 + 15000 + 8000 + 26000
+    assert flow["total_contracts"] == tot
+    assert cb["pct"] == round((14000 / tot) * 100, 1)
+
 
 

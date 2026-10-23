@@ -431,6 +431,67 @@
         // 8. Render Total Contracts Traded vs Gross Added Across Timeframes Graph
         cachedTimeframesData = timeframesData;
         app.renderTotalContractsChart(timeframesData);
+
+        // 9. Render 4-Category Flow Engine (Call Buy, Call Sell, Put Buy, Put Sell: Added vs Unwound)
+        const fourCat = timeframesData.four_category_flow;
+        if (fourCat) {
+            const elTotalFlow = document.getElementById('opt4CatTotalContracts');
+            if (elTotalFlow) {
+                elTotalFlow.textContent = fourCat.total_contracts_fmt ? (fourCat.total_contracts_fmt + ' Contracts') : '--';
+            }
+
+            // Call Buy
+            const cb = fourCat.call_buy;
+            if (cb) {
+                const elCbTotal = document.getElementById('opt4CatCallBuyTotal');
+                const elCbAdded = document.getElementById('opt4CatCallBuyAdded');
+                const elCbUnwound = document.getElementById('opt4CatCallBuyUnwound');
+                const elCbPct = document.getElementById('opt4CatCallBuyPct');
+                if (elCbTotal) elCbTotal.textContent = cb.total_fmt || '--';
+                if (elCbAdded) elCbAdded.textContent = cb.added_fmt ? ('+' + cb.added_fmt) : '--';
+                if (elCbUnwound) elCbUnwound.textContent = cb.unwound_fmt ? ('-' + cb.unwound_fmt) : '--';
+                if (elCbPct) elCbPct.textContent = `${cb.pct || 0}%`;
+            }
+
+            // Call Sell
+            const csFlow = fourCat.call_sell;
+            if (csFlow) {
+                const elCsTotal = document.getElementById('opt4CatCallSellTotal');
+                const elCsAdded = document.getElementById('opt4CatCallSellAdded');
+                const elCsUnwound = document.getElementById('opt4CatCallSellUnwound');
+                const elCsPct = document.getElementById('opt4CatCallSellPct');
+                if (elCsTotal) elCsTotal.textContent = csFlow.total_fmt || '--';
+                if (elCsAdded) elCsAdded.textContent = csFlow.added_fmt ? ('+' + csFlow.added_fmt) : '--';
+                if (elCsUnwound) elCsUnwound.textContent = csFlow.unwound_fmt ? ('-' + csFlow.unwound_fmt) : '--';
+                if (elCsPct) elCsPct.textContent = `${csFlow.pct || 0}%`;
+            }
+
+            // Put Buy
+            const pb = fourCat.put_buy;
+            if (pb) {
+                const elPbTotal = document.getElementById('opt4CatPutBuyTotal');
+                const elPbAdded = document.getElementById('opt4CatPutBuyAdded');
+                const elPbUnwound = document.getElementById('opt4CatPutBuyUnwound');
+                const elPbPct = document.getElementById('opt4CatPutBuyPct');
+                if (elPbTotal) elPbTotal.textContent = pb.total_fmt || '--';
+                if (elPbAdded) elPbAdded.textContent = pb.added_fmt ? ('+' + pb.added_fmt) : '--';
+                if (elPbUnwound) elPbUnwound.textContent = pb.unwound_fmt ? ('-' + pb.unwound_fmt) : '--';
+                if (elPbPct) elPbPct.textContent = `${pb.pct || 0}%`;
+            }
+
+            // Put Sell
+            const ps = fourCat.put_sell;
+            if (ps) {
+                const elPsTotal = document.getElementById('opt4CatPutSellTotal');
+                const elPsAdded = document.getElementById('opt4CatPutSellAdded');
+                const elPsUnwound = document.getElementById('opt4CatPutSellUnwound');
+                const elPsPct = document.getElementById('opt4CatPutSellPct');
+                if (elPsTotal) elPsTotal.textContent = ps.total_fmt || '--';
+                if (elPsAdded) elPsAdded.textContent = ps.added_fmt ? ('+' + ps.added_fmt) : '--';
+                if (elPsUnwound) elPsUnwound.textContent = ps.unwound_fmt ? ('-' + ps.unwound_fmt) : '--';
+                if (elPsPct) elPsPct.textContent = `${ps.pct || 0}%`;
+            }
+        }
     };
 
     /**

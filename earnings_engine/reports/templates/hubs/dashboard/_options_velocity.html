@@ -264,4 +264,138 @@
             <canvas id="optTotalContractsChart"></canvas>
         </div>
     </div>
+
+    <!-- 4-Category Flow Matrix: Call Buy, Call Sell, Put Buy, Put Sell (Added vs Unwound) -->
+    <div style="margin-top:1.1rem;background:#0d0e12;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:0.9rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.75rem;padding-bottom:0.6rem;border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#10b981;"></span>
+                    <span style="font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-primary);">
+                        4-Category Options Flow Engine: Addition vs Unwinding
+                    </span>
+                    <span class="badge" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-size:0.65rem;padding:0.15rem 0.45rem;border-radius:4px;font-weight:800;">
+                        POSITION TRANSITIONS
+                    </span>
+                </div>
+                <div style="font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;">
+                    Distinguishing new position additions (Long / Short Buildup) from existing position liquidations (Short Covering / Long Liquidation) across strikes
+                </div>
+            </div>
+            <div style="font-size:0.7rem;font-family:var(--font-mono);color:var(--text-secondary);">
+                Active Flow: <strong id="opt4CatTotalContracts" style="color:var(--text-primary);">--</strong>
+            </div>
+        </div>
+
+        <!-- 4 Cards Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.85rem;">
+            <!-- Card 1: Call Buy -->
+            <div style="background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.15);border-radius:8px;padding:0.8rem;display:flex;flex-direction:column;justify-content:space-between;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <span style="font-size:0.75rem;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.04em;">Call Buy</span>
+                    <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:800;">
+                        BULLISH BIAS
+                    </span>
+                </div>
+                <div style="font-size:1.25rem;font-weight:900;font-family:var(--font-mono);color:#ffffff;margin-bottom:0.35rem;" id="opt4CatCallBuyTotal">
+                    --
+                </div>
+                <!-- Dual Breakdown: Added (Long Buildup) vs Unwound (Long Liquidation) -->
+                <div style="display:flex;flex-direction:column;gap:0.3rem;font-size:0.7rem;font-family:var(--font-mono);background:rgba(0,0,0,0.35);padding:0.45rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#34d399;font-weight:600;" title="Price Up & OI Up: Aggressive long additions">+ Added (Long Buildup):</span>
+                        <strong id="opt4CatCallBuyAdded" style="color:#34d399;">--</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#94a3b8;font-weight:600;" title="Price Down & OI Down: Profit booking / long liquidation">- Unwound (Liquidation):</span>
+                        <strong id="opt4CatCallBuyUnwound" style="color:#cbd5e1;">--</strong>
+                    </div>
+                </div>
+                <div style="font-size:0.65rem;color:var(--text-secondary);margin-top:0.45rem;">
+                    Net Call Buying Volume (<span id="opt4CatCallBuyPct">--%</span> of total flow)
+                </div>
+            </div>
+
+            <!-- Card 2: Call Sell -->
+            <div style="background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:0.8rem;display:flex;flex-direction:column;justify-content:space-between;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <span style="font-size:0.75rem;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:0.04em;">Call Sell</span>
+                    <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:800;">
+                        BEARISH BIAS
+                    </span>
+                </div>
+                <div style="font-size:1.25rem;font-weight:900;font-family:var(--font-mono);color:#ffffff;margin-bottom:0.35rem;" id="opt4CatCallSellTotal">
+                    --
+                </div>
+                <!-- Dual Breakdown: Added (Short Buildup) vs Unwound (Short Covering) -->
+                <div style="display:flex;flex-direction:column;gap:0.3rem;font-size:0.7rem;font-family:var(--font-mono);background:rgba(0,0,0,0.35);padding:0.45rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#f87171;font-weight:600;" title="Price Down & OI Up: Institutional resistance underwriting">+ Added (Short Buildup):</span>
+                        <strong id="opt4CatCallSellAdded" style="color:#f87171;">--</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#38bdf8;font-weight:600;" title="Price Up & OI Down: Bear capitulation / short covering">- Unwound (Short Covering):</span>
+                        <strong id="opt4CatCallSellUnwound" style="color:#38bdf8;">--</strong>
+                    </div>
+                </div>
+                <div style="font-size:0.65rem;color:var(--text-secondary);margin-top:0.45rem;">
+                    Net Call Selling / Writing (<span id="opt4CatCallSellPct">--%</span> of total flow)
+                </div>
+            </div>
+
+            <!-- Card 3: Put Buy -->
+            <div style="background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:0.8rem;display:flex;flex-direction:column;justify-content:space-between;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <span style="font-size:0.75rem;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:0.04em;">Put Buy</span>
+                    <span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:800;">
+                        BEARISH BIAS
+                    </span>
+                </div>
+                <div style="font-size:1.25rem;font-weight:900;font-family:var(--font-mono);color:#ffffff;margin-bottom:0.35rem;" id="opt4CatPutBuyTotal">
+                    --
+                </div>
+                <!-- Dual Breakdown: Added (Put Buildup) vs Unwound (Put Liquidation) -->
+                <div style="display:flex;flex-direction:column;gap:0.3rem;font-size:0.7rem;font-family:var(--font-mono);background:rgba(0,0,0,0.35);padding:0.45rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#f87171;font-weight:600;" title="Price Up & OI Up: Institutional hedge demand">+ Added (Long Buildup):</span>
+                        <strong id="opt4CatPutBuyAdded" style="color:#f87171;">--</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#94a3b8;font-weight:600;" title="Price Down & OI Down: Put hedge profit liquidation">- Unwound (Liquidation):</span>
+                        <strong id="opt4CatPutBuyUnwound" style="color:#cbd5e1;">--</strong>
+                    </div>
+                </div>
+                <div style="font-size:0.65rem;color:var(--text-secondary);margin-top:0.45rem;">
+                    Protective Put Purchases (<span id="opt4CatPutBuyPct">--%</span> of total flow)
+                </div>
+            </div>
+
+            <!-- Card 4: Put Sell -->
+            <div style="background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.15);border-radius:8px;padding:0.8rem;display:flex;flex-direction:column;justify-content:space-between;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <span style="font-size:0.75rem;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.04em;">Put Sell</span>
+                    <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.62rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:800;">
+                        BULLISH BIAS
+                    </span>
+                </div>
+                <div style="font-size:1.25rem;font-weight:900;font-family:var(--font-mono);color:#ffffff;margin-bottom:0.35rem;" id="opt4CatPutSellTotal">
+                    --
+                </div>
+                <!-- Dual Breakdown: Added (Put Writing) vs Unwound (Short Covering) -->
+                <div style="display:flex;flex-direction:column;gap:0.3rem;font-size:0.7rem;font-family:var(--font-mono);background:rgba(0,0,0,0.35);padding:0.45rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#34d399;font-weight:600;" title="Price Down & OI Up: Institutional floor underwriting">+ Added (Short Buildup):</span>
+                        <strong id="opt4CatPutSellAdded" style="color:#34d399;">--</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#38bdf8;font-weight:600;" title="Price Up & OI Down: Trapped put writers covering">- Unwound (Short Covering):</span>
+                        <strong id="opt4CatPutSellUnwound" style="color:#38bdf8;">--</strong>
+                    </div>
+                </div>
+                <div style="font-size:0.65rem;color:var(--text-secondary);margin-top:0.45rem;">
+                    Institutional Put Underwriting (<span id="opt4CatPutSellPct">--%</span> of total flow)
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
