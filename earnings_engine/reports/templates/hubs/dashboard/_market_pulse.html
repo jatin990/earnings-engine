@@ -44,8 +44,8 @@
                 <div>
                     <div style="font-size:0.92rem;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.01em;">
                         Next-Day Quantitative Market Playbook &amp; Strategy Engine
-                        <span id="pulsePlaybookBiasBadge" class="signal-badge" style="background:rgba(52,211,153,0.18);color:#34d399;border:1px solid rgba(52,211,153,0.35);font-size:0.70rem;font-weight:800;">
-                            🟢 Bullish / Accumulation Stance
+                        <span id="pulsePlaybookBiasBadge" class="signal-badge" style="background:rgba(148,163,184,0.18);color:#94a3b8;border:1px solid rgba(148,163,184,0.35);font-size:0.70rem;font-weight:800;">
+                            ⏳ Calculating Stance...
                         </span>
                     </div>
                     <div id="pulsePlaybookHeadline" style="font-size:0.74rem;color:#94a3b8;margin-top:0.15rem;">
@@ -55,7 +55,7 @@
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <span id="pulsePlaybookConfluencePill" style="font-size:0.70rem;padding:0.2rem 0.55rem;border-radius:4px;background:rgba(99,102,241,0.18);color:#a5b4fc;font-family:var(--font-mono);font-weight:800;border:1px solid rgba(99,102,241,0.35);">
-                    Confluence: +28/100
+                    Confluence: —
                 </span>
                 <button type="button" onclick="app.openMetricGlossary('participant_oi')" class="btn-micro" style="padding:0.25rem 0.55rem;background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:4px;cursor:pointer;font-size:0.68rem;">
                     Glossary Guide ℹ️
@@ -71,19 +71,19 @@
                 <div>
                     <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
                         <span>⚡ 1D Volatility Corridor (India VIX Math)</span>
-                        <span id="pulsePlaybookVixTag" style="color:#38bdf8;font-family:var(--font-mono);font-size:0.68rem;">VIX: 13.8</span>
+                        <span id="pulsePlaybookVixTag" style="color:#38bdf8;font-family:var(--font-mono);font-size:0.68rem;">VIX: —</span>
                     </div>
                     <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.35rem;">
-                        <span id="pulsePlaybookNiftySpot" style="font-size:1.15rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);">24,850</span>
-                        <span id="pulsePlaybookExpectedMove" style="font-size:0.72rem;font-weight:700;color:#fbbf24;font-family:var(--font-mono);">±0.87% (±216 Pts)</span>
+                        <span id="pulsePlaybookNiftySpot" style="font-size:1.15rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);">—</span>
+                        <span id="pulsePlaybookExpectedMove" style="font-size:0.72rem;font-weight:700;color:#fbbf24;font-family:var(--font-mono);">—</span>
                     </div>
                     <div style="font-size:0.68rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.4rem;">
-                        <div>• <strong>68% Probability (1σ):</strong> <span id="pulsePlaybook1SigmaRange" style="font-family:var(--font-mono);color:#34d399;font-weight:700;">24,634 – 25,066</span></div>
-                        <div>• <strong>95% Probability (2σ):</strong> <span id="pulsePlaybook2SigmaRange" style="font-family:var(--font-mono);color:#64748b;font-weight:600;">24,418 – 25,282</span></div>
+                        <div>• <strong>68% Probability (1σ):</strong> <span id="pulsePlaybook1SigmaRange" style="font-family:var(--font-mono);color:#34d399;font-weight:700;">—</span></div>
+                        <div>• <strong>95% Probability (2σ):</strong> <span id="pulsePlaybook2SigmaRange" style="font-family:var(--font-mono);color:#64748b;font-weight:600;">—</span></div>
                     </div>
                 </div>
-                <div id="pulsePlaybookThetaEnv" style="font-size:0.65rem;padding:0.25rem 0.45rem;border-radius:4px;background:rgba(16,185,129,0.12);color:#34d399;font-weight:700;border:1px solid rgba(16,185,129,0.25);">
-                    🟢 Favorable for Option Selling / Theta Decay
+                <div id="pulsePlaybookThetaEnv" style="font-size:0.65rem;padding:0.25rem 0.45rem;border-radius:4px;background:rgba(255,255,255,0.05);color:#94a3b8;font-weight:700;border:1px solid rgba(255,255,255,0.1);">
+                    ⏳ Calculating option theta environment...
                 </div>
             </div>
 
@@ -92,20 +92,20 @@
                 <div>
                     <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
                         <span>🏛️ Smart Money vs. Retail Divergence</span>
-                        <span id="pulsePlaybookDivergenceBadge" style="font-size:0.65rem;color:#34d399;font-weight:700;">Balanced</span>
+                        <span id="pulsePlaybookDivergenceBadge" style="font-size:0.65rem;color:#94a3b8;font-weight:700;">—</span>
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.72rem;font-family:var(--font-mono);margin-bottom:0.35rem;background:rgba(255,255,255,0.03);padding:0.3rem 0.45rem;border-radius:4px;">
-                        <span>FII L/S: <strong id="pulsePlaybookFiiLs" style="color:#34d399;">1.15x</strong></span>
+                        <span>FII L/S: <strong id="pulsePlaybookFiiLs" style="color:#cbd5e1;">—</strong></span>
                         <span style="color:#64748b;">vs</span>
-                        <span>Client L/S: <strong id="pulsePlaybookClientLs" style="color:#fb923c;">0.92x</strong></span>
+                        <span>Client L/S: <strong id="pulsePlaybookClientLs" style="color:#cbd5e1;">—</strong></span>
                     </div>
                     <div id="pulsePlaybookTrapWarning" style="font-size:0.68rem;color:#cbd5e1;line-height:1.35;margin-bottom:0.4rem;">
-                        Institutions hold net long futures while retail is short. Risk of morning short-squeeze expansion.
+                        Synthesizing institutional positioning...
                     </div>
                 </div>
                 <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#94a3b8;border-top:1px solid rgba(255,255,255,0.05);padding-top:0.3rem;">
-                    <span>Trap Risk Score: <strong id="pulsePlaybookTrapScore" style="color:#38bdf8;font-family:var(--font-mono);">35/100 (Low)</strong></span>
-                    <span style="color:#64748b;">Divergence Delta: <strong id="pulsePlaybookDivDelta" style="font-family:var(--font-mono);color:#cbd5e1;">+0.23</strong></span>
+                    <span>Trap Risk Score: <strong id="pulsePlaybookTrapScore" style="color:#38bdf8;font-family:var(--font-mono);">—</strong></span>
+                    <span style="color:#64748b;">Divergence Delta: <strong id="pulsePlaybookDivDelta" style="font-family:var(--font-mono);color:#cbd5e1;">—</strong></span>
                 </div>
             </div>
 
@@ -113,12 +113,10 @@
             <div style="background:#06060a;padding:0.75rem;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
                 <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
                     <span>📋 Actionable Rules for Tomorrow</span>
-                    <span style="font-size:0.65rem;color:#a5b4fc;font-family:var(--font-mono);">3 Rules</span>
+                    <span style="font-size:0.65rem;color:#a5b4fc;font-family:var(--font-mono);">Rules</span>
                 </div>
-                <div id="pulsePlaybookRulesContainer" style="font-size:0.68rem;color:#e2e8f0;display:flex;flex-direction:column;gap:0.35rem;line-height:1.35;">
-                    <div>🎯 <strong>Primary:</strong> Buy 15-min opening pullbacks into 24,750 VWAP support.</div>
-                    <div>⚡ <strong>Options:</strong> Bull Call Spreads (24,900 CE / 25,100 CE) or OTM Put Credit Spreads.</div>
-                    <div>🛑 <strong>Invalidation:</strong> Daily close below 24,630 invalidates bullish structure.</div>
+                <div id="pulsePlaybookRulesContainer" style="font-size:0.68rem;color:#94a3b8;display:flex;flex-direction:column;gap:0.35rem;line-height:1.35;">
+                    <div>⏳ Calculating tactical directives from derivatives and market breadth...</div>
                 </div>
             </div>
         </div>
@@ -127,7 +125,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;font-size:0.70rem;background:#06060a;padding:0.45rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
             <div style="display:flex;align-items:center;gap:0.4rem;">
                 <span style="color:#94a3b8;font-weight:600;">Top Sector Tailwinds:</span>
-                <span id="pulsePlaybookFocusSectors" style="color:#34d399;font-weight:700;font-family:var(--font-mono);">IT (+1.4%), Auto (+0.9%), Private Banks (+0.6%)</span>
+                <span id="pulsePlaybookFocusSectors" style="color:#cbd5e1;font-weight:700;font-family:var(--font-mono);">—</span>
             </div>
             <a href="javascript:void(0)" onclick="app.openMetricGlossary('participant_oi')" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:0.68rem;">
                 Read Full Institutional Guide ➔
@@ -147,13 +145,13 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <span id="pulseFgTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
-                        <span id="pulseFgBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Greed / Bullish</span>
+                        <span id="pulseFgBadge" class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.68rem;">—</span>
                     </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
-                    <span id="pulseFgScore" style="font-size:1.6rem;font-weight:900;color:#34d399;font-family:var(--font-mono);line-height:1;">68.5</span>
+                    <span id="pulseFgScore" style="font-size:1.6rem;font-weight:900;color:#cbd5e1;font-family:var(--font-mono);line-height:1;">—</span>
                     <span style="font-size:0.72rem;color:#64748b;font-weight:600;">/ 100 Index</span>
-                    <span id="pulseFgDelta" style="font-size:0.70rem;color:#34d399;margin-left:auto;font-weight:600;">+3.2 (7D)</span>
+                    <span id="pulseFgDelta" style="font-size:0.70rem;color:#94a3b8;margin-left:auto;font-weight:600;">—</span>
                 </div>
             </div>
 
@@ -178,13 +176,13 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <span id="pulseVixTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
-                        <span id="pulseVixRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">🔵 Calm Trend</span>
+                        <span id="pulseVixRegimeBadge" class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.68rem;">—</span>
                     </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
-                    <span id="pulseVixLevel" style="font-size:1.6rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">13.82</span>
-                    <span id="pulseVixChange" style="font-size:0.72rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">-2.14% 1D</span>
-                    <span id="pulseVixStanceBadge" style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">Safe Corridor</span>
+                    <span id="pulseVixLevel" style="font-size:1.6rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">—</span>
+                    <span id="pulseVixChange" style="font-size:0.72rem;color:#94a3b8;font-weight:700;font-family:var(--font-mono);">—</span>
+                    <span id="pulseVixStanceBadge" style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">—</span>
                 </div>
             </div>
 
@@ -210,13 +208,13 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <span id="pulseNiftyTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
-                        <span id="pulsePredictionRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">Bullish Expansion</span>
+                        <span id="pulsePredictionRegimeBadge" class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.68rem;">—</span>
                     </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
-                    <span id="pulseNiftyLevel" style="font-size:1.6rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);line-height:1;">24,850.5</span>
-                    <span id="pulseNiftyChange" style="font-size:0.72rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">+0.45% 1D</span>
-                    <span style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">Supp: 24,650 · Target: 25,200</span>
+                    <span id="pulseNiftyLevel" style="font-size:1.6rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);line-height:1;">—</span>
+                    <span id="pulseNiftyChange" style="font-size:0.72rem;color:#94a3b8;font-weight:700;font-family:var(--font-mono);">—</span>
+                    <span id="pulseNiftyTargets" style="font-size:0.68rem;color:#94a3b8;margin-left:auto;">—</span>
                 </div>
             </div>
 
@@ -226,9 +224,9 @@
             </div>
 
             <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:#64748b;border-top:1px solid rgba(255,255,255,0.05);padding-top:0.3rem;margin-top:0.2rem;">
-                <span id="pulseNifty30dLow">30D Low: 24,150</span>
-                <span id="pulseNifty30dMom" style="color:#38bdf8;">Momentum: +2.8%</span>
-                <span id="pulseNifty30dHigh">30D High: 25,050</span>
+                <span id="pulseNifty30dLow">30D Low: —</span>
+                <span id="pulseNifty30dMom" style="color:#38bdf8;">Momentum: —</span>
+                <span id="pulseNifty30dHigh">30D High: —</span>
             </div>
         </div>
 
@@ -241,13 +239,13 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <span id="pulseOiChartTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
-                        <span id="pulseParticipantOiChartBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.68rem;">FII Net Long</span>
+                        <span id="pulseParticipantOiChartBadge" class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.68rem;">—</span>
                     </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
-                    <span id="pulseFiiNetContractsPill" style="font-size:1.3rem;font-weight:900;color:#34d399;font-family:var(--font-mono);line-height:1;">+24,500</span>
+                    <span id="pulseFiiNetContractsPill" style="font-size:1.3rem;font-weight:900;color:#cbd5e1;font-family:var(--font-mono);line-height:1;">—</span>
                     <span style="font-size:0.70rem;color:#64748b;font-weight:600;">FII Net Contracts</span>
-                    <span style="font-size:0.68rem;color:#fb923c;margin-left:auto;font-family:var(--font-mono);">Retail: -18,200</span>
+                    <span id="pulseRetailNetContractsPill" style="font-size:0.68rem;color:#94a3b8;margin-left:auto;font-family:var(--font-mono);">Retail: —</span>
                 </div>
             </div>
 
@@ -272,13 +270,13 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <span id="pulseFiiLsTimestamp" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">Updated: —</span>
-                        <span id="pulseFiiLsOscBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.68rem;">Normal Bullish</span>
+                        <span id="pulseFiiLsOscBadge" class="signal-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;font-size:0.68rem;">—</span>
                     </div>
                 </div>
                 <div style="display:flex;align-items:baseline;gap:0.4rem;margin-bottom:0.3rem;">
-                    <span id="pulseFiiLsRatioPill" style="font-size:1.3rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">1.15x</span>
+                    <span id="pulseFiiLsRatioPill" style="font-size:1.3rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">—</span>
                     <span style="font-size:0.70rem;color:#64748b;font-weight:600;">L/S Ratio</span>
-                    <span style="font-size:0.68rem;color:#34d399;margin-left:auto;font-weight:600;">53.5% Long</span>
+                    <span id="pulseFiiLongPctSub" style="font-size:0.68rem;color:#94a3b8;margin-left:auto;font-weight:600;">—</span>
                 </div>
             </div>
 
@@ -362,14 +360,14 @@
             <!-- Advances vs Declines Bar -->
             <div style="margin-bottom:0.85rem;">
                 <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:0.3rem;">
-                    <span style="color:#34d399;font-weight:700;">🟢 <span id="pulseAdvancesCount">1,240</span> Advances</span>
-                    <span style="color:#94a3b8;"><span id="pulseUnchangedCount">110</span> Unchanged</span>
-                    <span style="color:#f87171;font-weight:700;">🔴 <span id="pulseDeclinesCount">860</span> Declines</span>
+                    <span style="color:#34d399;font-weight:700;">🟢 <span id="pulseAdvancesCount">—</span> Advances</span>
+                    <span style="color:#94a3b8;"><span id="pulseUnchangedCount">—</span> Unchanged</span>
+                    <span style="color:#f87171;font-weight:700;">🔴 <span id="pulseDeclinesCount">—</span> Declines</span>
                 </div>
                 <div style="width:100%;height:7px;background:#18181b;border-radius:4px;overflow:hidden;display:flex;">
-                    <div id="pulseAdvBar" style="width:58%;height:100%;background:#10b981;"></div>
-                    <div id="pulseUnchBar" style="width:5%;height:100%;background:#64748b;"></div>
-                    <div id="pulseDecBar" style="width:37%;height:100%;background:#ef4444;"></div>
+                    <div id="pulseAdvBar" style="width:0%;height:100%;background:#10b981;"></div>
+                    <div id="pulseUnchBar" style="width:0%;height:100%;background:#64748b;"></div>
+                    <div id="pulseDecBar" style="width:0%;height:100%;background:#ef4444;"></div>
                 </div>
             </div>
 
@@ -380,14 +378,14 @@
                         <span>Stocks &gt; 20-DMA (Short-term)</span>
                         <span style="color:#34d399;">Bullish &gt;60%</span>
                     </div>
-                    <div id="pulsePct20dma" style="font-size:1.1rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.2rem;">64.5%</div>
+                    <div id="pulsePct20dma" style="font-size:1.1rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
                 </div>
                 <div style="background:#06060a;padding:0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
                     <div style="color:#94a3b8;font-size:0.68rem;display:flex;justify-content:space-between;">
                         <span>Stocks &gt; 50-DMA (Medium-term)</span>
                         <span style="color:#38bdf8;">Healthy &gt;55%</span>
                     </div>
-                    <div id="pulsePct50dma" style="font-size:1.1rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.2rem;">58.2%</div>
+                    <div id="pulsePct50dma" style="font-size:1.1rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
                 </div>
             </div>
         </div>
@@ -417,37 +415,37 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(135px, 1fr));gap:0.5rem;margin-bottom:0.65rem;">
                 <div style="background:#06060a;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);text-align:center;">
                     <div id="pulseSessionFiiLabel" style="color:#94a3b8;font-size:0.65rem;">Session FII Net</div>
-                    <div id="pulseFiiNet" style="font-size:0.98rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">+₹850.5 Cr</div>
+                    <div id="pulseFiiNet" style="font-size:0.98rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);margin-top:0.15rem;">—</div>
                     <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;margin-top:0.25rem;">
                         <span id="pulseFiiGrossSub" style="font-size:0.58rem;color:#64748b;font-family:var(--font-mono);">B: — | S: —</span>
-                        <span id="pulseFiiBsRatioPill" style="font-size:0.58rem;padding:0.05rem 0.25rem;border-radius:3px;background:rgba(52,211,153,0.12);color:#34d399;font-weight:700;font-family:var(--font-mono);">B/S: 1.0x</span>
+                        <span id="pulseFiiBsRatioPill" style="font-size:0.58rem;padding:0.05rem 0.25rem;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;font-weight:700;font-family:var(--font-mono);">B/S: —</span>
                     </div>
                 </div>
                 <div style="background:#06060a;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);text-align:center;">
                     <div id="pulseSessionDiiLabel" style="color:#94a3b8;font-size:0.65rem;">Session DII Net</div>
-                    <div id="pulseDiiNet" style="font-size:0.98rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">+₹1,420.0 Cr</div>
+                    <div id="pulseDiiNet" style="font-size:0.98rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);margin-top:0.15rem;">—</div>
                     <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;margin-top:0.25rem;">
                         <span id="pulseDiiGrossSub" style="font-size:0.58rem;color:#64748b;font-family:var(--font-mono);">B: — | S: —</span>
-                        <span id="pulseDiiBsRatioPill" style="font-size:0.58rem;padding:0.05rem 0.25rem;border-radius:3px;background:rgba(52,211,153,0.12);color:#34d399;font-weight:700;font-family:var(--font-mono);">B/S: 1.0x</span>
+                        <span id="pulseDiiBsRatioPill" style="font-size:0.58rem;padding:0.05rem 0.25rem;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;font-weight:700;font-family:var(--font-mono);">B/S: —</span>
                     </div>
                 </div>
                 <div style="background:#06060a;padding:0.55rem;border-radius:6px;border:1px solid rgba(56,189,248,0.2);text-align:center;">
                     <div id="pulseSessionTotLabel" style="color:#94a3b8;font-size:0.65rem;">Session Combined</div>
-                    <div id="pulseTotalNet" style="font-size:0.98rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">+₹2,270.5 Cr</div>
+                    <div id="pulseTotalNet" style="font-size:0.98rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);margin-top:0.15rem;">—</div>
                     <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;margin-top:0.25rem;">
                         <span id="pulseTurnoverSub" style="font-size:0.58rem;color:#64748b;font-family:var(--font-mono);">Turnover: —</span>
                     </div>
                 </div>
                 <div style="background:#06060a;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);text-align:center;display:flex;flex-direction:column;justify-content:center;">
                     <div style="color:#94a3b8;font-size:0.65rem;">Absorption Regime</div>
-                    <div id="pulseFlowRegimeBadge" style="font-size:0.72rem;font-weight:800;color:#34d399;margin-top:0.15rem;">🟢 Inflow Expansion</div>
-                    <div id="pulseFlowRegimeSub" style="font-size:0.58rem;color:#64748b;margin-top:0.25rem;">Net Inflows</div>
+                    <div id="pulseFlowRegimeBadge" style="font-size:0.72rem;font-weight:800;color:#94a3b8;margin-top:0.15rem;">—</div>
+                    <div id="pulseFlowRegimeSub" style="font-size:0.58rem;color:#64748b;margin-top:0.25rem;">—</div>
                 </div>
             </div>
 
             <div style="font-size:0.70rem;color:#cbd5e1;background:#06060a;padding:0.4rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;margin-bottom:0.65rem;">
                 <span>Today's Liquidity Stance:</span>
-                <strong id="pulseInstBias" style="color:#34d399;font-weight:800;">NET INFLOWS (BULLISH)</strong>
+                <strong id="pulseInstBias" style="color:#94a3b8;font-weight:800;">⏳ Calculating...</strong>
             </div>
 
             <!-- Past 7 Days / 30 Days Flow History Table -->

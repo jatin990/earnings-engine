@@ -206,13 +206,16 @@
             }
 
             grid.innerHTML = indices.map(idx => {
-                const isPositive = idx.change_pct >= 0;
+                const isPositive = (idx.change_pct || 0) >= 0;
                 const isVix = idx.symbol === '^INDIAVIX';
 
                 // For VIX, down is good (green), up is volatility risk (red)
-                const col = isVix ? (idx.change_pct <= 0 ? '#34d399' : '#f87171') : (isPositive ? '#34d399' : '#f87171');
-                const sign = idx.change_pct >= 0 ? '+' : '';
-                const ptsSign = idx.change_pts >= 0 ? '+' : '';
+                const col = isVix ? ((idx.change_pct || 0) <= 0 ? '#34d399' : '#f87171') : (isPositive ? '#34d399' : '#f87171');
+                const sign = (idx.change_pct != null && !isNaN(idx.change_pct) && idx.change_pct >= 0) ? '+' : '';
+                const ptsSign = (idx.change_pts != null && !isNaN(idx.change_pts) && idx.change_pts >= 0) ? '+' : '';
+                const priceFormatted = (idx.current_price != null && !isNaN(idx.current_price)) ? Number(idx.current_price).toLocaleString() : '—';
+                const ptsFormatted = (idx.change_pts != null && !isNaN(idx.change_pts)) ? `${ptsSign}${Number(idx.change_pts).toFixed(2)}` : '—';
+                const pctFormatted = (idx.change_pct != null && !isNaN(idx.change_pct)) ? `${sign}${Number(idx.change_pct).toFixed(2)}%` : '—';
 
                 // Simple SVG sparkline
                 const points = idx.sparkline || [];
@@ -241,7 +244,7 @@
                             <div>
                                 <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;letter-spacing:0.04em;">${idx.name}</div>
                                 <div style="font-size:1.05rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);margin-top:0.15rem;">
-                                    ${(idx.current_price || 0).toLocaleString()}
+                                    ${priceFormatted}
                                 </div>
                             </div>
                             <div style="text-align:right;">
@@ -249,9 +252,9 @@
                             </div>
                         </div>
                         <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;font-family:var(--font-mono);">
-                            <span style="color:#64748b;">${ptsSign}${idx.change_pts}</span>
+                            <span style="color:#64748b;">${ptsFormatted}</span>
                             <span style="font-weight:800;color:${col};background:${col}15;padding:0.1rem 0.35rem;border-radius:3px;">
-                                ${sign}${idx.change_pct}%
+                                ${pctFormatted}
                             </span>
                         </div>
                     </div>
@@ -325,23 +328,37 @@
             if (vixTag && pb.vix_level != null) {
                 vixTag.textContent = `VIX: ${pb.vix_level}`;
             }
-            if (spotEl && pb.nifty_spot) {
-                spotEl.textContent = Number(pb.nifty_spot).toLocaleString();
+            if (spotEl) {
+                spotEl.textContent = (pb.nifty_spot != null && !isNaN(pb.nifty_spot)) ? Number(pb.nifty_spot).toLocaleString() : '—';
             }
             if (expMoveEl) {
-                const pts = pb.expected_1d_move_pts ?? pb.expected_1d_range_pts ?? pb.corridor?.expected_1d_move_pts ?? pb.corridor?.expected_1d_range_pts ?? 0;
-                const pct = pb.expected_1d_move_pct ?? pb.expected_1d_range_pct ?? pb.corridor?.expected_1d_move_pct ?? pb.corridor?.expected_1d_range_pct ?? 0;
-                expMoveEl.textContent = `±${pct}% (±${pts} Pts)`;
+                const pts = pb.expected_1d_move_pts ?? pb.expected_1d_range_pts ?? pb.corridor?.expected_1d_move_pts ?? pb.corridor?.expected_1d_range_pts ?? null;
+                const pct = pb.expected_1d_move_pct ?? pb.expected_1d_range_pct ?? pb.corridor?.expected_1d_move_pct ?? pb.corridor?.expected_1d_range_pct ?? null;
+                if (pts != null && pct != null) {
+                    expMoveEl.textContent = `±${pct}% (±${pts} Pts)`;
+                } else if (pts != null) {
+                    expMoveEl.textContent = `±${pts} Pts`;
+                } else {
+                    expMoveEl.textContent = '—';
+                }
             }
             if (sigma1El) {
-                const low = pb.corridor?.lower_band_1sigma ?? pb.corridor?.lower_1sigma ?? pb.lower_band_1sigma ?? 0;
-                const high = pb.corridor?.upper_band_1sigma ?? pb.corridor?.upper_1sigma ?? pb.upper_band_1sigma ?? 0;
-                sigma1El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
+                const low = pb.corridor?.lower_band_1sigma ?? pb.corridor?.lower_1sigma ?? pb.lower_band_1sigma ?? null;
+                const high = pb.corridor?.upper_band_1sigma ?? pb.corridor?.upper_1sigma ?? pb.upper_band_1sigma ?? null;
+                if (low != null && high != null) {
+                    sigma1El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
+                } else {
+                    sigma1El.textContent = '—';
+                }
             }
             if (sigma2El) {
-                const low = pb.corridor?.lower_band_2sigma ?? pb.corridor?.lower_2sigma ?? pb.lower_band_2sigma ?? 0;
-                const high = pb.corridor?.upper_band_2sigma ?? pb.corridor?.upper_2sigma ?? pb.upper_band_2sigma ?? 0;
-                sigma2El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
+                const low = pb.corridor?.lower_band_2sigma ?? pb.corridor?.lower_2sigma ?? pb.lower_band_2sigma ?? null;
+                const high = pb.corridor?.upper_band_2sigma ?? pb.corridor?.upper_2sigma ?? pb.upper_band_2sigma ?? null;
+                if (low != null && high != null) {
+                    sigma2El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
+                } else {
+                    sigma2El.textContent = '—';
+                }
             }
             if (thetaEnvEl) {
                 const env = pb.theta_env_label || pb.theta_environment || pb.theta_decay_environment || '';
@@ -376,31 +393,57 @@
                     divBadge.style.color = '#38bdf8';
                 }
             }
-            const fiiRatio = sm.fii_ls_ratio ?? sm.fii_ls ?? 1.0;
-            const clientRatio = sm.client_ls_ratio ?? sm.client_ls ?? 1.0;
+            const fiiRatio = sm.fii_ls_ratio ?? sm.fii_ls ?? null;
+            const clientRatio = sm.client_ls_ratio ?? sm.client_ls ?? null;
             if (fiiLsEl) {
-                fiiLsEl.textContent = `${Number(fiiRatio).toFixed(2)}x`;
-                fiiLsEl.style.color = fiiRatio >= 1.0 ? '#34d399' : '#f87171';
+                if (fiiRatio != null && !isNaN(fiiRatio)) {
+                    fiiLsEl.textContent = `${Number(fiiRatio).toFixed(2)}x`;
+                    fiiLsEl.style.color = fiiRatio >= 1.0 ? '#34d399' : '#f87171';
+                } else {
+                    fiiLsEl.textContent = '—';
+                    fiiLsEl.style.color = '#94a3b8';
+                }
             }
             if (clientLsEl) {
-                clientLsEl.textContent = `${Number(clientRatio).toFixed(2)}x`;
-                clientLsEl.style.color = clientRatio >= 1.0 ? '#fb923c' : '#94a3b8';
+                if (clientRatio != null && !isNaN(clientRatio)) {
+                    clientLsEl.textContent = `${Number(clientRatio).toFixed(2)}x`;
+                    clientLsEl.style.color = clientRatio >= 1.0 ? '#fb923c' : '#94a3b8';
+                } else {
+                    clientLsEl.textContent = '—';
+                    clientLsEl.style.color = '#94a3b8';
+                }
             }
             const trapWarning = sm.trap_warning || sm.warning;
-            if (trapWarnEl && trapWarning) {
-                trapWarnEl.textContent = trapWarning;
+            if (trapWarnEl) {
+                if (trapWarning) {
+                    trapWarnEl.textContent = trapWarning;
+                } else {
+                    trapWarnEl.textContent = 'Institutional positions aligned with neutral regime.';
+                }
             }
             if (trapScoreEl) {
-                const score = sm.trap_risk_score !== undefined ? sm.trap_risk_score : 35;
-                const label = sm.trap_risk_label || (score > 60 ? 'High' : score > 35 ? 'Moderate' : 'Low');
-                trapScoreEl.textContent = `${score}/100 (${label})`;
-                trapScoreEl.style.color = score > 60 ? '#f87171' : score > 35 ? '#fbbf24' : '#34d399';
+                const score = (sm.trap_risk_score !== undefined && sm.trap_risk_score !== null) ? sm.trap_risk_score : null;
+                if (score !== null && !isNaN(score)) {
+                    const label = sm.trap_risk_label || (score > 60 ? 'High' : score > 35 ? 'Moderate' : 'Low');
+                    trapScoreEl.textContent = `${score}/100 (${label})`;
+                    trapScoreEl.style.color = score > 60 ? '#f87171' : score > 35 ? '#fbbf24' : '#34d399';
+                } else {
+                    trapScoreEl.textContent = '—';
+                    trapScoreEl.style.color = '#94a3b8';
+                }
             }
-            const divDelta = sm.divergence_delta !== undefined ? sm.divergence_delta : (fiiRatio - clientRatio);
-            if (divDeltaEl && divDelta !== undefined && divDelta !== null) {
-                const s = divDelta >= 0 ? '+' : '';
-                divDeltaEl.textContent = `${s}${Number(divDelta).toFixed(2)}`;
-                divDeltaEl.style.color = divDelta >= 0 ? '#34d399' : '#f87171';
+            const divDelta = (sm.divergence_delta !== undefined && sm.divergence_delta !== null)
+                ? sm.divergence_delta
+                : ((fiiRatio != null && clientRatio != null) ? (fiiRatio - clientRatio) : null);
+            if (divDeltaEl) {
+                if (divDelta !== null && !isNaN(divDelta)) {
+                    const s = divDelta >= 0 ? '+' : '';
+                    divDeltaEl.textContent = `${s}${Number(divDelta).toFixed(2)}`;
+                    divDeltaEl.style.color = divDelta >= 0 ? '#34d399' : '#f87171';
+                } else {
+                    divDeltaEl.textContent = '—';
+                    divDeltaEl.style.color = '#94a3b8';
+                }
             }
 
             // Column 3: Rules
@@ -465,7 +508,13 @@
             const stanceEl = document.getElementById('pulseVixStance');
             const stanceBadge = document.getElementById('pulseVixStanceBadge');
 
-            const vLevel = vix.vix_level != null ? Number(vix.vix_level) : 13.8;
+            if (!vix || vix.vix_level == null) {
+                if (levelEl) levelEl.textContent = '—';
+                if (changeEl) changeEl.textContent = '—';
+                return;
+            }
+
+            const vLevel = Number(vix.vix_level);
             const chg1d = vix.change_1d != null ? Number(vix.change_1d) : (vix.vix_1d_pct != null ? Number(vix.vix_1d_pct) : null);
             const vColor = vLevel < 13 ? '#34d399' : vLevel <= 17 ? '#38bdf8' : vLevel <= 22 ? '#fbbf24' : '#f43f5e';
 
@@ -501,6 +550,7 @@
             const convPill = document.getElementById('pulseConvictionPill');
             const supEl = document.getElementById('pulseNiftySupport');
             const resEl = document.getElementById('pulseNiftyResistance');
+            const targetsEl = document.getElementById('pulseNiftyTargets');
             const niftyLvl = document.getElementById('pulseNiftyLevel');
             const niftyChg = document.getElementById('pulseNiftyChange');
 
@@ -509,7 +559,10 @@
             if (convPill && pred.conviction_pct) convPill.textContent = `${pred.conviction_pct}% CONVICTION`;
             if (supEl && pred.nifty_support) supEl.textContent = pred.nifty_support;
             if (resEl && pred.nifty_resistance) resEl.textContent = pred.nifty_resistance;
-            if (niftyLvl && pred.nifty_spot) niftyLvl.textContent = (pred.nifty_spot).toLocaleString();
+            if (targetsEl && (pred.nifty_support || pred.nifty_resistance)) {
+                targetsEl.textContent = `S: ${pred.nifty_support || '—'} | R: ${pred.nifty_resistance || '—'}`;
+            }
+            if (niftyLvl && pred.nifty_spot) niftyLvl.textContent = Number(pred.nifty_spot).toLocaleString();
             if (niftyChg && pred.nifty_change_1d != null) {
                 const s = pred.nifty_change_1d >= 0 ? '+' : '';
                 niftyChg.textContent = `${s}${pred.nifty_change_1d}% 1D`;
@@ -1745,92 +1798,100 @@
             // 2. India VIX Volatility Corridor Chart
             const vixSeries = charts.vix || [];
             if (vixSeries.length) {
-                const vixValues = vixSeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 14.0)));
-                const vixDates = vixSeries.map(x => x.date || '');
-                const latestVix = vixValues[vixValues.length - 1];
-                const prevVix = vixValues.length >= 2 ? vixValues[vixValues.length - 2] : latestVix;
-                const vix1dChg = prevVix > 0 ? ((latestVix - prevVix) / prevVix) * 100 : 0;
+                const vixValues = vixSeries
+                    .map(x => (x.value !== undefined ? x.value : x.close))
+                    .filter(v => v !== undefined && v !== null && !isNaN(v));
+                if (vixValues.length) {
+                    const vixDates = vixSeries.map(x => x.date || '');
+                    const latestVix = vixValues[vixValues.length - 1];
+                    const prevVix = vixValues.length >= 2 ? vixValues[vixValues.length - 2] : latestVix;
+                    const vix1dChg = prevVix > 0 ? ((latestVix - prevVix) / prevVix) * 100 : 0;
 
-                const vixColor = latestVix < 13 ? '#34d399' : latestVix <= 17 ? '#38bdf8' : latestVix <= 22 ? '#fbbf24' : '#f43f5e';
-                const vixGrad = latestVix < 13 ? 'rgba(52, 211, 153, 0.28)' : latestVix <= 17 ? 'rgba(56, 189, 248, 0.28)' : 'rgba(244, 63, 94, 0.28)';
+                    const vixColor = latestVix < 13 ? '#34d399' : latestVix <= 17 ? '#38bdf8' : latestVix <= 22 ? '#fbbf24' : '#f43f5e';
+                    const vixGrad = latestVix < 13 ? 'rgba(52, 211, 153, 0.28)' : latestVix <= 17 ? 'rgba(56, 189, 248, 0.28)' : 'rgba(244, 63, 94, 0.28)';
 
-                this.drawSparklineChart('chartVix', vixValues, {
-                    color: vixColor,
-                    gradientFrom: vixGrad,
-                    gradientTo: 'rgba(0, 0, 0, 0.01)',
-                    referenceLines: [13, 17, 22],
-                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(56,189,248,0.3)', 'rgba(244,63,94,0.35)'],
-                    dates: vixDates,
-                    valueFormatter: (v) => {
-                        const num = Number(v).toFixed(2);
-                        const reg = v < 13 ? 'Low Vol (Bullish)' : v <= 17 ? 'Normal' : v <= 22 ? 'Elevated Chop' : 'Panic';
-                        return `${num} (${reg})`;
-                    },
-                });
+                    this.drawSparklineChart('chartVix', vixValues, {
+                        color: vixColor,
+                        gradientFrom: vixGrad,
+                        gradientTo: 'rgba(0, 0, 0, 0.01)',
+                        referenceLines: [13, 17, 22],
+                        refLineColors: ['rgba(52,211,153,0.35)', 'rgba(56,189,248,0.3)', 'rgba(244,63,94,0.35)'],
+                        dates: vixDates,
+                        valueFormatter: (v) => {
+                            const num = Number(v).toFixed(2);
+                            const reg = v < 13 ? 'Low Vol (Bullish)' : v <= 17 ? 'Normal' : v <= 22 ? 'Elevated Chop' : 'Panic';
+                            return `${num} (${reg})`;
+                        },
+                    });
 
-                const vixLevelEl = document.getElementById('pulseVixLevel');
-                const vixChangeEl = document.getElementById('pulseVixChange');
-                const vixBadgeEl = document.getElementById('pulseVixRegimeBadge');
-                const vixStanceBadge = document.getElementById('pulseVixStanceBadge');
-                if (vixLevelEl) {
-                    vixLevelEl.textContent = Number(latestVix).toFixed(2);
-                    vixLevelEl.style.color = vixColor;
-                }
-                if (vixChangeEl) {
-                    const s = vix1dChg >= 0 ? '+' : '';
-                    vixChangeEl.textContent = `${s}${vix1dChg.toFixed(2)}% 1D`;
-                    vixChangeEl.style.color = vix1dChg <= 0 ? '#34d399' : '#f87171';
-                }
-                if (vixBadgeEl) {
-                    const regLabel = latestVix < 13 ? '🟢 Low Vol (Bullish)' : latestVix <= 17 ? '🔵 Normal Vol' : latestVix <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike';
-                    vixBadgeEl.textContent = regLabel;
-                    vixBadgeEl.style.color = vixColor;
-                    vixBadgeEl.style.background = vixColor + '22';
-                }
-                if (vixStanceBadge) {
-                    vixStanceBadge.textContent = latestVix < 13 ? 'Trend Friendly' : latestVix <= 17 ? 'Safe Corridor' : latestVix <= 22 ? 'Hedge Advised' : 'High Risk';
-                    vixStanceBadge.style.color = vixColor;
+                    const vixLevelEl = document.getElementById('pulseVixLevel');
+                    const vixChangeEl = document.getElementById('pulseVixChange');
+                    const vixBadgeEl = document.getElementById('pulseVixRegimeBadge');
+                    const vixStanceBadge = document.getElementById('pulseVixStanceBadge');
+                    if (vixLevelEl) {
+                        vixLevelEl.textContent = Number(latestVix).toFixed(2);
+                        vixLevelEl.style.color = vixColor;
+                    }
+                    if (vixChangeEl) {
+                        const s = vix1dChg >= 0 ? '+' : '';
+                        vixChangeEl.textContent = `${s}${vix1dChg.toFixed(2)}% 1D`;
+                        vixChangeEl.style.color = vix1dChg <= 0 ? '#34d399' : '#f87171';
+                    }
+                    if (vixBadgeEl) {
+                        const regLabel = latestVix < 13 ? '🟢 Low Vol (Bullish)' : latestVix <= 17 ? '🔵 Normal Vol' : latestVix <= 22 ? '🟡 Elevated Chop' : '🔴 Panic Spike';
+                        vixBadgeEl.textContent = regLabel;
+                        vixBadgeEl.style.color = vixColor;
+                        vixBadgeEl.style.background = vixColor + '22';
+                    }
+                    if (vixStanceBadge) {
+                        vixStanceBadge.textContent = latestVix < 13 ? 'Trend Friendly' : latestVix <= 17 ? 'Safe Corridor' : latestVix <= 22 ? 'Hedge Advised' : 'High Risk';
+                        vixStanceBadge.style.color = vixColor;
+                    }
                 }
             }
 
             // 3. NIFTY 50 Benchmark Trajectory Chart
             const niftySeries = charts.nifty || [];
             if (niftySeries.length) {
-                const niftyValues = niftySeries.map(x => (x.value !== undefined ? x.value : (x.close !== undefined ? x.close : 24800)));
-                const niftyDates = niftySeries.map(x => x.date || '');
-                const latestNifty = niftyValues[niftyValues.length - 1];
-                const prevNifty = niftyValues.length >= 2 ? niftyValues[niftyValues.length - 2] : latestNifty;
-                const nifty1dChg = prevNifty > 0 ? ((latestNifty - prevNifty) / prevNifty) * 100 : 0;
-                const minNifty = Math.min(...niftyValues);
-                const maxNifty = Math.max(...niftyValues);
-                const mom30d = niftyValues.length > 1 ? ((latestNifty - niftyValues[0]) / niftyValues[0]) * 100 : 0;
+                const niftyValues = niftySeries
+                    .map(x => (x.value !== undefined ? x.value : x.close))
+                    .filter(v => v !== undefined && v !== null && !isNaN(v));
+                if (niftyValues.length) {
+                    const niftyDates = niftySeries.map(x => x.date || '');
+                    const latestNifty = niftyValues[niftyValues.length - 1];
+                    const prevNifty = niftyValues.length >= 2 ? niftyValues[niftyValues.length - 2] : latestNifty;
+                    const nifty1dChg = prevNifty > 0 ? ((latestNifty - prevNifty) / prevNifty) * 100 : 0;
+                    const minNifty = Math.min(...niftyValues);
+                    const maxNifty = Math.max(...niftyValues);
+                    const mom30d = niftyValues.length > 1 ? ((latestNifty - niftyValues[0]) / niftyValues[0]) * 100 : 0;
 
-                this.drawSparklineChart('chartNifty', niftyValues, {
-                    color: '#818cf8',
-                    gradientFrom: 'rgba(129, 140, 248, 0.28)',
-                    gradientTo: 'rgba(129, 140, 248, 0.01)',
-                    dates: niftyDates,
-                    valueFormatter: (v) => `${Math.round(v).toLocaleString('en-IN')}`,
-                });
+                    this.drawSparklineChart('chartNifty', niftyValues, {
+                        color: '#818cf8',
+                        gradientFrom: 'rgba(129, 140, 248, 0.28)',
+                        gradientTo: 'rgba(129, 140, 248, 0.01)',
+                        dates: niftyDates,
+                        valueFormatter: (v) => `${Math.round(v).toLocaleString('en-IN')}`,
+                    });
 
-                const niftyLvl = document.getElementById('pulseNiftyLevel');
-                const niftyChg = document.getElementById('pulseNiftyChange');
-                const niftyLowEl = document.getElementById('pulseNifty30dLow');
-                const niftyHighEl = document.getElementById('pulseNifty30dHigh');
-                const niftyMomEl = document.getElementById('pulseNifty30dMom');
+                    const niftyLvl = document.getElementById('pulseNiftyLevel');
+                    const niftyChg = document.getElementById('pulseNiftyChange');
+                    const niftyLowEl = document.getElementById('pulseNifty30dLow');
+                    const niftyHighEl = document.getElementById('pulseNifty30dHigh');
+                    const niftyMomEl = document.getElementById('pulseNifty30dMom');
 
-                if (niftyLvl) niftyLvl.textContent = Number(latestNifty).toLocaleString('en-IN', { maximumFractionDigits: 1 });
-                if (niftyChg) {
-                    const s = nifty1dChg >= 0 ? '+' : '';
-                    niftyChg.textContent = `${s}${nifty1dChg.toFixed(2)}% 1D`;
-                    niftyChg.style.color = nifty1dChg >= 0 ? '#34d399' : '#f87171';
-                }
-                if (niftyLowEl) niftyLowEl.textContent = `30D Low: ${Math.round(minNifty).toLocaleString('en-IN')}`;
-                if (niftyHighEl) niftyHighEl.textContent = `30D High: ${Math.round(maxNifty).toLocaleString('en-IN')}`;
-                if (niftyMomEl) {
-                    const s = mom30d >= 0 ? '+' : '';
-                    niftyMomEl.textContent = `Momentum: ${s}${mom30d.toFixed(1)}%`;
-                    niftyMomEl.style.color = mom30d >= 0 ? '#38bdf8' : '#f87171';
+                    if (niftyLvl) niftyLvl.textContent = Number(latestNifty).toLocaleString('en-IN', { maximumFractionDigits: 1 });
+                    if (niftyChg) {
+                        const s = nifty1dChg >= 0 ? '+' : '';
+                        niftyChg.textContent = `${s}${nifty1dChg.toFixed(2)}% 1D`;
+                        niftyChg.style.color = nifty1dChg >= 0 ? '#34d399' : '#f87171';
+                    }
+                    if (niftyLowEl) niftyLowEl.textContent = `30D Low: ${Math.round(minNifty).toLocaleString('en-IN')}`;
+                    if (niftyHighEl) niftyHighEl.textContent = `30D High: ${Math.round(maxNifty).toLocaleString('en-IN')}`;
+                    if (niftyMomEl) {
+                        const s = mom30d >= 0 ? '+' : '';
+                        niftyMomEl.textContent = `Momentum: ${s}${mom30d.toFixed(1)}%`;
+                        niftyMomEl.style.color = mom30d >= 0 ? '#38bdf8' : '#f87171';
+                    }
                 }
             }
 
@@ -1856,58 +1917,76 @@
                     valueFormatter: (v) => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString(),
                 });
 
-                const latestFii = oiHistory[0]?.fii_net_contracts ?? 0;
+                const latestFii = oiHistory[0]?.fii_net_contracts;
+                const latestClient = oiHistory[0]?.client_net_contracts;
                 const fiiBadge = document.getElementById('pulseParticipantOiChartBadge');
                 const fiiPill = document.getElementById('pulseFiiNetContractsPill');
-                if (fiiBadge) {
+                const retailPill = document.getElementById('pulseRetailNetContractsPill');
+                const fiiLongPctSub = document.getElementById('pulseFiiLongPctSub');
+
+                if (fiiBadge && latestFii != null) {
                     fiiBadge.textContent = latestFii >= 0 ? 'FII Net Long' : 'FII Net Short';
                     fiiBadge.style.color = latestFii >= 0 ? '#34d399' : '#f87171';
                     fiiBadge.style.background = latestFii >= 0 ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
                 }
-                if (fiiPill) {
+                if (fiiPill && latestFii != null) {
                     const s = latestFii >= 0 ? '+' : '';
                     fiiPill.textContent = `${s}${latestFii.toLocaleString()}`;
                     fiiPill.style.color = latestFii >= 0 ? '#34d399' : '#f87171';
+                }
+                if (retailPill && latestClient != null) {
+                    const s = latestClient >= 0 ? '+' : '';
+                    retailPill.textContent = `Retail: ${s}${latestClient.toLocaleString()}`;
+                    retailPill.style.color = latestClient >= 0 ? '#34d399' : '#f87171';
+                }
+                const latestFiiPct = oiHistory[0]?.fii_future_index_long_pct ?? (oiHistory[0]?.fii_long_short_ratio != null ? (oiHistory[0].fii_long_short_ratio / (1 + oiHistory[0].fii_long_short_ratio) * 100) : null);
+                if (fiiLongPctSub && latestFiiPct != null) {
+                    fiiLongPctSub.textContent = `${latestFiiPct.toFixed(1)}% Long`;
                 }
             }
 
             // 5. FII Long/Short Ratio Oscillator
             if (oiHistory.length >= 2) {
                 const chronological = [...oiHistory].reverse();
-                const fiiLsSeries = chronological.map(x => x.fii_long_short_ratio || 1.0);
-                const dates = chronological.map(x => x.date || x.session_date || '');
+                const fiiLsSeries = chronological
+                    .map(x => x.fii_long_short_ratio)
+                    .filter(v => v !== undefined && v !== null && !isNaN(v));
 
-                this.drawSparklineChart('chartFiiLsRatio', fiiLsSeries, {
-                    color: '#38bdf8',
-                    gradientFrom: 'rgba(56, 189, 248, 0.28)',
-                    gradientTo: 'rgba(56, 189, 248, 0.01)',
-                    referenceLines: [0.85, 1.0, 1.25],
-                    refLineColors: ['rgba(244,63,94,0.4)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.4)'],
-                    dates: dates,
-                    valueFormatter: (v) => `${v.toFixed(2)}x`,
-                });
+                if (fiiLsSeries.length >= 2) {
+                    const dates = chronological.map(x => x.date || x.session_date || '');
 
-                const latestLs = oiHistory[0]?.fii_long_short_ratio ?? 1.15;
-                const oscBadge = document.getElementById('pulseFiiLsOscBadge');
-                const oscPill = document.getElementById('pulseFiiLsRatioPill');
-                if (oscBadge) {
-                    if (latestLs >= 1.25) {
-                        oscBadge.textContent = 'Overbought (>1.25)';
-                        oscBadge.style.color = '#34d399';
-                        oscBadge.style.background = 'rgba(52,211,153,0.15)';
-                    } else if (latestLs <= 0.85) {
-                        oscBadge.textContent = 'Oversold Squeeze (<0.85)';
-                        oscBadge.style.color = '#f87171';
-                        oscBadge.style.background = 'rgba(239,68,68,0.15)';
-                    } else {
-                        oscBadge.textContent = latestLs >= 1.0 ? 'Normal Bullish' : 'Mild Bearish';
-                        oscBadge.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fbbf24';
-                        oscBadge.style.background = latestLs >= 1.0 ? 'rgba(56,189,248,0.15)' : 'rgba(251,191,36,0.15)';
+                    this.drawSparklineChart('chartFiiLsRatio', fiiLsSeries, {
+                        color: '#38bdf8',
+                        gradientFrom: 'rgba(56, 189, 248, 0.28)',
+                        gradientTo: 'rgba(56, 189, 248, 0.01)',
+                        referenceLines: [0.85, 1.0, 1.25],
+                        refLineColors: ['rgba(244,63,94,0.4)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.4)'],
+                        dates: dates,
+                        valueFormatter: (v) => `${v.toFixed(2)}x`,
+                    });
+
+                    const latestLs = oiHistory[0]?.fii_long_short_ratio;
+                    const oscBadge = document.getElementById('pulseFiiLsOscBadge');
+                    const oscPill = document.getElementById('pulseFiiLsRatioPill');
+                    if (oscBadge && latestLs != null) {
+                        if (latestLs >= 1.25) {
+                            oscBadge.textContent = 'Overbought (>1.25)';
+                            oscBadge.style.color = '#34d399';
+                            oscBadge.style.background = 'rgba(52,211,153,0.15)';
+                        } else if (latestLs <= 0.85) {
+                            oscBadge.textContent = 'Oversold Squeeze (<0.85)';
+                            oscBadge.style.color = '#f87171';
+                            oscBadge.style.background = 'rgba(239,68,68,0.15)';
+                        } else {
+                            oscBadge.textContent = latestLs >= 1.0 ? 'Normal Bullish' : 'Mild Bearish';
+                            oscBadge.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fbbf24';
+                            oscBadge.style.background = latestLs >= 1.0 ? 'rgba(56,189,248,0.15)' : 'rgba(251,191,36,0.15)';
+                        }
                     }
-                }
-                if (oscPill) {
-                    oscPill.textContent = `${latestLs.toFixed(2)}x`;
-                    oscPill.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fb923c';
+                    if (oscPill && latestLs != null) {
+                        oscPill.textContent = `${latestLs.toFixed(2)}x`;
+                        oscPill.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fb923c';
+                    }
                 }
             }
         },
