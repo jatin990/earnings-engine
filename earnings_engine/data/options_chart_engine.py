@@ -55,6 +55,17 @@ INDEX_MAP = {
     "BSE_SENSEX": "^BSESN",
 }
 
+# Mapping of index tickers to liquid benchmark proxy ETFs whose real intraday trade volume
+# reflects actual institutional participation, eliminating Yahoo Finance's zero-volume index artifact.
+INDEX_VOLUME_PROXY_MAP = {
+    "^NSEI": "NIFTYBEES.NS",
+    "^NSEBANK": "BANKBEES.NS",
+    "NIFTY_FIN_SERVICE.NS": "FINNIFTYBEES.NS",
+    "NIFTY_MID_SELECT.NS": "MID150BEES.NS",
+    "^BSESN": "SENSEXBEES.NS",
+    "^CNXIT": "ITBEES.NS",
+}
+
 
 def resolve_chart_symbol(symbol: str) -> str:
     """Map user/dashboard symbol to appropriate yfinance ticker."""
@@ -121,6 +132,26 @@ def fetch_chart_candles(
                             df = df.loc[valid_mask]
                     except Exception as tz_err:
                         logger.debug("[OPTIONS-CHART] Error filtering post-market intraday candles: %s", tz_err)
+
+                # Hydrate zero-volume index bars with real trade volume from the underlying benchmark proxy ETF
+                # Yahoo Finance returns volume=0 across all intraday candles for Indian cash indices (^NSEI, ^NSEBANK, etc.)
+                if df["volume"].sum() == 0 and yf_symbol in INDEX_VOLUME_PROXY_MAP:
+                    proxy_etf = INDEX_VOLUME_PROXY_MAP[yf_symbol]
+                    try:
+                        t_etf = yf.Ticker(proxy_etf)
+                        df_etf = t_etf.history(period=period, interval=norm_interval)
+                        if df_etf is not None and not df_etf.empty and "Volume" in df_etf.columns:
+                            etf_vols = df_etf["Volume"].fillna(0).astype(float)
+                            if df.index.tz is not None and etf_vols.index.tz is None:
+                                etf_vols.index = etf_vols.index.tz_localize(df.index.tz)
+                            elif df.index.tz is None and etf_vols.index.tz is not None:
+                                etf_vols.index = etf_vols.index.tz_convert(None)
+                            matched_vols = etf_vols.reindex(df.index, method="ffill").fillna(0)
+                            if matched_vols.sum() > 0:
+                                df["volume"] = matched_vols
+                                logger.info("[OPTIONS-CHART] Hydrated %s zero-volume candles using liquid proxy ETF %s (Total Vol: %s)", yf_symbol, proxy_etf, int(matched_vols.sum()))
+                    except Exception as proxy_err:
+                        logger.debug("[OPTIONS-CHART] Failed hydrating volume from proxy ETF %s: %s", proxy_etf, proxy_err)
 
                 return df
     except Exception as e:

@@ -3205,9 +3205,11 @@
 
                     let tipX = mouseX + 12;
                     let tipY = mouseY - 10;
-                    if (tipX + 180 > cRect.width) tipX = mouseX - 190;
-                    if (tipY + 110 > cRect.height) tipY = mouseY - 110;
-                    if (tipY < 4) tipY = 4;
+                    const tipWidth = 220;
+                    if (tipX + tipWidth > cRect.width) tipX = mouseX - tipWidth - 12;
+                    tipX = Math.max(6, Math.min(tipX, cRect.width - tipWidth - 6));
+                    if (tipY + 115 > cRect.height) tipY = mouseY - 115;
+                    tipY = Math.max(6, tipY);
 
                     tooltip.style.left = `${tipX}px`;
                     tooltip.style.top = `${tipY}px`;

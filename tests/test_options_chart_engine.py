@@ -216,4 +216,15 @@ def test_decompose_order_flow_and_whales():
             assert lvl["delta"] == lvl["buyer_vol"] - lvl["seller_vol"]
 
 
+def test_index_volume_proxy_hydration_mapping():
+    """Verify that Indian cash indices have proxy ETF mapping registered."""
+    assert "^NSEI" in oce.INDEX_VOLUME_PROXY_MAP
+    assert oce.INDEX_VOLUME_PROXY_MAP["^NSEI"] == "NIFTYBEES.NS"
+    assert "^NSEBANK" in oce.INDEX_VOLUME_PROXY_MAP
+    assert oce.INDEX_VOLUME_PROXY_MAP["^NSEBANK"] == "BANKBEES.NS"
+    assert "^BSESN" in oce.INDEX_VOLUME_PROXY_MAP
+    assert oce.INDEX_VOLUME_PROXY_MAP["^BSESN"] == "SENSEXBEES.NS"
+
+
+
 
