@@ -29,35 +29,35 @@
         ];
 
         const FONT_PRESETS = {
-            geist: {
-                label: 'Geist & Geist Mono (Modern Minimalist)',
-                sans: "'Geist', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-                mono: "'Geist Mono', 'JetBrains Mono', monospace",
-                heading: "'Geist', 'Space Grotesk', sans-serif"
+            jakarta: {
+                label: 'Plus Jakarta Sans & IBM Plex Mono (Ergonomic Curved 32" — Recommended)',
+                sans: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                mono: "'IBM Plex Mono', 'JetBrains Mono', monospace",
+                heading: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
             },
             inter: {
-                label: 'Inter & JetBrains Mono (Precision Fintech)',
-                sans: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-                mono: "'JetBrains Mono', monospace",
+                label: 'Inter & IBM Plex Mono (Precision Fintech)',
+                sans: "'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+                mono: "'IBM Plex Mono', monospace",
                 heading: "'Inter', sans-serif"
             },
+            geist: {
+                label: 'Geist & IBM Plex Mono (Modern Minimalist)',
+                sans: "'Geist', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+                mono: "'IBM Plex Mono', monospace",
+                heading: "'Geist', 'Plus Jakarta Sans', sans-serif"
+            },
             outfit: {
-                label: 'Outfit & Geist Mono (Futuristic Luxury)',
-                sans: "'Outfit', 'Inter', sans-serif",
-                mono: "'Geist Mono', 'JetBrains Mono', monospace",
+                label: 'Outfit & IBM Plex Mono (Futuristic Luxury)',
+                sans: "'Outfit', 'Plus Jakarta Sans', sans-serif",
+                mono: "'IBM Plex Mono', monospace",
                 heading: "'Outfit', sans-serif"
             },
             space: {
-                label: 'Space Grotesk & JetBrains Mono (Cyber Tech)',
-                sans: "'Space Grotesk', 'Inter', sans-serif",
-                mono: "'JetBrains Mono', monospace",
+                label: 'Space Grotesk & IBM Plex Mono (Cyber Tech)',
+                sans: "'Space Grotesk', 'Plus Jakarta Sans', sans-serif",
+                mono: "'IBM Plex Mono', monospace",
                 heading: "'Space Grotesk', sans-serif"
-            },
-            jakarta: {
-                label: 'Plus Jakarta Sans & JetBrains Mono (Executive Glass)',
-                sans: "'Plus Jakarta Sans', sans-serif",
-                mono: "'JetBrains Mono', monospace",
-                heading: "'Space Grotesk', 'Plus Jakarta Sans', sans-serif"
             }
         };
 
@@ -113,7 +113,7 @@
             activeSubTab: 'tabs',
             tabVisibility: {},
             activeTheme: 'obsidian',
-            activeFont: 'geist',
+            activeFont: 'jakarta',
             customColors: {},
             envData: null,
             envSearchQuery: '',
@@ -131,7 +131,7 @@
 
             // Restore font preset
             try {
-                const savedFont = localStorage.getItem('ee_active_font') || 'geist';
+                const savedFont = localStorage.getItem('ee_active_font') || 'jakarta';
                 app.applyFontPreset(savedFont, false);
             } catch (e) {}
 
@@ -797,12 +797,12 @@
         };
 
         app.applyFontPreset = function(fontKey, persist = true) {
-            const preset = FONT_PRESETS[fontKey] || FONT_PRESETS.geist;
+            const preset = FONT_PRESETS[fontKey] || FONT_PRESETS.jakarta;
             app._customizer.activeFont = fontKey;
             document.documentElement.style.setProperty('--font-sans', preset.sans);
             document.documentElement.style.setProperty('--font-mono', preset.mono);
             document.documentElement.style.setProperty('--font-heading', preset.heading);
-            
+
             const fontSelect = document.getElementById('pickerFontPreset');
             if (fontSelect) fontSelect.value = fontKey;
 
@@ -821,7 +821,7 @@
 
         app.resetDefaultColors = function() {
             app.applyPresetTheme('obsidian', true);
-            app.applyFontPreset('geist', true);
+            app.applyFontPreset('jakarta', true);
         };
 
         app.syncThemePickers = function() {

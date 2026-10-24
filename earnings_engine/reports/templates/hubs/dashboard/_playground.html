@@ -182,7 +182,7 @@
                     
                     <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.3rem;">
                         <span style="font-size:1.4rem;">⏱️</span>
-                        <h3 id="pgSchedModalTitle" style="margin:0; font-size:1.15rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">Configure Scheduled Flow</h3>
+                        <h3 id="pgSchedModalTitle" style="margin:0; font-size:1.15rem; font-family:var(--font-heading); color:#ffffff;">Configure Scheduled Flow</h3>
                     </div>
                     <p style="margin:0 0 1rem 0; font-size:0.72rem; color:#94a3b8;">Configure target stocklists, execution parameters, intervals, and trigger rules.</p>
 
@@ -346,7 +346,7 @@
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.65rem;">
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <span style="font-size:1.3rem;">📜</span>
-                            <h3 style="margin:0; font-size:1.15rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">Automation Execution Logs</h3>
+                            <h3 style="margin:0; font-size:1.15rem; font-family:var(--font-heading); color:#ffffff;">Automation Execution Logs</h3>
                         </div>
                         <div style="display:flex; gap:0.4rem; align-items:center;">
                             <select id="pgLogsJobFilter" onchange="app.loadScheduleLogs(this.value)" style="height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:#38bdf8; font-size:0.72rem; padding:0 0.5rem; outline:none;">
@@ -515,7 +515,7 @@
             <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">🧪 API Console</h3>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family:var(--font-heading); color:#ffffff;">🧪 API Console</h3>
                         <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Raw JSON explorer for Market Data / NSE / yfinance / Kronos</p>
                     </div>
                     <div style="display: flex; gap: 0.35rem; align-items: center;">
@@ -544,7 +544,7 @@
             <!-- Response viewer -->
             <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h4 style="margin: 0; font-size: 0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📦 Raw JSON Response</h4>
+                    <h4 style="margin: 0; font-size: 0.95rem; font-family:var(--font-heading); color:#ffffff;">📦 Raw JSON Response</h4>
                     <div style="display: flex; gap: 0.35rem; align-items: center;">
                         <span id="pgStatus" class="timestamp" style="font-size:0.72rem;"></span>
                         <button type="button" onclick="app.pg.copyJson()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Copy</button>

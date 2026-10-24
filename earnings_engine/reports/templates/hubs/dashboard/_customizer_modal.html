@@ -9,7 +9,7 @@
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span style="font-size: 1.5rem;">⚙️</span>
                 <div>
-                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; background: linear-gradient(to right, #ffffff, #60a5fa, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard Control Center</h2>
+                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800; font-family: var(--font-heading); background: linear-gradient(to right, #ffffff, #60a5fa, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard Control Center</h2>
                     <p style="margin: 0.15rem 0 0 0; font-size: 0.8rem; color: var(--muted);">Customize dashboard tabs, color themes, and environment configuration</p>
                 </div>
             </div>
@@ -38,7 +38,7 @@
             <div id="ccSectionTabs" style="display: block;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Dashboard Tab Manager</h3>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; font-family: var(--font-heading);">Dashboard Tab Manager</h3>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Turn tabs on or off to declutter your workspace. Changes apply instantly.</p>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
@@ -55,7 +55,7 @@
             <!-- ================= SUB-TAB 2: THEMES & COLORS ================= -->
             <div id="ccSectionThemes" style="display: none;">
                 <div style="margin-bottom: 1.25rem;">
-                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.05rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Preset Themes</h3>
+                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.05rem; font-weight: 700; font-family: var(--font-heading);">Preset Themes</h3>
                     <p style="margin: 0 0 1rem 0; font-size: 0.82rem; color: var(--muted);">Select a curated color palette or customize individual tokens below.</p>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem;">
                         <div onclick="app.applyPresetTheme('obsidian')" class="theme-card" style="background: #020408; border: 2px solid #3b82f6; border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; box-shadow: 0 0 20px rgba(59, 130, 246, 0.35);">
@@ -111,11 +111,11 @@
                     </div>
                     <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap;">
                         <select id="pickerFontPreset" onchange="app.applyFontPreset(this.value)" style="min-width: 280px; padding: 0.5rem 0.85rem; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 0.55rem; background: #000000; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none;">
-                            <option value="geist">✦ Geist & Geist Mono (Modern Minimalist Terminal)</option>
-                            <option value="inter">✦ Inter & JetBrains Mono (Precision Fintech)</option>
-                            <option value="outfit">✦ Outfit & Geist Mono (Futuristic Luxury)</option>
-                            <option value="space">✦ Space Grotesk & JetBrains Mono (Cyber Tech)</option>
-                            <option value="jakarta">✦ Plus Jakarta Sans & JetBrains Mono (Executive Glass)</option>
+                            <option value="jakarta">✦ Plus Jakarta Sans & IBM Plex Mono (Ergonomic Curved 32" — Recommended)</option>
+                            <option value="inter">✦ Inter & IBM Plex Mono (Precision Fintech)</option>
+                            <option value="geist">✦ Geist & IBM Plex Mono (Modern Minimalist)</option>
+                            <option value="outfit">✦ Outfit & IBM Plex Mono (Futuristic Luxury)</option>
+                            <option value="space">✦ Space Grotesk & IBM Plex Mono (Cyber Tech)</option>
                         </select>
                         <span id="fontSamplePreview" style="font-size: 0.82rem; color: #93c5fd; font-family: var(--font-sans); background: rgba(59, 130, 246, 0.12); padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(59, 130, 246, 0.25);">The quick brown fox jumps over the lazy dog 1234567890</span>
                     </div>
@@ -379,7 +379,7 @@
             </div>
             <div>
                 <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Custom Code (Optional)</label>
-                <input type="text" id="ccNewPassCode" placeholder="e.g. ALEX-VIP (Auto-generated if empty)" style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-family: monospace; font-size: 0.88rem; text-transform: uppercase;">
+                <input type="text" id="ccNewPassCode" placeholder="e.g. ALEX-VIP (Auto-generated if empty)" style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-family: var(--font-mono); font-size: 0.88rem; text-transform: uppercase;">
             </div>
             <div>
                 <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600;">Authorized Applications / Routes:</label>

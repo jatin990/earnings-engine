@@ -8,7 +8,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,8 +19,8 @@
                 extend: {
                     fontFamily: {
                         sans: ['Plus Jakarta Sans', 'sans-serif'],
-                        display: ['Outfit', 'Space Grotesk', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'monospace'],
                     },
                     fontSize: {
                         '2xs': ['0.78rem', { lineHeight: '1.1rem' }],
@@ -44,8 +44,8 @@
             --border-medium: oklch(1 0 0 / 0.14);
             --border-hover: oklch(1 0 0 / 0.22);
             --border-glow: oklch(1 0 0 / 0.30);
-            --font-mono: 'JetBrains Mono', monospace;
-            --font-display: 'Outfit', sans-serif;
+            --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+            --font-display: 'Plus Jakarta Sans', sans-serif;
             --font-smoothing: antialiased;
         }
 

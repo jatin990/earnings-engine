@@ -3,7 +3,7 @@
             <div class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;">
                     <div>
-                        <h3 style="margin:0; font-size:1.05rem; font-family:'Space Grotesk',sans-serif; display:inline-flex; align-items:center; gap:0.45rem; color:#ffffff;">
+                        <h3 style="margin:0; font-size:1.05rem; font-family:var(--font-heading); display:inline-flex; align-items:center; gap:0.45rem; color:#ffffff;">
                             <span>📈 Quantitative Strategy Backtest Engine</span>
                             <span id="btStrategyBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">Swing Channel Strategy</span>
                         </h3>
@@ -104,7 +104,7 @@
 
             <!-- Equity Curve Chart -->
             <div class="card" style="margin-top:0.75rem; padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
-                <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📊 Equity Curve & Cumulative Drawdown</h4>
+                <h4 style="margin:0 0 0.5rem 0; font-size:0.95rem; font-family:var(--font-heading); color:#ffffff;">📊 Equity Curve & Cumulative Drawdown</h4>
                 <div id="btChartContainer" style="position:relative;width:100%;height:300px;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;overflow:hidden;">
                     <canvas id="btEquityCanvas" style="width:100%;height:100%;"></canvas>
                     <div id="btChartPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted);font-size:0.8rem;">Run a backtest to see the equity curve</div>
@@ -114,7 +114,7 @@
             <!-- Trade Log Table -->
             <div class="card" style="margin-top:0.75rem; padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                    <h4 style="margin:0;font-size:0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📋 Trade Execution Log</h4>
+                    <h4 style="margin:0;font-size:0.95rem; font-family:var(--font-heading); color:#ffffff;">📋 Trade Execution Log</h4>
                     <span id="btTradeCount" class="timestamp" style="font-size:0.72rem; color:#a1a1aa;"></span>
                 </div>
                 <div id="btTradeLog" class="table-wrapper" style="max-height:380px;overflow-y:auto;">
