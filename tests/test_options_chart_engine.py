@@ -199,6 +199,21 @@ def test_decompose_order_flow_and_whales():
         assert "whale_side" in candle
         assert candle["buyer_vol"] + candle["seller_vol"] == candle["volume"]
         assert candle["net_delta"] == candle["buyer_vol"] - candle["seller_vol"]
+        assert "footprint_levels" in candle
+        assert len(candle["footprint_levels"]) == 4
+
+        for lvl in candle["footprint_levels"]:
+            assert "price" in lvl
+            assert "price_low" in lvl
+            assert "price_high" in lvl
+            assert "buyer_vol" in lvl
+            assert "seller_vol" in lvl
+            assert "delta" in lvl
+            assert "imbalance" in lvl
+            assert "is_active_zone" in lvl
+            assert lvl["active_type"] in ["NONE", "BIG_BUYER", "BIG_SELLER", "ABSORPTION"]
+            assert lvl["buyer_vol"] + lvl["seller_vol"] >= 0
+            assert lvl["delta"] == lvl["buyer_vol"] - lvl["seller_vol"]
 
 
 

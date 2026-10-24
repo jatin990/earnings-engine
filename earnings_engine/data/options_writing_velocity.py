@@ -694,7 +694,8 @@ def derive_multi_timeframe_oi(
         total_cache_elapsed = curr_snap["timestamp"] - history[0]["timestamp"]
 
         # If cache history does not reach back to target_sec_ago (base_snap was clamped to history[0])
-        if total_cache_elapsed < (target_sec_ago * 0.85):
+        # OR if observed delta between curr_snap and base_snap is 0, fall back to timeframe session projection
+        if total_cache_elapsed < (target_sec_ago * 0.85) or (c_delta == 0 and p_delta == 0):
             if total_cache_elapsed >= 30.0 and (c_delta != 0 or p_delta != 0):
                 # Rate per second from observed history, scaled strictly to the target horizon
                 rate_c = c_delta / max(total_cache_elapsed, 1.0)
@@ -713,7 +714,7 @@ def derive_multi_timeframe_oi(
                 c_delta = int(0.6 * c_clamped + 0.4 * c_session_proj)
                 p_delta = int(0.6 * p_clamped + 0.4 * p_session_proj)
             else:
-                # Early cold cache: strictly use session progress based on timeframe duration
+                # Early cold cache or zero delta: strictly use session progress based on timeframe duration
                 c_delta = c_session_proj
                 p_delta = p_session_proj
 

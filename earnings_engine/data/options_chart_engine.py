@@ -474,6 +474,47 @@ def _decompose_order_flow_and_whales(df: pd.DataFrame) -> tuple[list[dict[str, A
         # Whale bubble execution level: estimated VWAP of the candle
         candle_typical = round((high_p + low_p + close_p) / 3.0, 2)
 
+        # Order Flow Footprint Ladder Decomposition (3 to 6 vertical price brackets per candle)
+        # Slices candle range into discrete price levels showing Bid x Ask (Seller Vol x Buyer Vol)
+        footprint_levels: list[dict[str, Any]] = []
+        num_brackets = 4
+        bracket_step = tr / float(num_brackets)
+
+        for b_idx in range(num_brackets):
+            p_bottom = low_p + (b_idx * bracket_step)
+            p_top = low_p + ((b_idx + 1) * bracket_step)
+            p_mid = round((p_bottom + p_top) / 2.0, 2)
+
+            # Weight distribution across brackets:
+            # Lower brackets near wick/low, middle near body, upper near high
+            # Buyers dominate higher prints if bullish, sellers dominate lower prints if bearish
+            bracket_height_ratio = (b_idx + 0.5) / float(num_brackets)  # 0.125 to 0.875
+            bracket_vol_share = vol / float(num_brackets)
+
+            # Weight buyer dominance by price level and candle direction
+            local_buyer_ratio = max(0.05, min(0.95, buyer_ratio * (0.7 + 0.6 * bracket_height_ratio)))
+            lvl_buy = int(round(bracket_vol_share * local_buyer_ratio))
+            lvl_sell = int(max(0, bracket_vol_share - lvl_buy))
+            lvl_delta = lvl_buy - lvl_sell
+
+            # Highlight zones: Whale level active zone or severe delta imbalance (>= 3:1)
+            is_active_zone = is_whale or (lvl_buy >= lvl_sell * 3.0 and lvl_buy > 500) or (lvl_sell >= lvl_buy * 3.0 and lvl_sell > 500)
+            active_type = "NONE"
+            if is_active_zone:
+                active_type = "BIG_BUYER" if lvl_buy > lvl_sell else ("BIG_SELLER" if lvl_sell > lvl_buy else "ABSORPTION")
+
+            footprint_levels.append({
+                "price": p_mid,
+                "price_low": round(p_bottom, 2),
+                "price_high": round(p_top, 2),
+                "buyer_vol": lvl_buy,
+                "seller_vol": lvl_sell,
+                "delta": lvl_delta,
+                "imbalance": bool(lvl_buy >= lvl_sell * 3.0 or lvl_sell >= lvl_buy * 3.0),
+                "is_active_zone": is_active_zone,
+                "active_type": active_type,
+            })
+
         if is_whale:
             whale_count += 1
 
@@ -497,6 +538,7 @@ def _decompose_order_flow_and_whales(df: pd.DataFrame) -> tuple[list[dict[str, A
             "whale_tier": whale_tier,
             "whale_side": whale_side,
             "z_score": round((vol - vol_mean) / (vol_std + 1e-5), 2) if vol_std > 0 else 0.0,
+            "footprint_levels": footprint_levels,
         })
 
     flow_summary = {

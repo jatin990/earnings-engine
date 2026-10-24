@@ -26,6 +26,7 @@
         orb: true,
         trendlines: true,
         fib: false,
+        footprint: true,
     };
 
     app._optionsChart = null; // Chart.js instance for multi-mode derivatives visualizer
@@ -175,6 +176,7 @@
             orb: 'optToggleOrb',
             trendlines: 'optToggleTrendlines',
             fib: 'optToggleFib',
+            footprint: 'optToggleFootprint',
         };
 
         const btn = document.getElementById(btnIdMap[layer]);
@@ -186,6 +188,15 @@
 
         if (app._smartChartData) {
             app.renderSmartChart(app._smartChartData, true);
+            if (app._optionsLayers.footprint) {
+                app.renderFootprintOverlay(app._smartChartData);
+            } else {
+                const canvas = document.getElementById('optionsFootprintOverlayCanvas');
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
         }
     };
 
@@ -473,7 +484,12 @@
         chart.subscribeCrosshairMove(app.handleOptionsCrosshairMove);
 
         // Infinite scroll / pagination: dynamically load older candles when panning left
-        chart.timeScale().subscribeVisibleLogicalRangeChange(app.onOptionsSmartChartVisibleLogicalRangeChange);
+        chart.timeScale().subscribeVisibleLogicalRangeChange((newRange) => {
+            app.onOptionsSmartChartVisibleLogicalRangeChange(newRange);
+            if (app._optionsLayers.footprint && app._smartChartData) {
+                app.renderFootprintOverlay(app._smartChartData);
+            }
+        });
 
         // Responsive ResizeObserver
         const ro = new ResizeObserver(entries => {
@@ -481,6 +497,9 @@
             const { width, height } = entries[0].contentRect;
             if (width > 0 && height > 0) {
                 app._smartChart.applyOptions({ width, height });
+                if (app._optionsLayers.footprint && app._smartChartData) {
+                    app.renderFootprintOverlay(app._smartChartData);
+                }
             }
         });
         ro.observe(container);
@@ -730,6 +749,9 @@
 
             // Render chart (preserving user zoom / pan if background update) & Tactical HUD
             app.renderSmartChart(data, isBackground);
+            if (app._optionsLayers.footprint) {
+                app.renderFootprintOverlay(data);
+            }
             app.updateTacticalHUD(data);
             app.renderWhaleFlowRadar(data);
 
@@ -1114,6 +1136,11 @@
         } else if (!app._hasInitialChartFitted) {
             app._smartChart.timeScale().fitContent();
             app._hasInitialChartFitted = true;
+        }
+
+        // Render Footprint Overlay if layer is enabled
+        if (app._optionsLayers && app._optionsLayers.footprint) {
+            app.renderFootprintOverlay(data);
         }
     };
 
@@ -2662,6 +2689,230 @@
                 app.loadOptionsChartIntelligence(false, true);
             }
         }, 15000);
+    };
+
+    /**
+     * Render Order Flow Footprint Candlestick Overlay
+     * Draws numerical Bid x Ask volume ladders inside/beside candles when zoomed in,
+     * and high-visibility glowing badges on price levels where big institutional buyers
+     * or sellers became active (BIG_BUYER, BIG_SELLER, ABSORPTION).
+     */
+    app.renderFootprintOverlay = function (data) {
+        const canvas = document.getElementById('optionsFootprintOverlayCanvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Verify layer is active
+        if (!app._optionsLayers || !app._optionsLayers.footprint) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        if (!app._smartChart || !app._candleSeries || !data || !data.order_flow) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        const flowCandles = data.order_flow.flow_candles || [];
+        if (flowCandles.length === 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+
+        // 1. High-DPI Canvas Setup matched to chart container dimensions
+        const wrapper = document.getElementById('optionsSmartChartWrapper');
+        if (!wrapper) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const width = wrapper.clientWidth || 800;
+        const height = wrapper.clientHeight || 560;
+
+        if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+        }
+
+        ctx.resetTransform?.();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+
+        const timeScale = app._smartChart.timeScale();
+        const candleSeries = app._candleSeries;
+
+        // Calculate approximate bar spacing / width
+        let barSpacing = 16;
+        try {
+            barSpacing = timeScale.width() / Math.max(flowCandles.length, 1);
+            if (flowCandles.length >= 2) {
+                const c1 = timeScale.timeToCoordinate(flowCandles[flowCandles.length - 2].time);
+                const c2 = timeScale.timeToCoordinate(flowCandles[flowCandles.length - 1].time);
+                if (c1 !== null && c2 !== null && !isNaN(c1) && !isNaN(c2)) {
+                    barSpacing = Math.abs(c2 - c1);
+                }
+            }
+        } catch (e) {
+            barSpacing = 16;
+        }
+
+        // Format contracts display (e.g. 1.2k, 450, 12.5k)
+        const formatContracts = (num) => {
+            if (num == null || isNaN(num)) return '0';
+            const val = Math.abs(num);
+            if (val >= 100000) return (val / 100000).toFixed(1) + 'L';
+            if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+            return Math.round(val).toString();
+        };
+
+        // Render footprint across visible candles
+        for (let i = 0; i < flowCandles.length; i++) {
+            const candle = flowCandles[i];
+            const x = timeScale.timeToCoordinate(candle.time);
+
+            // Skip bars off-screen
+            if (x === null || isNaN(x) || x < -50 || x > width + 50) continue;
+
+            const levels = candle.footprint_levels || [];
+            if (levels.length === 0) continue;
+
+            // Bar drawing width: adapt based on zoom level
+            const barWidth = Math.max(12, Math.min(68, barSpacing * 0.85));
+
+            // LOD Decision:
+            // High Zoom (barWidth >= 24): Render dual Bid x Ask numbers
+            // Compact / Zoomed Out (barWidth < 24): Render highlighted institutional active levels & glowing badges
+            const showNumbers = barWidth >= 24;
+
+            levels.forEach(lvl => {
+                const yTop = candleSeries.priceToCoordinate(lvl.price_high);
+                const yBottom = candleSeries.priceToCoordinate(lvl.price_low);
+                const yMid = candleSeries.priceToCoordinate(lvl.price);
+
+                if (yTop === null || yBottom === null || isNaN(yTop) || isNaN(yBottom)) return;
+
+                const bracketTop = Math.min(yTop, yBottom);
+                const bracketHeight = Math.max(Math.abs(yBottom - yTop), 4);
+                const halfW = barWidth / 2;
+
+                const isBuyerDominant = lvl.delta >= 0;
+                const absDelta = Math.abs(lvl.delta);
+                const isImbalance = lvl.imbalance;
+                const isActiveZone = lvl.is_active_zone;
+                const activeType = lvl.active_type;
+
+                // 1. Bracket Background Fill: Directional delta coloring
+                if (isActiveZone) {
+                    // Prominent highlight on institutional active level
+                    ctx.save();
+                    if (activeType === 'BIG_BUYER') {
+                        ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
+                        ctx.strokeStyle = '#10b981';
+                        ctx.shadowColor = 'rgba(16, 185, 129, 0.8)';
+                        ctx.shadowBlur = 8;
+                    } else if (activeType === 'BIG_SELLER') {
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.shadowColor = 'rgba(239, 68, 68, 0.8)';
+                        ctx.shadowBlur = 8;
+                    } else {
+                        // Absorption
+                        ctx.fillStyle = 'rgba(234, 179, 8, 0.35)';
+                        ctx.strokeStyle = '#eab308';
+                        ctx.shadowColor = 'rgba(234, 179, 8, 0.8)';
+                        ctx.shadowBlur = 8;
+                    }
+
+                    ctx.lineWidth = 1.5;
+                    ctx.fillRect(x - halfW - 2, bracketTop, barWidth + 4, bracketHeight);
+                    ctx.strokeRect(x - halfW - 2, bracketTop, barWidth + 4, bracketHeight);
+                    ctx.restore();
+                } else if (showNumbers) {
+                    // Subtle background gradient for non-whale levels
+                    ctx.fillStyle = isBuyerDominant ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+                    ctx.fillRect(x - halfW, bracketTop, barWidth, bracketHeight);
+
+                    // Imbalance golden outline (>= 3:1)
+                    if (isImbalance) {
+                        ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x - halfW, bracketTop, barWidth, bracketHeight);
+                    }
+                }
+
+                // 2. Numerical Bid x Ask Printing (When zoomed in)
+                if (showNumbers && bracketHeight >= 11) {
+                    const fontSize = Math.min(10, Math.max(7, Math.floor(bracketHeight * 0.65)));
+                    ctx.font = `600 ${fontSize}px var(--font-mono, monospace)`;
+                    ctx.textBaseline = 'middle';
+
+                    const textY = bracketTop + (bracketHeight / 2);
+
+                    // Seller volume on left (Bid hit / Sell aggression)
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = isImbalance && !isBuyerDominant ? '#fca5a5' : '#94a3b8';
+                    ctx.fillText(formatContracts(lvl.seller_vol), x - 2, textY);
+
+                    // Center divider
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 0.8;
+                    ctx.beginPath();
+                    ctx.moveTo(x, bracketTop + 1);
+                    ctx.lineTo(x, bracketTop + bracketHeight - 1);
+                    ctx.stroke();
+
+                    // Buyer volume on right (Ask lifted / Buy aggression)
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = isImbalance && isBuyerDominant ? '#6ee7b7' : '#e2e8f0';
+                    ctx.fillText(formatContracts(lvl.buyer_vol), x + 3, textY);
+                }
+
+                // 3. Highlighted Institutional Active Zones: Prominent Badges
+                if (isActiveZone) {
+                    const badgeText = activeType === 'BIG_BUYER' ? 'BUY' :
+                                     (activeType === 'BIG_SELLER' ? 'SELL' : 'ABS');
+                    const badgeColor = activeType === 'BIG_BUYER' ? '#34d399' :
+                                      (activeType === 'BIG_SELLER' ? '#f87171' : '#fbbf24');
+
+                    ctx.save();
+                    const badgeW = showNumbers ? 28 : Math.max(20, barWidth + 6);
+                    const badgeH = Math.min(12, bracketHeight);
+                    const badgeX = x - (badgeW / 2);
+                    const badgeY = bracketTop + (bracketHeight / 2) - (badgeH / 2);
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                    ctx.strokeStyle = badgeColor;
+                    ctx.lineWidth = 1;
+
+                    // Rounded badge pill
+                    ctx.beginPath();
+                    ctx.roundRect ? ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3) : ctx.rect(badgeX, badgeY, badgeW, badgeH);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = badgeColor;
+                    ctx.font = 'bold 8px var(--font-mono, monospace)';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(badgeText, x, badgeY + (badgeH / 2));
+                    ctx.restore();
+                }
+            });
+
+            // 4. Bar Top / Bottom Institutional Whale Summary Flag
+            if (candle.is_whale) {
+                const yHigh = candleSeries.priceToCoordinate(candle.high);
+                if (yHigh !== null && !isNaN(yHigh)) {
+                    ctx.save();
+                    const flagY = Math.max(15, yHigh - 12);
+                    ctx.fillStyle = candle.whale_side === 'BUYER' ? '#10b981' : '#ef4444';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(candle.whale_tier === 'MEGA' ? '🐋' : '⚡', x, flagY);
+                    ctx.restore();
+                }
+            }
+        }
     };
 
     /**
