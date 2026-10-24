@@ -584,6 +584,127 @@ def _decompose_order_flow_and_whales(df: pd.DataFrame) -> tuple[list[dict[str, A
     return flow_candles, flow_summary
 
 
+def _decompose_options_contracts_flow(strikes: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Decompose option chain strike contracts into Call/Put traded volume and net contracts added (ΔOI).
+    Identifies institutional whale orders on specific option strikes where contract volume
+    or net contracts added indicate aggressive positioning by market makers or institutions.
+    """
+    if not strikes:
+        return {
+            "summary": {
+                "call_vol_total": 0,
+                "put_vol_total": 0,
+                "call_added_total": 0,
+                "put_added_total": 0,
+                "net_contract_flow": 0,
+                "options_whale_count": 0,
+                "dominant_options_side": "BALANCED",
+            },
+            "whale_strikes": [],
+        }
+
+    tot_call_vol = 0
+    tot_put_vol = 0
+    tot_call_added = 0
+    tot_put_added = 0
+
+    all_ce_vols = []
+    all_pe_vols = []
+    all_ce_chg = []
+    all_pe_chg = []
+
+    for s in strikes:
+        cv = int(s.get("ce_vol") or 0)
+        pv = int(s.get("pe_vol") or 0)
+        cc = int(s.get("ce_change_oi") or 0)
+        pc = int(s.get("pe_change_oi") or 0)
+
+        tot_call_vol += cv
+        tot_put_vol += pv
+        tot_call_added += cc
+        tot_put_added += pc
+
+        if cv > 0:
+            all_ce_vols.append(cv)
+        if pv > 0:
+            all_pe_vols.append(pv)
+        if abs(cc) > 0:
+            all_ce_chg.append(abs(cc))
+        if abs(pc) > 0:
+            all_pe_chg.append(abs(pc))
+
+    # Compute thresholds for institutional whale strike orders (90th percentile or default fallback)
+    ce_vol_p90 = float(np.percentile(all_ce_vols, 90)) if len(all_ce_vols) >= 5 else 50000.0
+    pe_vol_p90 = float(np.percentile(all_pe_vols, 90)) if len(all_pe_vols) >= 5 else 50000.0
+    ce_chg_p90 = float(np.percentile(all_ce_chg, 90)) if len(all_ce_chg) >= 5 else 25000.0
+    pe_chg_p90 = float(np.percentile(all_pe_chg, 90)) if len(all_pe_chg) >= 5 else 25000.0
+
+    whale_strikes: list[dict[str, Any]] = []
+
+    for s in strikes:
+        stk = float(s.get("strike") or 0.0)
+        cv = int(s.get("ce_vol") or 0)
+        pv = int(s.get("pe_vol") or 0)
+        cc = int(s.get("ce_change_oi") or 0)
+        pc = int(s.get("pe_change_oi") or 0)
+        ce_ltp = float(s.get("ce_ltp") or 0.0)
+        pe_ltp = float(s.get("pe_ltp") or 0.0)
+
+        # 1. Call side whale detection
+        if cv >= ce_vol_p90 or abs(cc) >= ce_chg_p90:
+            tier = "MEGA" if (cv >= ce_vol_p90 * 1.8 or abs(cc) >= ce_chg_p90 * 1.8) else "WHALE"
+            action = "CONTRACTS_ADDED" if cc > 0 else ("CONTRACTS_UNWOUND" if cc < 0 else "HEAVY_VOLUME")
+            whale_strikes.append({
+                "strike": stk,
+                "option_type": "CE",
+                "contract_name": f"{int(stk) if stk.is_integer() else stk} CE",
+                "volume": cv,
+                "contracts_added": cc,
+                "ltp": ce_ltp,
+                "whale_tier": tier,
+                "side": "SELL" if cc > 0 else "BUY",  # Significant call OI addition represents call writing/resistance
+                "action": action,
+            })
+
+        # 2. Put side whale detection
+        if pv >= pe_vol_p90 or abs(pc) >= pe_chg_p90:
+            tier = "MEGA" if (pv >= pe_vol_p90 * 1.8 or abs(pc) >= pe_chg_p90 * 1.8) else "WHALE"
+            action = "CONTRACTS_ADDED" if pc > 0 else ("CONTRACTS_UNWOUND" if pc < 0 else "HEAVY_VOLUME")
+            whale_strikes.append({
+                "strike": stk,
+                "option_type": "PE",
+                "contract_name": f"{int(stk) if stk.is_integer() else stk} PE",
+                "volume": pv,
+                "contracts_added": pc,
+                "ltp": pe_ltp,
+                "whale_tier": tier,
+                "side": "BUY" if pc > 0 else "SELL",  # Significant put OI addition represents put writing/bullish floor
+                "action": action,
+            })
+
+    # Sort whale strikes by contract magnitude (contracts added + volume) descending
+    whale_strikes.sort(key=lambda w: abs(w["contracts_added"]) * 2 + w["volume"], reverse=True)
+
+    # Net options sentiment from contract flow: Put writing (+) vs Call writing (-)
+    # Put contracts added > Call contracts added = Bullish (floor building)
+    net_added_bias = tot_put_added - tot_call_added
+    dominant_options_side = "BUYERS" if net_added_bias > 0 else ("SELLERS" if net_added_bias < 0 else "BALANCED")
+
+    return {
+        "summary": {
+            "call_vol_total": tot_call_vol,
+            "put_vol_total": tot_put_vol,
+            "call_added_total": tot_call_added,
+            "put_added_total": tot_put_added,
+            "net_contract_flow": net_added_bias,
+            "options_whale_count": len(whale_strikes),
+            "dominant_options_side": dominant_options_side,
+        },
+        "whale_strikes": whale_strikes,
+    }
+
+
 def _generate_tactical_signals(
     df: pd.DataFrame,
     current_price: float,
@@ -809,8 +930,22 @@ def get_options_chart_intelligence(
     order_blocks, fvgs = _detect_order_blocks_and_fvg(df)
     trendlines = _detect_trendlines(df)
 
-    # 5. Order Flow Decomposition & Whale Transactions
+    # 5. Order Flow Decomposition & Whale Transactions (Spot candles + Options Contract Flow)
     flow_candles, flow_summary = _decompose_order_flow_and_whales(df)
+    options_flow = _decompose_options_contracts_flow(opt_analysis.get("strikes", [])) if is_fno else {
+        "summary": {
+            "call_vol_total": 0,
+            "put_vol_total": 0,
+            "call_added_total": 0,
+            "put_added_total": 0,
+            "net_contract_flow": 0,
+            "options_whale_count": 0,
+            "dominant_options_side": "BALANCED",
+        },
+        "whale_strikes": [],
+    }
+    # Merge options contracts metrics into flow summary
+    flow_summary.update(options_flow.get("summary", {}))
 
     # 6. Derivatives Structural Levels
     if is_fno:
@@ -863,6 +998,7 @@ def get_options_chart_intelligence(
         "order_flow": {
             "flow_candles": flow_candles,
             "summary": flow_summary,
+            "whale_strikes": options_flow.get("whale_strikes", []),
         },
         "derivatives_levels": derivatives_levels,
         "tactical_signals": tactical_signals,

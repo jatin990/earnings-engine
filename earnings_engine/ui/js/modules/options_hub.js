@@ -2930,10 +2930,12 @@
 
         // 1. Update Sub-KPIs and Badges
         const whaleBadge = document.getElementById('optWhaleCountBadge');
+        const whaleStrikes = orderFlow.whale_strikes || [];
+        const totalWhales = (summary.options_whale_count || whaleStrikes.length || summary.whale_count || 0);
+
         if (whaleBadge) {
-            const count = summary.whale_count || 0;
-            whaleBadge.textContent = `${count} Whale${count === 1 ? '' : 's'}`;
-            if (count > 0) {
+            whaleBadge.textContent = `${totalWhales} Whale${totalWhales === 1 ? '' : 's'}`;
+            if (totalWhales > 0) {
                 whaleBadge.style.background = 'rgba(56,189,248,0.2)';
                 whaleBadge.style.borderColor = '#38bdf8';
             } else {
@@ -2953,8 +2955,35 @@
 
         const buyerEl = document.getElementById('optWhaleBuyerVolText');
         const sellerEl = document.getElementById('optWhaleSellerVolText');
-        if (buyerEl) buyerEl.textContent = formatQty(summary.total_buyer_vol);
-        if (sellerEl) sellerEl.textContent = formatQty(summary.total_seller_vol);
+        const buyerSub = document.getElementById('optWhaleBuyerAddedSub');
+        const sellerSub = document.getElementById('optWhaleSellerAddedSub');
+
+        // Prioritize Options Contract Flow (Call vs Put volume & contracts added)
+        const callVol = summary.call_vol_total ?? summary.total_buyer_vol ?? 0;
+        const putVol = summary.put_vol_total ?? summary.total_seller_vol ?? 0;
+        const callAdded = summary.call_added_total;
+        const putAdded = summary.put_added_total;
+
+        if (buyerEl) buyerEl.textContent = formatQty(callVol);
+        if (sellerEl) sellerEl.textContent = formatQty(putVol);
+
+        if (buyerSub) {
+            if (callAdded != null && !isNaN(callAdded)) {
+                const isPos = callAdded >= 0;
+                buyerSub.innerHTML = `Added: <strong style="color:${isPos ? '#34d399' : '#f87171'};">${isPos ? '+' : ''}${formatQty(callAdded)}</strong>`;
+            } else {
+                buyerSub.textContent = 'Added: --';
+            }
+        }
+
+        if (sellerSub) {
+            if (putAdded != null && !isNaN(putAdded)) {
+                const isPos = putAdded >= 0;
+                sellerSub.innerHTML = `Added: <strong style="color:${isPos ? '#34d399' : '#f87171'};">${isPos ? '+' : ''}${formatQty(putAdded)}</strong>`;
+            } else {
+                sellerSub.textContent = 'Added: --';
+            }
+        }
 
         // 2. High-DPI Canvas Setup
         const rect = canvas.getBoundingClientRect();
@@ -2972,7 +3001,11 @@
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
 
-        if (!flowCandles || flowCandles.length === 0) {
+        // Check if we render strike-level options whales or candlestick flow
+        const hasOptionsWhales = whaleStrikes && whaleStrikes.length > 0;
+        const hasCandleFlow = flowCandles && flowCandles.length > 0;
+
+        if (!hasOptionsWhales && !hasCandleFlow) {
             ctx.fillStyle = '#64748b';
             ctx.font = '11px var(--font-mono, monospace)';
             ctx.textAlign = 'center';
@@ -2995,24 +3028,6 @@
         });
         ctx.setLineDash([]);
 
-        // Determine min and max prices for vertical mapping
-        let minPrice = Infinity;
-        let maxPrice = -Infinity;
-        let maxAbsDelta = 1;
-
-        flowCandles.forEach(c => {
-            const p = c.typical_price || c.close;
-            if (p < minPrice) minPrice = p;
-            if (p > maxPrice) maxPrice = p;
-            const absDelta = Math.abs(c.net_delta || 0);
-            if (absDelta > maxAbsDelta) maxAbsDelta = absDelta;
-        });
-
-        const pricePad = Math.max((maxPrice - minPrice) * 0.12, 1.0);
-        minPrice -= pricePad;
-        maxPrice += pricePad;
-        const priceRange = maxPrice - minPrice || 1.0;
-
         const padX = 24;
         const padY = 20;
         const usableWidth = width - padX * 2;
@@ -3021,48 +3036,72 @@
         // Store bubble hit targets for interactive hover tooltip
         app._whaleFlowBubbles = [];
 
-        // Draw connecting flow stream trajectory
-        ctx.beginPath();
-        flowCandles.forEach((c, idx) => {
-            const x = padX + (idx / Math.max(flowCandles.length - 1, 1)) * usableWidth;
-            const price = c.typical_price || c.close;
-            const y = height - padY - ((price - minPrice) / priceRange) * usableHeight;
-            if (idx === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        if (hasOptionsWhales) {
+            // RENDER OPTIONS STRIKE WHALE BLOCKS
+            // Display institutional strike orders across price strikes
+            let minStrike = Infinity;
+            let maxStrike = -Infinity;
+            let maxOptVol = 1;
 
-        // Render each candle bubble (moving from left [earliest] to right [latest])
-        flowCandles.forEach((c, idx) => {
-            const x = padX + (idx / Math.max(flowCandles.length - 1, 1)) * usableWidth;
-            const price = c.typical_price || c.close;
-            const y = height - padY - ((price - minPrice) / priceRange) * usableHeight;
-
-            const isBuyer = c.net_delta >= 0;
-            const absDelta = Math.abs(c.net_delta || 0);
-            // Sizing: base radius 4px up to 22px proportional to delta square root
-            const sizeRatio = Math.sqrt(absDelta) / Math.sqrt(maxAbsDelta || 1);
-            let radius = Math.max(4, Math.min(22, 4 + sizeRatio * 18));
-
-            if (c.is_whale) {
-                radius = Math.max(radius, c.whale_tier === 'MEGA' ? 14 : 10);
-            }
-
-            // Save hit target for tooltip
-            app._whaleFlowBubbles.push({
-                x,
-                y,
-                radius,
-                data: c,
+            whaleStrikes.forEach(w => {
+                if (w.strike < minStrike) minStrike = w.strike;
+                if (w.strike > maxStrike) maxOptVol = Math.max(maxOptVol, w.volume);
+                if (w.strike > maxStrike) maxStrike = w.strike;
+                if (w.volume > maxOptVol) maxOptVol = w.volume;
             });
 
-            // Ambient glow for Institutional Whales
-            if (c.is_whale) {
+            const strikePad = Math.max((maxStrike - minStrike) * 0.12, 100.0);
+            minStrike -= strikePad;
+            maxStrike += strikePad;
+            const strikeRange = maxStrike - minStrike || 1.0;
+
+            // Draw center horizontal equilibrium dashed guide
+            ctx.beginPath();
+            ctx.moveTo(padX, height / 2);
+            ctx.lineTo(width - padX, height / 2);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Render each strike whale order as a bubble
+            // Display up to 18 strike whales spread left-to-right by order of significance
+            const displayWhales = whaleStrikes.slice(0, 18);
+            displayWhales.forEach((w, idx) => {
+                const x = padX + (idx / Math.max(displayWhales.length - 1, 1)) * usableWidth;
+                const y = height - padY - ((w.strike - minStrike) / strikeRange) * usableHeight;
+
+                const isCe = w.option_type === 'CE';
+                const isBuyer = isCe ? (w.contracts_added <= 0) : (w.contracts_added > 0);
+                const absAdded = Math.abs(w.contracts_added || 0);
+                const sizeRatio = Math.sqrt(absAdded * 2 + (w.volume || 0)) / Math.sqrt(maxOptVol * 2 || 1);
+                let radius = Math.max(6, Math.min(22, 6 + sizeRatio * 16));
+
+                if (w.whale_tier === 'MEGA') {
+                    radius = Math.max(radius, 14);
+                }
+
+                app._whaleFlowBubbles.push({
+                    x,
+                    y,
+                    radius,
+                    data: {
+                        is_option_strike: true,
+                        strike: w.strike,
+                        option_type: w.option_type,
+                        contract_name: w.contract_name,
+                        volume: w.volume,
+                        contracts_added: w.contracts_added,
+                        ltp: w.ltp,
+                        whale_tier: w.whale_tier,
+                        action: w.action,
+                        side: w.side,
+                    },
+                });
+
+                // Ambient glow for Institutional Whales
                 ctx.save();
                 const glowGrad = ctx.createRadialGradient(x, y, radius * 0.5, x, y, radius * 2.2);
-                if (isBuyer) {
+                if (isCe) {
                     glowGrad.addColorStop(0, 'rgba(16, 185, 129, 0.55)');
                     glowGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
                 } else {
@@ -3074,90 +3113,240 @@
                 ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Outer pulsing perimeter ring
-                ctx.strokeStyle = isBuyer ? '#34d399' : '#f87171';
-                ctx.lineWidth = c.whale_tier === 'MEGA' ? 2 : 1.2;
+                // Outer perimeter ring
+                ctx.strokeStyle = isCe ? '#34d399' : '#f87171';
+                ctx.lineWidth = w.whale_tier === 'MEGA' ? 2 : 1.2;
                 ctx.beginPath();
                 ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.restore();
-            }
 
-            // Core bubble body with volumetric 3D lighting
-            const coreGrad = ctx.createRadialGradient(
-                x - radius * 0.35,
-                y - radius * 0.35,
-                radius * 0.1,
-                x,
-                y,
-                radius
-            );
+                // Core bubble body
+                const coreGrad = ctx.createRadialGradient(
+                    x - radius * 0.35,
+                    y - radius * 0.35,
+                    radius * 0.1,
+                    x,
+                    y,
+                    radius
+                );
 
-            if (isBuyer) {
-                coreGrad.addColorStop(0, '#6ee7b7');
-                coreGrad.addColorStop(0.5, '#10b981');
-                coreGrad.addColorStop(1, 'rgba(6, 78, 59, 0.85)');
-            } else {
-                coreGrad.addColorStop(0, '#fca5a5');
-                coreGrad.addColorStop(0.5, '#ef4444');
-                coreGrad.addColorStop(1, 'rgba(127, 29, 29, 0.85)');
-            }
+                if (isCe) {
+                    coreGrad.addColorStop(0, '#6ee7b7');
+                    coreGrad.addColorStop(0.5, '#10b981');
+                    coreGrad.addColorStop(1, 'rgba(6, 78, 59, 0.85)');
+                } else {
+                    coreGrad.addColorStop(0, '#fca5a5');
+                    coreGrad.addColorStop(0.5, '#ef4444');
+                    coreGrad.addColorStop(1, 'rgba(127, 29, 29, 0.85)');
+                }
 
-            ctx.fillStyle = coreGrad;
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = isCe ? 'rgba(52, 211, 153, 0.9)' : 'rgba(248, 113, 113, 0.9)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Icon badge
+                if (radius >= 9) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 9px var(--font-mono, monospace)';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(w.whale_tier === 'MEGA' ? '🐋' : (isCe ? 'C' : 'P'), x, y);
+                }
+            });
+        } else {
+            // Fallback: Candlestick order flow
+            let minPrice = Infinity;
+            let maxPrice = -Infinity;
+            let maxAbsDelta = 1;
+
+            flowCandles.forEach(c => {
+                const p = c.typical_price || c.close;
+                if (p < minPrice) minPrice = p;
+                if (p > maxPrice) maxPrice = p;
+                const absDelta = Math.abs(c.net_delta || 0);
+                if (absDelta > maxAbsDelta) maxAbsDelta = absDelta;
+            });
+
+            const pricePad = Math.max((maxPrice - minPrice) * 0.12, 1.0);
+            minPrice -= pricePad;
+            maxPrice += pricePad;
+            const priceRange = maxPrice - minPrice || 1.0;
+
+            // Draw connecting flow stream trajectory
             ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Inner core stroke
-            ctx.strokeStyle = isBuyer ? 'rgba(52, 211, 153, 0.9)' : 'rgba(248, 113, 113, 0.9)';
-            ctx.lineWidth = 1;
+            flowCandles.forEach((c, idx) => {
+                const x = padX + (idx / Math.max(flowCandles.length - 1, 1)) * usableWidth;
+                const price = c.typical_price || c.close;
+                const y = height - padY - ((price - minPrice) / priceRange) * usableHeight;
+                if (idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+            ctx.lineWidth = 1.5;
             ctx.stroke();
 
-            // Whale Icon / Tier Flag on dominant orders
-            if (c.is_whale && radius >= 9) {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 9px var(--font-mono, monospace)';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(c.whale_tier === 'MEGA' ? '🐋' : '⚡', x, y);
-            }
-        });
+            // Render each candle bubble
+            flowCandles.forEach((c, idx) => {
+                const x = padX + (idx / Math.max(flowCandles.length - 1, 1)) * usableWidth;
+                const price = c.typical_price || c.close;
+                const y = height - padY - ((price - minPrice) / priceRange) * usableHeight;
+
+                const isBuyer = c.net_delta >= 0;
+                const absDelta = Math.abs(c.net_delta || 0);
+                const sizeRatio = Math.sqrt(absDelta) / Math.sqrt(maxAbsDelta || 1);
+                let radius = Math.max(4, Math.min(22, 4 + sizeRatio * 18));
+
+                if (c.is_whale) {
+                    radius = Math.max(radius, c.whale_tier === 'MEGA' ? 14 : 10);
+                }
+
+                app._whaleFlowBubbles.push({
+                    x,
+                    y,
+                    radius,
+                    data: c,
+                });
+
+                if (c.is_whale) {
+                    ctx.save();
+                    const glowGrad = ctx.createRadialGradient(x, y, radius * 0.5, x, y, radius * 2.2);
+                    if (isBuyer) {
+                        glowGrad.addColorStop(0, 'rgba(16, 185, 129, 0.55)');
+                        glowGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+                    } else {
+                        glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+                        glowGrad.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+                    }
+                    ctx.fillStyle = glowGrad;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = isBuyer ? '#34d399' : '#f87171';
+                    ctx.lineWidth = c.whale_tier === 'MEGA' ? 2 : 1.2;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                const coreGrad = ctx.createRadialGradient(
+                    x - radius * 0.35,
+                    y - radius * 0.35,
+                    radius * 0.1,
+                    x,
+                    y,
+                    radius
+                );
+
+                if (isBuyer) {
+                    coreGrad.addColorStop(0, '#6ee7b7');
+                    coreGrad.addColorStop(0.5, '#10b981');
+                    coreGrad.addColorStop(1, 'rgba(6, 78, 59, 0.85)');
+                } else {
+                    coreGrad.addColorStop(0, '#fca5a5');
+                    coreGrad.addColorStop(0.5, '#ef4444');
+                    coreGrad.addColorStop(1, 'rgba(127, 29, 29, 0.85)');
+                }
+
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = isBuyer ? 'rgba(52, 211, 153, 0.9)' : 'rgba(248, 113, 113, 0.9)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                if (c.is_whale && radius >= 9) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 9px var(--font-mono, monospace)';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(c.whale_tier === 'MEGA' ? '🐋' : '⚡', x, y);
+                }
+            });
+        }
 
         // 3. Populate Recent Whale Orders Feed Ticker
         const feedEl = document.getElementById('optWhaleEventsFeed');
         if (feedEl) {
-            const whaleEvents = flowCandles.filter(c => c.is_whale || Math.abs(c.net_delta) >= maxAbsDelta * 0.65).slice(-5).reverse();
-            if (whaleEvents.length === 0) {
-                feedEl.innerHTML = `
-                    <div style="color:var(--text-secondary);text-align:center;padding:0.4rem 0;">
-                        No extreme whale orders detected in current session window.
-                    </div>
-                `;
-            } else {
+            // Prioritize strike-level options whale orders (call/put contracts volume and added ΔOI)
+            if (whaleStrikes && whaleStrikes.length > 0) {
                 let html = '';
-                whaleEvents.forEach(ev => {
-                    const isBuy = ev.net_delta >= 0;
-                    const dateObj = new Date(ev.time * 1000);
-                    const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
-                    const tierBadge = ev.whale_tier === 'MEGA' ? '🐋 MEGA WHALE' : (ev.is_whale ? '⚡ WHALE' : 'BLOCK');
-                    const sideColor = isBuy ? '#34d399' : '#f87171';
-                    const sideBg = isBuy ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
-                    const sideBorder = isBuy ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+                const displayWhales = whaleStrikes.slice(0, 5);
+                displayWhales.forEach(w => {
+                    const isCe = w.option_type === 'CE';
+                    const isAdded = w.contracts_added > 0;
+                    const tierBadge = w.whale_tier === 'MEGA' ? '🐋 MEGA' : '⚡ WHALE';
+                    const sideColor = isCe ? '#34d399' : '#f87171';
+                    const sideBg = isCe ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+                    const sideBorder = isCe ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+
+                    let actionBadge = '';
+                    if (w.action === 'CONTRACTS_ADDED') {
+                        actionBadge = `<span style="color:#38bdf8;font-size:0.62rem;">+${formatQty(w.contracts_added)} added</span>`;
+                    } else if (w.action === 'CONTRACTS_UNWOUND') {
+                        actionBadge = `<span style="color:#f87171;font-size:0.62rem;">${formatQty(w.contracts_added)} unwound</span>`;
+                    } else {
+                        actionBadge = `<span style="color:#fbbf24;font-size:0.62rem;">Vol: ${formatQty(w.volume)}</span>`;
+                    }
 
                     html += `
                         <div style="display:flex;justify-content:space-between;align-items:center;background:${sideBg};border:1px solid ${sideBorder};border-radius:5px;padding:0.25rem 0.45rem;">
                             <div style="display:flex;align-items:center;gap:0.35rem;">
-                                <span style="color:#94a3b8;font-size:0.65rem;">${timeStr}</span>
-                                <span style="color:${sideColor};font-weight:700;">${tierBadge}</span>
-                                <span style="color:#ffffff;">@ ₹${ev.typical_price || ev.close}</span>
+                                <span style="color:${sideColor};font-weight:800;font-size:0.7rem;">${w.contract_name || (w.strike + ' ' + w.option_type)}</span>
+                                <span style="color:${sideColor};font-size:0.62rem;font-weight:700;">${tierBadge}</span>
+                                ${w.ltp > 0 ? `<span style="color:#94a3b8;font-size:0.62rem;">@ ₹${w.ltp.toFixed(1)}</span>` : ''}
                             </div>
-                            <div style="font-weight:700;color:${sideColor};">
-                                ${isBuy ? '+' : ''}${formatQty(ev.net_delta)}
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                ${actionBadge}
+                                <span style="font-weight:700;color:#ffffff;font-size:0.65rem;">Vol ${formatQty(w.volume)}</span>
                             </div>
                         </div>
                     `;
                 });
                 feedEl.innerHTML = html;
+            } else {
+                const whaleEvents = flowCandles.filter(c => c.is_whale || Math.abs(c.net_delta) >= maxAbsDelta * 0.65).slice(-5).reverse();
+                if (whaleEvents.length === 0) {
+                    feedEl.innerHTML = `
+                        <div style="color:var(--text-secondary);text-align:center;padding:0.4rem 0;">
+                            No extreme whale orders detected in current session window.
+                        </div>
+                    `;
+                } else {
+                    let html = '';
+                    whaleEvents.forEach(ev => {
+                        const isBuy = ev.net_delta >= 0;
+                        const dateObj = new Date(ev.time * 1000);
+                        const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+                        const tierBadge = ev.whale_tier === 'MEGA' ? '🐋 MEGA WHALE' : (ev.is_whale ? '⚡ WHALE' : 'BLOCK');
+                        const sideColor = isBuy ? '#34d399' : '#f87171';
+                        const sideBg = isBuy ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
+                        const sideBorder = isBuy ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+
+                        html += `
+                            <div style="display:flex;justify-content:space-between;align-items:center;background:${sideBg};border:1px solid ${sideBorder};border-radius:5px;padding:0.25rem 0.45rem;">
+                                <div style="display:flex;align-items:center;gap:0.35rem;">
+                                    <span style="color:#94a3b8;font-size:0.65rem;">${timeStr}</span>
+                                    <span style="color:${sideColor};font-weight:700;">${tierBadge}</span>
+                                    <span style="color:#ffffff;">@ ₹${ev.typical_price || ev.close}</span>
+                                </div>
+                                <div style="font-weight:700;color:${sideColor};">
+                                    ${isBuy ? '+' : ''}${formatQty(ev.net_delta)}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    feedEl.innerHTML = html;
+                }
             }
         }
 
@@ -3185,23 +3374,44 @@
 
                 if (hit) {
                     const c = hit.data;
-                    const isBuy = c.net_delta >= 0;
-                    const dateObj = new Date(c.time * 1000);
-                    const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    if (c.is_option_strike) {
+                        const isCe = c.option_type === 'CE';
+                        const isAdded = c.contracts_added > 0;
+                        const actionText = c.action === 'CONTRACTS_ADDED' ? `+${formatQty(c.contracts_added)} ADDED` :
+                                          (c.action === 'CONTRACTS_UNWOUND' ? `${formatQty(c.contracts_added)} UNWOUND` : 'HEAVY VOL');
 
-                    tooltip.innerHTML = `
-                        <div style="font-weight:800;color:#38bdf8;margin-bottom:0.2rem;display:flex;justify-content:space-between;gap:0.75rem;">
-                            <span>${timeStr} IST</span>
-                            <span style="color:${isBuy ? '#34d399' : '#f87171'}">${c.dominant_side === 'BUY' ? '🟢 BUY AGGRESSION' : '🔴 SELL DISTRIBUTION'}</span>
-                        </div>
-                        <div style="display:grid;grid-template-columns:auto auto;gap:0.15rem 0.5rem;font-size:0.68rem;">
-                            <span style="color:#94a3b8;">Candle Price:</span><strong style="color:#ffffff;">₹${c.close}</strong>
-                            <span style="color:#94a3b8;">Net Delta:</span><strong style="color:${isBuy ? '#34d399' : '#f87171'}">${isBuy ? '+' : ''}${c.net_delta.toLocaleString()} contracts</strong>
-                            <span style="color:#94a3b8;">Buyer Vol:</span><strong style="color:#34d399;">${c.buyer_vol.toLocaleString()}</strong>
-                            <span style="color:#94a3b8;">Seller Vol:</span><strong style="color:#f87171;">${c.seller_vol.toLocaleString()}</strong>
-                            <span style="color:#94a3b8;">Institutional:</span><strong style="color:#fbbf24;">${c.whale_tier} (Z: ${c.z_score})</strong>
-                        </div>
-                    `;
+                        tooltip.innerHTML = `
+                            <div style="font-weight:800;color:#38bdf8;margin-bottom:0.2rem;display:flex;justify-content:space-between;gap:0.75rem;">
+                                <span>${c.contract_name}</span>
+                                <span style="color:${isCe ? '#34d399' : '#f87171'}">${c.whale_tier} ${c.option_type} BLOCK</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:auto auto;gap:0.15rem 0.5rem;font-size:0.68rem;">
+                                <span style="color:#94a3b8;">Strike Price:</span><strong style="color:#ffffff;">₹${c.strike}</strong>
+                                <span style="color:#94a3b8;">Action:</span><strong style="color:${isAdded ? '#38bdf8' : '#f87171'}">${actionText}</strong>
+                                <span style="color:#94a3b8;">Traded Volume:</span><strong style="color:#ffffff;">${formatQty(c.volume)} (${c.volume.toLocaleString()})</strong>
+                                <span style="color:#94a3b8;">Net Added ΔOI:</span><strong style="color:${isAdded ? '#34d399' : '#f87171'}">${c.contracts_added > 0 ? '+' : ''}${c.contracts_added.toLocaleString()}</strong>
+                                ${c.ltp > 0 ? `<span style="color:#94a3b8;">Premium LTP:</span><strong style="color:#fbbf24;">₹${c.ltp.toFixed(1)}</strong>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        const isBuy = c.net_delta >= 0;
+                        const dateObj = new Date(c.time * 1000);
+                        const timeStr = dateObj.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                        tooltip.innerHTML = `
+                            <div style="font-weight:800;color:#38bdf8;margin-bottom:0.2rem;display:flex;justify-content:space-between;gap:0.75rem;">
+                                <span>${timeStr} IST</span>
+                                <span style="color:${isBuy ? '#34d399' : '#f87171'}">${c.dominant_side === 'BUY' ? '🟢 BUY AGGRESSION' : '🔴 SELL DISTRIBUTION'}</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:auto auto;gap:0.15rem 0.5rem;font-size:0.68rem;">
+                                <span style="color:#94a3b8;">Candle Price:</span><strong style="color:#ffffff;">₹${c.close}</strong>
+                                <span style="color:#94a3b8;">Net Delta:</span><strong style="color:${isBuy ? '#34d399' : '#f87171'}">${isBuy ? '+' : ''}${c.net_delta.toLocaleString()} contracts</strong>
+                                <span style="color:#94a3b8;">Buyer Vol:</span><strong style="color:#34d399;">${c.buyer_vol.toLocaleString()}</strong>
+                                <span style="color:#94a3b8;">Seller Vol:</span><strong style="color:#f87171;">${c.seller_vol.toLocaleString()}</strong>
+                                <span style="color:#94a3b8;">Institutional:</span><strong style="color:#fbbf24;">${c.whale_tier} (Z: ${c.z_score})</strong>
+                            </div>
+                        `;
+                    }
 
                     let tipX = mouseX + 12;
                     let tipY = mouseY - 10;

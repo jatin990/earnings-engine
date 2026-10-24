@@ -226,5 +226,65 @@ def test_index_volume_proxy_hydration_mapping():
     assert oce.INDEX_VOLUME_PROXY_MAP["^BSESN"] == "SENSEXBEES.NS"
 
 
+def test_decompose_options_contracts_flow():
+    """Verify options contracts flow decomposition and institutional strike detection."""
+    sample_strikes = [
+        {
+            "strike": 24800.0,
+            "ce_vol": 12000,
+            "pe_vol": 85000,
+            "ce_change_oi": -2000,
+            "pe_change_oi": 45000,
+            "ce_ltp": 250.0,
+            "pe_ltp": 45.0,
+        },
+        {
+            "strike": 25000.0,
+            "ce_vol": 120000,
+            "pe_vol": 25000,
+            "ce_change_oi": 60000,
+            "pe_change_oi": -5000,
+            "ce_ltp": 120.0,
+            "pe_ltp": 115.0,
+        },
+        {
+            "strike": 25200.0,
+            "ce_vol": 30000,
+            "pe_vol": 8000,
+            "ce_change_oi": 15000,
+            "pe_change_oi": 1000,
+            "ce_ltp": 35.0,
+            "pe_ltp": 210.0,
+        },
+    ]
+
+    flow = oce._decompose_options_contracts_flow(sample_strikes)
+    summary = flow["summary"]
+    whale_strikes = flow["whale_strikes"]
+
+    # Verify aggregation
+    assert summary["call_vol_total"] == 12000 + 120000 + 30000
+    assert summary["put_vol_total"] == 85000 + 25000 + 8000
+    assert summary["call_added_total"] == -2000 + 60000 + 15000
+    assert summary["put_added_total"] == 45000 + -5000 + 1000
+    assert summary["net_contract_flow"] == summary["put_added_total"] - summary["call_added_total"]
+
+    # Verify whale strike detection
+    assert len(whale_strikes) > 0
+    # 25000 CE has 120000 vol & +60000 added contracts -> must be detected
+    ce_whales = [w for w in whale_strikes if w["contract_name"] == "25000 CE"]
+    assert len(ce_whales) == 1
+    assert ce_whales[0]["volume"] == 120000
+    assert ce_whales[0]["contracts_added"] == 60000
+    assert ce_whales[0]["action"] == "CONTRACTS_ADDED"
+
+    # 24800 PE has 85000 vol & +45000 added contracts -> must be detected
+    pe_whales = [w for w in whale_strikes if w["contract_name"] == "24800 PE"]
+    assert len(pe_whales) == 1
+    assert pe_whales[0]["volume"] == 85000
+    assert pe_whales[0]["contracts_added"] == 45000
+
+
+
 
 

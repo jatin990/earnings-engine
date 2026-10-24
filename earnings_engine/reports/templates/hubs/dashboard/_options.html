@@ -308,12 +308,14 @@
                 <!-- Sub-KPI Ticker -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.6rem;font-family:var(--font-mono);font-size:0.72rem;">
                     <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:5px;padding:0.35rem 0.5rem;">
-                        <span style="color:#34d399;font-size:0.65rem;display:block;">BUY AGGRESSION</span>
+                        <span id="optWhaleBuyerVolLabel" style="color:#34d399;font-size:0.65rem;display:block;">CALL VOLUME / AGGRESSION</span>
                         <strong id="optWhaleBuyerVolText" style="color:#ffffff;font-size:0.8rem;">--</strong>
+                        <span id="optWhaleBuyerAddedSub" style="color:#94a3b8;font-size:0.62rem;display:block;margin-top:2px;">Added: --</span>
                     </div>
                     <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:5px;padding:0.35rem 0.5rem;">
-                        <span style="color:#f87171;font-size:0.65rem;display:block;">SELL DISTRIBUTION</span>
+                        <span id="optWhaleSellerVolLabel" style="color:#f87171;font-size:0.65rem;display:block;">PUT VOLUME / DISTRIBUTION</span>
                         <strong id="optWhaleSellerVolText" style="color:#ffffff;font-size:0.8rem;">--</strong>
+                        <span id="optWhaleSellerAddedSub" style="color:#94a3b8;font-size:0.62rem;display:block;margin-top:2px;">Added: --</span>
                     </div>
                 </div>
 
@@ -325,10 +327,10 @@
                     </div>
                     <!-- Axis Label Overlay -->
                     <div style="position:absolute;bottom:4px;left:6px;font-size:0.62rem;color:rgba(255,255,255,0.3);font-family:var(--font-mono);pointer-events:none;">
-                        Time Stream &rarr; (Past to Latest)
+                        Time / Strike Ladder &rarr;
                     </div>
                     <div style="position:absolute;top:4px;right:6px;font-size:0.62rem;color:rgba(255,255,255,0.3);font-family:var(--font-mono);pointer-events:none;">
-                        Bubble Size = Volume Delta
+                        Bubble Size = Volume + &Delta;OI
                     </div>
                 </div>
 
