@@ -17,10 +17,11 @@
         graphData: null,          // last fetched graph payload from /api/transmission/graph
         nodes: [],
         edges: [],
-        nodePositions: {},        // { node_id: { x, y, w, h } } populated after DOM render
-        activeParticles: [],      // max 40 particles
+        nodePositions: {},        // { node_id: { x, y, w, h, portOut, portIn } } populated after DOM render
+        activeParticles: [],      // max 50 particles
         animationFrameId: null,
         selectedNodeId: null,
+        hoveredNodeId: null,      // highlighted node for interactive conduit tracing
         isLoading: false,
         tradeMatrixFilter: 'ALL',
         isTabActive: false,
@@ -132,10 +133,19 @@
             ? `<span style="font-size:0.58rem;font-weight:800;color:${node.trade_action.action_color};background:${node.trade_action.action_color}18;border:1px solid ${node.trade_action.action_color}35;padding:0.08rem 0.32rem;border-radius:3px;font-family:var(--font-mono);">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
             : '';
 
+        const tier = node.tier_column || node.tier || 1;
+        // Ingress port for downstream receiver tiers (Tier 2 & 3), Egress port for source tiers (Tier 1 & 2)
+        const inPortHtml = (tier > 1) ? `<span class="tm-port-in" title="Upstream Ingress Port"></span>` : '';
+        const outPortHtml = (tier < 3) ? `<span class="tm-port-out" title="Downstream Egress Port"></span>` : '';
+
         return `<div class="tm-node-card" id="tm-card-${_esc(node.node_id)}"
                      data-node-id="${_esc(node.node_id)}"
                      onclick="window.transmissionRadar.openDrawer('${_esc(node.node_id)}')"
+                     onmouseenter="window.transmissionRadar.onNodeHover('${_esc(node.node_id)}')"
+                     onmouseleave="window.transmissionRadar.onNodeHover(null)"
                      style="border-left: 3px solid ${sc.border};">
+            ${inPortHtml}
+            ${outPortHtml}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
                 <div style="display:flex;align-items:center;gap:0.35rem;">
                     <span style="font-size:0.85rem;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">${_esc(node.symbol)}</span>
@@ -350,6 +360,15 @@
                 y: r.top - cRect.top + r.height / 2,
                 w: r.width,
                 h: r.height,
+                // Perimeter Ports: egress out of right edge, ingress into left edge
+                portOut: {
+                    x: r.right - cRect.left,
+                    y: r.top - cRect.top + r.height / 2,
+                },
+                portIn: {
+                    x: r.left - cRect.left,
+                    y: r.top - cRect.top + r.height / 2,
+                },
             };
         }
     }
@@ -370,17 +389,23 @@
         // Distribute particles evenly across edges (up to MAX_PARTICLES total)
         const perEdge = Math.max(1, Math.floor(MAX_PARTICLES / edges.length));
         for (const edge of edges) {
-            const src = _state.nodePositions[edge.source_node_id || edge.source];
-            const tgt = _state.nodePositions[edge.target_node_id || edge.target];
+            const srcId = edge.source_node_id || edge.source;
+            const tgtId = edge.target_node_id || edge.target;
+            const src = _state.nodePositions[srcId];
+            const tgt = _state.nodePositions[tgtId];
             if (!src || !tgt) continue;
             const color = impactColors[edge.impact_level] || '#38bdf8';
             for (let i = 0; i < perEdge && _state.activeParticles.length < MAX_PARTICLES; i++) {
                 _state.activeParticles.push({
-                    src, tgt,
+                    srcId,
+                    tgtId,
+                    src,
+                    tgt,
                     t: i / perEdge,      // stagger start positions
                     color,
                     speed: PARTICLE_SPEED * (0.8 + Math.random() * 0.4),
-                    alpha: 0.6 + Math.random() * 0.4,
+                    alpha: 0.7 + Math.random() * 0.3,
+                    history: [],          // trailing positions for comet effect
                 });
             }
         }
@@ -407,61 +432,139 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cw, ch);
 
-        // Draw static Bezier curve links with glowing double-pass
+        const hoveredId = _state.hoveredNodeId;
+
+        // Draw Bezier conduits with elevated visibility and hover-focus hierarchy
         for (const edge of _state.edges) {
-            const src = _state.nodePositions[edge.source_node_id || edge.source];
-            const tgt = _state.nodePositions[edge.target_node_id || edge.target];
-            if (!src || !tgt) continue;
+            const srcId = edge.source_node_id || edge.source;
+            const tgtId = edge.target_node_id || edge.target;
+            const srcPos = _state.nodePositions[srcId];
+            const tgtPos = _state.nodePositions[tgtId];
+            if (!srcPos || !tgtPos) continue;
+
+            // Connect from source right perimeter port to target left perimeter port
+            const p1 = srcPos.portOut || { x: srcPos.x, y: srcPos.y };
+            const p2 = tgtPos.portIn  || { x: tgtPos.x, y: tgtPos.y };
+
+            const isIncident = hoveredId ? (srcId === hoveredId || tgtId === hoveredId) : false;
+            const isDimmed = hoveredId ? !isIncident : false;
 
             const edgeColor = edge.pulse_color || (edge.impact_level === 'CRITICAL' ? '#ef4444' : edge.impact_level === 'HIGH' ? '#f97316' : '#38bdf8');
-            const cpx = src.x + (tgt.x - src.x) * 0.45;
+            const dx = Math.max(40, (p2.x - p1.x) * 0.5);
+            const cp1x = p1.x + dx;
+            const cp1y = p1.y;
+            const cp2x = p2.x - dx;
+            const cp2y = p2.y;
 
-            // Pass 1: Illuminated atmospheric outer glow
-            ctx.beginPath();
-            ctx.moveTo(src.x, src.y);
-            ctx.bezierCurveTo(cpx, src.y, cpx, tgt.y, tgt.x, tgt.y);
-            ctx.strokeStyle = edgeColor;
-            ctx.globalAlpha = edge.impact_level === 'CRITICAL' ? 0.35 : 0.22;
-            ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 7.0 : 5.0;
-            ctx.stroke();
+            ctx.save();
 
-            // Pass 2: Sharp, bold laser transmission conduit
-            ctx.beginPath();
-            ctx.moveTo(src.x, src.y);
-            ctx.bezierCurveTo(cpx, src.y, cpx, tgt.y, tgt.x, tgt.y);
-            ctx.strokeStyle = edgeColor;
-            ctx.globalAlpha = 0.88;
-            ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 3.0 : (edge.impact_level === 'HIGH' ? 2.4 : 1.8);
-            ctx.stroke();
+            if (isDimmed) {
+                // Background dimmed conduits
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                ctx.strokeStyle = '#52525b';
+                ctx.globalAlpha = 0.08;
+                ctx.lineWidth = 1.0;
+                ctx.stroke();
+            } else if (isIncident) {
+                // High-intensity highlighted conduits when node is hovered
+                // Pass 1: Laser outer bloom
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                ctx.strokeStyle = edgeColor;
+                ctx.globalAlpha = 0.45;
+                ctx.lineWidth = 9.0;
+                ctx.stroke();
+
+                // Pass 2: Laser core beam
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                ctx.strokeStyle = '#ffffff';
+                ctx.globalAlpha = 0.95;
+                ctx.lineWidth = 3.0;
+                ctx.stroke();
+            } else {
+                // Normal state: high contrast laser pipeline
+                // Pass 1: Ambient diffusion halo
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                ctx.strokeStyle = edgeColor;
+                ctx.globalAlpha = edge.impact_level === 'CRITICAL' ? 0.38 : 0.24;
+                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 7.5 : 5.5;
+                ctx.stroke();
+
+                // Pass 2: Vibrant neon conduit stroke
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                ctx.strokeStyle = edgeColor;
+                ctx.globalAlpha = 0.85;
+                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 2.8 : (edge.impact_level === 'HIGH' ? 2.2 : 1.8);
+                ctx.stroke();
+            }
+
+            ctx.restore();
         }
 
-        // Draw & advance energetic traveling particles
+        // Draw & advance energetic traveling particles with comet tail
         for (const p of _state.activeParticles) {
-            const src = p.src;
-            const tgt = p.tgt;
-            const cpx = src.x + (tgt.x - src.x) * 0.45;
+            const srcPos = _state.nodePositions[p.srcId];
+            const tgtPos = _state.nodePositions[p.tgtId];
+            if (!srcPos || !tgtPos) continue;
 
-            const cp1 = { x: cpx, y: src.y };
-            const cp2 = { x: cpx, y: tgt.y };
-            const pos = _bezierPoint(src, cp1, cp2, tgt, p.t);
+            const p1 = srcPos.portOut || { x: srcPos.x, y: srcPos.y };
+            const p2 = tgtPos.portIn  || { x: tgtPos.x, y: tgtPos.y };
 
-            // Wide energetic glow halo
+            const isIncident = hoveredId ? (p.srcId === hoveredId || p.tgtId === hoveredId) : false;
+            const isDimmed = hoveredId ? !isIncident : false;
+
+            const dx = Math.max(40, (p2.x - p1.x) * 0.5);
+            const cp1 = { x: p1.x + dx, y: p1.y };
+            const cp2 = { x: p2.x - dx, y: p2.y };
+            const curPos = _bezierPoint(p1, cp1, cp2, p2, p.t);
+
+            if (isDimmed) {
+                p.t += p.speed;
+                if (p.t > 1) p.t = 0;
+                continue; // Suppress dimmed particles during selective inspection
+            }
+
+            // Draw comet trail (sample 3 historical points behind current t)
+            const tailSteps = 3;
+            for (let s = tailSteps; s >= 1; s--) {
+                const trailT = Math.max(0, p.t - (s * 0.018));
+                const trailPt = _bezierPoint(p1, cp1, cp2, p2, trailT);
+                const tailAlpha = (1 - s / (tailSteps + 1)) * 0.45;
+                const tailRadius = 3.0 * (1 - s / (tailSteps + 1));
+
+                ctx.beginPath();
+                ctx.arc(trailPt.x, trailPt.y, Math.max(1, tailRadius), 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = tailAlpha;
+                ctx.fill();
+            }
+
+            // Comet Head Glow
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 11.0, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, isIncident ? 13.0 : 9.5, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
-            ctx.globalAlpha = p.alpha * 0.35;
+            ctx.globalAlpha = isIncident ? 0.6 : 0.38;
             ctx.fill();
 
             // Saturated particle core
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 5.0, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, isIncident ? 5.5 : 4.2, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.globalAlpha = 0.95;
             ctx.fill();
 
-            // White laser focal point
+            // High-luminance laser white core
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 2.2, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, 2.0, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 1.0;
             ctx.fill();
@@ -879,6 +982,46 @@
                 console.error('[TransmissionRadar] gate3 update error:', err);
             } finally {
                 if (saveBtn) saveBtn.textContent = 'Save Status';
+            }
+        },
+
+        onNodeHover(nodeId) {
+            _state.hoveredNodeId = nodeId;
+
+            // Find parents and children of hovered node
+            const parentIds = new Set();
+            const childIds = new Set();
+
+            if (nodeId) {
+                for (const edge of _state.edges) {
+                    const src = edge.source_node_id || edge.source;
+                    const tgt = edge.target_node_id || edge.target;
+                    if (tgt === nodeId) parentIds.add(src);
+                    if (src === nodeId) childIds.add(tgt);
+                }
+            }
+
+            // Update DOM card classes for lineage illumination
+            for (const n of _state.nodes) {
+                const card = document.getElementById(`tm-card-${n.node_id}`);
+                if (!card) continue;
+
+                if (!nodeId) {
+                    // Reset all
+                    card.classList.remove('tm-node-dimmed', 'tm-node-active-hover', 'tm-node-upstream-focus', 'tm-node-downstream-focus');
+                } else if (n.node_id === nodeId) {
+                    card.classList.add('tm-node-active-hover');
+                    card.classList.remove('tm-node-dimmed', 'tm-node-upstream-focus', 'tm-node-downstream-focus');
+                } else if (parentIds.has(n.node_id)) {
+                    card.classList.add('tm-node-upstream-focus');
+                    card.classList.remove('tm-node-dimmed', 'tm-node-active-hover', 'tm-node-downstream-focus');
+                } else if (childIds.has(n.node_id)) {
+                    card.classList.add('tm-node-downstream-focus');
+                    card.classList.remove('tm-node-dimmed', 'tm-node-active-hover', 'tm-node-upstream-focus');
+                } else {
+                    card.classList.add('tm-node-dimmed');
+                    card.classList.remove('tm-node-active-hover', 'tm-node-upstream-focus', 'tm-node-downstream-focus');
+                }
             }
         },
 
