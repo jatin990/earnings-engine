@@ -468,8 +468,15 @@
                     <td style="padding: 0.45rem 0.5rem; font-family: var(--font-mono); font-weight: 700; color: ${distColor};">
                         ${_fmtPct(dist)}
                     </td>
-                    <td style="padding: 0.45rem 0.5rem; font-family: var(--font-mono); font-weight: 600; color: ${volColor};">
-                        ${_fmtRatio(volSurge)}
+                    <td style="padding: 0.45rem 0.5rem; font-family: var(--font-mono);">
+                        <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                            <span style="font-weight: 600; color: ${volColor};">${_fmtRatio(volSurge)}</span>
+                            ${item.technicals?.vol_badge_label ? `
+                                <span class="signal-badge" style="background: ${item.technicals.vol_badge_bg || 'rgba(148, 163, 184, 0.12)'}; color: ${item.technicals.vol_badge_color || '#94a3b8'}; border: 1px solid ${item.technicals.vol_badge_border || 'rgba(148, 163, 184, 0.25)'}; font-size: 0.58rem; padding: 0.04rem 0.25rem; white-space: nowrap;" title="${_esc(item.technicals.vol_tooltip || '')}">
+                                    ${_esc(item.technicals.vol_badge_label)}
+                                </span>
+                            ` : ''}
+                        </div>
                     </td>
                     <td style="padding: 0.45rem 0.5rem; font-family: var(--font-mono);">
                         <span style="display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 800; font-size: 0.72rem; background: ${scoreBg}; color: ${scoreColor};">
@@ -717,6 +724,41 @@
                         ${tech.momentum_3d_pct != null ? ` 3D Momentum: <strong>${_fmtPct(tech.momentum_3d_pct)}</strong>.` : ''}
                         ${isSqueeze ? ' Volatility Squeeze is currently active (Bollinger Band inside Keltner Channel).' : ''}
                     </div>
+                </div>
+
+                <!-- Section 4: Volume Polarity & F&O Positioning -->
+                <div style="margin-bottom: 0.85rem; background: #06060a; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.6rem 0.75rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.45rem;">
+                        <div style="font-size: 0.66rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px;">
+                            ⚡ Volume Polarity &amp; Institutional Positioning
+                        </div>
+                        ${candidate.is_fno ? '<span class="signal-badge" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); font-size: 0.58rem; padding: 0.04rem 0.3rem;">NSE F&amp;O</span>' : '<span style="font-size: 0.58rem; color: #64748b;">Cash Equity</span>'}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.45rem; font-size: 0.72rem; font-family: var(--font-mono);">
+                        <div style="display: flex; justify-content: space-between; padding: 0.2rem 0; border-bottom: 1px dashed rgba(255,255,255,0.06);">
+                            <span style="color: #64748b;">Polarity:</span>
+                            <span style="font-weight: 700; color: ${tech.vol_badge_color || '#94a3b8'};">${_esc(candidate.volume_polarity || 'NEUTRAL')}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.2rem 0; border-bottom: 1px dashed rgba(255,255,255,0.06);">
+                            <span style="color: #64748b;">Volume Character:</span>
+                            <span style="font-weight: 600; color: #f8fafc;">${_esc(candidate.volume_character || '—')}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.2rem 0;">
+                            <span style="color: #64748b;">F&amp;O Open Interest:</span>
+                            <span style="font-weight: 600; color: ${candidate.oi_change_pct > 0 ? '#34d399' : (candidate.oi_change_pct < 0 ? '#f87171' : '#94a3b8')};">
+                                ${candidate.oi_change_pct != null ? `${candidate.oi_change_pct > 0 ? '+' : ''}${candidate.oi_change_pct.toFixed(2)}%` : '—'}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.2rem 0;">
+                            <span style="color: #64748b;">Derivatives Buildup:</span>
+                            <span style="font-weight: 700; color: ${candidate.oi_buildup ? '#38bdf8' : '#64748b'};">${_esc(candidate.oi_buildup || 'N/A (Cash)')}</span>
+                        </div>
+                    </div>
+                    ${tech.vol_tooltip ? `
+                        <div style="font-size: 0.64rem; color: #94a3b8; font-family: var(--font-sans); margin-top: 0.4rem; padding-top: 0.35rem; border-top: 1px solid rgba(255,255,255,0.04); line-height: 1.35;">
+                            ℹ️ ${_esc(tech.vol_tooltip)}
+                        </div>
+                    ` : ''}
                 </div>
 
                 <!-- Action Footer Buttons -->

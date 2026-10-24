@@ -186,6 +186,16 @@
             style="background:transparent;color:var(--text-muted, #64748b);font-size:0.6rem;padding:0.08rem 0.3rem;border:none;cursor:pointer;">Small</button>
         </div>
 
+        <!-- Volume Polarity Filter -->
+        <div style="display:flex;align-items:center;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;padding:1px;" title="Filter by Volume Polarity / Institutional Positioning">
+          <button type="button" id="rl-vol-all" onclick="window.resultsLedger && window.resultsLedger.setVolPolarityFilter('all')"
+            style="background:rgba(255,255,255,0.12);color:var(--text-primary, #f8fafc);font-size:0.6rem;padding:0.08rem 0.35rem;border:none;border-radius:2px;cursor:pointer;font-weight:700;">Vol: All</button>
+          <button type="button" id="rl-vol-bullish" onclick="window.resultsLedger && window.resultsLedger.setVolPolarityFilter('bullish')"
+            style="background:transparent;color:#34d399;font-size:0.6rem;padding:0.08rem 0.35rem;border:none;cursor:pointer;" title="Bullish Volume & Long Buildup / Accumulation">🟢 Bullish</button>
+          <button type="button" id="rl-vol-bearish" onclick="window.resultsLedger && window.resultsLedger.setVolPolarityFilter('bearish')"
+            style="background:transparent;color:#fb7185;font-size:0.6rem;padding:0.08rem 0.35rem;border:none;cursor:pointer;" title="Bearish Volume & Short Buildup / Distribution">🔴 Bearish</button>
+        </div>
+
         <!-- Density toggle -->
         <div style="display:flex;align-items:center;background:var(--bg-main, #0a0c14);border:1px solid var(--border-subtle, rgba(255,255,255,0.1));border-radius:3px;padding:1px;">
           <button type="button" id="rl-density-compact" onclick="window.resultsLedger && window.resultsLedger.setDensity('compact')"

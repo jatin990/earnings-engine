@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
+from earnings_engine.analysis.volume_polarity import classify_volume_polarity, get_stock_oi_delta
 from earnings_engine.data import prices as prices_mod
 from earnings_engine.data.earnings import _connect as _earnings_connect
 from earnings_engine.data.industry import get_industry_map
@@ -472,6 +473,25 @@ def get_results_breakout_candidates(
         industry = industry_map.get(ticker, "General")
         symbol = ticker[:-3] if ticker.endswith(".NS") else ticker
 
+        # Directional Volume & F&O OI Polarity
+        prev_close_bar = float(closes.iloc[-2]) if len(closes) >= 2 else None
+        day_chg_pct = round(((current_price - prev_close_bar) / prev_close_bar) * 100.0, 2) if prev_close_bar and prev_close_bar > 0 else None
+        latest_high = float(highs.iloc[-1]) if not highs.empty else current_price
+        latest_low = float(lows.iloc[-1]) if not lows.empty else current_price
+        latest_open = float(opens.iloc[-1]) if not opens.empty else current_price
+        oi_delta_pct = get_stock_oi_delta(ticker)
+
+        vol_polarity_meta = classify_volume_polarity(
+            ticker=ticker,
+            price_change_pct=day_chg_pct,
+            volume_ratio=volume_ratio,
+            close=current_price,
+            high=latest_high,
+            low=latest_low,
+            open_price=latest_open,
+            oi_change_pct=oi_delta_pct,
+        )
+
         items.append({
             "ticker": ticker,
             "symbol": symbol,
@@ -490,6 +510,11 @@ def get_results_breakout_candidates(
             "pct_from_trigger": round(float(pct_from_trigger), 2),
             "dist_to_trigger_pct": round(float(pct_from_trigger), 2),
             "is_breaking_out": is_breaking_out,
+            "volume_polarity": vol_polarity_meta["volume_polarity"],
+            "volume_character": vol_polarity_meta["volume_character"],
+            "oi_buildup": vol_polarity_meta["oi_buildup"],
+            "oi_change_pct": vol_polarity_meta["oi_change_pct"],
+            "is_fno": vol_polarity_meta["is_fno"],
             "target_1": target_1,
             "target_2": target_2,
             "stop_loss": stop_loss,
@@ -520,6 +545,16 @@ def get_results_breakout_candidates(
             "technicals": {
                 "volume_ratio": round(float(volume_ratio), 2),
                 "volume_ratio_20d": round(float(volume_ratio), 2),
+                "volume_polarity": vol_polarity_meta["volume_polarity"],
+                "volume_character": vol_polarity_meta["volume_character"],
+                "oi_buildup": vol_polarity_meta["oi_buildup"],
+                "oi_change_pct": vol_polarity_meta["oi_change_pct"],
+                "is_fno": vol_polarity_meta["is_fno"],
+                "vol_badge_label": vol_polarity_meta["badge_label"],
+                "vol_badge_color": vol_polarity_meta["badge_color"],
+                "vol_badge_bg": vol_polarity_meta["badge_bg"],
+                "vol_badge_border": vol_polarity_meta["badge_border"],
+                "vol_tooltip": vol_polarity_meta["tooltip"],
                 "atr_val": round(float(atr_val), 2),
                 "atr_14d": round(float(atr_val), 2),
                 "atr_pct": round(float(atr_pct), 2),

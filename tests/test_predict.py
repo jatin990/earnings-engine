@@ -428,8 +428,8 @@ def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
     assert "2026-08-01" in html
     assert "Large Cap" in html or "Small Cap" in html
     assert "AAA" in html
-    assert "Kronos 14D" in html
-    assert "GBM" in html
+    assert "cell-ai-edge" in html
+    assert "cell-technical-setup" in html
 
     # Ledger stock cell shows company name
     assert "Alpha Corp" in html

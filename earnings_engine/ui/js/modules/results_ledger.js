@@ -20,7 +20,7 @@ const ResultsLedger = (() => {
   let _sortDir = 'asc';
   let _state = {
     daySectionsMeta: [], months: [], activeMonth: 'ALL',
-    selectedDates: new Set(), capFilter: 'all', densityMode: 'compact',
+    selectedDates: new Set(), capFilter: 'all', volPolarityFilter: 'all', densityMode: 'compact',
     excludedIndustries: new Set(), allIndustries: [], industrySearchQuery: '',
     searchQuery: '', totalStocks: 0, activeWindowName: '', activePreset: 'next3',
   };
@@ -333,6 +333,7 @@ const ResultsLedger = (() => {
   function filterTable() {
     const q      = _state.searchQuery.toLowerCase();
     const cap    = _state.capFilter;
+    const volPol = _state.volPolarityFilter;
     const excl   = _state.excludedIndustries;
     const selDates = _state.selectedDates;
     const aMonth = _state.activeMonth;
@@ -345,17 +346,19 @@ const ResultsLedger = (() => {
       const month   = date.substring(0, 7);
       const ticker  = (row.dataset.ticker || '').toLowerCase();
       const capTier = (row.dataset.cap    || '').toLowerCase();
+      const rowPol  = (row.dataset.volPolarity || '').toLowerCase();
       const industry= (row.dataset.industry || '').toLowerCase();
       const monthOk = aMonth === 'ALL' || month === aMonth;
       const dateOk  = !selDates.size || selDates.has(date);
       const capOk   = cap === 'all' || capTier === cap;
+      const volOk   = volPol === 'all' || rowPol === volPol;
       const indOk   = !excl.size || !excl.has(row.dataset.industry || '');
       const searchOk= !q || ticker.includes(q) || industry.includes(q)
         || (row.querySelector('.stock-company-sub')?.textContent || '').toLowerCase().includes(q)
         || (row.querySelector('.institutional-tags-strip')?.textContent || '').toLowerCase().includes(q)
         || (row.dataset.setup || '').toLowerCase().includes(q)
         || (row.dataset.buySignal || '').toLowerCase().includes(q);
-      const show = monthOk && dateOk && capOk && indOk && searchOk;
+      const show = monthOk && dateOk && capOk && volOk && indOk && searchOk;
       row.style.display = show ? '' : 'none';
       if (show) {
         visible++;
@@ -430,6 +433,17 @@ const ResultsLedger = (() => {
       btn.style.background = t === tier ? 'rgba(255,255,255,0.12)' : 'transparent';
       btn.style.color = t === tier ? '#f8fafc' : '#6b7485';
       btn.style.fontWeight = t === tier ? '700' : '400';
+    });
+    filterTable();
+  }
+
+  function setVolPolarityFilter(polarity) {
+    _state.volPolarityFilter = polarity;
+    ['all', 'bullish', 'bearish'].forEach(p => {
+      const btn = _el(`rl-vol-${p}`);
+      if (!btn) return;
+      btn.style.background = p === polarity ? 'rgba(255,255,255,0.12)' : 'transparent';
+      btn.style.fontWeight = p === polarity ? '700' : '400';
     });
     filterTable();
   }
@@ -749,7 +763,7 @@ const ResultsLedger = (() => {
   return {
     init, destroy, loadReport, cancel, getSliderValues, onSliderInput, onMarketChange, setPreset,
     renderTable, renderMonthStrip, renderDateChipRail, filterTable, setMonth, toggleDate,
-    setCapFilter, setDensity, onSearchInput, toggleIndustryDropdown, filterIndustryList,
+    setCapFilter, setVolPolarityFilter, setDensity, onSearchInput, toggleIndustryDropdown, filterIndustryList,
     onIndustryCheckboxChange, selectAllIndustries, clearAllIndustries, syncCalendar,
     recalcPrices, summarize, openDrawer, openMonthModal, refreshSinglePrice,
     onMonthCellClick: setMonth,

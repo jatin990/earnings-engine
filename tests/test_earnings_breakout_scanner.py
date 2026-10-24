@@ -152,6 +152,12 @@ def test_declared_rdh_expansion(settings):
     assert item["target_1"] == item["trade_levels"]["target_1"]
     assert item["target_2"] == item["trade_levels"]["target_2"]
     assert item["breakout_trigger"] == item["trade_levels"]["breakout_trigger"]
+    assert "volume_polarity" in item
+    assert item["volume_polarity"] in ["BULLISH", "BEARISH", "NEUTRAL"]
+    assert item["is_fno"] is True
+    assert "volume_polarity" in item["technicals"]
+    assert "vol_badge_label" in item["technicals"]
+    assert "vol_badge_color" in item["technicals"]
 
 
 def test_upcoming_pre_earnings_coil(settings):
