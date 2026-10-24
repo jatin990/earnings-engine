@@ -114,23 +114,29 @@
         const anom = _anomalyMeta(node.anomaly_flag);
         const c1d = Number(node.change_1d_pct ?? 0);
         const pctColor = c1d > 0 ? '#34d399' : c1d < 0 ? '#f87171' : '#a1a1aa';
-        const freshBadge = node.is_stale
-            ? `<span style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">STALE·${node.snapshot_age_minutes}m</span>`
-            : `<span style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">LIVE·${node.snapshot_age_minutes}m</span>`;
+
+        // Stale warning indicator (only show badge when stale to avoid noise)
+        const staleBadge = node.is_stale
+            ? `<span style="background:rgba(234,179,8,0.12);color:#fde047;border:1px solid rgba(234,179,8,0.25);font-size:0.58rem;padding:0.04rem 0.28rem;border-radius:3px;font-family:var(--font-mono);">STALE·${node.snapshot_age_minutes}m</span>`
+            : '';
+
+        // Circuit warning indicator (only show badge when NOT stable)
         const circuitColor = _circuitColors(node.circuit_status);
         const circuitBadge = (node.circuit_status && node.circuit_status !== 'STABLE')
-            ? `<span style="background:rgba(239,68,68,0.12);color:${circuitColor};border:1px solid ${circuitColor}33;font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);" title="Circuit Status">${node.circuit_status}</span>`
+            ? `<span style="background:rgba(239,68,68,0.12);color:${circuitColor};border:1px solid ${circuitColor}33;font-size:0.58rem;padding:0.04rem 0.28rem;border-radius:3px;font-family:var(--font-mono);" title="Circuit Status">${node.circuit_status}</span>`
             : '';
+
+        // Anomaly badge (only when flag is present)
         const anomBadge = anom
-            ? `<span style="background:${anom.bg};color:${anom.color};border:1px solid ${anom.border};font-size:0.58rem;padding:0.05rem 0.3rem;border-radius:3px;" title="${_esc(node.anomaly_flag)}">${anom.label}</span>`
+            ? `<span style="background:${anom.bg};color:${anom.color};border:1px solid ${anom.border};font-size:0.58rem;padding:0.04rem 0.28rem;border-radius:3px;" title="${_esc(node.anomaly_flag)}">${anom.label}</span>`
             : '';
 
         const elastLabel = (node.elasticity_label && node.elasticity_label !== 'N/A (Anchor)' && node.elasticity_label !== 'N/A')
-            ? `<span style="color:#a1a1aa;font-size:0.62rem;font-family:var(--font-mono);">${_esc(node.elasticity_label)}</span>`
+            ? `<span style="color:#71717a;font-size:0.6rem;font-family:var(--font-mono);">${_esc(node.elasticity_label)}</span>`
             : '';
 
         const actionBadge = (node.trade_action && node.trade_action.action)
-            ? `<span style="font-size:0.58rem;font-weight:800;color:${node.trade_action.action_color};background:${node.trade_action.action_color}18;border:1px solid ${node.trade_action.action_color}35;padding:0.08rem 0.32rem;border-radius:3px;font-family:var(--font-mono);">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
+            ? `<span style="font-size:0.6rem;font-weight:700;color:${node.trade_action.action_color};background:${node.trade_action.action_color}14;border:1px solid ${node.trade_action.action_color}30;padding:0.08rem 0.35rem;border-radius:3px;font-family:var(--font-mono);letter-spacing:0.02em;">${_esc(node.trade_action.action.replace(/_/g, ' '))}</span>`
             : '';
 
         const tier = node.tier_column || node.tier || 1;
@@ -143,29 +149,29 @@
                      onclick="window.transmissionRadar.openDrawer('${_esc(node.node_id)}')"
                      onmouseenter="window.transmissionRadar.onNodeHover('${_esc(node.node_id)}')"
                      onmouseleave="window.transmissionRadar.onNodeHover(null)"
-                     style="border-left: 3px solid ${sc.border};">
+                     style="border-left: 2.5px solid ${sc.border};">
             ${inPortHtml}
             ${outPortHtml}
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
-                <div style="display:flex;align-items:center;gap:0.35rem;">
-                    <span style="font-size:0.85rem;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">${_esc(node.symbol)}</span>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.18rem;">
+                <div style="display:flex;align-items:baseline;gap:0.35rem;min-width:0;">
+                    <span style="font-size:0.84rem;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">${_esc(node.symbol)}</span>
                     <span style="font-size:0.6rem;color:#71717a;font-family:var(--font-mono);">${_esc(node.market || '')}</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:0.35rem;">
+                <div style="display:flex;align-items:baseline;gap:0.35rem;flex-shrink:0;">
                     <span style="font-size:0.82rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${node.price != null ? (node.market === 'NSE' ? '₹' : '$') + _fmtPrice(node.price) : '—'}</span>
-                    <span style="font-size:0.72rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}</span>
+                    <span style="font-size:0.7rem;font-weight:700;color:${pctColor};font-family:var(--font-mono);">${c1d != null ? _fmt(c1d) + '%' : '—'}</span>
                 </div>
             </div>
-            <div style="font-size:0.65rem;color:#a1a1aa;margin-bottom:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_esc(node.product_lineage || node.name)}">${_esc(node.product_lineage || node.name)}</div>
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.2rem;flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:0.25rem;">
+            <div style="font-size:0.64rem;color:#8892b0;margin-bottom:0.35rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_esc(node.product_lineage || node.name)}">${_esc(node.product_lineage || node.name)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.25rem;">
+                <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
                     ${actionBadge}
                     ${elastLabel}
                 </div>
-                <div style="display:flex;align-items:center;gap:0.25rem;">
+                <div style="display:flex;align-items:center;gap:0.25rem;flex-shrink:0;">
                     ${anomBadge}
                     ${circuitBadge}
-                    ${freshBadge}
+                    ${staleBadge}
                 </div>
             </div>
         </div>`;
@@ -474,8 +480,8 @@
                 ctx.moveTo(p1.x, p1.y);
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
                 ctx.strokeStyle = edgeColor;
-                ctx.globalAlpha = 0.45;
-                ctx.lineWidth = 9.0;
+                ctx.globalAlpha = 0.35;
+                ctx.lineWidth = 6.0;
                 ctx.stroke();
 
                 // Pass 2: Laser core beam
@@ -484,26 +490,26 @@
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
                 ctx.strokeStyle = '#ffffff';
                 ctx.globalAlpha = 0.95;
-                ctx.lineWidth = 3.0;
+                ctx.lineWidth = 2.2;
                 ctx.stroke();
             } else {
-                // Normal state: high contrast laser pipeline
-                // Pass 1: Ambient diffusion halo
+                // Normal state: refined laser conduit filament (crisp, uncluttered)
+                // Pass 1: Subtle ambient halo
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
                 ctx.strokeStyle = edgeColor;
-                ctx.globalAlpha = edge.impact_level === 'CRITICAL' ? 0.38 : 0.24;
-                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 7.5 : 5.5;
+                ctx.globalAlpha = edge.impact_level === 'CRITICAL' ? 0.22 : 0.14;
+                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 4.5 : 3.0;
                 ctx.stroke();
 
-                // Pass 2: Vibrant neon conduit stroke
+                // Pass 2: Vibrant neon filament stroke
                 ctx.beginPath();
                 ctx.moveTo(p1.x, p1.y);
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
                 ctx.strokeStyle = edgeColor;
-                ctx.globalAlpha = 0.85;
-                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 2.8 : (edge.impact_level === 'HIGH' ? 2.2 : 1.8);
+                ctx.globalAlpha = 0.75;
+                ctx.lineWidth = edge.impact_level === 'CRITICAL' ? 1.8 : 1.2;
                 ctx.stroke();
             }
 
@@ -538,33 +544,33 @@
             for (let s = tailSteps; s >= 1; s--) {
                 const trailT = Math.max(0, p.t - (s * 0.018));
                 const trailPt = _bezierPoint(p1, cp1, cp2, p2, trailT);
-                const tailAlpha = (1 - s / (tailSteps + 1)) * 0.45;
-                const tailRadius = 3.0 * (1 - s / (tailSteps + 1));
+                const tailAlpha = (1 - s / (tailSteps + 1)) * 0.35;
+                const tailRadius = 2.4 * (1 - s / (tailSteps + 1));
 
                 ctx.beginPath();
-                ctx.arc(trailPt.x, trailPt.y, Math.max(1, tailRadius), 0, Math.PI * 2);
+                ctx.arc(trailPt.x, trailPt.y, Math.max(0.8, tailRadius), 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
                 ctx.globalAlpha = tailAlpha;
                 ctx.fill();
             }
 
-            // Comet Head Glow
+            // Comet Head Glow (Refined, no overpowering blotch)
             ctx.beginPath();
-            ctx.arc(curPos.x, curPos.y, isIncident ? 13.0 : 9.5, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, isIncident ? 9.0 : 6.5, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
-            ctx.globalAlpha = isIncident ? 0.6 : 0.38;
+            ctx.globalAlpha = isIncident ? 0.45 : 0.25;
             ctx.fill();
 
             // Saturated particle core
             ctx.beginPath();
-            ctx.arc(curPos.x, curPos.y, isIncident ? 5.5 : 4.2, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, isIncident ? 3.8 : 2.8, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.globalAlpha = 0.95;
             ctx.fill();
 
-            // High-luminance laser white core
+            // High-luminance laser white core dot
             ctx.beginPath();
-            ctx.arc(curPos.x, curPos.y, 2.0, 0, Math.PI * 2);
+            ctx.arc(curPos.x, curPos.y, 1.4, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = 1.0;
             ctx.fill();
