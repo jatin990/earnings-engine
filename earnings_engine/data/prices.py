@@ -405,6 +405,7 @@ def _merge_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
 
 
 KNOWN_TICKER_ALIASES: dict[str, str] = {
+    # Renamed / merged NSE equities
     "STERLITE.NS": "STLTECH.NS",
     "STERTECH.NS": "STLTECH.NS",
     "ZOMATO.NS": "ETERNAL.NS",
@@ -413,13 +414,129 @@ KNOWN_TICKER_ALIASES: dict[str, str] = {
     "CADILAHC.NS": "ZYDUSLIFE.NS",
     "HEXAWARE.NS": "HEXT.NS",
     "DHFL.NS": "PIRAMALFIN.NS",
+    # Indian indices & sectoral aliases -> Yahoo Finance symbols
+    "^NSE": "^NSEI",
+    "NIFTY": "^NSEI",
+    "NIFTY50": "^NSEI",
+    "NIFTY 50": "^NSEI",
+    "NIFTY.NS": "^NSEI",
+    "NIFTY50.NS": "^NSEI",
+    "BANKNIFTY": "^NSEBANK",
+    "NIFTYBANK": "^NSEBANK",
+    "NIFTY BANK": "^NSEBANK",
+    "^BANKNIFTY": "^NSEBANK",
+    "BANKNIFTY.NS": "^NSEBANK",
+    "NIFTYBANK.NS": "^NSEBANK",
+    "FINNIFTY": "^CNXFIN",
+    "^FINNIFTY": "^CNXFIN",
+    "FINNIFTY.NS": "^CNXFIN",
+    "NIFTYIT": "^CNXIT",
+    "^NSEIT": "^CNXIT",
+    "^NIFTYIT": "^CNXIT",
+    "NIFTYIT.NS": "^CNXIT",
+    "NIFTY AUTO": "^CNXAUTO",
+    "NIFTYAUTO.NS": "^CNXAUTO",
+    "NIFTY PHARMA": "^CNXPHARMA",
+    "NIFTYPHARMA.NS": "^CNXPHARMA",
+    "NIFTY METAL": "^CNXMETAL",
+    "NIFTYMETAL.NS": "^CNXMETAL",
+    "^NIFTYMETAL": "^CNXMETAL",
+    "NIFTY FMCG": "^CNXFMCG",
+    "NIFTYFMCG.NS": "^CNXFMCG",
+    "NIFTY ENERGY": "^CNXENERGY",
+    "NIFTYENERGY.NS": "^CNXENERGY",
+    "^NIFTYENERGY": "^CNXENERGY",
+    "NIFTY REALTY": "^CNXREALTY",
+    "NIFTYREALTY.NS": "^CNXREALTY",
+    "NIFTY INFRA": "^CNXINFRA",
+    "NIFTYINFRA.NS": "^CNXINFRA",
+    "NIFTY PSE": "^CNXPSE",
+    "NIFTYPSE.NS": "^CNXPSE",
+    "NIFTY PSU BANK": "^CNXPSUBANK",
+    "NIFTYPSUBANK.NS": "^CNXPSUBANK",
+    "NIFTY MEDIA": "^CNXMEDIA",
+    "NIFTYMEDIA.NS": "^CNXMEDIA",
+    "NIFTY SMALLCAP": "^CNXSC",
+    "NIFTY SMALLCAP 100": "^CNXSC",
+    "NIFTYSC.NS": "^CNXSC",
+    "NIFTY MIDCAP 50": "^NSEMDCP50",
+    "NIFTY MIDCAP 100": "^CRSLDX",
+    "NIFTY 500": "^CRSLDX",
+    "NIFTY500.NS": "^CRSLDX",
+    "INDIA VIX": "^INDIAVIX",
+    "INDIAVIX": "^INDIAVIX",
+    "INDIAVIX.NS": "^INDIAVIX",
+    "SENSEX": "^BSESN",
+    "BSESENSEX": "^BSESN",
+    "BSE:SENSEX": "^BSESN",
+    "SENSEX.BO": "^BSESN",
+    "S&P 500": "^GSPC",
+    "SP500": "^GSPC",
+    "NASDAQ": "^NDX",
+    "NASDAQ 100": "^NDX",
+    "DOW": "^DJI",
+    "DOW JONES": "^DJI",
 }
+
+# Delisted / suspended tickers with frequent upstream 404s to suppress
+DEAD_LETTER_TICKERS: set[str] = {
+    "SANGINITA.NS",
+    "ADV.NS",
+    "SILLYMONKS.NS",
+    "AETL.NS",
+    "ASOCSTONE.NS",
+    "SUPER.NS",
+    "LAKSELECON.NS",
+    "DEEPAKSPIN.NS",
+    "SIPAPER.NS",
+}
+
+_DEAD_LETTER_FAILURES: dict[str, float] = {}
+_DEAD_LETTER_LOCK = threading.Lock()
+_DEAD_LETTER_BACKOFF_SECONDS = 86400.0  # 24 hours backoff for dead-letter symbols
+
+
+def is_dead_letter_ticker(ticker: str) -> bool:
+    """Return True if ticker is permanently delisted or currently in dead-letter backoff."""
+    sym = (ticker or "").strip().upper()
+    if sym in DEAD_LETTER_TICKERS:
+        return True
+    now = time.monotonic()
+    with _DEAD_LETTER_LOCK:
+        last_fail = _DEAD_LETTER_FAILURES.get(sym)
+        if last_fail is not None and (now - last_fail) < _DEAD_LETTER_BACKOFF_SECONDS:
+            return True
+    return False
+
+
+def record_dead_letter_failure(ticker: str) -> None:
+    """Record a 404 / quote not found failure to prevent repeated external network hits."""
+    sym = (ticker or "").strip().upper()
+    with _DEAD_LETTER_LOCK:
+        _DEAD_LETTER_FAILURES[sym] = time.monotonic()
 
 
 def canonical_symbol(ticker: str) -> str:
-    """Return the official/current active NSE trading symbol for rebranded or renamed tickers."""
+    """Return the official/current active trading symbol for rebranded or renamed tickers and indices.
+
+    Also normalizes US equities erroneously passed with an NSE '.NS' suffix (e.g. AAPL.NS -> AAPL).
+    """
     sym = (ticker or "").strip().upper()
-    return KNOWN_TICKER_ALIASES.get(sym, sym)
+    if not sym:
+        return ""
+
+    # Check direct dictionary alias
+    if sym in KNOWN_TICKER_ALIASES:
+        return KNOWN_TICKER_ALIASES[sym]
+
+    # If an equity symbol ends with .NS, check if the base symbol is an established US ticker
+    if sym.endswith(".NS"):
+        base_sym = sym[:-3]
+        from earnings_engine.data.universe import _SEED_US_TOP
+        if base_sym in _SEED_US_TOP:
+            return base_sym
+
+    return sym
 
 
 def fetch_prices(
@@ -439,6 +556,10 @@ def fetch_prices(
     fetch_symbol = sym
     target_start_str = start_date or settings.history_start
     target_start_ts = pd.Timestamp(target_start_str)
+
+    if is_dead_letter_ticker(sym):
+        logger.debug("[DATA-FETCH] [dead-letter] Suppressing price fetch for delisted/failing ticker=%s", sym)
+        return load_prices(sym, settings)
 
     if not force and not hard_refresh:
         first_cached = _first_cached_date(sym, settings)
@@ -629,9 +750,11 @@ def ensure_prices_batch(
     cleaned = [canonical_symbol(t) for t in tickers if t and t.strip()]
     unique_tickers = list(dict.fromkeys(cleaned))
 
-    # Identify tickers that need fetching
+    # Identify tickers that need fetching (skipping dead-letter tickers)
     to_fetch: list[str] = []
     for t in unique_tickers:
+        if is_dead_letter_ticker(t):
+            continue
         if force or not _is_fresh(t, settings) or not prices_recent_enough(t, settings):
             to_fetch.append(t)
 
@@ -1298,6 +1421,31 @@ def fetch_live_quote(
     sym = ticker.strip().upper()
     fetch_sym = KNOWN_TICKER_ALIASES.get(sym, sym)
     canonical = canonical_symbol(sym)
+
+    if is_dead_letter_ticker(sym) or is_dead_letter_ticker(canonical):
+        logger.debug("[QUOTE:DEAD-LETTER] %s is suppressed (dead-letter/delisted ticker)", sym)
+        return {
+            "ticker": sym,
+            "symbol": sym,
+            "current_price": None,
+            "previous_close": None,
+            "day_change": None,
+            "day_change_pct": None,
+            "day_open": None,
+            "day_high": None,
+            "day_low": None,
+            "week_52_high": None,
+            "week_52_low": None,
+            "volume": None,
+            "avg_volume": None,
+            "market_cap": None,
+            "currency": "INR" if sym.endswith(".NS") else "USD",
+            "is_live": False,
+            "last_updated": datetime.now().isoformat(),
+            "pct_from_52w_high": None,
+            "pct_from_52w_low": None,
+        }
+
     session = _get_market_session_status(sym, now_dt=now_dt)
 
     # 1. DB-First Freshness Check (serve immediately if fresh in SQLite)
@@ -1506,6 +1654,11 @@ def fetch_live_quote(
 
     except Exception as e:
         elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
+        err_msg = str(e)
+        if "404" in err_msg or "Quote not found" in err_msg or "Not Found" in err_msg:
+            record_dead_letter_failure(sym)
+            if fetch_sym != sym:
+                record_dead_letter_failure(fetch_sym)
         if not silent:
             logger.warning("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
         else:
@@ -1933,6 +2086,29 @@ def fetch_batch_live_quotes(
         cached_records = _get_cached_quotes_batch(unique_tickers, settings=settings)
         for t in unique_tickers:
             sym = canonical_symbol(t)
+            if is_dead_letter_ticker(t) or is_dead_letter_ticker(sym):
+                results[t] = {
+                    "ticker": t,
+                    "symbol": sym,
+                    "current_price": None,
+                    "previous_close": None,
+                    "day_change": None,
+                    "day_change_pct": None,
+                    "day_open": None,
+                    "day_high": None,
+                    "day_low": None,
+                    "week_52_high": None,
+                    "week_52_low": None,
+                    "volume": None,
+                    "avg_volume": None,
+                    "market_cap": None,
+                    "currency": "INR" if sym.endswith(".NS") else "USD",
+                    "is_live": False,
+                    "last_updated": datetime.now().isoformat(),
+                    "pct_from_52w_high": None,
+                    "pct_from_52w_low": None,
+                }
+                continue
             record = cached_records.get(sym) or cached_records.get(t)
             session = _get_market_session_status(sym)
             if record and _is_cached_quote_fresh(record, session, ttl_minutes=ttl_minutes):
@@ -1964,7 +2140,32 @@ def fetch_batch_live_quotes(
                         pass
                 stale_tickers.append(t)
     else:
-        stale_tickers = list(unique_tickers)
+        for t in unique_tickers:
+            sym = canonical_symbol(t)
+            if is_dead_letter_ticker(t) or is_dead_letter_ticker(sym):
+                results[t] = {
+                    "ticker": t,
+                    "symbol": sym,
+                    "current_price": None,
+                    "previous_close": None,
+                    "day_change": None,
+                    "day_change_pct": None,
+                    "day_open": None,
+                    "day_high": None,
+                    "day_low": None,
+                    "week_52_high": None,
+                    "week_52_low": None,
+                    "volume": None,
+                    "avg_volume": None,
+                    "market_cap": None,
+                    "currency": "INR" if sym.endswith(".NS") else "USD",
+                    "is_live": False,
+                    "last_updated": datetime.now().isoformat(),
+                    "pct_from_52w_high": None,
+                    "pct_from_52w_low": None,
+                }
+            else:
+                stale_tickers.append(t)
 
     fresh_count = len(results)
     stale_count = len(stale_tickers)
@@ -1983,7 +2184,9 @@ def fetch_batch_live_quotes(
 
         missing_tickers = [
             t for t in stale_tickers
-            if t not in results or results[t].get("current_price") is None
+            if (t not in results or results[t].get("current_price") is None)
+            and not is_dead_letter_ticker(t)
+            and not is_dead_letter_ticker(canonical_symbol(t))
         ]
         if missing_tickers:
             logger.info(

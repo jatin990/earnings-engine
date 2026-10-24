@@ -34,7 +34,8 @@ class YFinanceProvider(DataProvider):
 
     @staticmethod
     def _normalize_symbol(ticker: str) -> str:
-        sym = ticker.strip().upper()
+        from earnings_engine.data.prices import canonical_symbol
+        sym = canonical_symbol(ticker)
         index_map = {
             "NIFTY": "^NSEI",
             "NIFTY50": "^NSEI",
