@@ -16,6 +16,13 @@
     <script>
         // Global Auth & Fetch Interceptor for Nexus Gateway Passcode Access
         (function() {
+            // Restore persistent collapsed sidebar state immediately to prevent FOUC / layout shift
+            try {
+                if (localStorage.getItem('ee_sidebar_collapsed') === 'true') {
+                    document.documentElement.classList.add('sidebar-collapsed');
+                }
+            } catch(e) {}
+
             const urlParams = new URLSearchParams(window.location.search);
             const codeInUrl = urlParams.get('code') || urlParams.get('passcode') || urlParams.get('invite');
             if (codeInUrl) {

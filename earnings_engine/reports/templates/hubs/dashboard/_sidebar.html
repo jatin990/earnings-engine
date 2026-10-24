@@ -4,20 +4,23 @@
 <aside class="app-sidebar" id="appSidebar">
 
     <!-- 1. Workspace / Account Switcher Header -->
-    <div style="padding: 0.75rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
+    <div class="sidebar-workspace-header" style="padding: 0.75rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
-            <div style="width: 22px; height: 22px; border-radius: 50%; background: #ffffff; color: #000000; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.7rem; flex-shrink: 0;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: #ffffff; color: #000000; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.7rem; flex-shrink: 0;" title="Earnings Engine Quantum Terminal">
                 ▲
             </div>
-            <div style="display: flex; flex-direction: column; overflow: hidden;">
+            <div class="sidebar-workspace-text" style="display: flex; flex-direction: column; overflow: hidden;">
                 <div style="display: flex; align-items: center; gap: 0.35rem;">
                     <span style="font-size: 0.82rem; font-weight: 600; color: #ededed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">earnings-engine</span>
                     <span style="background: rgba(255,255,255,0.1); color: #a1a1aa; font-size: 0.62rem; font-weight: 600; padding: 0.08rem 0.3rem; border-radius: 4px;">PRO</span>
                 </div>
             </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.25rem;">
-            <button type="button" onclick="app.openCustomizerModal()" class="btn-icon" style="background: transparent; border: none; color: #71717a; cursor: pointer; padding: 0.2rem; font-size: 0.8rem;" title="Account & Control Center">
+        <div class="sidebar-header-actions" style="display: flex; align-items: center; gap: 0.2rem;">
+            <button type="button" id="sidebarCollapseToggleBtn" onclick="app.toggleSidebarCollapse()" class="sidebar-collapse-toggle-btn" title="Toggle Sidebar [Ctrl+B / []">
+                <span id="sidebarCollapseIcon">◀</span>
+            </button>
+            <button type="button" onclick="app.openCustomizerModal()" class="btn-icon sidebar-workspace-text" style="background: transparent; border: none; color: #71717a; cursor: pointer; padding: 0.2rem; font-size: 0.8rem;" title="Account & Control Center">
                 ⚙️
             </button>
             <button type="button" onclick="app.toggleMobileSidebar(false)" class="btn-icon mobile-sidebar-close" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #ededed; border-radius: 6px; cursor: pointer; padding: 0.2rem 0.45rem; font-size: 0.75rem;" title="Close Menu">
@@ -27,7 +30,7 @@
     </div>
 
     <!-- 2. Sidebar Quick Filter -->
-    <div style="padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+    <div class="sidebar-filter-wrapper" style="padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
         <div style="position: relative; display: flex; align-items: center;">
             <span style="position: absolute; left: 0.55rem; font-size: 0.72rem; color: #71717a;">🔍</span>
             <input type="text" id="sidebarFind" oninput="app.filterSidebarTabs(this.value)" placeholder="Find screen..." style="width: 100%; padding: 0.32rem 1.8rem 0.32rem 1.7rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; color: #ededed; font-size: 0.75rem; font-family: var(--font-sans); outline: none;" autocomplete="off">
@@ -42,19 +45,19 @@
         <div class="sidebar-group">
             <div class="sidebar-group-title">Markets &amp; Scanners</div>
             <div class="sidebar-group-items">
-                <a class="sidebar-nav-item active" data-tab="home" onclick="app.switchTab('home')">
+                <a class="sidebar-nav-item active" data-tab="home" onclick="app.switchTab('home')" title="Market Pulse (Live)">
                     <span class="sidebar-icon">🌐</span>
                     <span class="sidebar-label">Market Pulse</span>
                     <span class="sidebar-pill">Live</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="results" onclick="app.switchTab('results')">
+                <a class="sidebar-nav-item" data-tab="results" onclick="app.switchTab('results')" title="Results Ledger">
                     <span class="sidebar-icon">📊</span>
                     <span class="sidebar-label">Results Ledger</span>
                 </a>
 
                 <!-- Breakout Radar with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-breakout" data-parent-tab="breakout">
-                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
+                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')" title="Breakout Radar">
                         <span class="sidebar-icon">⚡</span>
                         <span class="sidebar-label">Breakout Radar</span>
                         <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
@@ -81,7 +84,7 @@
 
                 <!-- Swing Ranges with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-swing" data-parent-tab="swing">
-                    <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')">
+                    <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')" title="Swing Ranges">
                         <span class="sidebar-icon">🔄</span>
                         <span class="sidebar-label">Swing Ranges</span>
                         <span id="sidebarSwingCountBadge" class="sidebar-pill" style="display:none;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
@@ -102,25 +105,25 @@
                     </div>
                 </div>
 
-                <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')">
+                <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')" title="Inst-Earnings Synergy (Alpha)">
                     <span class="sidebar-icon">🔗</span>
                     <span class="sidebar-label">Inst-Earnings Synergy</span>
                     <span id="sidebarConfluenceBadge" class="sidebar-pill" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">ALPHA</span>
                 </a>
 
-                <a class="sidebar-nav-item" data-tab="transmission" onclick="app.switchTab('transmission')">
+                <a class="sidebar-nav-item" data-tab="transmission" onclick="app.switchTab('transmission')" title="Transmission Lead-Lag Web Radar">
                     <span class="sidebar-icon">🕸️</span>
                     <span class="sidebar-label">Transmission Web</span>
                     <span id="sidebarTransmissionBadge" class="sidebar-pill" style="background:rgba(139,92,246,0.2);color:#a78bfa;border:1px solid rgba(139,92,246,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">RADAR</span>
                 </a>
 
-                <a class="sidebar-nav-item" data-tab="options" onclick="app.switchTab('options')">
+                <a class="sidebar-nav-item" data-tab="options" onclick="app.switchTab('options')" title="Option Chain & F&O Live">
                     <span class="sidebar-icon">⛓️</span>
                     <span class="sidebar-label">Option Chain &amp; F&amp;O</span>
                     <span class="sidebar-pill" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;">Live</span>
                 </a>
 
-                <a class="sidebar-nav-item" data-tab="commodities" onclick="app.switchTab('commodities')">
+                <a class="sidebar-nav-item" data-tab="commodities" onclick="app.switchTab('commodities')" title="Commodities & Energy (SMC)">
                     <span class="sidebar-icon">🥇</span>
                     <span class="sidebar-label">Commodities &amp; Energy</span>
                     <span class="sidebar-pill" style="background:rgba(234,179,8,0.2);color:#eab308;border:1px solid rgba(234,179,8,0.35);font-weight:700;">SMC</span>
@@ -128,7 +131,7 @@
 
                 <!-- Gainers & Breakouts with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-gainers" data-parent-tab="gainers">
-                    <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
+                    <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')" title="Gainers & Breakouts">
                         <span class="sidebar-icon">📈</span>
                         <span class="sidebar-label">Gainers &amp; Breakouts</span>
                         <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
@@ -151,7 +154,7 @@
 
                 <!-- Catalysts, News & Pre-Market Hub with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-catalysts" data-parent-tab="catalysts">
-                    <a class="sidebar-nav-item" data-tab="catalysts" onclick="app.switchTab('catalysts')">
+                    <a class="sidebar-nav-item" data-tab="catalysts" onclick="app.switchTab('catalysts')" title="Catalysts & News">
                         <span class="sidebar-icon">📰</span>
                         <span class="sidebar-label">Catalysts &amp; News</span>
                         <span id="sidebarCatalystCountBadge" class="sidebar-pill" style="display:none;background:rgba(239,68,68,0.22);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Recent High-Impact Catalysts (>70% Impact)">0</span>
@@ -189,17 +192,17 @@
                 </div>
 
                 <!-- Morning Setups: Block Deals & Board Meetings Radar -->
-                <a class="sidebar-nav-item" data-tab="morning-setups" onclick="app.switchTab('morning-setups')">
+                <a class="sidebar-nav-item" data-tab="morning-setups" onclick="app.switchTab('morning-setups')" title="Morning Setups (Block Deals & Board Meetings)">
                     <span class="sidebar-icon">🌅</span>
                     <span class="sidebar-label">Morning Setups</span>
                     <span id="sidebarMorningBadge" class="sidebar-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">DEALS</span>
                 </a>
 
-                <a class="sidebar-nav-item" data-tab="monthfilter" onclick="app.switchTab('monthfilter')">
+                <a class="sidebar-nav-item" data-tab="monthfilter" onclick="app.switchTab('monthfilter')" title="Month Filter">
                     <span class="sidebar-icon">🗓️</span>
                     <span class="sidebar-label">Month Filter</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="scanner" onclick="app.switchTab('scanner')">
+                <a class="sidebar-nav-item" data-tab="scanner" onclick="app.switchTab('scanner')" title="Sector Scanner">
                     <span class="sidebar-icon">🔍</span>
                     <span class="sidebar-label">Sector Scanner</span>
                 </a>
@@ -210,7 +213,7 @@
         <div class="sidebar-group">
             <div class="sidebar-group-title">AI &amp; Quant Lab</div>
             <div class="sidebar-group-items">
-                <a class="sidebar-nav-item" data-tab="consensus" onclick="app.switchTab('consensus')">
+                <a class="sidebar-nav-item" data-tab="consensus" onclick="app.switchTab('consensus')" title="4-Model Consensus Engine">
                     <span class="sidebar-icon">🧠</span>
                     <span class="sidebar-label">4-Model Consensus</span>
                     <span class="sidebar-pill" style="background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.35);">Omni</span>
@@ -218,7 +221,7 @@
 
                 <!-- Kronos 14D Forecast with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-kronos" data-parent-tab="kronos">
-                    <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')">
+                    <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')" title="Kronos 14D Forecast">
                         <span class="sidebar-icon">🤖</span>
                         <span class="sidebar-label">Kronos 14D Forecast</span>
                     </a>
@@ -238,15 +241,15 @@
                     </div>
                 </div>
 
-                <a class="sidebar-nav-item" data-tab="buydip" onclick="app.switchTab('buydip')">
+                <a class="sidebar-nav-item" data-tab="buydip" onclick="app.switchTab('buydip')" title="Buy the Dip Radar">
                     <span class="sidebar-icon">📉</span>
                     <span class="sidebar-label">Buy the Dip</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="playground" onclick="app.switchTab('playground')">
+                <a class="sidebar-nav-item" data-tab="playground" onclick="app.switchTab('playground')" title="Quant Playground">
                     <span class="sidebar-icon">🧪</span>
                     <span class="sidebar-label">Quant Playground</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="backtest" onclick="app.switchTab('backtest')">
+                <a class="sidebar-nav-item" data-tab="backtest" onclick="app.switchTab('backtest')" title="Backtest Engine">
                     <span class="sidebar-icon">📈</span>
                     <span class="sidebar-label">Backtest Engine</span>
                 </a>
@@ -259,7 +262,7 @@
             <div class="sidebar-group-items">
                 <!-- Institutional Flows with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-institutional" data-parent-tab="institutional">
-                    <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
+                    <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')" title="Institutional Flows">
                         <span class="sidebar-icon">🏛️</span>
                         <span class="sidebar-label">Institutional Flows</span>
                         <span class="sidebar-pill" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Funds</span>
@@ -284,25 +287,25 @@
                     </div>
                 </div>
 
-                <a class="sidebar-nav-item" data-tab="repeaters" onclick="app.switchTab('repeaters')">
+                <a class="sidebar-nav-item" data-tab="repeaters" onclick="app.switchTab('repeaters')" title="Quarter Repeaters AI">
                     <span class="sidebar-icon">🔁</span>
                     <span class="sidebar-label">Quarter Repeaters</span>
                     <span class="sidebar-pill" style="background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.35);">AI</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="new-additions" onclick="app.switchTab('new-additions')">
+                <a class="sidebar-nav-item" data-tab="new-additions" onclick="app.switchTab('new-additions')" title="Recent Additions & IPOs">
                     <span class="sidebar-icon">🆕</span>
                     <span class="sidebar-label">Recent Additions &amp; IPOs</span>
                     <span class="sidebar-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">NSE</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="coverage" onclick="app.switchTab('coverage')">
+                <a class="sidebar-nav-item" data-tab="coverage" onclick="app.switchTab('coverage')" title="Data Coverage Status">
                     <span class="sidebar-icon">📊</span>
                     <span class="sidebar-label">Data Coverage</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="industries" onclick="app.switchTab('industries')">
+                <a class="sidebar-nav-item" data-tab="industries" onclick="app.switchTab('industries')" title="Industries & Multiples">
                     <span class="sidebar-icon">🏭</span>
                     <span class="sidebar-label">Industries &amp; Multiples</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="patterns" onclick="app.switchTab('patterns')">
+                <a class="sidebar-nav-item" data-tab="patterns" onclick="app.switchTab('patterns')" title="Technical Patterns">
                     <span class="sidebar-icon">📐</span>
                     <span class="sidebar-label">Technical Patterns</span>
                 </a>
@@ -313,7 +316,7 @@
         <div class="sidebar-group">
             <div class="sidebar-group-title">Operations &amp; Portfolios</div>
             <div class="sidebar-group-items">
-                <a class="sidebar-nav-item" data-tab="watchlist" onclick="app.switchTab('watchlist')">
+                <a class="sidebar-nav-item" data-tab="watchlist" onclick="app.switchTab('watchlist')" title="Watchlist Hub">
                     <span class="sidebar-icon">⭐</span>
                     <span class="sidebar-label">Watchlist Hub</span>
                 </a>
@@ -343,36 +346,36 @@
     </div>
 
     <!-- 4. Sidebar Footer Utilities -->
-    <div style="padding: 0.65rem 0.85rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #050505; display: flex; flex-direction: column; gap: 0.35rem;">
+    <div class="sidebar-footer" style="padding: 0.65rem 0.85rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #050505; display: flex; flex-direction: column; gap: 0.35rem;">
 
         <!-- Rate Limits & Quotas Shortcut -->
         <a onclick="app.openCustomizerModal('ratelimits')" class="sidebar-footer-link" title="View Downstream API Quotas & Limits">
             <span style="font-size: 0.8rem;">⚡</span>
-            <span style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">API Quotas</span>
-            <span id="sidebarRateLimitPill" style="font-size: 0.65rem; color: #34d399; font-family: var(--font-mono);">Healthy</span>
+            <span class="sidebar-footer-text" style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">API Quotas</span>
+            <span class="sidebar-footer-badge" id="sidebarRateLimitPill" style="font-size: 0.65rem; color: #34d399; font-family: var(--font-mono);">Healthy</span>
         </a>
 
         <!-- Control Center Shortcut -->
         <a onclick="app.openCustomizerModal()" class="sidebar-footer-link" title="Dashboard Preferences & Settings">
             <span style="font-size: 0.8rem;">⚙️</span>
-            <span style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">Control Center</span>
-            <span style="font-size: 0.65rem; color: #71717a;">Prefs</span>
+            <span class="sidebar-footer-text" style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">Control Center</span>
+            <span class="sidebar-footer-badge" style="font-size: 0.65rem; color: #71717a;">Prefs</span>
         </a>
 
         <!-- Nexus Portal Link -->
         <a href="/portal" class="sidebar-footer-link" title="Open Nexus Portal">
             <span style="font-size: 0.8rem;">🧭</span>
-            <span style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">Nexus Portal</span>
-            <span style="font-size: 0.65rem; color: #71717a;">↗</span>
+            <span class="sidebar-footer-text" style="flex: 1; font-size: 0.75rem; color: #a1a1aa;">Nexus Portal</span>
+            <span class="sidebar-footer-badge" style="font-size: 0.65rem; color: #71717a;">↗</span>
         </a>
 
         <!-- User Badge -->
-        <div style="margin-top: 0.25rem; padding-top: 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem;">
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <div class="sidebar-user-row" style="margin-top: 0.25rem; padding-top: 0.4rem; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: space-between; font-size: 0.7rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;" title="Logged in as jatin990 (Local v1.4)">
                 <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
-                <span style="color: #ededed; font-weight: 600;">jatin990</span>
+                <span class="sidebar-user-details" style="color: #ededed; font-weight: 600;">jatin990</span>
             </div>
-            <span style="color: #71717a; font-family: var(--font-mono);">Local v1.4</span>
+            <span class="sidebar-user-details" style="color: #71717a; font-family: var(--font-mono);">Local v1.4</span>
         </div>
     </div>
 </aside>

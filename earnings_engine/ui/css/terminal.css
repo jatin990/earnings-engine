@@ -142,6 +142,12 @@
             max-width: 100vw;
             background: var(--bg);
             overflow: hidden;
+            transition: grid-template-columns 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .app-shell.sidebar-collapsed,
+        .sidebar-collapsed .app-shell {
+            grid-template-columns: 64px 1fr;
         }
 
         .app-sidebar {
@@ -156,6 +162,11 @@
             flex-direction: column;
             z-index: 50;
             overflow: hidden;
+            transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .sidebar-collapsed .app-sidebar {
+            width: 64px;
         }
 
         .sidebar-nav-scroll {
@@ -308,6 +319,120 @@
         .sidebar-footer-link:hover {
             background: rgba(255, 255, 255, 0.06);
             color: #ffffff;
+        }
+
+        /* ======================================================== */
+        /* 🖤 COLLAPSIBLE SIDEBAR RAIL (SLIM ICON-ONLY MODE) */
+        /* ======================================================== */
+        @media (min-width: 993px) {
+            .sidebar-collapsed .sidebar-workspace-text,
+            .sidebar-collapsed .sidebar-filter-wrapper,
+            .sidebar-collapsed .sidebar-group-title,
+            .sidebar-collapsed .sidebar-label,
+            .sidebar-collapsed .sidebar-pill,
+            .sidebar-collapsed .sidebar-sub-items,
+            .sidebar-collapsed .sidebar-footer-text,
+            .sidebar-collapsed .sidebar-footer-badge,
+            .sidebar-collapsed .sidebar-user-details,
+            .sidebar-collapsed #sidebarFind {
+                display: none !important;
+            }
+
+            .sidebar-collapsed .sidebar-workspace-header {
+                padding: 0.75rem 0.4rem !important;
+                justify-content: center !important;
+            }
+
+            .sidebar-collapsed .sidebar-header-actions {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 100% !important;
+            }
+
+            .sidebar-collapsed .sidebar-nav-scroll {
+                padding: 0.6rem 0.35rem !important;
+                align-items: center;
+            }
+
+            .sidebar-collapsed .sidebar-group {
+                width: 100%;
+                align-items: center;
+            }
+
+            .sidebar-collapsed .sidebar-group-items {
+                width: 100%;
+                align-items: center;
+            }
+
+            .sidebar-collapsed .sidebar-nav-item {
+                justify-content: center;
+                padding: 0.5rem 0.35rem;
+                width: 44px;
+                height: 38px;
+                margin: 0 auto;
+                position: relative;
+            }
+
+            .sidebar-collapsed .sidebar-nav-tree {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }
+
+            .sidebar-collapsed .sidebar-icon {
+                margin: 0 auto;
+                font-size: 1.05rem;
+                width: auto;
+            }
+
+            .sidebar-collapsed .sidebar-footer {
+                padding: 0.65rem 0.35rem !important;
+                align-items: center !important;
+            }
+
+            .sidebar-collapsed .sidebar-footer-link {
+                justify-content: center;
+                padding: 0.45rem 0.35rem;
+                width: 44px;
+                height: 36px;
+                margin: 0 auto;
+            }
+
+            .sidebar-collapsed .sidebar-user-row {
+                justify-content: center !important;
+                padding: 0.4rem 0 !important;
+            }
+
+            .mobile-sidebar-close {
+                display: none !important;
+            }
+        }
+
+        /* Sidebar Collapse / Expand Toggle Button */
+        .sidebar-collapse-toggle-btn {
+            background: transparent;
+            border: none;
+            color: #71717a;
+            cursor: pointer;
+            padding: 0.25rem 0.35rem;
+            font-size: 0.78rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .sidebar-collapse-toggle-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 992px) {
+            .sidebar-collapse-toggle-btn {
+                display: none !important;
+            }
         }
 
         .app-main {

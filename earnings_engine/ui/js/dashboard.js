@@ -517,6 +517,7 @@ const API_BASE = window.location.origin;
 
             async init() {
                 await this.initAuthAndPermissions();
+                this.initSidebarCollapse();
                 this.initCustomizer();
                 this.bindKeyboardShortcuts();
                 this.setupResultsKeyboardNavigation?.();
@@ -596,12 +597,73 @@ const API_BASE = window.location.origin;
                 });
             },
 
+            initSidebarCollapse() {
+                try {
+                    const isCollapsed = localStorage.getItem('ee_sidebar_collapsed') === 'true';
+                    const appShell = document.querySelector('.app-shell');
+                    const sidebar = document.getElementById('appSidebar') || document.querySelector('.app-sidebar');
+                    const collapseIcon = document.getElementById('sidebarCollapseIcon');
+                    const toggleBtn = document.getElementById('sidebarCollapseToggleBtn');
+
+                    if (isCollapsed) {
+                        document.documentElement.classList.add('sidebar-collapsed');
+                        if (appShell) appShell.classList.add('sidebar-collapsed');
+                        if (sidebar) sidebar.classList.add('sidebar-collapsed');
+                        if (collapseIcon) collapseIcon.textContent = '▶';
+                        if (toggleBtn) toggleBtn.setAttribute('title', 'Expand Sidebar ([ / Ctrl+B)');
+                    } else {
+                        document.documentElement.classList.remove('sidebar-collapsed');
+                        if (appShell) appShell.classList.remove('sidebar-collapsed');
+                        if (sidebar) sidebar.classList.remove('sidebar-collapsed');
+                        if (collapseIcon) collapseIcon.textContent = '◀';
+                        if (toggleBtn) toggleBtn.setAttribute('title', 'Collapse Sidebar ([ / Ctrl+B)');
+                    }
+                } catch (e) {
+                    console.debug('[SIDEBAR] Init collapse error:', e);
+                }
+            },
+
+            toggleSidebarCollapse(forceState = null) {
+                try {
+                    const appShell = document.querySelector('.app-shell');
+                    const sidebar = document.getElementById('appSidebar') || document.querySelector('.app-sidebar');
+                    const collapseIcon = document.getElementById('sidebarCollapseIcon');
+                    const toggleBtn = document.getElementById('sidebarCollapseToggleBtn');
+
+                    const currentlyCollapsed = document.documentElement.classList.contains('sidebar-collapsed') ||
+                        (appShell && appShell.classList.contains('sidebar-collapsed'));
+
+                    const nextCollapsed = forceState !== null ? !!forceState : !currentlyCollapsed;
+
+                    document.documentElement.classList.toggle('sidebar-collapsed', nextCollapsed);
+                    if (appShell) appShell.classList.toggle('sidebar-collapsed', nextCollapsed);
+                    if (sidebar) sidebar.classList.toggle('sidebar-collapsed', nextCollapsed);
+
+                    if (collapseIcon) collapseIcon.textContent = nextCollapsed ? '▶' : '◀';
+                    if (toggleBtn) {
+                        toggleBtn.setAttribute('title', nextCollapsed ? 'Expand Sidebar ([ / Ctrl+B)' : 'Collapse Sidebar ([ / Ctrl+B)');
+                    }
+
+                    localStorage.setItem('ee_sidebar_collapsed', nextCollapsed ? 'true' : 'false');
+
+                    // Trigger resize event so charts and responsive tables re-evaluate widths immediately
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 240);
+                } catch (e) {
+                    console.error('[SIDEBAR] Toggle collapse error:', e);
+                }
+            },
+
             bindKeyboardShortcuts() {
                 window.addEventListener('keydown', (e) => {
                     const tag = (e.target.tagName || '').toLowerCase();
                     const isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
-                    
-                    if (e.key === '/' && !isInput) {
+
+                    if (!isInput && (e.key === '[' || ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')))) {
+                        e.preventDefault();
+                        this.toggleSidebarCollapse();
+                    } else if (e.key === '/' && !isInput) {
                         e.preventDefault();
                         const searchEl = document.getElementById('tickerSearch');
                         if (searchEl) {
